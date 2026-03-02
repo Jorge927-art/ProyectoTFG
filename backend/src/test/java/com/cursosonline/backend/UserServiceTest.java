@@ -9,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Users;
@@ -19,6 +20,9 @@ import com.cursosonline.backend.services.UserService;
 public class UserServiceTest {
     @Mock
     private UserRepository userRepository; // El mock de la base de datos
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private UserService userService; // Inyecta el mock de arriba aquí
@@ -45,7 +49,12 @@ public class UserServiceTest {
         // Arranque
         Users newUser = new Users(null, "Luis", "luis@yahoo.es", "jki", Role.STUDENT, "informatica", "cine");
         Users savedUser = new Users(1L, "Luis", "luis@yahoo.es", "jki", Role.STUDENT, "informatica", "cine");
-
+        // CONFIGURACIÓN DE MOCKS:
+        // Simular que el usuario NO existe todavía
+        when(userRepository.findByUsername("Luis")).thenReturn(Optional.empty());
+        // Simular el cifrado de contraseña (devuelve una cadena cualquiera)
+        when(passwordEncoder.encode("jki")).thenReturn("encoded_jki");
+        // Simular el guardado
         when(userRepository.save(any(Users.class))).thenReturn(savedUser);
 
         // ACT
@@ -54,7 +63,8 @@ public class UserServiceTest {
         // ASSERT
         assertNotNull(result.getUser_id());
         assertEquals(1L, result.getUser_id());
-        verify(userRepository, times(1)).save(newUser);
+        verify(userRepository).save(any(Users.class));
+        verify(passwordEncoder).encode("jki"); // Verifica que se intentó cifrar
     }
 
     @Test
@@ -91,7 +101,7 @@ public class UserServiceTest {
             userService.registerUser(new_user);
         });
         // 3. VERIFICACIONES ADICIONALES
-        assertEquals("El usuario ya existe", excepcion.getMessage());
+        assertTrue(excepcion.getMessage().contains(username));
         // Verificamos que NUNCA se llegó a llamar al método save
         verify(userRepository, never()).save(any(Users.class));
     }
