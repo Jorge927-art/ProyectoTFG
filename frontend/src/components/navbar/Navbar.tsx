@@ -20,7 +20,7 @@ const Navbar = () => {
                     </div>
 
                     <div className="flex justify-center items-center font-bold text-gray-600">
-                        <span className="text-4xl">Cursos OnLine Educativos</span>
+                        <span className="text-3xl">Cursos OnLine Educativos</span>
                     </div>
 
                     <div className="flex justify-end gap-2">
