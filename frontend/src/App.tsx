@@ -1,29 +1,33 @@
-import { useState, useEffect } from 'react'
+import Navbar from "./components/navbar/Navbar.tsx";
+import GenericHeader from './components/UI/GenericHeader.tsx';
 
-function App() {
-  const [mensaje, setMensaje] = useState("Esperando al Backend...");
-
-  useEffect(() => {
-    fetch('http://localhost:8080/api/prueba')
-      .then(response => {
-        if (response.ok) return response.json();
-        throw new Error("Error 404: Ruta no encontrada");
-      })
-      .then(data => setMensaje(data.mensaje)) // Si conecta, cambia el texto
-      .catch(error => setMensaje("Error: " + error.message));
-  }, []);
-
+function App(){
   return (
-    <div style={{ textAlign: 'center', marginTop: '50px' }}>
-      <h1>Proyecto TFG: Conexión Full-Stack</h1>
-      <div className="card">
-        <p style={{ fontSize: '1.5rem', color: '#646cff' }}>
-          Estado: <strong>{mensaje}</strong>
-        </p>
+    <div className="min-h-screen bg-slate-50">
+
+      <Navbar/>
+
+      <main className="pt-24 px-6 max-w-7xl mx-auto">
+          <header className="text-center pt-0 pb-10">
+            <h1 className="text-4xl font-bold text-blue-500 mb-2 mt-0">
+              COLE
+            </h1>
+          </header>
+
+          <GenericHeader
+              title="Estudios en linea" 
+              subtitle="bla,bla,bla......"
+              imageSrc="/futuristic-cyborg-with-robotic-arm-stands-illuminated-night-generated-by-ai.jpg"
+              imageAlt="Imagen de desarrollo web"
+              />
+              
+        </main>
+
+        <footer className="py-10 text-center text-slate-400 text-sm">
+          &copy; 2026 Proyecto TFG
+        </footer>
       </div>
-      <p>Java 21 + Spring Boot 3.4.2 + React/Vite</p>
-    </div>
-  )
+  );
 }
 
-export default App
+export default App;
