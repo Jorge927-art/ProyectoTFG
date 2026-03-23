@@ -11,8 +11,5 @@ public interface UserRepository extends JpaRepository<Users, Long> {
     // Método para buscar por nombre de usuario (útil para el login)
     Optional<Users> findByUsername(String username);
 
-    // Método para buscar por email
-    Optional<Users> findByEmail(String email);
-
-    // Podrías añadir métodos para filtrar por rol (ADMIN, PROFESSOR, STUDENT)
+    // Se pueden añadir métodos para filtrar por rol (ADMIN, PROFESSOR, STUDENT)
 }

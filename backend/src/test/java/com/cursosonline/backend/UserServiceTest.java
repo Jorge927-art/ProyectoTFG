@@ -31,8 +31,7 @@ public class UserServiceTest {
     void findByUsername_DebeRetornarUsuario_CuandoExiste() {
         // 1. ARRANGE (Preparar el escenario)
         String username = "Luis";
-        Users expectedUser = new Users(1L, "Luis", "luis@yahoo.es",
-                "jki", Role.STUDENT, "informatica", "cine");
+        Users expectedUser = new Users(1L, "Luis", "jki", Role.STUDENT);
         // Configuramos el mock: "Cuando llamen a findById(1), devuelve este usuario"
         // Simulamos el repositorio
         when(userRepository.findByUsername("Luis")).thenReturn(Optional.of(expectedUser));
@@ -47,8 +46,8 @@ public class UserServiceTest {
     @Test
     void assignUser() {
         // Arranque
-        Users newUser = new Users(null, "Luis", "luis@yahoo.es", "jki", Role.STUDENT, "informatica", "cine");
-        Users savedUser = new Users(1L, "Luis", "luis@yahoo.es", "jki", Role.STUDENT, "informatica", "cine");
+        Users newUser = new Users(null, "Luis", "jki", Role.STUDENT);
+        Users savedUser = new Users(1L, "Luis", "jki", Role.STUDENT);
         // CONFIGURACIÓN DE MOCKS:
         // Simular que el usuario NO existe todavía
         when(userRepository.findByUsername("Luis")).thenReturn(Optional.empty());
@@ -90,8 +89,8 @@ public class UserServiceTest {
     void registerUser_DebeLanzarExcepcion_CuandoElNombreDeUsuarioYaExiste() {
         // 1. ARRANGE
         String username = "Luis";
-        Users new_user = new Users(null, username, "email@test.com", "frgt", Role.STUDENT, "biologia", "musica");
-        Users existing_user = new Users(1L, username, "otro@email.com", "frgt", Role.STUDENT, "biologia", "musica");
+        Users new_user = new Users(null, username, "frgt", Role.STUDENT);
+        Users existing_user = new Users(1L, username, "frgt", Role.STUDENT);
 
         // Simulamos que el repositorio SÍ encuentra a alguien con ese nombre
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(existing_user));

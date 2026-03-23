@@ -1,5 +1,6 @@
 package com.cursosonline.backend.services;
 
+import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.exception.ServicesException;
 import com.cursosonline.backend.exception.UserAlreadyExistsException;
@@ -32,37 +33,41 @@ public class UserService {
 
     /**
      * Registra un nuevo usuario en la plataforma.
-     * Aquí se podría incluir lógica de cifrado de contraseñas.
+     * Incluir lógica de cifrado de contraseñas.
      */
     @Transactional
     public Users registerUser(Users user) {
+        System.out.println("DEBUG - Usuario recibido: " + user.getUsername());
+        System.out.println("DEBUG - Password recibido: " + user.getPassword());
         if (userRepository.findByUsername(user.getUsername()).isPresent()) {
             throw new UserAlreadyExistsException(user.getUsername());
         }
 
-        // 2. Cifrar la contraseña
+        // Cifrar la contraseña
         // Obtenemos la clave en texto plano, la ciframos y la seteamos de nuevo
         String encodedPassword = passwordEncoder.encode(user.getPassword());
         user.setPassword(encodedPassword);
 
-        // 3. Guardar el usuario con la contraseña ya protegida
-        // Lógica adicional: verificar si el email ya existe, etc.
+        // Rol de student por defecto
+        user.setRole(Role.STUDENT);
+
+        // Guardar el usuario con la contraseña ya protegida
         return userRepository.save(user);
     }
 
     @Transactional(readOnly = true)
     public Users login(String username, String rawPassword) {
-        // 1. Buscar al usuario por nombre de usuario
+        // Buscar al usuario por nombre de usuario
         Users user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ServicesException("Usuario no encontrado"));
 
-        // 2. Verificar si la contraseña ingresada coincide con la cifrada en BD
+        // Verificar si la contraseña ingresada coincide con la cifrada en BD
         // El método matches recibe: (contraseñaPlana, contraseñaCifrada)
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
             throw new ServicesException("Contraseña incorrecta");
         }
 
-        // 3. Si coincide, retornar el usuario (o generar un token JWT/Sesión)
+        // Si coincide, retornar el usuario (o generar un token JWT/Sesión)
         return user;
     }
 
@@ -72,17 +77,6 @@ public class UserService {
     @Transactional(readOnly = true)
     public List<Users> getAllUsers() {
         return userRepository.findAll();
-    }
-
-    /**
-     * Lógica preliminar para el sistema de recomendación.
-     * Obtiene el perfil y los intereses del estudiante para ser procesados.
-     */
-    @Transactional(readOnly = true)
-    public String getUserInterests(Long userId) {
-        return userRepository.findById(userId)
-                .map(Users::getInterests)
-                .orElse("");
     }
 
 }

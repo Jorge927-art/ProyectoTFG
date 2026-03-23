@@ -19,18 +19,11 @@ public class Users {
     @Column(nullable = false, unique = true)
     private String username;
 
-    @Column(nullable = false, unique = true)
-    private String email;
-
     @Column(nullable = false)
     private String password;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role; // Enum para: ADMIN, PROFESSOR, STUDENT
-
-    // Campos adicionales para el perfil y recomendaciones
-    private String interests;
-    private String bio;
 
 }

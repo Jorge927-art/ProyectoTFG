@@ -14,8 +14,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.springframework.security.config.Customizer.withDefaults;
-
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -23,22 +21,23 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // 1. Integrar CORS en la cadena de seguridad
+                // Integrar CORS en la cadena de seguridad
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable()) // Deshabilitado para facilitar el desarrollo con APIs REST
                 .authorizeHttpRequests(auth -> auth
-                        // 2. Control de acceso por perfiles según los requisitos
+                        // Control de acceso por perfiles según los requisitos
                         .requestMatchers("/api/auth/**").permitAll() // Permitir login y registro
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/profesor/**").hasRole("PROFESSOR")
-                        .requestMatchers("/api/estudiante/**").hasRole("STUDENT")
+                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
+                        .requestMatchers("/api/profesor/**").hasAuthority("PROFESSOR")
+                        .requestMatchers("/api/estudiante/**").hasAuthority("STUDENT")
                         .anyRequest().authenticated())
-                .httpBasic(withDefaults());// O el método de autenticación que prefieras (JWT, etc.)
+                .formLogin(form -> form.disable())
+                .httpBasic(basic -> basic.disable());
 
         return http.build();
     }
 
-    // 3. Definición de la fuente de configuración CORS
+    // Definición de la fuente de configuración CORS
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
@@ -52,7 +51,7 @@ public class SecurityConfig {
         return source;
     }
 
-    // 4. Contraseñas encriptadas
+    // Contraseñas encriptadas
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X } from 'lucide-react';
 import Input from "../Input"; 
+import axios from 'axios';
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -15,7 +16,6 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView }: AuthModalPr
     const [formData, setFormData] = useState(initialFormState);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-    const [uniqueId] = useState(() => crypto.randomUUID().substring(0, 8));
 
     if (!isOpen) return null;
 
@@ -42,23 +42,35 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView }: AuthModalPr
 
         setLoading(true);
         try {
-            const endpoint = isLoginView ? "/api/login" : "/api/register";
-            console.log(`Enviando a ${endpoint}:`, formData);
-            // Simulación de API
-            setTimeout(() => {
-                setLoading(false);
-                handleClose();
-            }, 1000);
-        } catch {
-            setError("Error de conexión con el servidor");
-            setLoading(false);
+            const endpoint = isLoginView ? "/api/auth/login" : "/api/auth/register";
+            const response = await axios.post(`http://localhost:8080${endpoint}`, formData);
+            console.log("Usuario registrado:", response.data);
+            if (response.status === 200) {
+                //Guardar los datos del usuario en el navegador (para que no se pierdan al refrescar)
+                localStorage.setItem('user', JSON.stringify(response.data));
+    
+                //Cerrar el modal o redirigir
+                console.log("¡Bienvenido, " + response.data.username + "!");
+    
+                // Opcional: recargar la página para que el header cambie "Login" por "Cerrar Sesión"
+                window.location.reload(); 
+            }
+          
+        } catch(error) {
+            let message = "Error de conexion con el servidor";
+            if(axios.isAxiosError(error)) {
+                message = error.response?.data || message;
+            }
+            setError(message);          
+        } finally{
+              setLoading(false);
         }
     };
 
     return (
         <div 
             onClick={handleClose} 
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] backdrop-blur-sm"
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm"
         >
             <div 
                 onClick={(e) => e.stopPropagation()}
@@ -87,21 +99,21 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView }: AuthModalPr
                     className="flex flex-col gap-4">
                     {/* USANDO EL INPUT GENÉRICO */}
                     <Input
-                        name={isLoginView ? "username" : `user_${uniqueId}`}
+                        name="username"
                         type="text"
                         placeholder="Nombre de usuario"
                         value={formData.username}
                         onChange={handleChange}
-                        autoComplete={isLoginView ? "username" : "off"}
+                        autoComplete="off"
                         required
                     />
                     <Input
-                        name={isLoginView ? "password" : `pass_${uniqueId}`}
+                        name="password"
                         type="password"
                         placeholder="Contraseña"
                         value={formData.password}
                         onChange={handleChange}
-                        autoComplete={isLoginView ? "current-password" : "new-password"}
+                        autoComplete="new-password"
                         required
                     />
                     <button 
