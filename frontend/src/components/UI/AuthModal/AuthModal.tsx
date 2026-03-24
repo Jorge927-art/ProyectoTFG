@@ -3,6 +3,14 @@ import { X } from 'lucide-react';
 import Input from "../Input"; 
 import axios from 'axios';
 
+/**
+ * Componente AuthModal que muestra un modal de autenticación para iniciar sesión o registrarse.
+ * Permite a los usuarios ingresar su nombre de usuario y contraseña, y maneja la lógica de autenticación.
+ * @param isOpen - Indica si el modal está abierto o cerrado.
+ * @param onClose - Función para cerrar el modal.
+ * @param isLoginView - Indica si se muestra la vista de inicio de sesión o registro.
+ * @param setIsLoginView - Función para cambiar entre la vista de inicio de sesión y registro.
+ */
 interface AuthModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -46,13 +54,8 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView }: AuthModalPr
             const response = await axios.post(`http://localhost:8080${endpoint}`, formData);
             console.log("Usuario registrado:", response.data);
             if (response.status === 200) {
-                //Guardar los datos del usuario en el navegador (para que no se pierdan al refrescar)
                 localStorage.setItem('user', JSON.stringify(response.data));
-    
-                //Cerrar el modal o redirigir
                 console.log("¡Bienvenido, " + response.data.username + "!");
-    
-                // Opcional: recargar la página para que el header cambie "Login" por "Cerrar Sesión"
                 window.location.reload(); 
             }
           

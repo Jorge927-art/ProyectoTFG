@@ -3,6 +3,11 @@ import { Home, Search, LogIn } from 'lucide-react';
 import GenericButton from "../UI/GenericButton/GenericButton";
 import AuthModal from "../UI/AuthModal/AuthModal"; 
 
+/**
+ * Componente Navbar que contiene la barra de navegación principal de la aplicación.
+ * Incluye botones para ir al inicio, buscar y abrir el modal de autenticación.
+ * @returns 
+ */
 const Navbar = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoginView, setIsLoginView] = useState(true);
@@ -43,7 +48,7 @@ const Navbar = () => {
             </nav>
 
             {/* Inyectamos el Modal separado */}
-            <AuthModal 
+            <AuthModal
                 isOpen={isModalOpen} 
                 onClose={() => setIsModalOpen(false)} 
                 isLoginView={isLoginView}

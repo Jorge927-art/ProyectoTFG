@@ -2,12 +2,15 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AuthModal from './AuthModal';
 
+/**
+ * Pruebas unitarias para el componente AuthModal que verifica su comportamiento en diferentes escenarios.
+ * Se prueba que el modal no se renderice cuando isOpen es false, que cambie entre Login y Registro,
+ * que muestre errores de validación, que maneje el estado de carga correctamente y que se cierre al hacer clic en el botón X.
+ */
 describe('AuthModal', () => {
-    // Mocks de las funciones que vienen por props
     const mockOnClose = vi.fn();
     const mockSetIsLoginView = vi.fn();
 
-    // Limpiamos los mocks antes de cada test para que no se acumulen los clics
     beforeEach(() => {
         vi.clearAllMocks();
     });
@@ -27,7 +30,6 @@ describe('AuthModal', () => {
         const switchButton = screen.getByText(/Regístrate aquí/i);
         fireEvent.click(switchButton);
 
-        // Verificamos que se llamó a la función para cambiar la vista
         expect(mockSetIsLoginView).toHaveBeenCalledWith(false);
     });
 
@@ -39,15 +41,12 @@ describe('AuthModal', () => {
     const passInput = screen.getByPlaceholderText(/Contraseña/i);
     const userInput = screen.getByPlaceholderText(/Nombre de usuario/i);
 
-    // 1. Llenamos AMBOS campos (por si el 'required' del navegador bloquea el submit)
     fireEvent.change(userInput, { target: { value: 'usuario_test' } });
     fireEvent.change(passInput, { target: { value: '123' } });
     
-    // 2. Buscamos el botón y lo pulsamos
     const submitButton = screen.getByRole('button', { name: /Entrar/i });
     fireEvent.click(submitButton);
 
-    // 3. Usamos una función buscadora flexible por si el texto está dividido en etiquetas
     const errorMessage = await screen.findByText((content) => {
         return content.includes("mínimo") || content.includes("6 caracteres");
     });
@@ -65,17 +64,14 @@ describe('AuthModal', () => {
         const userInput = screen.getByPlaceholderText(/Nombre de usuario/i);
         const submitButton = screen.getByRole('button', { name: /Entrar/i });
 
-        // Llenamos datos válidos
         fireEvent.change(userInput, { target: { value: 'testuser' } });
         fireEvent.change(passInput, { target: { value: '123456' } });
         
         fireEvent.click(submitButton);
 
-        // Verificamos estado de carga
         expect(screen.getByText(/Procesando.../i)).toBeInTheDocument();
         expect(submitButton).toBeDisabled();
 
-        // Esperamos a que la simulación del setTimeout termine (handleClose se llama tras 1s)
         await waitFor(() => expect(mockOnClose).toHaveBeenCalled(), { timeout: 1500 });
     });
 

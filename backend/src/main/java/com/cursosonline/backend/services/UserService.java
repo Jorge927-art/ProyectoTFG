@@ -14,17 +14,25 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+/**
+ * Servicio que maneja la lógica de negocio relacionada con los usuarios de la
+ * plataforma. Incluye métodos para registrar nuevos usuarios, realizar login y
+ * obtener la lista de usuarios registrados. Utiliza UserRepository para
+ * interactuar con la base de datos y PasswordEncoder para cifrar las
+ * contraseñas.
+ */
 @Service
-@RequiredArgsConstructor // Genera el constructor para la inyección de dependencias (Lombok)
+@RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
-
     private final PasswordEncoder passwordEncoder;
 
     /**
      * Busca un usuario por su nombre de usuario.
-     * Útil para el proceso de autenticación en el frontend.
+     * 
+     * @param username
+     * @return
      */
     @Transactional(readOnly = true) // optimización para lecturas
     public Optional<Users> findByUsername(String username) {
@@ -33,7 +41,11 @@ public class UserService {
 
     /**
      * Registra un nuevo usuario en la plataforma.
-     * Incluir lógica de cifrado de contraseñas.
+     * Verifica que el nombre de usuario no exista previamente, cifra la contraseña
+     * y asigna el rol de student por defecto.
+     * 
+     * @param user
+     * @return
      */
     @Transactional
     public Users registerUser(Users user) {
@@ -42,37 +54,33 @@ public class UserService {
         if (userRepository.findByUsername(user.getUsername()).isPresent()) {
             throw new UserAlreadyExistsException(user.getUsername());
         }
-
-        // Cifrar la contraseña
-        // Obtenemos la clave en texto plano, la ciframos y la seteamos de nuevo
         String encodedPassword = passwordEncoder.encode(user.getPassword());
         user.setPassword(encodedPassword);
-
-        // Rol de student por defecto
         user.setRole(Role.STUDENT);
-
-        // Guardar el usuario con la contraseña ya protegida
         return userRepository.save(user);
     }
 
+    /**
+     * Realiza el proceso de login verificando el nombre de usuario y la contraseña.
+     * 
+     * @param username
+     * @param rawPassword
+     * @return
+     */
     @Transactional(readOnly = true)
     public Users login(String username, String rawPassword) {
-        // Buscar al usuario por nombre de usuario
         Users user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ServicesException("Usuario no encontrado"));
-
-        // Verificar si la contraseña ingresada coincide con la cifrada en BD
-        // El método matches recibe: (contraseñaPlana, contraseñaCifrada)
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
             throw new ServicesException("Contraseña incorrecta");
         }
-
-        // Si coincide, retornar el usuario (o generar un token JWT/Sesión)
         return user;
     }
 
     /**
-     * Obtiene todos los usuarios, útil para el dashboard del Administrador.
+     * Obtiene una lista de todos los usuarios registrados en la plataforma.
+     * 
+     * @return
      */
     @Transactional(readOnly = true)
     public List<Users> getAllUsers() {

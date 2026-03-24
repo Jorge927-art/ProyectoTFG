@@ -7,6 +7,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.Map;
 
+/**
+ * Controlador de prueba para verificar la conexión entre el frontend
+ * (React/Vite) y el backend (Spring Boot).
+ * Contiene un endpoint GET /api/prueba que devuelve un mensaje de confirmación.
+ */
 @RestController
 @RequestMapping("/api")
 public class TestController {

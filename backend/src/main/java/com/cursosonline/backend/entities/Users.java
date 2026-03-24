@@ -11,6 +11,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor // Constructor vacío para JPA
 @AllArgsConstructor // Constructor con todos los campos
 
+/**
+ * Entidad que representa a los usuarios de la plataforma.
+ * Contiene campos para el ID, nombre de usuario, contraseña, rol y correo
+ * electrónico.
+ */
 public class Users {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

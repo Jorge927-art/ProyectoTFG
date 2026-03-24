@@ -10,17 +10,26 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@RestController // Define que esta clase es un controlador REST
-@RequestMapping("/api/auth") // Ruta base para todos los endpoints de usuarios
-@RequiredArgsConstructor // Inyección de dependencias mediante Lombok
-@CrossOrigin(origins = "http://localhost:5173") // Permite la conexión con React+Vite
+@RestController
+@RequestMapping("/api/auth")
+@RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:5173")
 
+/**
+ * Controlador REST que maneja las solicitudes relacionadas con la autenticación
+ * y gestión de usuarios.
+ * Proporciona endpoints para el registro de nuevos usuarios, login y obtención
+ * del perfil de usuario. Utiliza UserService para delegar la lógica de negocio
+ * y ResponseEntity para construir las respuestas HTTP adecuadas.
+ */
 public class UserController {
     private final UserService userService;
 
     /**
      * Endpoint para obtener el perfil de un usuario.
-     * Permite al estudiante ver sus intereses y recomendaciones.
+     * 
+     * @param username
+     * @return
      */
     @GetMapping("/{username}")
     public ResponseEntity<Users> getUserProfile(@PathVariable String username) {
@@ -30,14 +39,22 @@ public class UserController {
     }
 
     /**
-     * Endpoint para registrar nuevos usuarios.
-     * Fundamental para la inscripción de estudiantes y profesores.
+     * Endpoint para el registro de nuevos usuarios.
+     * 
+     * @param user
+     * @return
      */
     @PostMapping("/register")
     public ResponseEntity<Users> register(@RequestBody Users user) {
         return ResponseEntity.ok(userService.registerUser(user));
     }
 
+    /**
+     * Endpoint para el login de usuarios.
+     * 
+     * @param loginRequest
+     * @return
+     */
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Users loginRequest) {
         try {
@@ -54,8 +71,10 @@ public class UserController {
     }
 
     /**
-     * Endpoint para el Administrador.
-     * Permite la gestión global de todos los usuarios de la plataforma.
+     * Endpoint para obtener la lista de todos los usuarios (solo para
+     * Administrador).
+     * 
+     * @return
      */
     @GetMapping
     public ResponseEntity<List<Users>> listAllUsers() {

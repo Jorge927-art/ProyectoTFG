@@ -1,4 +1,9 @@
 
+/**
+ * Componente GenericHeader que muestra un encabezado genérico con un título, subtítulo y una imagen.
+ * Se puede reutilizar en diferentes partes de la aplicación para mostrar información destacada.
+ * @param title - El título principal del encabezado.
+ */
 interface GenericHeaderProps{
     title: string;
     subtitle?: string;
