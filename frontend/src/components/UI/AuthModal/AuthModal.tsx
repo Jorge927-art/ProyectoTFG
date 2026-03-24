@@ -53,17 +53,23 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView }: AuthModalPr
             const endpoint = isLoginView ? "/api/auth/login" : "/api/auth/register";
             const response = await axios.post(`http://localhost:8080${endpoint}`, formData);
             console.log("Usuario registrado:", response.data);
-            if (response.status === 200) {
+            if (response.status === 200 || response.status === 201) {
                 localStorage.setItem('user', JSON.stringify(response.data));
-                console.log("¡Bienvenido, " + response.data.username + "!");
                 window.location.reload(); 
             }
           
         } catch(error) {
             let message = "Error de conexion con el servidor";
             if(axios.isAxiosError(error)) {
-                message = error.response?.data || message;
+                const ServerResponse = error.response?.data;
+            if (typeof ServerResponse === 'string') {
+                message = ServerResponse;
+            } else if(ServerResponse?.message){
+                message = ServerResponse.message;
+            } else if(error.request?.status === 409) {
+                message = "El nombre de usuario ya existe";
             }
+        }
             setError(message);          
         } finally{
               setLoading(false);
