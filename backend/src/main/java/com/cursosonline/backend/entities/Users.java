@@ -26,4 +26,7 @@ public class Users {
     @Column(nullable = false)
     private Role role; // Enum para: ADMIN, PROFESSOR, STUDENT
 
+    @Column(name = "email", nullable = true)
+    private String email;
+
 }
