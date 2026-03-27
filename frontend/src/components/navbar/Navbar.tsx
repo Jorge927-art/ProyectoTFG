@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Home, Search, LogIn } from 'lucide-react';
 import GenericButton from "../UI/GenericButton/GenericButton";
-import AuthModal from "../UI/AuthModal/AuthModal"; 
+import AuthModal from "../UI/AuthModal/AuthModal";
 
 /**
  * Componente Navbar que contiene la barra de navegación principal de la aplicación.
@@ -25,14 +25,14 @@ const Navbar = () => {
                     </div>
 
                     <div className="flex justify-center items-center font-bold text-gray-600">
-                        <span className="text-3xl">Cursos OnLine Educativos</span>
+                        <span className="text-3xl">GESTIÓN DE CURSOS ONLINE</span>
                     </div>
 
                     <div className="flex justify-end gap-2">
                         <GenericButton
                             variant="search"
                             icon={<Search size={20} className="text-gray-500" />}
-                            onClick={() => console.log("Buscando...")} 
+                            onClick={() => console.log("Buscando...")}
                         />
 
                         <GenericButton
@@ -41,7 +41,7 @@ const Navbar = () => {
                             onClick={() => {
                                 setIsLoginView(true); // Por defecto abrir en Login
                                 setIsModalOpen(true);
-                            }} 
+                            }}
                         />
                     </div>
                 </div>
@@ -49,8 +49,8 @@ const Navbar = () => {
 
             {/* Inyectamos el Modal separado */}
             <AuthModal
-                isOpen={isModalOpen} 
-                onClose={() => setIsModalOpen(false)} 
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
                 isLoginView={isLoginView}
                 setIsLoginView={setIsLoginView}
             />
