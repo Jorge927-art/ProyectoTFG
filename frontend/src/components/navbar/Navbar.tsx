@@ -30,6 +30,7 @@ const Navbar = () => {
 
                     <div className="flex justify-end gap-2">
                         <GenericButton
+                            text="¿Qué deseas aprender?"
                             variant="search"
                             icon={<Search size={20} className="text-gray-500" />}
                             onClick={() => console.log("Buscando...")}
