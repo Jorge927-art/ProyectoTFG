@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Home, Search, LogIn } from 'lucide-react';
-import GenericButton from "../UI/GenericButton/GenericButton";
-import AuthModal from "../UI/AuthModal/AuthModal";
+import GenericButton from "../UI/genericButton/GenericButton";
+import AuthModal from "../UI/authModal/AuthModal";
 
 /**
  * Componente Navbar que contiene la barra de navegación principal de la aplicación.

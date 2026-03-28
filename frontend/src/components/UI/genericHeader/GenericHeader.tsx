@@ -4,9 +4,9 @@ interface GenericHeaderProps {
     title: string;
     subtitle?: string;
     description?: React.ReactNode;
-    imageSrc: string;
-    imageAlt: string;
-
+    imageSrc?: string;
+    imageAlt?: string;
+    icon?: React.ReactNode;
     // --- Personalización de Colores (Clases Tailwind) ---
     bgColor?: string;      // ej: 'bg-blue-700'
     titleColor?: string;   // ej: 'text-white'
@@ -21,6 +21,10 @@ interface GenericHeaderProps {
     textPadding?: string;
     /** Clases adicionales para el contenedor (ej: 'py-0', 'border-b') */
     containerClass?: string;
+    /** Tamaños de texto (ej: 'text-4xl md:text-7xl lg:text-8xl' para el título, 'text-lg md:text-2xl' para la descripción) */
+    titleSize?: string; // ej: 'text-4xl md:text-7xl lg:text-8xl'
+    /** Tamaños de texto (ej: 'text-lg md:text-2xl' para la descripción) */
+    descriptionSize?: string; // ej: 'text-lg md:text-2xl'
 }
 
 const GenericHeader = ({
@@ -29,14 +33,18 @@ const GenericHeader = ({
     description,
     imageSrc,
     imageAlt,
-    bgColor = "bg-blue-700",
-    titleColor = "text-white",
-    subtitleColor = "text-blue-300",
-    descriptionColor = "text-blue-100",
-    align = 'left',
-    imageMinHeight = "min-h-100", // Corregido según la sugerencia del linter
-    textPadding = "p-10 md:p-24",
-    containerClass = ""
+    icon,
+    bgColor,
+    titleColor,
+    subtitleColor,
+    descriptionColor,
+    align = 'center',
+    imageMinHeight,
+    textPadding,
+    containerClass = "",
+    titleSize,
+    descriptionSize
+
 }: GenericHeaderProps) => {
 
     // Lógica de dirección (Horizontal en desktop, vertical en móvil)
@@ -53,29 +61,34 @@ const GenericHeader = ({
                 {/* LADO TEXTO */}
                 <div className={`flex-1 flex flex-col justify-center ${textPadding}`}>
                     {subtitle && (
-                        <span className={`text-sm font-bold uppercase tracking-[0.2em] mb-4 ${subtitleColor}`}>
+                        <span className={`mt-6 font-medium leading-relaxed ${descriptionSize} ${subtitleColor}`}>
                             {subtitle}
                         </span>
                     )}
-                    <h1 className={`font-black leading-[1.1] text-4xl md:text-7xl lg:text-8xl ${titleColor}`}>
-                        {title}
-                    </h1>
+                    {/* Título con posible ícono */}
+                    <div className="flex items-center gap-4 ${align === 'center' ? 'justify-center' : ''}">
+                        {icon && <div className={titleColor}>{icon}</div>}
+                        <h1 className={`font-black leading-[1.1] ${titleSize} ${titleColor}`}>
+                            {title}
+                        </h1>
+                    </div>
                     {description && (
-                        <div className={`mt-8 text-lg md:text-2xl font-medium ${descriptionColor}`}>
+                        <div className={`mt-8 text-lg md:text-xl font-medium leading-relaxed ${descriptionColor}`}>
                             {description}
                         </div>
                     )}
                 </div>
 
                 {/* LADO IMAGEN: Sin efectos, plana y ajustable */}
-                <div className={`flex-1 relative ${imageMinHeight}`}>
-                    <img
-                        src={imageSrc}
-                        alt={imageAlt}
-                        className="absolute inset-0 w-full h-full object-cover shadow-none border-none rounded-none"
-                    />
-                </div>
-
+                {imageSrc && (
+                    <div className={`flex-1 relative ${imageMinHeight}`}>
+                        <img
+                            src={imageSrc}
+                            alt={imageAlt}
+                            className="absolute inset-0 w-full h-full object-cover shadow-none border-none rounded-none"
+                        />
+                    </div>
+                )}
             </div>
         </header>
     );
