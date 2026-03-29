@@ -1,5 +1,9 @@
 import React from 'react';
 
+/**
+ * GenericHeader es un componente de encabezado versátil y personalizable que se adapta a diversas necesidades de diseño.
+ * Permite mostrar un título, subtítulo, descripción y una imagen opcional, con una amplia gama de opciones de personalización.
+ */
 interface GenericHeaderProps {
     title: string;
     subtitle?: string;
@@ -32,26 +36,32 @@ const GenericHeader = ({
     subtitle,
     description,
     imageSrc,
-    imageAlt,
+    imageAlt = "Imagen",
     icon,
-    bgColor,
-    titleColor,
-    subtitleColor,
-    descriptionColor,
-    align = 'center',
-    imageMinHeight,
-    textPadding,
+    bgColor = "",
+    titleColor = "",
+    subtitleColor = "",
+    descriptionColor = "",
+    align = 'left',
+    imageMinHeight = "",
+    textPadding = "",
     containerClass = "",
-    titleSize,
-    descriptionSize
+    titleSize = "text-2xl md:text-4xl",
+    descriptionSize = "text-sm md:text-base"
 
 }: GenericHeaderProps) => {
 
     // Lógica de dirección (Horizontal en desktop, vertical en móvil)
     const directionMap = {
-        left: "md:flex-row text-left",
-        center: "flex-col text-center",
-        right: "md:flex-row-reverse text-right"
+        left: "md:flex-row",
+        center: "flex-col",
+        right: "md:flex-row-reverse"
+    };
+
+    const itemsAlign = {
+        left: "items-start text-left",
+        center: "items-center text-center",
+        right: "items-start text-left" // <--- FORZAMOS que en el testimonio derecho el texto siga a la izquierda
     };
 
     return (
@@ -59,21 +69,21 @@ const GenericHeader = ({
             <div className={`flex flex-col ${directionMap[align]} items-stretch w-full`}>
 
                 {/* LADO TEXTO */}
-                <div className={`flex-1 flex flex-col justify-center ${textPadding}`}>
+                <div className={`flex-1 flex flex-col justify-center ${textPadding} ${itemsAlign[align]}`}>
                     {subtitle && (
-                        <span className={`mt-6 font-medium leading-relaxed ${descriptionSize} ${subtitleColor}`}>
+                        <span className={`font-bold tracking-tight mb-2 ${descriptionSize} ${subtitleColor}`}>
                             {subtitle}
                         </span>
                     )}
                     {/* Título con posible ícono */}
-                    <div className="flex items-center gap-4 ${align === 'center' ? 'justify-center' : ''}">
+                    <div className={`flex items-center gap-4 ${align === 'center' ? 'justify-center' : ''}`}>
                         {icon && <div className={titleColor}>{icon}</div>}
                         <h1 className={`font-black leading-[1.1] ${titleSize} ${titleColor}`}>
                             {title}
                         </h1>
                     </div>
                     {description && (
-                        <div className={`mt-8 text-lg md:text-xl font-medium leading-relaxed ${descriptionColor}`}>
+                        <div className={`mt-4 font-medium leading-relaxed ${descriptionColor} ${descriptionSize}`}>
                             {description}
                         </div>
                     )}
@@ -81,11 +91,11 @@ const GenericHeader = ({
 
                 {/* LADO IMAGEN: Sin efectos, plana y ajustable */}
                 {imageSrc && (
-                    <div className={`flex-1 relative ${imageMinHeight}`}>
+                    <div className={`flex-1 flex items-center justify-center bg-slate-50 ${imageMinHeight}`}>
                         <img
                             src={imageSrc}
                             alt={imageAlt}
-                            className="absolute inset-0 w-full h-full object-cover shadow-none border-none rounded-none"
+                            className="w-full h-full object-cover"
                         />
                     </div>
                 )}
