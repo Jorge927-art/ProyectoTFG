@@ -12,8 +12,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor // Constructor con todos los campos
 /**
  * Entidad que representa a los cursos disponibles en la plataforma.
- * Contiene campos para el ID, título, URL, introducción, categoría, 
- * subcategoría, tipo de curso, idioma, idiomas de subtítulos, habilidades, 
+ * Contiene campos para el ID, título, URL, introducción, categoría,
+ * subcategoría, tipo de curso, idioma, idiomas de subtítulos, habilidades,
  * instructores, calificación, número de espectadores, duración y sitio web.
  */
 
@@ -25,44 +25,42 @@ public class Courses {
     @Column(nullable = true)
     private String title;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "TEXT")
     private String url;
 
-    @Column(nullable = true)
-    private String shortIntro; 
+    @Column(name = "short_intro", nullable = true, columnDefinition = "TEXT")
+    private String shortIntro;
 
     @Column(nullable = true)
     private String category;
 
-    @Column(nullable = true)
+    @Column(name = "sub-category", nullable = true)
     private String subCategory;
 
-    @Column(nullable = true)
+    @Column(name = "course_type", nullable = true)
     private String courseType;
 
     @Column(nullable = true)
     private String language;
 
-    @Column(nullable = true)
+    @Column(name = "subtitle_languages", nullable = true, columnDefinition = "TEXT")
     private String subtitleLanguages;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "TEXT")
     private String skills;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "TEXT")
     private String instructors;
 
     @Column(nullable = true)
     private Float rating;
 
-    @Column(nullable = true)
+    @Column(name = "num of viewers", nullable = true)
     private Integer numOfViewers;
 
     @Column(nullable = true)
-    private Integer duration;
+    private Float duration;
 
     @Column(nullable = true)
     private String site;
 }
-
-
