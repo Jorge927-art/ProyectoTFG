@@ -9,6 +9,7 @@ const Hero = () => {
             imageSrc="/glasses-with-pile-books.png"
             imageAlt="Banner"
             bgColor="bg-blue-800"
+            titleColor="text-blue-300"
             subtitleColor="text-white"
             descriptionColor="text-white"
             textPadding="p-8 md:p-16"

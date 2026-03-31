@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Home, Search, LogIn } from 'lucide-react';
 import GenericButton from "../UI/genericButton/GenericButton";
 import AuthModal from "../UI/authModal/AuthModal";
+import CategoryModal from "../UI/categoryModal/CategoryModal";
 
 /**
  * Componente Navbar que contiene la barra de navegación principal de la aplicación.
@@ -9,7 +10,8 @@ import AuthModal from "../UI/authModal/AuthModal";
  * @returns 
  */
 const Navbar = () => {
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [isLoginView, setIsLoginView] = useState(true);
 
     return (
@@ -33,7 +35,7 @@ const Navbar = () => {
                             text="¿Qué deseas aprender?"
                             variant="search"
                             icon={<Search size={20} className="text-gray-500" />}
-                            onClick={() => console.log("Buscando...")}
+                            onClick={() => setIsCategoryModalOpen(true)}
                         />
 
                         <GenericButton
@@ -41,7 +43,7 @@ const Navbar = () => {
                             icon={<LogIn size={18} />}
                             onClick={() => {
                                 setIsLoginView(true); // Por defecto abrir en Login
-                                setIsModalOpen(true);
+                                setIsAuthModalOpen(true);
                             }}
                         />
                     </div>
@@ -50,10 +52,15 @@ const Navbar = () => {
 
             {/* Inyectamos el Modal separado */}
             <AuthModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                isOpen={isAuthModalOpen}
+                onClose={() => setIsAuthModalOpen(false)}
                 isLoginView={isLoginView}
                 setIsLoginView={setIsLoginView}
+            />
+
+            <CategoryModal
+                isOpen={isCategoryModalOpen}
+                onClose={() => setIsCategoryModalOpen(false)}
             />
         </>
     );
