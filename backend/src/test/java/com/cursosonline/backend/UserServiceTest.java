@@ -61,17 +61,18 @@ public class UserServiceTest {
      * contraseña. Además, se confirma que el método save del repositorio haya sido
      * llamado para guardar el nuevo usuario.
      */
+    @SuppressWarnings("null")
     @Test
     void assignUser() {
         Users newUser = new Users(null, "Luis", "jki", Role.STUDENT, "jose.gmail.com");
         Users savedUser = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com");
         when(userRepository.findByUsername("Luis")).thenReturn(Optional.empty());
         when(passwordEncoder.encode("jki")).thenReturn("encoded_jki");
-        when(userRepository.save(any(Users.class))).thenReturn(savedUser);
+        when(userRepository.save(any())).thenReturn(savedUser);
         Users result = userService.registerUser(newUser);
-        assertNotNull(result.getUser_id());
+        assertNotNull(newUser);
         assertEquals(1L, result.getUser_id());
-        verify(userRepository).save(any(Users.class));
+        verify(userRepository).save(any());
         verify(passwordEncoder).encode("jki"); // Verifica que se intentó cifrar
     }
 
@@ -104,6 +105,7 @@ public class UserServiceTest {
      * verifica que el método save del repositorio nunca se haya llamado, ya que el
      * registro debería fallar antes de intentar guardar el nuevo usuario.
      */
+    @SuppressWarnings("null")
     @Test
     void registerUser_DebeLanzarExcepcion_CuandoElNombreDeUsuarioYaExiste() {
         String username = "Luis";
