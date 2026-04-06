@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Home, Search, LogIn } from 'lucide-react';
 import GenericButton from "../UI/genericButton/GenericButton";
 import AuthModal from "../UI/authModal/AuthModal";
-import CategoryModal from "../UI/categoryModal/CategoryModal";
+import CourseInfoModal from "../UI/courseInfoModal/CourseInfoModal";
 
 /**
  * Componente Navbar que contiene la barra de navegación principal de la aplicación.
@@ -11,7 +11,7 @@ import CategoryModal from "../UI/categoryModal/CategoryModal";
  */
 const Navbar = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+    const [isCourseInfoModalOpen, setIsCourseInfoModalOpen] = useState(false);
     const [isLoginView, setIsLoginView] = useState(true);
 
     return (
@@ -35,7 +35,7 @@ const Navbar = () => {
                             text="¿Qué deseas aprender?"
                             variant="search"
                             icon={<Search size={20} className="text-gray-500" />}
-                            onClick={() => setIsCategoryModalOpen(true)}
+                            onClick={() => setIsCourseInfoModalOpen(true)}
                         />
 
                         <GenericButton
@@ -58,9 +58,9 @@ const Navbar = () => {
                 setIsLoginView={setIsLoginView}
             />
 
-            <CategoryModal
-                isOpen={isCategoryModalOpen}
-                onClose={() => setIsCategoryModalOpen(false)}
+            <CourseInfoModal
+                isOpen={isCourseInfoModalOpen}
+                onClose={() => setIsCourseInfoModalOpen(false)}
             />
         </>
     );
