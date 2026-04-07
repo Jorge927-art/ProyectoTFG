@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect} from 'vitest';
+import { describe, it, expect } from 'vitest';
 import Navbar from './Navbar';
 
 /**
@@ -8,10 +8,10 @@ import Navbar from './Navbar';
  * muestre los botones de navegación y maneje la apertura y cierre del modal de autenticación.
  */
 describe('Navbar Component', () => {
-    
+
     it('debe renderizar el logo o nombre de la aplicación', () => {
         render(<Navbar />);
-        expect(screen.getByText(/Cursos Online Educativos/i) || screen.getByRole('link')).toBeInTheDocument();
+        expect(screen.getByText(/GESTIÓN DE CURSOS ONLINE/i)).toBeInTheDocument();
     });
 
     it('debe mostrar los botones de navegación principales', () => {
@@ -21,7 +21,7 @@ describe('Navbar Component', () => {
 
     it('debe abrir el modal de login al hacer clic en "Entrar"', () => {
         render(<Navbar />);
-        
+
         const loginButton = screen.getByRole('button', { name: /Entrar/i });
         fireEvent.click(loginButton);
 
@@ -30,9 +30,9 @@ describe('Navbar Component', () => {
 
     it('debe cerrar el modal al pulsar la X dentro del mismo', async () => {
         render(<Navbar />);
-        
+
         fireEvent.click(screen.getByRole('button', { name: /Entrar/i }));
-        
+
         const closeButton = screen.getByLabelText(/Cerrar modal/i);
         fireEvent.click(closeButton);
 

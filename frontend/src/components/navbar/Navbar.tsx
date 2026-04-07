@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Home, Search, LogIn } from 'lucide-react';
 import GenericButton from '../ui/genericButton/GenericButton';
 import AuthModal from '../ui/authModal/AuthModal';
@@ -73,6 +73,7 @@ interface NavbarProps {
  * @returns {JSX.Element} Fragment con navbar y modalidades (AuthModal, CourseInfoModal)
  */
 const Navbar = ({ onLoginSuccess }: NavbarProps) => {
+    const preventReopenUntilRef = useRef(0);
     /**
      * Control de visibilidad del modal de autenticación (login/registro).
      * Independiente de isCourseInfoModalOpen para permitir flujo de:
@@ -162,6 +163,9 @@ const Navbar = ({ onLoginSuccess }: NavbarProps) => {
                             label="Entrar / Registro"
                             icon={<LogIn size={18} />}
                             onClick={() => {
+                                if (Date.now() < preventReopenUntilRef.current) {
+                                    return;
+                                }
                                 setIsLoginView(true);  // Mostrar formulario Login por defecto
                                 setIsAuthModalOpen(true);
                             }}
@@ -185,7 +189,12 @@ const Navbar = ({ onLoginSuccess }: NavbarProps) => {
                 onClose={() => setIsAuthModalOpen(false)}
                 isLoginView={isLoginView}
                 setIsLoginView={setIsLoginView}
-                onSuccess={onLoginSuccess}
+                onSuccess={(userData) => {
+                    // Evita reaperturas por rebote justo despues de cerrar por login exitoso.
+                    preventReopenUntilRef.current = Date.now() + 700;
+                    setIsAuthModalOpen(false);
+                    onLoginSuccess?.(userData);
+                }}
             />
 
             {/* 

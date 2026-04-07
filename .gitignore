@@ -5,5 +5,8 @@ dist/
 .vscode/
 *.class
 .env
+.env.local
+.env.properties
+.env.*.local
 *.jar
 build/

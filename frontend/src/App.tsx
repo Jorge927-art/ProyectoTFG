@@ -1,12 +1,12 @@
-import Navbar from "./components/navbar/Navbar";
-import Hero from "./components/Hero";
-import Features from "./components/Features";
-import Testimonials from "./components/Testimonials";
+import { MainNavbar } from "@/components/navbar";
+import Hero from "@/components/Hero";
+import Features from "@/components/Features";
+import Testimonials from "@/components/Testimonials";
 
 function App() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      <Navbar />
+      <MainNavbar />
       <main>
         <Hero />
         <Features />
