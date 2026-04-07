@@ -5,14 +5,14 @@ import GenericButton from './GenericButton';
 describe('GenericButton', () => {
   
   it('debe mostrar el texto correctamente', () => {
-    render(<GenericButton text="Enviar" />);
+    render(<GenericButton label="Enviar" />);
     // Buscamos si el texto "Enviar" existe en pantalla
     expect(screen.getByText(/Enviar/i)).toBeInTheDocument();
   });
 
   it('debe ejecutar la función onClick al hacer clic', () => {
     const mockClick = vi.fn(); // Creamos una función espía
-    render(<GenericButton text="Click me" onClick={mockClick} />);
+    render(<GenericButton label="Click me" onClick={mockClick} />);
     
     const button = screen.getByRole('button'); // Buscamos el elemento por su rol HTML
     fireEvent.click(button);
@@ -30,7 +30,7 @@ describe('GenericButton', () => {
     expect(button.className).not.toContain('rounded-lg');
   });
 
-  it('no debe mostrar el span de texto si la prop "text" no se envía', () => {
+  it('no debe mostrar el span de texto si la prop "label" no se envía', () => {
     render(<GenericButton icon={<span>Icono</span>} />);
     // Verificamos que NO haya un elemento con texto (usamos queryBy para que no explote si no lo halla)
     const textSpan = screen.queryByText((_, element) => {
