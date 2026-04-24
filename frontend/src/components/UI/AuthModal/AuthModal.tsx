@@ -3,6 +3,7 @@ import type { FormEvent, ChangeEvent } from 'react';
 import { X } from 'lucide-react';
 import Input from '../Input';
 import axios from 'axios';
+import { useAuth } from '@/auth';
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -21,6 +22,7 @@ const initialFormState: AuthFormState = { username: '', password: '' };
 const REQUEST_TIMEOUT_MS = 5000;
 
 const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: AuthModalProps) => {
+    const { login } = useAuth();
     const [formData, setFormData] = useState<AuthFormState>(initialFormState);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -67,7 +69,7 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
             if (!isMountedRef.current) return;
 
             if (response.status === 200 || response.status === 201) {
-                localStorage.setItem('user', JSON.stringify(response.data));
+                login(response.data);
                 handleClose();
                 onSuccess?.(response.data);
             }

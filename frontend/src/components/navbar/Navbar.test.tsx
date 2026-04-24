@@ -1,6 +1,12 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
+import type { ReactElement } from 'react';
 import Navbar from './Navbar';
+import { AuthProvider } from '@/auth';
+
+const renderWithAuthProvider = (ui: ReactElement) => {
+    return render(<AuthProvider>{ui}</AuthProvider>);
+};
 
 /**
  * Pruebas unitarias para el componente Navbar.
@@ -10,17 +16,17 @@ import Navbar from './Navbar';
 describe('Navbar Component', () => {
 
     it('debe renderizar el logo o nombre de la aplicación', () => {
-        render(<Navbar />);
+        renderWithAuthProvider(<Navbar />);
         expect(screen.getByText(/GESTIÓN DE CURSOS ONLINE/i)).toBeInTheDocument();
     });
 
     it('debe mostrar los botones de navegación principales', () => {
-        render(<Navbar />);
+        renderWithAuthProvider(<Navbar />);
         expect(screen.getByRole('button', { name: /Entrar/i })).toBeInTheDocument();
     });
 
     it('debe abrir el modal de login al hacer clic en "Entrar"', () => {
-        render(<Navbar />);
+        renderWithAuthProvider(<Navbar />);
 
         const loginButton = screen.getByRole('button', { name: /Entrar/i });
         fireEvent.click(loginButton);
@@ -29,7 +35,7 @@ describe('Navbar Component', () => {
     });
 
     it('debe cerrar el modal al pulsar la X dentro del mismo', async () => {
-        render(<Navbar />);
+        renderWithAuthProvider(<Navbar />);
 
         fireEvent.click(screen.getByRole('button', { name: /Entrar/i }));
 

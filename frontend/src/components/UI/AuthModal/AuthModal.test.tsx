@@ -1,11 +1,17 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { ReactElement } from 'react';
 import AuthModal from './AuthModal';
 import axios from 'axios';
 import { AxiosError } from 'axios';
+import { AuthProvider } from '@/auth';
 
 vi.mock('axios');
 const mockedAxios = vi.mocked(axios, true);
+
+const renderWithAuthProvider = (ui: ReactElement) => {
+    return render(<AuthProvider>{ui}</AuthProvider>);
+};
 
 /**
  * Pruebas unitarias para el componente AuthModal que verifica su comportamiento en diferentes escenarios.
@@ -26,13 +32,15 @@ describe('AuthModal', () => {
 
     it('no debe renderizar nada si isOpen es false', () => {
         const { container } = render(
-            <AuthModal isOpen={false} onClose={mockOnClose} isLoginView={true} setIsLoginView={mockSetIsLoginView} />
+            <AuthProvider>
+                <AuthModal isOpen={false} onClose={mockOnClose} isLoginView={true} setIsLoginView={mockSetIsLoginView} />
+            </AuthProvider>
         );
         expect(container.firstChild).toBeNull();
     });
 
     it('debe cambiar entre Login y Registro al hacer clic en el botón inferior', () => {
-        render(
+        renderWithAuthProvider(
             <AuthModal isOpen={true} onClose={mockOnClose} isLoginView={true} setIsLoginView={mockSetIsLoginView} />
         );
 
@@ -43,7 +51,7 @@ describe('AuthModal', () => {
     });
 
     it('debe mostrar error de validación si la contraseña es menor a 6 caracteres', async () => {
-        render(
+        renderWithAuthProvider(
             <AuthModal isOpen={true} onClose={mockOnClose} isLoginView={true} setIsLoginView={mockSetIsLoginView} />
         );
 
@@ -65,7 +73,7 @@ describe('AuthModal', () => {
 
 
     it('debe mostrar "Procesando..." y deshabilitar el botón al enviar formulario válido', async () => {
-        render(
+        renderWithAuthProvider(
             <AuthModal isOpen={true} onClose={mockOnClose} isLoginView={true} setIsLoginView={mockSetIsLoginView} />
         );
 
@@ -87,7 +95,7 @@ describe('AuthModal', () => {
     it('debe mostrar error de conexión cuando el backend no responde', async () => {
         mockedAxios.post.mockRejectedValueOnce(new AxiosError('Network Error', 'ERR_NETWORK'));
 
-        render(
+        renderWithAuthProvider(
             <AuthModal isOpen={true} onClose={mockOnClose} isLoginView={true} setIsLoginView={mockSetIsLoginView} />
         );
 
@@ -107,7 +115,7 @@ describe('AuthModal', () => {
         error.response = undefined;
         mockedAxios.post.mockRejectedValueOnce(error);
 
-        render(
+        renderWithAuthProvider(
             <AuthModal isOpen={true} onClose={mockOnClose} isLoginView={true} setIsLoginView={mockSetIsLoginView} />
         );
 
@@ -122,7 +130,7 @@ describe('AuthModal', () => {
     });
 
     it('debe cerrar el modal al hacer clic en el botón X', () => {
-        render(
+        renderWithAuthProvider(
             <AuthModal isOpen={true} onClose={mockOnClose} isLoginView={true} setIsLoginView={mockSetIsLoginView} />
         );
 
