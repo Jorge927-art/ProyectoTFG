@@ -1,10 +1,15 @@
 package com.cursosonline.backend.controller;
 
+import com.cursosonline.backend.dto.AuthResponse;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.exception.ServicesException;
+import com.cursosonline.backend.services.SessionAuthenticationService;
 import com.cursosonline.backend.services.UserService;
 import lombok.RequiredArgsConstructor;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +29,7 @@ import java.util.List;
  */
 public class UserController {
     private final UserService userService;
+    private final SessionAuthenticationService sessionAuthenticationService;
 
     /**
      * Endpoint para obtener el perfil de un usuario.
@@ -56,18 +62,39 @@ public class UserController {
      * @return
      */
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Users loginRequest) {
+    public ResponseEntity<AuthResponse> login(@RequestBody Users loginRequest, HttpServletRequest request,
+            HttpServletResponse response) {
         try {
-            // Llamamos al nuevo método del servicio que acabas de crear
-            Users user = userService.login(loginRequest.getUsername(), loginRequest.getPassword());
-            return ResponseEntity.ok(user);
+            AuthResponse authResponse = sessionAuthenticationService.login(loginRequest.getUsername(),
+                    loginRequest.getPassword(), request, response);
+            return ResponseEntity.ok(authResponse);
+        } catch (org.springframework.security.core.AuthenticationException e) {
+            return ResponseEntity.status(401).build();
         } catch (ServicesException e) {
             // Si el usuario no existe o la contraseña está mal, devolvemos 401
-            return ResponseEntity.status(401).body(e.getMessage());
+            return ResponseEntity.status(401).build();
         } catch (Exception e) {
             // Cualquier otro error inesperado
-            return ResponseEntity.status(500).body("Error interno del servidor");
+            return ResponseEntity.status(500).build();
         }
+    }
+
+    /**
+     * Endpoint para obtener el usuario autenticado de la sesión actual.
+     *
+     * @param authentication
+     * @return
+     */
+    @GetMapping("/me")
+    public ResponseEntity<AuthResponse> me(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        return userService.findByUsername(authentication.getName())
+                .map(AuthResponse::from)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.status(404).build());
     }
 
     /**

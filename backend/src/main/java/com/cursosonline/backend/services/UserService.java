@@ -49,8 +49,6 @@ public class UserService {
      */
     @Transactional
     public Users registerUser(Users user) {
-        System.out.println("DEBUG - Usuario recibido: " + user.getUsername());
-        System.out.println("DEBUG - Password recibido: " + user.getPassword());
         if (userRepository.findByUsername(user.getUsername()).isPresent()) {
             throw new UserAlreadyExistsException(user.getUsername());
         }
