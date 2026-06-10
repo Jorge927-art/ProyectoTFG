@@ -41,3 +41,97 @@ Para realizar una migración segura y evitar la ruptura del sistema, se aplicar�
 2. **Fase 2 (Pruebas de Bloqueo):** Validar mediante tests que los nuevos endpoints JWT gestionan correctamente el login, la autorización y el rechazo de accesos no autenticados sin alterar la capa de sesión clásica.
 3. **Fase 3 (Adaptación del Frontend):** Modificar React para migrar al flujo de *Token Bearer*.
 4. **Fase 4 (Limpieza):** Retirar de forma progresiva la infraestructura antigua de sesiones una vez que el flujo JWT esté 100% estabilizado en producción.
+
+---
+
+## 4. Diseño de Paquetes y Fases de Ejecución
+
+### Estructura de Paquetes Propuesta (Backend)
+
+* `com.cursosonline.backend.security.jwt`: Contendrá `JwtService.java` (generación/validación) y `JwtAuthenticationFilter.java` (filtro de petición).
+* `com.cursosonline.backend.config.jwt`: Contendrá `JwtProperties.java` (lectura segura de claves desde properties).
+* `com.cursosonline.backend.dto.auth`: Contendrá los nuevos contratos de entrada y salida (`AuthRequest`, `AuthTokenResponse`).
+* `com.cursosonline.backend.services.auth`: Contendrá `JwtAuthenticationService.java` para orquestar el login con tokens.
+
+### Mapa de Ruta Estructurado en Fases
+
+* **Fase 0:** Preparación de la rama de Git y definición de variables en `application.properties`.
+* **Fase 1:** Creación de la capa JWT aislada (servicios y propiedades) sin conectar a la red.
+* **Fase 2:** Integración del filtro en `SecurityConfig.java` habilitando la doble vía (Sesión + JWT).
+* **Fase 3:** Creación de los nuevos DTOs y adaptación de los controladores en `UserController.java`.
+* **Fase 4:** Despliegue del servicio de autenticación y pruebas de validación en paralelo.
+* **Fase 5:** Endurecimiento de seguridad (CORS, control de errores 401/403) y paso final a *Stateless*.
+
+---
+
+## 5. Checklist Operativo Diario y Criterios Go/No-Go
+
+Esta guía de ejecución permite avanzar de forma incremental, garantizando que el sistema no sufra regresiones funcionales mientras conviven el modelo de sesión y JWT.
+
+### 📅 Día 1: Base JWT Aislada
+
+* **[ ] Preparar configuración y contrato técnico:** Definir variables de entorno (secretos, expiraciones) en `application.properties`.
+  * **Go:** Parámetros configurados externamente; backlog actualizado; sin impacto en el entorno de ejecución.
+  * **No-Go:** Secretos escritos directamente en el código Java o ambigüedad en los tiempos de expiración.
+  * *Evidencia mínima:* Archivo de propiedades configurado y parámetros validados.
+* **[ ] Crear estructura de paquetes y clases JWT:** Desarrollar `JwtService`, `JwtAuthenticationFilter` y `JwtProperties`.
+  * **Go:** Clases creadas con responsabilidades separadas; el proyecto compila limpiamente.
+  * **No-Go:** Acoplar lógica de negocio de login dentro del filtro o generar dependencias circulares.
+  * *Evidencia mínima:* Compilación del backend con éxito (`BUILD SUCCESS`).
+* **[ ] Validar integridad del flujo de sesión actual:** Probar el comportamiento de los endpoints activos.
+  * **Go:** El login tradicional y el endpoint `/api/auth/me` responden de forma idéntica a la inicial.
+  * **No-Go:** Cualquier fallo o cambio en los códigos de estado HTTP en las peticiones de sesión.
+  * *Evidencia mínima:* Test manual satisfactorio de login por sesión en el navegador o cliente API.
+
+### 📅 Día 2: Convivencia Segura en SecurityConfig
+
+* **[ ] Integrar filtro JWT en la cadena de seguridad:** Registrar el componente en `SecurityConfig.java`.
+  * **Go:** Filtro JWT posicionado antes de la autenticación estándar; política de sesión en `IF_REQUIRED`.
+  * **No-Go:** Cambiar a política *stateless* antes de tiempo o bloquear peticiones sin token que tienen sesión activa.
+  * *Evidencia mínima:* Peticiones con cookie de sesión y peticiones con Bearer Token son válidas simultáneamente.
+* **[ ] Verificar la autorización basada en roles:** Validar los accesos restringidos.
+  * **Go:** Los perfiles de administración, profesorado y estudiantado mantienen sus restricciones de acceso intactas.
+  * **No-Go:** Respuestas de acceso denegado (403) inesperadas para usuarios con permisos correctos.
+  * *Evidencia mínima:* Matriz de verificación de endpoints y roles completada con éxito.
+* **[ ] Consolidar el control de errores HTTP:** Asegurar respuestas semánticas homogéneas.
+  * **Go:** El sistema devuelve estrictamente `401 Unauthorized` si no hay identidad y `403 Forbidden` si no hay permisos.
+  * **No-Go:** Respuestas erróneas mezcladas o respuestas vacías según el origen de la autenticación.
+  * *Evidencia mínima:* Verificación de respuestas en el manejador global de excepciones.
+
+### 📅 Día 3: Contrato JWT en API y Compatibilidad
+
+* **[ ] Definir Objetos de Transferencia de Datos (DTOs):** Crear el paquete `dto.auth` con los nuevos contratos.
+  * **Go:** Modelos claros para peticiones y respuestas JWT; mantenimiento temporal del contrato anterior.
+  * **No-Go:** Exponer o reutilizar la entidad de persistencia `Users` directamente en el cuerpo de la petición.
+  * *Evidencia mínima:* Nuevas clases DTO integradas sin errores de compilación.
+* **[ ] Implementar el servicio de autenticación JWT:** Desplegar `JwtAuthenticationService` de forma aislada.
+  * **Go:** Lógica de emisión de tokens y refresco operativa; el servicio de sesiones sigue funcionando en paralelo.
+  * **No-Go:** Eliminar o alterar la infraestructura del servicio de sesión clásico.
+  * *Evidencia mínima:* Generación exitosa del primer token simulado mediante pruebas unitarias.
+* **[ ] Habilitar doble vía en controladores:** Adaptar la capa de exposición web.
+  * **Go:** El endpoint `/api/auth/me` resuelve la identidad del usuario tanto por token como por sesión.
+  * **No-Go:** Caída del endpoint `/me` en cualquiera de las dos modalidades de acceso.
+  * *Evidencia mínima:* Batería de pruebas funcionales ejecutada correctamente para ambos flujos.
+
+### 📅 Día 4: Endurecimiento (Hardening) y Criterio de Transición
+
+* **[ ] Auditoría de seguridad operativa:** Revisión final de parámetros críticos.
+  * **Go:** Expiraciones temporales estrictas (token de acceso corto, refresco largo); políticas CORS restringidas.
+  * **No-Go:** Uso de credenciales por defecto, secretos débiles o políticas CORS excesivamente permisivas.
+  * *Evidencia mínima:* Archivo de configuración validado bajo criterios de seguridad empresarial.
+* **[ ] Evaluación de la fase de convivencia:** Comprobación del estado general del backend.
+  * **Go:** El backend es robusto, no presenta regresiones y tolera ambos tipos de clientes simultáneamente.
+  * **No-Go:** Persistencia de comportamientos indeterminados o fallos intermitentes en la cadena de seguridad.
+  * *Evidencia mínima:* Informe de estado de compilación definitivo y confirmación del backend compatible.
+* **[ ] Definición del criterio de desconexión (Fase Stateless):** Establecer las pautas de cierre del flujo antiguo.
+  * **Go:** El cliente en React consume JWT y gestiona el refresco de sesión de forma autónoma.
+  * **No-Go:** Frontend dependiente de la cookie de sesión del servidor para operaciones críticas.
+  * *Evidencia mínima:* Validación completa del flujo de la interfaz de usuario contra la API protegida por JWT.
+
+---
+
+## 🚦 Semáforo de Control de Riesgos
+
+* 🟢 **Verde (GO):** El proyecto compila sin advertencias, los flujos previos de sesión se mantienen totalmente operativos, los componentes de seguridad JWT se integran de forma incremental, los roles operan bajo la política definida y las excepciones HTTP conservan su semántica técnica.
+* 🟡 **Amarillo (GO CONDICIONADO):** El sistema compila y opera de forma funcional, pero se identifican de uno a dos riesgos menores de integración no bloqueantes. Se requiere documentar el plan de mitigación inmediato antes de continuar con la siguiente actividad.
+* 🔴 **Rojo (NO-GO):** Se detecta una regresión en los endpoints core existentes (`login`, `/me`), inconsistencia en la aplicación de roles, alteración del filtro global de Spring Security o vulnerabilidades expuestas en la configuración del token. Se detiene el avance hasta solventar el conflicto.
