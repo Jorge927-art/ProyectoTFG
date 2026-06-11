@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import Input from '../Input';
 import axios from 'axios';
 import { useAuth } from '@/auth';
+import type { AuthTokenResponse } from '@/auth/authTypes'; // Importación explícita del contrato JWT
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -69,9 +70,17 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
             if (!isMountedRef.current) return;
 
             if (response.status === 200 || response.status === 201) {
-                login(response.data);
-                handleClose();
-                onSuccess?.(response.data);
+                if (isLoginView) {
+                    // Flujo JWT: Casteamos la respuesta HTTP al formato AuthTokenResponse del servidor
+                    const tokenData = response.data as AuthTokenResponse;
+                    login(tokenData);
+                    handleClose();
+                    onSuccess?.({ username: tokenData.username });
+                } else {
+                    // Flujo de Registro clásico: Mantiene el comportamiento base del backend
+                    handleClose();
+                    setIsLoginView(true); // Redirigimos al usuario al login tras registrarse
+                }
             }
         } catch (error) {
             let message = 'Error de conexión con el servidor';
@@ -86,6 +95,8 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
                         message = serverResponse;
                     } else if (serverResponse?.message) {
                         message = serverResponse.message;
+                    } else if (error.response?.status === 401) {
+                        message = 'Nombre de usuario o contraseña incorrectos'; // Manejo de credenciales inválidas
                     } else if (error.response?.status === 409) {
                         message = 'El nombre de usuario ya existe';
                     }
@@ -176,3 +187,4 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
 };
 
 export default AuthModal;
+
