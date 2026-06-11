@@ -79,6 +79,39 @@ Este documento centraliza las decisiones técnicas críticas tomadas durante el 
 * **Justificación para el TFG:** Demuestra un diseño basado en el principio de menor conocimiento o Ley de Demeter aplicada a interfaces web. El componente visual de la vista (`AuthModal`) no tiene conocimiento de cómo ni dónde se almacena el JWT en el navegador, ni tampoco conoce los mecanismos criptográficos del backend; su única responsabilidad consiste en capturar las credenciales, transmitirlas a la API y despachar la respuesta exitosa al contexto de la aplicación, garantizando un código modular, escalable y mantenible.
 * **Consecuencias:** Sincronización completa del flujo de Login web con el backend híbrido. La SPA es capaz de iniciar sesión de forma transparente emitiendo el token en local y manteniendo el Semáforo de compilación limpio de advertencias en TypeScript.
 
+---
+
+## [ADR-08] Centralización de Peticiones HTTP mediante Interceptores de Red
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Almacenado el token JWT en el cliente, se requería un mecanismo para adjuntarlo en la cabecera `Authorization: Bearer` de cada petición hacia recursos protegidos del backend, evitando que los componentes visuales asuman lógica repetitiva de red o manipulen directamente el almacenamiento físico.
+* **Decisión:** Implementar un cliente HTTP personalizado (`src/services/apiClient.ts`) basado en Axios, de uso obligatorio para las comunicaciones con la API, incorporando interceptores automáticos de solicitud (*Request Interceptors*).
+* **Justificación para el TFG:** Demuestra un profundo conocimiento del patrón de diseño estructural *Proxy* o *Middleware* aplicado a comunicaciones de red. Al delegar la inyección del token en un interceptor centralizado, se garantiza el principio de Securitización Transparente: el resto de la aplicación consume la API de forma nativa, mientras que el interceptor se encarga de auditar y adjuntar las credenciales necesarias, aislando por completo la capa visual de la capa de transporte de seguridad.
+* **Consecuencias:** Reducción drástica del acoplamiento en el frontend. Automatización completa de la inyección de seguridad en peticiones salientes y centralización de la captura de errores globales de autenticación (códigos HTTP 401).
+
+---
+
+## [ADR-09] Mecanismo de Hidratación de Sesión mediante Validación Síncrona del Token
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Al recargar la interfaz web de la SPA, el estado volátil de React se destruye. Se requería un mecanismo automático que determinase si el token almacenado localmente seguía siendo válido en el servidor antes de renderizar las pantallas privadas de la aplicación.
+* **Decisión:** Implementar un efecto secundario de ciclo de vida (`useEffect`) en la inicialización del `AuthProvider` para consumir el endpoint `/api/auth/me` de forma transparente, controlando el flujo mediante un estado bandera `isLoading`.
+* **Justificación para el TFG:** Demuestra el uso correcto del patrón de sincronización de estado cliente-servidor (*State Hydration*). Utilizar una variable `isLoading` evita la pérdida de sesión en recargas y unifica la verificación síncrona en el cliente con las respuestas de la API del servidor.
+* **Consecuencias:** Consolidación total de la seguridad de la SPA. Las recargas de página recuperan la identidad del usuario de forma inmediata y el estado se sincroniza de forma robusta ante tokens expirados.
+
+---
+
+## [ADR-10] Mitigación de Redirecciones Prematuras en Clientes SPA mediante Guardianes Asíncronos
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Al introducir la hidratación asíncrona de la sesión en el cliente, el componente de guardia de navegación (`ProtectedRoute.tsx`) evaluaba el acceso de forma inmediata antes de recibir la respuesta HTTP del backend. Esto provocaba un comportamiento anómalo que expulsaba a usuarios con tokens válidos hacia la vista pública en cada recarga de página (*F5*).
+* **Decisión:** Interceptar el flujo de renderizado del guardián base mediante la bandera reactiva de sincronización `isLoading`, inyectando una pantalla de transición transitoria hasta que el proveedor de autenticación resuelva el estado de identidad definitivo.
+* **Justificación para el TFG:** Demuestra la resolución de problemas de asincronía en aplicaciones de una sola página (*SPA*) bajo criterios de robustez y experiencia de usuario. El control de acceso se transforma en un flujo determinista de dos estados: un estado síncrono de evaluación técnica y un estado condicional de autorización por roles funcionales. Esto blinda las vistas privadas administrativas, docentes y estudiantiles contra renderizados parciales o brechas de visualización indeseadas.
+* **Consecuencias:** Estabilización de la experiencia de usuario en la navegación web. Las rutas protegidas detienen de forma segura las peticiones y se sincronizan perfectamente con la velocidad de respuesta del servidor.
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026
