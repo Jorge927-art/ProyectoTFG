@@ -68,6 +68,17 @@ Este documento centraliza las decisiones técnicas críticas tomadas durante el 
 * **Justificación para el TFG:** Esta separación de responsabilidades en el almacenamiento local (*localStorage*) es una buena práctica de ingeniería web fundamental para la memoria del TFG. Aislar el token en su propia clave de memoria (`accessToken`) independiza la lógica de las llamadas HTTP respecto al estado visual de la interfaz. Esto facilitará que en la siguiente fase de desarrollo se pueda inyectar el token de forma automatizada en las cabeceras `Authorization Bearer` de un cliente Axios o Fetch centralizado, manteniendo intacto el ciclo de renderizado de los componentes de React.
 * **Consecuencias:** Se estabiliza el tipado estático del frontend sin advertencias del compilador de TypeScript, asegurando un punto de partida óptimo para conectar las llamadas API reales de los formularios de la SPA sin alterar la experiencia de usuario preexistente.
 
+---
+
+## [ADR-07] Consumo del Contrato JWT y Desacoplamiento de Vistas en el Cliente
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Tras rediseñar el almacenamiento de tokens en React, se requería adaptar la interfaz gráfica de inicio de sesión (`AuthModal.tsx`) para consumir el nuevo payload del servidor sin alterar el diseño visual, las animaciones ni la experiencia de usuario de los formularios de la SPA.
+* **Decisión:** Refactorizar la función controladora del formulario de Login para realizar el tipado estático seguro (*type casting*) de la respuesta HTTP de Axios hacia la interfaz `AuthTokenResponse`, delegando el almacenamiento inmediato del token de acceso de red y los metadatos de perfil en el despachador global del contexto.
+* **Justificación para el TFG:** Demuestra un diseño basado en el principio de menor conocimiento o Ley de Demeter aplicada a interfaces web. El componente visual de la vista (`AuthModal`) no tiene conocimiento de cómo ni dónde se almacena el JWT en el navegador, ni tampoco conoce los mecanismos criptográficos del backend; su única responsabilidad consiste en capturar las credenciales, transmitirlas a la API y despachar la respuesta exitosa al contexto de la aplicación, garantizando un código modular, escalable y mantenible.
+* **Consecuencias:** Sincronización completa del flujo de Login web con el backend híbrido. La SPA es capaz de iniciar sesión de forma transparente emitiendo el token en local y manteniendo el Semáforo de compilación limpio de advertencias en TypeScript.
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026
