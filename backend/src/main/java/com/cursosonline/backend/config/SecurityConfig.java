@@ -60,8 +60,9 @@ public class SecurityConfig {
                 // Integrar CORS en la cadena de seguridad
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable()) // Deshabilitado para facilitar el desarrollo con APIs REST
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
-                .securityContext(context -> context.securityContextRepository(securityContextRepository()))
+                // Cambiamos de IF_REQUIRED a STATELESS: El servidor ya no guarda estados de
+                // sesión
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // Control de acceso por perfiles según los requisitos
