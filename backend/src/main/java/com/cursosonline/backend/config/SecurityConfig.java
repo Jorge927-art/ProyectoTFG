@@ -68,8 +68,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
                         .requestMatchers("/api/auth/me").authenticated()
                         .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
-                        .requestMatchers("/api/profesor/**").hasAuthority("PROFESSOR")
-                        .requestMatchers("/api/estudiante/**").hasAuthority("STUDENT")
+                        .requestMatchers("/api/professor/**").hasAuthority("PROFESSOR")
+                        .requestMatchers("/api/student/**").hasAuthority("STUDENT")
                         .anyRequest().authenticated())
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable());
