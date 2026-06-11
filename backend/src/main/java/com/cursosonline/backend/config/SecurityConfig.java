@@ -1,5 +1,7 @@
 package com.cursosonline.backend.config;
 
+import com.cursosonline.backend.security.jwt.JwtAuthenticationFilter;
+import com.cursosonline.backend.security.jwt.JwtService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -8,9 +10,11 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.cors.CorsConfiguration;
@@ -25,26 +29,33 @@ import java.util.List;
  * acceso
  * a las diferentes rutas de la API según los roles de usuario (ADMIN,
  * PROFESSOR, STUDENT).
- * Configura CORS para permitir solicitudes desde el frontend (React/Vite) y
- * establece el uso de BCrypt para el cifrado de contraseñas. Esta configuración
- * es esencial para proteger los endpoints de la API y garantizar que solo los
- * usuarios autorizados puedan acceder a ciertas funcionalidades.
+ * Configura la convivencia entre el modelo de sesiones HTTP tradicional y los
+ * tokens JWT.
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
+    private final JwtService jwtService;
+    private final UserDetailsService userDetailsService;
+
+    // Inyección de dependencias por constructor requerida para el filtro JWT
+    public SecurityConfig(JwtService jwtService, UserDetailsService userDetailsService) {
+        this.jwtService = jwtService;
+        this.userDetailsService = userDetailsService;
+    }
+
     /**
-     * Configura la cadena de seguridad HTTP, definiendo las reglas de acceso a los
-     * endpoints de la API según los roles de usuario. Permite el acceso libre a las
-     * rutas de autenticación y registro.
-     * 
-     * @param http
-     * @return
-     * @throws Exception
+     * Configura la cadena de seguridad HTTP, incorporando el filtro de intercepción
+     * JWT
+     * de forma no intrusiva antes de los mecanismos tradicionales de Spring
+     * Security.
      */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        // Instanciamos el filtro pasándole los servicios inyectados
+        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService, userDetailsService);
+
         http
                 // Integrar CORS en la cadena de seguridad
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -63,17 +74,15 @@ public class SecurityConfig {
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable());
 
+        // CONVIVENCIA: Registramos el filtro JWT antes del filtro de credenciales
+        // estándar
+        http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
 
     /**
-     * Configura CORS para permitir solicitudes desde el frontend (React/Vite) que
-     * se
-     * conectan al backend (Spring Boot). Define los orígenes permitidos, métodos
-     * HTTP y encabezados. Esto es esencial para evitar problemas de CORS al
-     * consumir la API desde el frontend durante el desarrollo.
-     * 
-     * @return
+     * Configura CORS para permitir solicitudes desde el frontend (React/Vite).
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -89,11 +98,7 @@ public class SecurityConfig {
     }
 
     /**
-     * Bean para el cifrado de contraseñas utilizando BCrypt. Este encoder se
-     * utiliza
-     * en el servicio de usuarios para cifrar las contraseñas antes de almacenarlas
-     * 
-     * @return
+     * Bean para el cifrado de contraseñas utilizando BCrypt.
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
