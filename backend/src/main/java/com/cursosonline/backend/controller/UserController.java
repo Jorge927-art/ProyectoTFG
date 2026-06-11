@@ -32,19 +32,6 @@ public class UserController {
     private final SessionAuthenticationService sessionAuthenticationService;
 
     /**
-     * Endpoint para obtener el perfil de un usuario.
-     * 
-     * @param username
-     * @return
-     */
-    @GetMapping("/{username}")
-    public ResponseEntity<Users> getUserProfile(@PathVariable String username) {
-        return userService.findByUsername(username)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
-
-    /**
      * Endpoint para el registro de nuevos usuarios.
      * 
      * @param user
@@ -77,6 +64,19 @@ public class UserController {
             // Cualquier otro error inesperado
             return ResponseEntity.status(500).build();
         }
+    }
+
+    /**
+     * Endpoint para obtener el perfil de un usuario.
+     * 
+     * @param username
+     * @return
+     */
+    @GetMapping("/{username}")
+    public ResponseEntity<Users> getUserProfile(@PathVariable String username) {
+        return userService.findByUsername(username)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     /**
