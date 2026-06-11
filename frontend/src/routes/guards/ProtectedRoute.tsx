@@ -13,26 +13,31 @@ interface ProtectedRouteProps {
 }
 
 /**
- * Guardia base para rutas privadas.
- *
- * RESPONSABILIDAD:
- * 1) Verificar que exista una sesión válida (usuario autenticado).
- * 2) (Opcional) Verificar si el rol del usuario pertenece a una lista permitida.
- * 3) Redirigir cuando no se cumplen las condiciones de acceso.
- * 4) Si pasa la validación, permitir renderizar la ruta hija con <Outlet />.
- *
- * NOTA:
- * Con este diseño, una guardia específica (por ejemplo StudentRoute) solo necesita
- * configurar `allowedRoles`, evitando duplicar lógica de sesión/redirect.
+ * Guardia base para rutas privadas adaptada para flujos asíncronos JWT.
  */
 const ProtectedRoute = ({
     allowedRoles,
     redirectIfUnauthorized = DEFAULT_REDIRECT_IF_UNAUTHORIZED,
 }: ProtectedRouteProps) => {
-    const { user, isAuthenticated } = useAuth();
+    // Inyectamos isLoading desde el contexto global para controlar la hidratación del token
+    const { user, isAuthenticated, isLoading } = useAuth();
     const location = useLocation();
 
-    // Si no hay sesión, bloqueamos acceso a la ruta privada.
+    // FRENO DE SEGURIDAD ASÍNCRONO: Mientras el interceptor y el proveedor validan 
+    // el token contra el backend, pausamos la redirección para evitar falsos negativos.
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="flex flex-col items-center gap-4">
+                    {/* Spinner visual conceptual de carga */}
+                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-gray-500 font-semibold animate-pulse">Verificando credenciales de seguridad...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Si terminó la carga de validación técnica y no hay sesión, bloqueamos el acceso
     if (!isAuthenticated || !user) {
         return (
             <Navigate
@@ -43,7 +48,7 @@ const ProtectedRoute = ({
         );
     }
 
-    // Si hay política de roles, validamos que el rol actual esté permitido.
+    // Si hay política de roles, validamos que el rol actual esté permitido
     if (allowedRoles && allowedRoles.length > 0) {
         const normalizedRole = String(user.role ?? "").toUpperCase();
         const normalizedAllowedRoles = allowedRoles.map((role) => role.toUpperCase());
@@ -59,8 +64,9 @@ const ProtectedRoute = ({
         }
     }
 
-    // Si hay sesión válida, permitimos que se renderice la ruta hija.
+    // Si la sesión es válida y el rol está autorizado, permitimos el renderizado de la ruta hija
     return <Outlet />;
 };
 
 export default ProtectedRoute;
+
