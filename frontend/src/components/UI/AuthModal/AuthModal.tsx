@@ -1,10 +1,10 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ChangeEvent } from 'react';
-import { X } from 'lucide-react';
 import Input from '../Input';
 import axios from 'axios';
 import { useAuth } from '@/auth';
-import type { AuthTokenResponse } from '@/auth/authTypes'; // Importación explícita del contrato JWT
+import type { AuthTokenResponse } from '@/auth/authTypes';
+import { apiClient } from '@/services/apiClient'; // Tu nueva instancia centralizada
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -20,7 +20,6 @@ interface AuthFormState {
 }
 
 const initialFormState: AuthFormState = { username: '', password: '' };
-const REQUEST_TIMEOUT_MS = 5000;
 
 const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: AuthModalProps) => {
     const { login } = useAuth();
@@ -61,28 +60,25 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
         setLoading(true);
 
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
             const endpoint = isLoginView ? '/api/auth/login' : '/api/auth/register';
-            const response = await axios.post(`${apiUrl}${endpoint}`, formData, {
-                timeout: REQUEST_TIMEOUT_MS,
-            });
+            // Consumo directo a través del middleware apiClient centralizado
+            const response = await apiClient.post(endpoint, formData);
 
             if (!isMountedRef.current) return;
 
             if (response.status === 200 || response.status === 201) {
                 if (isLoginView) {
-                    // Flujo JWT: Casteamos la respuesta HTTP al formato AuthTokenResponse del servidor
                     const tokenData = response.data as AuthTokenResponse;
                     login(tokenData);
                     handleClose();
                     onSuccess?.({ username: tokenData.username });
                 } else {
-                    // Flujo de Registro clásico: Mantiene el comportamiento base del backend
                     handleClose();
-                    setIsLoginView(true); // Redirigimos al usuario al login tras registrarse
+                    setIsLoginView(true);
                 }
             }
         } catch (error) {
+            if (!isMountedRef.current) return;
             let message = 'Error de conexión con el servidor';
 
             if (axios.isAxiosError(error)) {
@@ -96,7 +92,7 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
                     } else if (serverResponse?.message) {
                         message = serverResponse.message;
                     } else if (error.response?.status === 401) {
-                        message = 'Nombre de usuario o contraseña incorrectos'; // Manejo de credenciales inválidas
+                        message = 'Nombre de usuario o contraseña incorrectos';
                     } else if (error.response?.status === 409) {
                         message = 'El nombre de usuario ya existe';
                     }
@@ -107,7 +103,9 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
 
             setError(message);
         } finally {
-            setLoading(false);
+            if (isMountedRef.current) {
+                setLoading(false);
+            }
         }
     };
 
@@ -120,14 +118,6 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
                 onClick={(e) => e.stopPropagation()}
                 className='bg-white p-8 rounded-xl shadow-xl w-96 relative animate-in fade-in zoom-in duration-200'
             >
-                <button
-                    onClick={handleClose}
-                    className='absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors'
-                    aria-label='Cerrar modal'
-                >
-                    <X size={24} />
-                </button>
-
                 <h2 className='text-2xl font-extrabold mb-6 text-gray-800'>
                     {isLoginView ? 'Iniciar Sesión' : 'Regístrate aquí'}
                 </h2>
@@ -187,4 +177,5 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
 };
 
 export default AuthModal;
+
 
