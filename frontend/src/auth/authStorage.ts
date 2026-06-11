@@ -1,23 +1,41 @@
 import type { AuthUser } from './authTypes';
 
-const STORAGE_KEY = 'user';
+const USER_KEY = 'user';
+const TOKEN_KEY = 'accessToken'; // Nueva clave para persistir el JWT de forma aislada
 
 function canUseBrowserStorage() {
     return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 }
 
 /**
- * Lee la sesión guardada en el navegador.
- *
- * Este helper existe para concentrar toda la lógica de parseo y validación
- * de localStorage en un solo sitio.
+ * Lee el token JWT guardado en el navegador de forma aislada.
+ */
+export function readStoredToken(): string | null {
+    if (!canUseBrowserStorage()) {
+        return null;
+    }
+    return window.localStorage.getItem(TOKEN_KEY);
+}
+
+/**
+ * Persiste el token de acceso JWT en el navegador de forma segura.
+ */
+export function writeStoredToken(token: string) {
+    if (!canUseBrowserStorage()) {
+        return;
+    }
+    window.localStorage.setItem(TOKEN_KEY, token);
+}
+
+/**
+ * Lee la sesión del usuario guardada en el navegador.
  */
 export function readStoredAuthUser(): AuthUser | null {
     if (!canUseBrowserStorage()) {
         return null;
     }
 
-    const rawValue = window.localStorage.getItem(STORAGE_KEY);
+    const rawValue = window.localStorage.getItem(USER_KEY);
     if (!rawValue) {
         return null;
     }
@@ -39,26 +57,23 @@ export function readStoredAuthUser(): AuthUser | null {
 }
 
 /**
- * Persiste el usuario autenticado.
- *
- * Aunque el estado principal vive en React, localStorage permite restaurar
- * la sesión al recargar la página.
+ * Persiste el usuario autenticado junto con su estructura básica de datos.
  */
 export function writeStoredAuthUser(user: AuthUser) {
     if (!canUseBrowserStorage()) {
         return;
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    window.localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
 /**
- * Elimina la sesión persistida al cerrar sesión.
+ * Elimina completamente los rastros de la sesión (Usuario y JWT) al cerrar sesión.
  */
-export function clearStoredAuthUser() {
+export function clearStoredAuth() {
     if (!canUseBrowserStorage()) {
         return;
     }
-
-    window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(USER_KEY);
+    window.localStorage.removeItem(TOKEN_KEY); // Limpieza absoluta del token
 }

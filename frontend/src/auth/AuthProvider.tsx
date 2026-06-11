@@ -1,37 +1,53 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { AuthUser } from './authTypes';
+import type { AuthUser, AuthTokenResponse } from './authTypes';
 import { AuthContext } from './AuthContext';
-import { clearStoredAuthUser, readStoredAuthUser, writeStoredAuthUser } from './authStorage';
+import { clearStoredAuth, readStoredAuthUser, writeStoredAuthUser, writeStoredToken } from './authStorage';
 
 interface AuthProviderProps {
     children: ReactNode;
 }
 
 /**
- * Provider global de autenticación.
- *
- * Este componente convierte la sesión en una única fuente de verdad para toda
- * la SPA. Cualquier parte de la interfaz puede leer el usuario actual sin
- * depender de props intermedias ni duplicar lógica en varios componentes.
+ * Provider global de autenticación adaptado para JWT.
+ * Convierte el estado de autenticación y el token en la fuente de verdad de la SPA.
  */
 export const AuthProvider = ({ children }: AuthProviderProps) => {
+    // Inicializa el estado leyendo el usuario que ya estaba guardado en localStorage
     const [user, setUser] = useState<AuthUser | null>(() => readStoredAuthUser());
 
-    const login = (nextUser: AuthUser) => {
+    /**
+     * Procesa el inicio de sesión con JWT.
+     * Captura el payload del backend, aislando el token del perfil de usuario.
+     */
+    const login = (tokenData: AuthTokenResponse) => {
+        // 1. Extraer los datos que el frontend necesita para pintar la interfaz
+        const nextUser: AuthUser = {
+            user_id: tokenData.userId,
+            username: tokenData.username,
+            role: tokenData.role,
+            email: tokenData.email
+        };
+
+        // 2. Actualizar el estado de React y la persistencia local de ambos elementos
         setUser(nextUser);
         writeStoredAuthUser(nextUser);
+        writeStoredToken(tokenData.accessToken); // Guardamos el JWT de forma aislada
     };
 
+    /**
+     * Cierra la sesión del usuario limpiando el estado y el almacenamiento.
+     */
     const logout = () => {
         setUser(null);
-        clearStoredAuthUser();
+        clearStoredAuth(); // Limpieza absoluta de usuario y token
     };
 
     const value = useMemo(
         () => ({
             user,
             isAuthenticated: Boolean(user),
+            isLoading: false, // Indicador base requerido por el contrato del contexto
             login,
             logout,
         }),
@@ -40,3 +56,4 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
