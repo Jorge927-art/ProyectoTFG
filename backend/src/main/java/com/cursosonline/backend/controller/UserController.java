@@ -1,8 +1,11 @@
 package com.cursosonline.backend.controller;
 
 import com.cursosonline.backend.dto.AuthResponse;
+import com.cursosonline.backend.dto.AuthTokenResponse;
+import com.cursosonline.backend.dto.LoginRequest;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.exception.ServicesException;
+import com.cursosonline.backend.security.jwt.JwtService;
 import com.cursosonline.backend.services.SessionAuthenticationService;
 import com.cursosonline.backend.services.UserService;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +16,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.List;
 
 @RestController
@@ -22,20 +26,16 @@ import java.util.List;
 
 /**
  * Controlador REST que maneja las solicitudes relacionadas con la autenticación
- * y gestión de usuarios.
- * Proporciona endpoints para el registro de nuevos usuarios, login y obtención
- * del perfil de usuario. Utiliza UserService para delegar la lógica de negocio
- * y ResponseEntity para construir las respuestas HTTP adecuadas.
+ * y gestión de usuarios, soportando de forma híbrida sesiones HTTP
+ * tradicionales y tokens JWT.
  */
 public class UserController {
     private final UserService userService;
     private final SessionAuthenticationService sessionAuthenticationService;
+    private final JwtService jwtService;
 
     /**
      * Endpoint para el registro de nuevos usuarios.
-     * 
-     * @param user
-     * @return
      */
     @PostMapping("/register")
     public ResponseEntity<Users> register(@RequestBody Users user) {
@@ -43,22 +43,43 @@ public class UserController {
     }
 
     /**
-     * Endpoint para el login de usuarios.
-     * 
-     * @param loginRequest
-     * @return
+     * Endpoint híbrido para el login de usuarios.
+     * Genera la sesión tradicional en el servidor y emite un token JWT en la
+     * respuesta HTTP.
      */
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody Users loginRequest, HttpServletRequest request,
+    public ResponseEntity<AuthTokenResponse> login(@RequestBody LoginRequest loginRequest, HttpServletRequest request,
             HttpServletResponse response) {
         try {
-            AuthResponse authResponse = sessionAuthenticationService.login(loginRequest.getUsername(),
-                    loginRequest.getPassword(), request, response);
-            return ResponseEntity.ok(authResponse);
-        } catch (org.springframework.security.core.AuthenticationException e) {
-            return ResponseEntity.status(401).build();
-        } catch (ServicesException e) {
-            // Si el usuario no existe o la contraseña está mal, devolvemos 401
+            // 1. Ejecutar el login tradicional por sesión (mantiene compatibilidad con el
+            // frontend actual)
+            sessionAuthenticationService.login(loginRequest.username(), loginRequest.password(), request, response);
+
+            // 2. Buscar al usuario autenticado para extraer sus datos y pasárselos al token
+            Users user = userService.findByUsername(loginRequest.username())
+                    .orElseThrow(() -> new ServicesException("Usuario no encontrado tras autenticación"));
+
+            // 3. Generar el token JWT de forma aislada a través del método nativo de tu
+            // JwtService
+            // Dado que la entidad Users implementa o puede adaptarse a UserDetails (o
+            // Spring la reconoce), se pasa el objeto.
+            String jwtToken = jwtService.generateAccessToken(user);
+
+            // 4. Extraer el tiempo de expiración del token generado y calcular los segundos
+            // restantes
+            Instant expirationInstant = jwtService.extractExpiration(jwtToken);
+            long expiresInSeconds = expirationInstant != null
+                    ? (expirationInstant.getEpochSecond() - Instant.now().getEpochSecond())
+                    : 0;
+
+            // 5. Construir la nueva respuesta enriquecida con el Bearer Token para el
+            // cliente
+            AuthTokenResponse tokenResponse = AuthTokenResponse.from(user, jwtToken, expiresInSeconds);
+
+            return ResponseEntity.ok(tokenResponse);
+
+        } catch (org.springframework.security.core.AuthenticationException | ServicesException e) {
+            // Si las credenciales están mal o el usuario no existe, devolvemos 401
             return ResponseEntity.status(401).build();
         } catch (Exception e) {
             // Cualquier otro error inesperado
@@ -68,9 +89,6 @@ public class UserController {
 
     /**
      * Endpoint para obtener el perfil de un usuario.
-     * 
-     * @param username
-     * @return
      */
     @GetMapping("/{username}")
     public ResponseEntity<Users> getUserProfile(@PathVariable String username) {
@@ -80,10 +98,9 @@ public class UserController {
     }
 
     /**
-     * Endpoint para obtener el usuario autenticado de la sesión actual.
-     *
-     * @param authentication
-     * @return
+     * Endpoint polimórfico para obtener el usuario autenticado.
+     * Funciona de forma transparente tanto si la identidad proviene de una sesión
+     * HTTP como de un token JWT.
      */
     @GetMapping("/me")
     public ResponseEntity<AuthResponse> me(Authentication authentication) {
@@ -100,12 +117,9 @@ public class UserController {
     /**
      * Endpoint para obtener la lista de todos los usuarios (solo para
      * Administrador).
-     * 
-     * @return
      */
     @GetMapping
     public ResponseEntity<List<Users>> listAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
     }
-
 }
