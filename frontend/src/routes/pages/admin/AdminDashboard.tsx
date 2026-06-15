@@ -120,8 +120,8 @@ const AdminDashboard = () => {
 
                                         <div className="flex items-center gap-2">
                                             <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${String(item.role).toUpperCase().includes('ADMIN') ? 'bg-red-50 text-red-600 border border-red-100' :
-                                                    String(item.role).toUpperCase().includes('PROF') ? 'bg-amber-50 text-amber-600 border border-amber-100' :
-                                                        'bg-blue-50 text-blue-600 border border-blue-100'
+                                                String(item.role).toUpperCase().includes('PROF') ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                                                    'bg-blue-50 text-blue-600 border border-blue-100'
                                                 }`}>
                                                 {String(item.role).toUpperCase().includes('ADMIN') && <Shield size={10} />}
                                                 {item.role}
