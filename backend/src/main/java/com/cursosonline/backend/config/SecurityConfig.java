@@ -65,12 +65,17 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        // Control de acceso por perfiles según los requisitos
                         .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                        // Endpoint para obtener información del usuario autenticado
                         .requestMatchers("/api/auth/me").authenticated()
+                        // Rutas protegidas según roles
                         .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
-                        .requestMatchers("/api/professor/**").hasAuthority("PROFESSOR")
-                        .requestMatchers("/api/student/**").hasAuthority("STUDENT")
+                        .requestMatchers("/api/users/**").hasAuthority("ADMIN")
+                        // Rutas protegidas para profesores y administradores
+                        .requestMatchers("/api/professor/**").hasAnyAuthority("PROFESSOR", "ADMIN")
+                        // Rutas protegidas para estudiantes y administradores
+                        .requestMatchers("/api/student/**").hasAnyAuthority("STUDENT", "ADMIN")
+                        // Cualquier otra solicitud requiere autenticación
                         .anyRequest().authenticated())
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable());
