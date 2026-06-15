@@ -112,6 +112,44 @@ Este documento centraliza las decisiones técnicas críticas tomadas durante el 
 * **Justificación para el TFG:** Demuestra la resolución de problemas de asincronía en aplicaciones de una sola página (*SPA*) bajo criterios de robustez y experiencia de usuario. El control de acceso se transforma en un flujo determinista de dos estados: un estado síncrono de evaluación técnica y un estado condicional de autorización por roles funcionales. Esto blinda las vistas privadas administrativas, docentes y estudiantiles contra renderizados parciales o brechas de visualización indeseadas.
 * **Consecuencias:** Estabilización de la experiencia de usuario en la navegación web. Las rutas protegidas detienen de forma segura las peticiones y se sincronizan perfectamente con la velocidad de respuesta del servidor.
 
+## [ADR-14] Soporte Multirrol Dinámico y Corrección de Ámbito en Bloques Asíncronos (AuthModal & NavbarUser)
+
+### Estatus
+
+Aceptado
+
+### Contexto
+
+Se requería la inclusión de un nuevo rol de usuario (`PROFESSOR`) dentro de la plataforma escolar, el cual debía coexistir de manera jerárquica con los roles preexistentes (`ADMIN` y `STUDENT`).
+
+Al intentar introducir manualmente esta lógica intermedia en el cliente SPA, se produjeron fallos críticos de sintaxis:
+
+1. **Pérdida de Ámbito (Scope) en `AuthModal.tsx`**: Un cierre prematuro de llaves (`}}`) al final de la lógica de éxito en el bloque `try` desconectó el bloque `catch` y `finally` del hilo de ejecución principal de la función asíncrona `handleSubmit`. Esto provocó errores de compilación tales como `Parsing error: 'catch' or 'finally' expected` y bloqueó el acceso a los mutadores de estado reactivos (`setError`, `setLoading`).
+2. **Evaluación Lineal Incorrecta**: La redirección por defecto a la ruta `/student` se ejecutaba de forma secuencial y fuera de un bloque `else` restrictivo, lo que saboteaba el flujo de redirecciones de los roles previos.
+3. **Limitación Estructural en JSX en `NavbarUser.tsx`**: La barra de navegación utilizaba un operador ternario binario tradicional (`condicion ? A : B`). Al intentar mutarlo directamente para un tercer rol mediante una estructura procedural `if/else`, se rompió la especificación sintáctica de JSX, la cual solo admite expresiones evaluables.
+
+### Decisión
+
+1. **Saneamiento y Unificación Estricta en `AuthModal.tsx`**:
+   * Se reestructuró el bloque analizado reubicando las llaves de cierre de forma jerárquica dentro del bloque de captura asíncrono.
+   * Se confinó la lógica de redirección dentro de una estructura de control mutuamente excluyente de tres vías (`if`, `else if`, `else`), garantizando que la asignación de rutas sea atómica e impida la colisión de ejecuciones.
+
+2. **Inyección de Expresiones Procedurales en JSX (IIFE) en `NavbarUser.tsx`**:
+   * Se implementó una función flecha auto-invocada (`(() => { ... })()`) dentro del árbol de renderizado del componente para encapsular lógica procedural condicional compleja (`if / else if / else`).
+   * Se diseñó la identidad visual para el rol docente utilizando un esquema de color esmeralda corporativo (`bg-emerald-50`, `text-emerald-800`, `border-emerald-100`) acoplado al icono descriptivo `BookOpen` de la librería `lucide-react`, manteniendo la paridad estética y de animaciones (`animate-in fade-in`) del resto de roles.
+
+### Consecuencias
+
+#### Positivas
+
+* **Compilación Limpia**: Se eliminaron por completo los errores de parseo y de pérdida de alcance de variables reactivas al restaurar el árbol sintáctico del `try/catch/finally`.
+* **Escalabilidad**: El uso de IIFE en la interfaz JSX desacopla el componente del número de roles existentes, permitiendo añadir futuros estados (ej. `PRECEPTOR`, `DIRECTOR`) sin alterar la arquitectura de la vista.
+* **Seguridad de Flujo**: La estructura condicional excluyente asegura que un usuario redirigido jamás ejecute código residual de otra ruta.
+
+#### Negativas / Deuda Técnica
+
+* **Complejidad en Vistas**: El uso de funciones auto-invocadas directamente en el JSX puede dificultar ligeramente la legibilidad del código si la cantidad de líneas de marcado por rol crece de forma desmedida en el futuro (en ese punto se evaluaría extraer los indicadores a micro-componentes independientes).
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026
