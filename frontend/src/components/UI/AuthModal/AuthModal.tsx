@@ -93,6 +93,8 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
                     const userRole = String(tokenData.role).toUpperCase().trim();
                     if (userRole === 'ADMIN') {
                         window.location.href = '/admin';
+                    } else if (userRole === 'PROFESSOR') {
+                        window.location.href = '/professor';
                     } else {
                         window.location.href = '/student';
                     }
@@ -161,3 +163,4 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
 };
 
 export default AuthModal;
+

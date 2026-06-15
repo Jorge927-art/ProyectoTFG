@@ -10,8 +10,6 @@ import com.cursosonline.backend.services.SessionAuthenticationService;
 import com.cursosonline.backend.services.UserService;
 import lombok.RequiredArgsConstructor;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,16 +21,21 @@ import java.util.List;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "http://localhost:5173")
-
 /**
  * Controlador REST que maneja las solicitudes relacionadas con la autenticación
  * y gestión de usuarios, soportando de forma híbrida sesiones HTTP
  * tradicionales y tokens JWT.
  */
 public class UserController {
+
     private final UserService userService;
     private final SessionAuthenticationService sessionAuthenticationService;
     private final JwtService jwtService;
+
+    // Inyección correcta del contexto de persistencia JPA para limpiar la caché de
+    // consultas
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
 
     /**
      * Endpoint para el registro de nuevos usuarios.
@@ -48,41 +51,38 @@ public class UserController {
      * respuesta HTTP.
      */
     @PostMapping("/login")
-    public ResponseEntity<AuthTokenResponse> login(@RequestBody LoginRequest loginRequest, HttpServletRequest request,
-            HttpServletResponse response) {
+    public ResponseEntity<AuthTokenResponse> login(@RequestBody LoginRequest loginRequest) {
         try {
-            // 1. Ejecutar el login tradicional por sesión (mantiene compatibilidad con el
-            // frontend actual)
-            sessionAuthenticationService.login(loginRequest.username(), loginRequest.password(), request, response);
+            // 1. Autenticar credenciales
+            sessionAuthenticationService.login(loginRequest.username(), loginRequest.password());
 
-            // 2. Buscar al usuario autenticado para extraer sus datos y pasárselos al token
+            // 🔥 TRUCO CLAVE: Forzamos la limpieza de la caché de Hibernate del hilo actual
+            // para obligar al servidor a leer los cambios físicos que hiciste en pgAdmin 4.
+            if (entityManager != null) {
+                entityManager.clear();
+            }
+
+            // 2. Buscar al usuario REAL y FRESCO desde el disco de PostgreSQL
             Users user = userService.findByUsername(loginRequest.username())
                     .orElseThrow(() -> new ServicesException("Usuario no encontrado tras autenticación"));
 
-            // 3. Generar el token JWT de forma aislada a través del método nativo de tu
-            // JwtService
-            // Dado que la entidad Users implementa o puede adaptarse a UserDetails (o
-            // Spring la reconoce), se pasa el objeto.
+            // 3. Generar el token con los datos reales
             String jwtToken = jwtService.generateAccessToken(user);
 
-            // 4. Extraer el tiempo de expiración del token generado y calcular los segundos
-            // restantes
+            // 4. Calcular expiración
             Instant expirationInstant = jwtService.extractExpiration(jwtToken);
             long expiresInSeconds = expirationInstant != null
                     ? (expirationInstant.getEpochSecond() - Instant.now().getEpochSecond())
                     : 0;
 
-            // 5. Construir la nueva respuesta enriquecida con el Bearer Token para el
-            // cliente
+            // 5. Construir respuesta
             AuthTokenResponse tokenResponse = AuthTokenResponse.from(user, jwtToken, expiresInSeconds);
 
             return ResponseEntity.ok(tokenResponse);
 
         } catch (org.springframework.security.core.AuthenticationException | ServicesException e) {
-            // Si las credenciales están mal o el usuario no existe, devolvemos 401
             return ResponseEntity.status(401).build();
         } catch (Exception e) {
-            // Cualquier otro error inesperado
             return ResponseEntity.status(500).build();
         }
     }
