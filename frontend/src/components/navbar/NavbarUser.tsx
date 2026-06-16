@@ -52,7 +52,7 @@ const NavbarUser = ({ username, userPhoto, onLogout, onProfileClick }: NavbarUse
                             /* 🔴 INDICADOR MODO ADMINISTRADOR: Estilo rojo/slate corporativo de gestión */
                             <div className="bg-red-50 px-3 py-1 rounded-full border border-red-100 flex items-center gap-1.5 text-red-800 font-bold text-[11px] uppercase tracking-wider shadow-sm animate-in fade-in duration-300">
                                 <ShieldAlert size={14} className="text-red-600" />
-                                <span>Modo Administrador</span>
+                                <span>Administrador</span>
                             </div>
                         );
                     } else if (currentRole === 'PROFESSOR') {
@@ -60,7 +60,7 @@ const NavbarUser = ({ username, userPhoto, onLogout, onProfileClick }: NavbarUse
                             /* 🟢 INDICADOR MODO PROFESOR: Estilo esmeralda corporativo docente */
                             <div className="bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 flex items-center gap-1.5 text-emerald-800 font-bold text-[11px] uppercase tracking-wider shadow-sm animate-in fade-in duration-300">
                                 <BookOpen size={14} className="text-emerald-600" />
-                                <span>Modo Profesor</span>
+                                <span>Profesor</span>
                             </div>
                         );
                     } else {
@@ -68,7 +68,7 @@ const NavbarUser = ({ username, userPhoto, onLogout, onProfileClick }: NavbarUse
                             /* 🔵 INDICADOR MODO ALUMNO: Estilo azul académico */
                             <div className="bg-blue-50 px-3 py-1 rounded-full border border-blue-100 flex items-center gap-1.5 text-blue-800 font-bold text-[11px] uppercase tracking-wider shadow-sm animate-in fade-in duration-300">
                                 <GraduationCap size={14} className="text-blue-600" />
-                                <span>Modo Alumno</span>
+                                <span>Alumno</span>
                             </div>
                         );
                     }
