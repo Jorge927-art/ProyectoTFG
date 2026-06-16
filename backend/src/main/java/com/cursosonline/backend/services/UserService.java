@@ -85,4 +85,28 @@ public class UserService {
         return userRepository.findAll();
     }
 
+    /**
+     * Actualiza el rol de un usuario específico en la plataforma.
+     * 
+     * @param username El nombre de usuario al que se le cambiará el rol.
+     * @param newRole  El nuevo rol a asignar (ADMIN, PROFESSOR, STUDENT).
+     * @return El usuario con el rol actualizado.
+     */
+
+    /**
+     * Actualiza el rol de un usuario específico en la plataforma.
+     * 
+     * @param username
+     * @param newRole
+     * @return
+     */
+    @Transactional
+    public Users updateUserRole(String username, Role newRole) {
+        Users user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ServicesException("Usuario no encontrado para actualizar el rol"));
+
+        user.setRole(newRole);
+        return userRepository.save(user);
+    }
+
 }

@@ -17,7 +17,7 @@ const AdminDashboard = () => {
     const [updatingId, setUpdatingId] = useState<number | null>(null);
     const [error, setError] = useState<string>('');
 
-    // 🟢 FUNCIÓN QUIRÚRGICA: Ataca de forma real al endpoint verificado de tu Spring Boot
+    // 1. FUNCIÓN DE BÚSQUEDA: Consulta directa al endpoint de Spring Boot
     const handleSearchUser = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!searchName.trim()) return;
@@ -46,20 +46,28 @@ const AdminDashboard = () => {
         }
     };
 
+    // 2. FUNCIÓN DE ACTUALIZACIÓN: Se conecta con el endpoint PATCH administrativo
     const handleRoleChange = async (targetId: number, newRole: string) => {
+        if (!foundUser) return;
         setUpdatingId(targetId);
+        setError('');
+
         try {
-            // Intenta persistir de forma asíncrona la mutación del rol
-            await apiClient.patch(`/api/auth/${foundUser?.username}/role`, { role: newRole });
-            if (foundUser) {
+            // Ataca la ruta exacta: /api/auth/users/{username}/role pasándole {"role": "..."}
+            const response = await apiClient.patch(`/api/auth/users/${foundUser.username}/role`, {
+                role: newRole
+            });
+
+            if (response.status === 200) {
                 setFoundUser({ ...foundUser, role: newRole });
             }
         } catch (err) {
-            console.error("Error de persistencia en red, aplicando mutación reactiva local:", err);
-            // Sincroniza localmente la interfaz para asegurar el flujo visual reactivo
-            if (foundUser) {
-                setFoundUser({ ...foundUser, role: newRole });
+            console.error("Error al cambiar el rol en el servidor:", err);
+            let message = 'No se pudo actualizar el rol en la base de datos.';
+            if (axios.isAxiosError(err) && err.response?.data?.message) {
+                message = err.response.data.message;
             }
+            setError(message);
         } finally {
             setUpdatingId(null);
         }
@@ -89,7 +97,7 @@ const AdminDashboard = () => {
                     <form onSubmit={handleSearchUser} className="flex gap-2 mb-4">
                         <input
                             type="text"
-                            placeholder="Introduce el nombre (ej. Luis)"
+                            placeholder="Introduce el nombre (ej. Laura)"
                             value={searchName}
                             onChange={(e) => setSearchName(e.target.value)}
                             required
@@ -106,7 +114,7 @@ const AdminDashboard = () => {
                         </button>
                     </form>
 
-                    {/* Manejo de Estados de Red pasivos */}
+                    {/* Manejo de Errores */}
                     {error && (
                         <div className="bg-red-50 border border-red-100 text-red-600 p-3 rounded-xl text-xs font-semibold mb-2 animate-in fade-in duration-200">
                             ⚠️ {error}
@@ -127,19 +135,23 @@ const AdminDashboard = () => {
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                    <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${String(foundUser.role).toUpperCase().includes('ADMIN') ? 'bg-red-50 text-red-600 border border-red-100' :
-                                            String(foundUser.role).toUpperCase().includes('PROF') ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                                    {/* Badge de Rol Dinámico con esquema Esmeralda para PROFESSOR */}
+                                    <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold tracking-wider uppercase ${String(foundUser.role).toUpperCase().includes('ADMIN')
+                                            ? 'bg-red-50 text-red-600 border border-red-100' :
+                                            String(foundUser.role).toUpperCase().includes('PROF')
+                                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                                                 'bg-blue-50 text-blue-600 border border-blue-100'
                                         }`}>
                                         {String(foundUser.role).toUpperCase().includes('ADMIN') && <Shield size={10} />}
                                         {foundUser.role}
                                     </span>
 
+                                    {/* Desplegable interactivo */}
                                     <select
                                         value={foundUser.role}
                                         disabled={updatingId === (foundUser.userId || foundUser.id)}
                                         onChange={(e) => handleRoleChange(foundUser.userId || foundUser.id || 1, e.target.value)}
-                                        className="text-xs font-bold bg-slate-50 border border-slate-200 text-slate-700 rounded-lg py-1 px-1.5 focus:outline-none"
+                                        className="text-xs font-bold bg-white border border-slate-200 text-slate-700 rounded-lg py-1 px-1.5 focus:outline-none cursor-pointer hover:border-slate-300 disabled:opacity-50 transition-all"
                                         title={`Modificar privilegios de ${foundUser.username}`}
                                         aria-label={`Modificar privilegios de ${foundUser.username}`}
                                     >
@@ -152,7 +164,6 @@ const AdminDashboard = () => {
                         </div>
                     )}
                 </div>
-
             </main>
         </div>
     );

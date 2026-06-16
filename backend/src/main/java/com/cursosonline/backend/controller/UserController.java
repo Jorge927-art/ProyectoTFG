@@ -14,6 +14,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+import com.cursosonline.backend.entities.Role;
+
 import java.time.Instant;
 import java.util.List;
 
@@ -122,4 +125,75 @@ public class UserController {
     public ResponseEntity<List<Users>> listAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
     }
+
+    /**
+     * Endpoint exclusivo para que el Administrador cambie el rol de cualquier
+     * usuario.
+     * Ruta: PATCH http://localhost:8080/api/auth/users/{username}/role
+     * Cuerpo JSON: { "role": "PROFESSOR" }
+     */
+    @PatchMapping("/users/{username}/role")
+    public ResponseEntity<?> changeUserRoleByAdmin(
+            Authentication authentication,
+            @PathVariable String username,
+            @RequestBody Map<String, String> requestBody) {
+
+        // 1. Verificación básica de sesión
+        if (authentication == null || authentication.getName() == null) {
+            return ResponseEntity.status(401).body(Map.of("message", "Usuario no autenticado"));
+        }
+
+        try {
+            // 2. Control de acceso: Verificar que quien hace la petición sea realmente un
+            // ADMIN
+            // Nota: Si usas anotaciones como @PreAuthorize("hasRole('ADMIN')") en tu
+            // proyecto,
+            // puedes omitir este bloque if y delegarlo a Spring Security.
+            Users adminUser = userService.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new ServicesException("Administrador no encontrado"));
+
+            if (!"ADMIN".equals(adminUser.getRole().name())) {
+                return ResponseEntity.status(403)
+                        .body(Map.of("message", "Acceso denegado: Se requieren permisos de Administrador"));
+            }
+
+            // 3. Validar el campo 'role' recibido del desplegable del frontend
+            String roleStr = requestBody.get("role");
+            if (roleStr == null || roleStr.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "El campo 'role' es requerido"));
+            }
+
+            // 4. Mapear la cadena al ENUM Role de forma segura
+            Role newRole;
+            try {
+                newRole = Role.valueOf(roleStr.toUpperCase().trim());
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("message", "Rol inválido. Opciones válidas: STUDENT, PROFESSOR, ADMIN"));
+            }
+
+            // 5. Modificar el rol del usuario destino en PostgreSQL
+            Users updatedUser = userService.updateUserRole(username, newRole);
+
+            // 🔥 Sincronizamos la caché de Hibernate para que los listados del admin
+            // reflejen el cambio de inmediato
+            if (entityManager != null) {
+                entityManager.clear();
+            }
+
+            // 6. Retornar el usuario modificado con su nuevo rol reflejado
+            return ResponseEntity.ok(Map.of(
+                    "username", updatedUser.getUsername(),
+                    "role", updatedUser.getRole().name(),
+                    "message",
+                    "El rol del usuario " + username + " fue actualizado a " + newRole.name() + " con éxito."));
+
+        } catch (ServicesException e) {
+            return ResponseEntity.status(404).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body(Map.of("message", "Error interno al procesar el cambio de rol: " + e.getMessage()));
+        }
+    }
+
 }

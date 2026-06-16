@@ -81,13 +81,12 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 const Input = ({ label, error, className, ...props }: InputProps) => {
     // Clases base aplicadas a todos los inputs (sin importar el estado)
     const baseStyles = 'border p-3 rounded-xl bg-gray-50 outline-none transition-all';
-    
+
     // Clases dinámicas según estado de validación
     // Si hay error: borde rojo y ring rojo. Si no: borde gris y ring azul.
     const stateStyles = error
         ? 'border-red-500 focus:ring-2 focus:ring-red-200'
         : 'border-gray-200 focus:ring-2 focus:ring-blue-500';
-    
     // Combina clases base, dinámicas y personalizadas (className del usuario)
     // El orden es importante: base → estado → personalizadas (para permitir sobrescrituras)
     const inputClasses = `${baseStyles} ${stateStyles} ${className || ''}`.trim();

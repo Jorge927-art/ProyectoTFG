@@ -5,22 +5,29 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/**
+ * Filtro de autenticación JWT de alto rendimiento y libre de duplicidades.
+ * Extrae y valida la identidad y roles directamente desde el Token en memoria,
+ * eliminando las consultas redundantes a PostgreSQL en cada petición HTTP.
+ */
+@Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final UserDetailsService userDetailsService;
 
-    // Constructor manual para inyectarlo fácilmente en la configuración
-    public JwtAuthenticationFilter(JwtService jwtService, UserDetailsService userDetailsService) {
+    // Inyección limpia del servicio de tokens
+    public JwtAuthenticationFilter(JwtService jwtService) {
         this.jwtService = jwtService;
-        this.userDetailsService = userDetailsService;
     }
 
     @Override
@@ -31,35 +38,51 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String jwt;
         final String username;
 
-        // ESTRATEGIA DE CONVIVENCIA: Si no viene cabecera Bearer, permitimos que
-        // continúe la petición.
-        // Esto permite que actúe la sesión HTTP tradicional como fallback (respaldo).
+        // Si no se suministra un token Bearer válido, delegamos a la cadena estándar
+        // (Stateless)
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
         jwt = authHeader.substring(7);
-        username = jwtService.extractUsername(jwt); // Extracción conceptual de la identidad
 
-        // Si el token tiene un usuario válido y no está autenticado en el contexto
-        // actual
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
+        try {
+            username = jwtService.extractUsername(jwt);
 
-            // Validamos criptográficamente el token con el servicio aislado
-            if (jwtService.isTokenValid(jwt, userDetails)) {
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            // Si el token es válido y el contexto de seguridad actual se encuentra libre
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-                // Establecemos la identidad en el contexto de Spring Security para esta
-                // petición
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                // 🔴 RENDIMIENTO PURO JWT: Extraemos el rol guardado en el token sin golpear la
+                // BBDD
+                String role = jwtService.extractRole(jwt);
+
+                // Si el token es estructural y criptográficamente válido
+                if (jwtService.isTokenValid(jwt)) {
+
+                    // Reconstruimos la lista de autoridades autorizadas usando el rol del token
+                    List<SimpleGrantedAuthority> authorities = (role != null)
+                            ? List.of(new SimpleGrantedAuthority(role))
+                            : List.of();
+
+                    // Instanciamos un UserDetails virtual ligero en memoria
+                    UserDetails userDetails = new User(username, "", authorities);
+
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails, null, userDetails.getAuthorities());
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                    // Establecemos la identidad en el contexto de Spring Security para el ciclo de
+                    // vida de esta petición
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
+        } catch (Exception ex) {
+            // Salvaguarda: Si el token está corrupto o mal firmado, limpiamos el contexto
+            SecurityContextHolder.clearContext();
         }
 
-        // Continuamos la cadena de filtros
+        // Continuamos la cadena de filtros de forma limpia
         filterChain.doFilter(request, response);
     }
 }

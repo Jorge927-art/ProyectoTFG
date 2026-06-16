@@ -23,9 +23,8 @@ import java.util.regex.Pattern;
 
 /**
  * Servicio de bajo nivel para generar y validar JWT firmados con HS256.
- *
  * Mantiene la lógica de codificación, verificación de firma y expiración
- * separada del resto de la seguridad para facilitar la Fase 1 de la migración.
+ * aislada.
  */
 @Service
 @RequiredArgsConstructor
@@ -70,7 +69,13 @@ public class JwtService {
     }
 
     public boolean isTokenValid(String token) {
-        return isTokenValid(token, null);
+        try {
+            Map<String, Object> claims = parseAndVerify(token);
+            String username = asString(claims.get("sub"));
+            return username != null && !isExpired(claims);
+        } catch (RuntimeException ex) {
+            return false;
+        }
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
@@ -80,12 +85,7 @@ public class JwtService {
             if (username == null || isExpired(claims)) {
                 return false;
             }
-
-            if (userDetails != null && !username.equals(userDetails.getUsername())) {
-                return false;
-            }
-
-            return true;
+            return userDetails == null || username.equals(userDetails.getUsername());
         } catch (RuntimeException ex) {
             return false;
         }
@@ -152,207 +152,92 @@ public class JwtService {
         byte[] actualSignature = BASE64_URL_DECODER.decode(parts[2]);
 
         if (!MessageDigest.isEqual(expectedSignature, actualSignature)) {
-            throw new IllegalArgumentException("Firma JWT inválida");
+            throw new SecurityException("Firma del token inválida");
         }
 
         String payloadJson = new String(BASE64_URL_DECODER.decode(parts[1]), StandardCharsets.UTF_8);
-        return parseClaims(payloadJson);
+        return parseJson(payloadJson);
+    }
+
+    private <T> T getClaim(String token, String claimKey, Class<T> type) {
+        try {
+            Map<String, Object> claims = parseAndVerify(token);
+            Object value = claims.get(claimKey);
+            if (value == null)
+                return null;
+            if (type == Long.class && value instanceof Number) {
+                return type.cast(((Number) value).longValue());
+            }
+            return type.cast(value);
+        } catch (Exception ex) {
+            throw new RuntimeException("Error al extraer claim: " + claimKey, ex);
+        }
     }
 
     private boolean isExpired(Map<String, Object> claims) {
-        Long exp = asLong(claims.get("exp"));
-        if (exp == null) {
-            return true;
+        Object expObj = claims.get("exp");
+        if (expObj instanceof Number) {
+            long expSeconds = ((Number) expObj).longValue();
+            return Instant.ofEpochSecond(expSeconds).isBefore(Instant.now(clock));
         }
-
-        Instant expiration = Instant.ofEpochSecond(exp);
-        Instant now = Instant.now(clock).minusSeconds(jwtProperties.getClockSkewSeconds());
-        return now.isAfter(expiration);
-    }
-
-    private <T> T getClaim(String token, String claimName, Class<T> type) {
-        Map<String, Object> claims = parseAndVerify(token);
-        Object value = claims.get(claimName);
-        if (value == null) {
-            return null;
-        }
-
-        if (type.isInstance(value)) {
-            return type.cast(value);
-        }
-
-        if (type == Long.class) {
-            return type.cast(asLong(value));
-        }
-
-        if (type == Integer.class) {
-            Long numericValue = asLong(value);
-            return numericValue == null ? null : type.cast(numericValue.intValue());
-        }
-
-        return type.cast(value.toString());
-    }
-
-    private byte[] serializeClaims(Map<String, Object> claims) {
-        return toJson(claims).getBytes(StandardCharsets.UTF_8);
-    }
-
-    private Map<String, Object> parseClaims(String json) {
-        String trimmed = json.trim();
-        if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
-            throw new IllegalArgumentException("Contenido JWT inválido");
-        }
-
-        Map<String, Object> claims = new LinkedHashMap<>();
-        Matcher matcher = JSON_FIELD_PATTERN.matcher(trimmed);
-        int lastEnd = 1;
-        while (matcher.find()) {
-            String between = trimmed.substring(lastEnd, matcher.start()).trim();
-            if (!between.isEmpty() && !",".equals(between)) {
-                throw new IllegalArgumentException("Contenido JWT inválido");
-            }
-
-            String key = unescapeJson(matcher.group(1));
-            String rawValue = matcher.group(2);
-            claims.put(key, parseJsonValue(rawValue, matcher.group(3)));
-            lastEnd = matcher.end();
-        }
-
-        String tail = trimmed.substring(lastEnd, trimmed.length() - 1).trim();
-        if (!tail.isEmpty()) {
-            throw new IllegalArgumentException("Contenido JWT inválido");
-        }
-
-        return claims;
-    }
-
-    private Object parseJsonValue(String rawValue, String stringContent) {
-        if (rawValue.startsWith("\"")) {
-            return unescapeJson(stringContent);
-        }
-
-        if ("true".equals(rawValue) || "false".equals(rawValue)) {
-            return Boolean.parseBoolean(rawValue);
-        }
-
-        if ("null".equals(rawValue)) {
-            return null;
-        }
-
-        return Long.parseLong(rawValue);
-    }
-
-    private String toJson(Map<String, Object> claims) {
-        StringBuilder builder = new StringBuilder("{");
-        boolean first = true;
-        for (Map.Entry<String, Object> entry : claims.entrySet()) {
-            if (!first) {
-                builder.append(',');
-            }
-            builder.append('"').append(escapeJson(entry.getKey())).append('"').append(':')
-                    .append(formatJsonValue(entry.getValue()));
-            first = false;
-        }
-        return builder.append('}').toString();
-    }
-
-    private String formatJsonValue(Object value) {
-        if (value == null) {
-            return "null";
-        }
-
-        if (value instanceof Number || value instanceof Boolean) {
-            return value.toString();
-        }
-
-        return '"' + escapeJson(value.toString()) + '"';
-    }
-
-    private String escapeJson(String value) {
-        StringBuilder builder = new StringBuilder(value.length());
-        for (char character : value.toCharArray()) {
-            switch (character) {
-                case '\\' -> builder.append("\\\\");
-                case '"' -> builder.append("\\\"");
-                case '\b' -> builder.append("\\b");
-                case '\f' -> builder.append("\\f");
-                case '\n' -> builder.append("\\n");
-                case '\r' -> builder.append("\\r");
-                case '\t' -> builder.append("\\t");
-                default -> {
-                    if (character < 0x20) {
-                        builder.append(String.format("\\u%04x", (int) character));
-                    } else {
-                        builder.append(character);
-                    }
-                }
-            }
-        }
-        return builder.toString();
-    }
-
-    private String unescapeJson(String value) {
-        StringBuilder builder = new StringBuilder(value.length());
-        for (int index = 0; index < value.length(); index++) {
-            char character = value.charAt(index);
-            if (character != '\\') {
-                builder.append(character);
-                continue;
-            }
-
-            if (index + 1 >= value.length()) {
-                throw new IllegalArgumentException("Contenido JWT inválido");
-            }
-
-            char escaped = value.charAt(++index);
-            switch (escaped) {
-                case '"' -> builder.append('"');
-                case '\\' -> builder.append('\\');
-                case '/' -> builder.append('/');
-                case 'b' -> builder.append('\b');
-                case 'f' -> builder.append('\f');
-                case 'n' -> builder.append('\n');
-                case 'r' -> builder.append('\r');
-                case 't' -> builder.append('\t');
-                case 'u' -> {
-                    if (index + 4 >= value.length()) {
-                        throw new IllegalArgumentException("Contenido JWT inválido");
-                    }
-                    String hex = value.substring(index + 1, index + 5);
-                    builder.append((char) Integer.parseInt(hex, 16));
-                    index += 4;
-                }
-                default -> throw new IllegalArgumentException("Contenido JWT inválido");
-            }
-        }
-        return builder.toString();
-    }
-
-    private String base64Url(byte[] value) {
-        return BASE64_URL_ENCODER.encodeToString(value);
+        return true;
     }
 
     private String resolvePrimaryAuthority(Collection<? extends GrantedAuthority> authorities) {
-        if (authorities == null || authorities.isEmpty()) {
+        if (authorities == null || authorities.isEmpty())
             return null;
-        }
-
         return authorities.iterator().next().getAuthority();
     }
 
-    private String asString(Object value) {
-        return value == null ? null : value.toString();
+    private String base64Url(byte[] bytes) {
+        return BASE64_URL_ENCODER.encodeToString(bytes);
     }
 
-    private Long asLong(Object value) {
-        if (value instanceof Number number) {
-            return number.longValue();
-        }
+    private String asString(Object obj) {
+        return obj instanceof String ? (String) obj : null;
+    }
 
-        if (value == null) {
-            return null;
+    private byte[] serializeClaims(Map<String, Object> claims) {
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (Map.Entry<String, Object> entry : claims.entrySet()) {
+            if (!first)
+                sb.append(",");
+            first = false;
+            sb.append("\"").append(entry.getKey()).append("\":");
+            Object val = entry.getValue();
+            if (val instanceof String) {
+                sb.append("\"").append(val).append("\"");
+            } else {
+                sb.append(val);
+            }
         }
+        sb.append("}");
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
+    }
 
-        return Long.parseLong(value.toString());
+    private Map<String, Object> parseJson(String json) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        Matcher matcher = JSON_FIELD_PATTERN.matcher(json);
+        while (matcher.find()) {
+            String key = matcher.group(1);
+            String valueStr = matcher.group(2);
+            if (valueStr.startsWith("\"")) {
+                map.put(key, matcher.group(3));
+            } else if (valueStr.equals("true")) {
+                map.put(key, true);
+            } else if (valueStr.equals("false")) {
+                map.put(key, false);
+            } else if (valueStr.equals("null")) {
+                map.put(key, null);
+            } else {
+                try {
+                    map.put(key, Long.parseLong(valueStr));
+                } catch (NumberFormatException e) {
+                    map.put(key, Double.parseDouble(valueStr));
+                }
+            }
+        }
+        return map;
     }
 }
