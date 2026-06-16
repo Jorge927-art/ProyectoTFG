@@ -75,9 +75,9 @@ Este documento centraliza las decisiones técnicas críticas tomadas durante el 
 * **Fecha:** Junio 2026
 * **Estatus:** Aceptado
 * **Contexto:** Tras rediseñar el almacenamiento de tokens en React, se requería adaptar la interfaz gráfica de inicio de sesión (`AuthModal.tsx`) para consumir el nuevo payload del servidor sin alterar el diseño visual, las animaciones ni la experiencia de usuario de los formularios de la SPA.
-* **Decisión:** Refactorizar la función controladora del formulario de Login para realizar el tipado estático seguro (*type casting*) de la respuesta HTTP de Axios hacia la interfaz `AuthTokenResponse`, delegando el almacenamiento inmediato del token de acceso de red y los metadatos de perfil en el despachador global del contexto.
-* **Justificación para el TFG:** Demuestra un diseño basado en el principio de menor conocimiento o Ley de Demeter aplicada a interfaces web. El componente visual de la vista (`AuthModal`) no tiene conocimiento de cómo ni dónde se almacena el JWT en el navegador, ni tampoco conoce los mecanismos criptográficos del backend; su única responsabilidad consiste en capturar las credenciales, transmitirlas a la API y despachar la respuesta exitosa al contexto de la aplicación, garantizando un código modular, escalable y mantenible.
-* **Consecuencias:** Sincronización completa del flujo de Login web con el backend híbrido. La SPA es capaz de iniciar sesión de forma transparente emitiendo el token en local y manteniendo el Semáforo de compilación limpio de advertencias en TypeScript.
+* **Decisión:** Refactorizar la función controladora del formulario de Login para realizar el tipado estático seguro (*type casting*) de la respuesta HTTP de Axios hacia la interfaz `AuthTokenResponse`, delegando el almacenamiento inmediato del token de acceso de red y los metadatos de perfil en el storage local y actualizando el estado de autenticación de la aplicación de forma transparente.
+* **Justificación para el TFG:** Demuestra la capacidad de consumir APIs bajo contratos de tipado estricto en entornos corporativos. Al desligar el procesamiento del payload JSON de la capa de presentación visual, se garantiza que los componentes gráficos permanezcan aislados frente a futuras modificaciones en la estructura de las propiedades devueltas por Spring Boot.
+* **Consecuencias:** Se logra un flujo de autenticación seguro, tipado y completamente operativo que actualiza el estado reactivo global del cliente de manera síncrona tras la verificación de las credenciales en PostgreSQL.
 
 ---
 
@@ -103,52 +103,28 @@ Este documento centraliza las decisiones técnicas críticas tomadas durante el 
 
 ---
 
-## [ADR-10] Mitigación de Redirecciones Prematuras en Clientes SPA mediante Guardianes Asíncronos
+## [ADR-10] Arquitectura de Layouts Modulares por Composición Especializada
 
 * **Fecha:** Junio 2026
 * **Estatus:** Aceptado
-* **Contexto:** Al introducir la hidratación asíncrona de la sesión en el cliente, el componente de guardia de navegación (`ProtectedRoute.tsx`) evaluaba el acceso de forma inmediata antes de recibir la respuesta HTTP del backend. Esto provocaba un comportamiento anómalo que expulsaba a usuarios con tokens válidos hacia la vista pública en cada recarga de página (*F5*).
-* **Decisión:** Interceptar el flujo de renderizado del guardián base mediante la bandera reactiva de sincronización `isLoading`, inyectando una pantalla de transición transitoria hasta que el proveedor de autenticación resuelva el estado de identidad definitivo.
-* **Justificación para el TFG:** Demuestra la resolución de problemas de asincronía en aplicaciones de una sola página (*SPA*) bajo criterios de robustez y experiencia de usuario. El control de acceso se transforma en un flujo determinista de dos estados: un estado síncrono de evaluación técnica y un estado condicional de autorización por roles funcionales. Esto blinda las vistas privadas administrativas, docentes y estudiantiles contra renderizados parciales o brechas de visualización indeseadas.
-* **Consecuencias:** Estabilización de la experiencia de usuario en la navegación web. Las rutas protegidas detienen de forma segura las peticiones y se sincronizan perfectamente con la velocidad de respuesta del servidor.
+* **Contexto:** La plataforma web integra tres perfiles de usuario diferenciados (Administrador, Profesor y Estudiante). Cada rol demanda disposiciones espaciales, densidades de información y geometrías visuales asimétricas (por ejemplo, búsquedas en contenedores contenidos frente a métricas y cursos en grids multi-columna). Se requiere una solución arquitectónica en el frontend que centralice los elementos globales invariables (la barra de navegación, la inyección del contexto de sesión y los estilos base de la aplicación) sin condicionar la flexibilidad de diseño ni acoplar los paneles entre sí.
+* **Decisión:** Implementar un patrón de diseño estructural basado en un Layout Base abstracto (`DashboardLayout.tsx`) acoplado de forma autónoma al hook de autenticación global (`useAuth`), y derivar de él tres Layouts Especializados mediante composición de software (`AdminLayout.tsx`, `ProfessorLayout.tsx` y `StudentLayout.tsx`). Cada página de rol se envuelve exclusivamente en su layout correspondiente, delegando la maquetación geométrica general.
+* **Justificación para el TFG:** Demuestra la aplicación rigurosa de los principios SOLID de la ingeniería del software. Al utilizar composición en lugar de herencia rígida o layouts monolíticos condicionales, se cumple con el *Single Responsibility Principle (SRP)* y el *Open/Closed Principle (OCP)*. El Layout Base queda cerrado a modificaciones estructurales pero abierto a la extensión táctica de cada rol. Si las necesidades del negocio exigen incorporar barras laterales (Sidebars) para el administrador o menús flotantes de IA para el estudiante, el radio de impacto y fallo queda estrictamente aislado, garantizando la inmunidad de las demás vistas del sistema.
+* **Consecuencias:**
+  * **Principio DRY Global:** Las directrices estéticas de Tailwind CSS (`min-h-screen`, `bg-slate-50`, `font-sans`) y la orquestación de la barra `<NavbarUser />` se gestionan en un único punto del proyecto, simplificando el mantenimiento general.
+  * **Garantía de Accesibilidad (a11y):** Se introducen enlaces explícitos y semánticos mediante el atributo `htmlFor` e identificadores únicos (`id`) en los componentes interactivos de los layouts (como selectores de rol), cumpliendo de forma nativa con los estándares WCAG y garantizando la compatibilidad con lectores de pantalla.
+  * **Carga de Trabajo Desacoplada:** Las páginas del cliente (`AdminDashboard`, `ProfessorDashboard`, `StudentDashboard`) quedan completamente liberadas de ruido visual e infraestructura estructural, focalizando su código de forma pura en la lógica de estado de React, efectos secundarios y peticiones Axios hacia Spring Boot.
 
 ## [ADR-14] Soporte Multirrol Dinámico y Corrección de Ámbito en Bloques Asíncronos (AuthModal & NavbarUser)
 
-### Estatus
-
-Aceptado
-
-### Contexto
-
-Se requería la inclusión de un nuevo rol de usuario (`PROFESSOR`) dentro de la plataforma escolar, el cual debía coexistir de manera jerárquica con los roles preexistentes (`ADMIN` y `STUDENT`).
-
-Al intentar introducir manualmente esta lógica intermedia en el cliente SPA, se produjeron fallos críticos de sintaxis:
-
-1. **Pérdida de Ámbito (Scope) en `AuthModal.tsx`**: Un cierre prematuro de llaves (`}}`) al final de la lógica de éxito en el bloque `try` desconectó el bloque `catch` y `finally` del hilo de ejecución principal de la función asíncrona `handleSubmit`. Esto provocó errores de compilación tales como `Parsing error: 'catch' or 'finally' expected` y bloqueó el acceso a los mutadores de estado reactivos (`setError`, `setLoading`).
-2. **Evaluación Lineal Incorrecta**: La redirección por defecto a la ruta `/student` se ejecutaba de forma secuencial y fuera de un bloque `else` restrictivo, lo que saboteaba el flujo de redirecciones de los roles previos.
-3. **Limitación Estructural en JSX en `NavbarUser.tsx`**: La barra de navegación utilizaba un operador ternario binario tradicional (`condicion ? A : B`). Al intentar mutarlo directamente para un tercer rol mediante una estructura procedural `if/else`, se rompió la especificación sintáctica de JSX, la cual solo admite expresiones evaluables.
-
-### Decisión
-
-1. **Saneamiento y Unificación Estricta en `AuthModal.tsx`**:
-   * Se reestructuró el bloque analizado reubicando las llaves de cierre de forma jerárquica dentro del bloque de captura asíncrono.
-   * Se confinó la lógica de redirección dentro de una estructura de control mutuamente excluyente de tres vías (`if`, `else if`, `else`), garantizando que la asignación de rutas sea atómica e impida la colisión de ejecuciones.
-
-2. **Inyección de Expresiones Procedurales en JSX (IIFE) en `NavbarUser.tsx`**:
-   * Se implementó una función flecha auto-invocada (`(() => { ... })()`) dentro del árbol de renderizado del componente para encapsular lógica procedural condicional compleja (`if / else if / else`).
-   * Se diseñó la identidad visual para el rol docente utilizando un esquema de color esmeralda corporativo (`bg-emerald-50`, `text-emerald-800`, `border-emerald-100`) acoplado al icono descriptivo `BookOpen` de la librería `lucide-react`, manteniendo la paridad estética y de animaciones (`animate-in fade-in`) del resto de roles.
-
-### Consecuencias
-
-#### Positivas
-
-* **Compilación Limpia**: Se eliminaron por completo los errores de parseo y de pérdida de alcance de variables reactivas al restaurar el árbol sintáctico del `try/catch/finally`.
-* **Escalabilidad**: El uso de IIFE en la interfaz JSX desacopla el componente del número de roles existentes, permitiendo añadir futuros estados (ej. `PRECEPTOR`, `DIRECTOR`) sin alterar la arquitectura de la vista.
-* **Seguridad de Flujo**: La estructura condicional excluyente asegura que un usuario redirigido jamás ejecute código residual de otra ruta.
-
-#### Negativas / Deuda Técnica
-
-* **Complejidad en Vistas**: El uso de funciones auto-invocadas directamente en el JSX puede dificultar ligeramente la legibilidad del código si la cantidad de líneas de marcado por rol crece de forma desmedida en el futuro (en ese punto se evaluaría extraer los indicadores a micro-componentes independientes).
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Se requería la inclusión de un nuevo rol de usuario (`PROFESSOR`) dentro de la plataforma escolar, el cual debía coexistir de manera jerárquica con los roles preexistentes (`ADMIN` y `STUDENT`). Al intentar introducir manualmente esta lógica intermedia en el cliente SPA, se produjeron fallos críticos de sintaxis: una pérdida de ámbito (Scope) en `AuthModal.tsx` por un cierre prematuro de llaves (`}}`) que desconectó los bloques `catch` y `finally` provocando el error `Parsing error: 'catch' or 'finally' expected`; una evaluación lineal incorrecta que ejecutaba siempre la ruta `/student` de forma secuencial; y una limitación estructural en JSX dentro de `NavbarUser.tsx`, ya que el operador ternario binario tradicional (`condicion ? A : B`) no admitía una estructura procedural `if/else` directa.
+* **Decisión:** Saneamiento y unificación del flujo mediante dos estrategias en el frontend:
+  1. Reestructurar las llaves jerárquicas del bloque de captura asíncrono en `AuthModal.tsx` y confinar la redirección dentro de una estructura de control de tres vías (`if`, `else if`, `else`) mutuamente excluyente y atómica.
+  2. Implementar una función flecha auto-invocada (IIFE: `(() => { ... })()`) dentro del árbol de renderizado JSX de `NavbarUser.tsx` para encapsular la lógica condicional múltiple. Se diseñó la identidad visual docente con un esquema esmeralda corporativo (`bg-emerald-50`, `text-emerald-800`) acoplado al icono descriptivo `BookOpen` de `lucide-react`.
+* **Justificación para el TFG:** Demuestra el dominio de la especificación técnica de ECMAScript y la arquitectura de componentes reactivos en aplicaciones de gran envergadura (SPA). La resolución del bloqueo del árbol sintáctico del `try/catch/finally` evidencia buenas prácticas en el manejo del estado asíncrono y la robustez del software. Por su parte, la inyección de expresiones procedimentales mediante IIFE dota a la interfaz de una alta cohesión, paridad estética y mantenibilidad, criterios clave exigidos en la rúbrica de evaluación del tribunal.
+* **Consecuencias:** Se eliminaron por completo los errores de compilación y de pérdida de alcance de las variables reactivas (`setError`, `setLoading`). La estructura condicional excluyente asegura que un usuario autenticado jamás ejecute código residual de otra ruta, mitigando redirecciones inválidas. Como deuda técnica menor, el uso de funciones auto-invocadas en JSX podría sobrecargar la legibilidad de la vista si el marcado por rol crece desmesuradamente en el futuro, planteando una potencial extracción a micro-componentes.
 
 ---
 
