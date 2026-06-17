@@ -70,7 +70,9 @@ public class UserController {
                     .orElseThrow(() -> new ServicesException("Usuario no encontrado tras autenticación"));
 
             // 3. Generar el token con los datos reales
-            String jwtToken = jwtService.generateAccessToken(user);
+            String jwtToken = jwtService.generateAccessToken(
+                    (org.springframework.security.core.userdetails.UserDetails) user, user.getUser_id(),
+                    user.getEmail());
 
             // 4. Calcular expiración
             Instant expirationInstant = jwtService.extractExpiration(jwtToken);
@@ -174,12 +176,6 @@ public class UserController {
 
             // 5. Modificar el rol del usuario destino en PostgreSQL
             Users updatedUser = userService.updateUserRole(username, newRole);
-
-            // 🔥 Sincronizamos la caché de Hibernate para que los listados del admin
-            // reflejen el cambio de inmediato
-            if (entityManager != null) {
-                entityManager.clear();
-            }
 
             // 6. Retornar el usuario modificado con su nuevo rol reflejado
             return ResponseEntity.ok(Map.of(

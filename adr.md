@@ -92,7 +92,7 @@ Este documento centraliza las decisiones técnicas críticas tomadas durante el 
 
 ---
 
-## [ADR-09] Mecanismo de Hidratación de Sesión mediante Validación Síncrona del Token
+## [ADR-09] Mecanismo de Hidratación de Sesión mediante Validación Asíncrona del Token
 
 * **Fecha:** Junio 2026
 * **Estatus:** Aceptado
@@ -114,6 +114,33 @@ Este documento centraliza las decisiones técnicas críticas tomadas durante el 
   * **Principio DRY Global:** Las directrices estéticas de Tailwind CSS (`min-h-screen`, `bg-slate-50`, `font-sans`) y la orquestación de la barra `<NavbarUser />` se gestionan en un único punto del proyecto, simplificando el mantenimiento general.
   * **Garantía de Accesibilidad (a11y):** Se introducen enlaces explícitos y semánticos mediante el atributo `htmlFor` e identificadores únicos (`id`) en los componentes interactivos de los layouts (como selectores de rol), cumpliendo de forma nativa con los estándares WCAG y garantizando la compatibilidad con lectores de pantalla.
   * **Carga de Trabajo Desacoplada:** Las páginas del cliente (`AdminDashboard`, `ProfessorDashboard`, `StudentDashboard`) quedan completamente liberadas de ruido visual e infraestructura estructural, focalizando su código de forma pura en la lógica de estado de React, efectos secundarios y peticiones Axios hacia Spring Boot.
+
+  ---
+
+  # [ADR-11] Mitigación de Desincronización Temporal mediante Margen de Tolerancia (Clock Skew) en JWT
+
+## Estado
+
+Aceptado
+
+## Contexto
+
+En arquitecturas distribuidas de producción, los relojes internos de los diferentes entornos (servidor API de Spring Boot, base de datos PostgreSQL y clientes web/móviles) pueden sufrir ligeras desincronizaciones micrométricas (desviaciones de tiempo o *clock drift*).
+Nuestra auditoría técnica detectó una propiedad inactiva (`app.jwt.clock-skew-seconds`) y una validación estricta de la fecha de expiración en `JwtService.java`. Esto generaba un riesgo crítico: la invalidación prematura e injustificada de tokens JWT legítimos inmediatamente después de su emisión si el reloj del cliente o del servidor presentaba una variación de apenas unos segundos.
+
+## Decisión
+
+Se decide desacoplar la validación de tiempo estricta e integrar de forma activa un margen de tolerancia (*Clock Skew*) en la lógica de expiración de tokens (`isExpired`) en `JwtService.java`.
+
+Se ha parametrizado mediante inyección de dependencias (`JwtProperties`) un margen configurable de 60 segundos (valor recomendado por la especificación OAuth 2.0 / RFC 7519). Al evaluar la expiración, el tiempo absoluto actual del sistema se mitiga restándole este margen de tolerancia:
+`Instant adjustedCurrentTime = Instant.now(clock).minusSeconds(skew);`
+
+## Consecuencias
+
+* **Positivas:** Se elimina el error silencioso de tokens rechazados por desalineación temporal en producción. Aumenta la robustez de la API sin degradar la experiencia de usuario.
+* **Negativas:** La ventana real de validez del token se extiende exactamente por el número de segundos configurado en el *clock skew*, un impacto marginal que se asume en favor de la disponibilidad.
+
+---
 
 ## [ADR-14] Soporte Multirrol Dinámico y Corrección de Ámbito en Bloques Asíncronos (AuthModal & NavbarUser)
 

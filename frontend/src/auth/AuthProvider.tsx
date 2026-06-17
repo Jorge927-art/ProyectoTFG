@@ -13,7 +13,7 @@ interface AuthProviderProps {
  * Convierte el estado de autenticación y el token en la fuente de verdad de la SPA.
  */
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-    // Inicializa el estado leyendo el usuario que ya estaba guardado en localStorage
+    // Estado de usuario autenticado, inicializado desde el almacenamiento local
     const [user, setUser] = useState<AuthUser | null>(() => readStoredAuthUser());
 
     /**
@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const login = (tokenData: AuthTokenResponse) => {
         // 1. Extraer los datos que el frontend necesita para pintar la interfaz
         const nextUser: AuthUser = {
-            user_id: tokenData.userId,
+            userId: tokenData.userId,
             username: tokenData.username,
             role: tokenData.role,
             email: tokenData.email

@@ -8,7 +8,7 @@ export interface AuthUser {
     username: string;
     photo?: string;
     role?: UserRole;
-    user_id?: number;
+    userId?: number;
     email?: string;
     [key: string]: unknown;
 }

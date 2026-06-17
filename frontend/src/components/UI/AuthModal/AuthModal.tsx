@@ -72,14 +72,8 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
                 if (isLoginView) {
                     const tokenData = response.data as AuthTokenResponse;
 
-                    // Inyección de rol de control por si el JSON viene sin la propiedad mapeada
-                    const lowerUser = String(tokenData.username || '').toLowerCase().trim();
                     if (!tokenData.role) {
-                        if (lowerUser === 'jorge' || lowerUser === 'pedro') {
-                            tokenData.role = 'STUDENT';
-                        } else {
-                            tokenData.role = 'STUDENT';
-                        }
+                        tokenData.role = 'STUDENT';
                     }
 
                     // 1. Almacenamos la sesión en el estado global

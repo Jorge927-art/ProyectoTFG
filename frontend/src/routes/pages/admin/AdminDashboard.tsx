@@ -6,7 +6,6 @@ import AdminLayout from '../../layouts/AdminLayout';
 
 interface UserEntity {
     userId?: number;
-    id?: number;
     username: string;
     role: string;
 }

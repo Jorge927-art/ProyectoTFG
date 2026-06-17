@@ -43,12 +43,12 @@ public class JwtService {
     private final JwtProperties jwtProperties;
     private final Clock clock = Clock.systemUTC();
 
-    public String generateAccessToken(UserDetails userDetails) {
-        return generateToken(userDetails, ACCESS_TOKEN_TYPE, accessTokenTtl());
+    public String generateAccessToken(UserDetails userDetails, Long userId, String email) {
+        return generateToken(userDetails, ACCESS_TOKEN_TYPE, accessTokenTtl(), userId, email);
     }
 
-    public String generateRefreshToken(UserDetails userDetails) {
-        return generateToken(userDetails, REFRESH_TOKEN_TYPE, refreshTokenTtl());
+    public String generateRefreshToken(UserDetails userDetails, Long userId, String email) {
+        return generateToken(userDetails, REFRESH_TOKEN_TYPE, refreshTokenTtl(), userId, email);
     }
 
     public String extractUsername(String token) {
@@ -99,7 +99,7 @@ public class JwtService {
         }
     }
 
-    private String generateToken(UserDetails userDetails, String tokenType, Duration ttl) {
+    private String generateToken(UserDetails userDetails, String tokenType, Duration ttl, Long userId, String email) {
         Instant issuedAt = Instant.now(clock);
         Instant expiresAt = issuedAt.plus(ttl);
 
@@ -110,6 +110,12 @@ public class JwtService {
         claims.put("exp", expiresAt.getEpochSecond());
         claims.put("tokenType", tokenType);
         claims.put("jti", UUID.randomUUID().toString());
+        if (userId != null) {
+            claims.put("userId", userId);
+        }
+        if (email != null) {
+            claims.put("email", email);
+        }
 
         String role = resolvePrimaryAuthority(userDetails.getAuthorities());
         if (role != null) {
@@ -178,7 +184,9 @@ public class JwtService {
         Object expObj = claims.get("exp");
         if (expObj instanceof Number) {
             long expSeconds = ((Number) expObj).longValue();
-            return Instant.ofEpochSecond(expSeconds).isBefore(Instant.now(clock));
+            long skew = jwtProperties.getClockSkewSeconds();
+            Instant adjustedCurrentTime = Instant.now(clock).minusSeconds(skew);
+            return Instant.ofEpochSecond(expSeconds).isBefore(adjustedCurrentTime);
         }
         return true;
     }
