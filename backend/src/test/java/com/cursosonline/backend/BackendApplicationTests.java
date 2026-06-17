@@ -1,23 +1,32 @@
 package com.cursosonline.backend;
 
+import com.cursosonline.backend.controller.UserController;
+import com.cursosonline.backend.security.jwt.JwtService;
+import com.cursosonline.backend.services.UserService;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-/**
- * Clase de pruebas para la aplicación Backend. Esta clase se encarga de
- * verificar que el contexto de la aplicación se cargue correctamente. Es una
- * prueba básica que se ejecuta para asegurar que la configuración general de
- * Spring Boot no tenga errores y que los componentes principales de la
- * aplicación estén disponibles. Aunque esta prueba no verifica funcionalidades
- * específicas, es un punto de partida importante para garantizar que la
- * aplicación pueda iniciarse sin problemas antes de ejecutar pruebas más
- * detalladas en servicios, controladores y repositorios.
- */
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 @SpringBootTest
 class BackendApplicationTests {
 
-	@Test
-	void contextLoads() {
-	}
+	@Autowired
+	private UserController userController;
 
+	@Autowired
+	private JwtService jwtService;
+
+	@Autowired
+	private UserService userService;
+
+	@Test
+	void contextLoadsAndCriticalBeansAreInjected() {
+		// Validar de forma asertiva que la infraestructura base levanta y se securiza
+		// sin fallos de IoC
+		assertNotNull(userController, "El controlador web crítico no se instanció correctamente.");
+		assertNotNull(jwtService, "El motor criptográfico JwtService no está disponible en el contexto.");
+		assertNotNull(userService, "La capa de servicios centrales de negocio falló al inicializarse.");
+	}
 }

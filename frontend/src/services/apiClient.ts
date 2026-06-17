@@ -37,8 +37,14 @@ apiClient.interceptors.response.use(
     (response) => response,
     (error) => {
         if (axios.isAxiosError(error) && error.response?.status === 401) {
-            console.warn('Token inválido o expirado detectado de forma global.');
+            // 1. Limpieza de traza inútil en producción
+            console.warn('Sesión expirada. Desencadenando limpieza de seguridad...');
+            
+            // 2. SOLUCCIÓN DE INGENIERÍA: Emitir un evento global personalizado en el DOM
+            // Esto avisa al AuthProvider de forma desacoplada para que limpie el estado
+            window.dispatchEvent(new Event('auth-session-expired'));
         }
         return Promise.reject(error);
     }
 );
+
