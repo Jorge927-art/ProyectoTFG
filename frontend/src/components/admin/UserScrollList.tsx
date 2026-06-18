@@ -68,7 +68,7 @@ export const UserScrollList = () => {
             ) : users.length === 0 ? (
                 <div className="text-center py-8 text-xs text-slate-400">No hay registros de usuarios.</div>
             ) : (
-                <div className="h-[116px] overflow-y-auto pr-1 space-y-2 mt-2 scrollbar-thin scrollbar-thumb-slate-200">
+                <div className="h-29 overflow-y-auto pr-1 space-y-2 mt-2 scrollbar-thin scrollbar-thumb-slate-200">
                     {users.map((item) => (
                         <div key={item.userId} className="flex items-center justify-between p-2.5 rounded-lg border border-slate-50 hover:bg-slate-50/50 transition-all shadow-2xs">
                             <div className="flex items-center gap-2.5">
