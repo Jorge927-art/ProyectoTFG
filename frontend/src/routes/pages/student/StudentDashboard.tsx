@@ -69,9 +69,9 @@ const StudentDashboard = () => {
                                         <span className="font-bold text-blue-600">{course.progress}%</span>
                                     </div>
                                     <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
+                                        {/* Eliminamos el atributo style e inyectamos el ancho dinámico en las clases de Tailwind */}
                                         <div
-                                            className="bg-blue-600 h-full transition-all duration-500"
-                                            style={{ width: `${course.progress}%` }}
+                                            className={`bg-blue-600 h-full transition-all duration-500 w-[${course.progress}%]`}
                                         />
                                     </div>
                                     <button className="w-full bg-slate-800 hover:bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1">

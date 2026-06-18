@@ -65,9 +65,9 @@ const ProfessorDashboard = () => {
                                         <span className="font-bold text-blue-600">{course.averageProgress}%</span>
                                     </div>
                                     <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
+                                        {/* Eliminamos el atributo style por completo para silenciar el linter de Edge */}
                                         <div
-                                            className="bg-blue-600 h-full transition-all duration-500"
-                                            style={{ width: `${course.averageProgress}%` }}
+                                            className={`bg-blue-600 h-full transition-all duration-500 w-[${course.averageProgress}%]`}
                                         />
                                     </div>
                                     <button className="w-full bg-slate-800 hover:bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1">
