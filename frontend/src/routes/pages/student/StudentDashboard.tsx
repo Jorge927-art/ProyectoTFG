@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BookOpen, ArrowRight, Sparkles, Star } from 'lucide-react';
 import GenericCard from '../../../components/ui/genericCard/GenericCard';
-import StudentLayout from '../../layouts/StudentLayout'; // Importamos tu nuevo layout específico
+import StudentLayout from '../../layouts/StudentLayout';
 
 interface Course {
     id: number;
@@ -47,27 +47,39 @@ const StudentDashboard = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {courses.map((course) => (
-                            <GenericCard
-                                key={course.id}
-                                tag={course.category}
-                                title={course.title}
-                                subtitle={`Prof. ${course.instructor}`}
-                                footerChildren={
-                                    <>
-                                        <div className="flex justify-between text-xs text-slate-500 mb-1">
-                                            <span>Progreso</span>
-                                            <span className="font-bold text-blue-600">{course.progress}%</span>
-                                        </div>
-                                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
-                                            <div className="bg-blue-600 h-full" style={{ width: `${course.progress}%` }} />
-                                        </div>
-                                        <button className="w-full bg-slate-800 hover:bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1">
-                                            <span>Continuar</span>
-                                            <ArrowRight size={14} />
-                                        </button>
-                                    </>
-                                }
-                            />
+                            /* PRIMERA REFRACTORIZACIÓN: Tarjeta genérica pura por composición */
+                            <GenericCard key={course.id}>
+                                {/* Encabezado semántico */}
+                                <div className="mb-4">
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-slate-100 text-slate-600">
+                                        {course.category}
+                                    </span>
+                                    <h3 className="text-base font-bold text-slate-800 leading-tight mt-2">
+                                        {course.title}
+                                    </h3>
+                                    <p className="text-xs text-slate-400 mt-1">
+                                        Prof. {course.instructor}
+                                    </p>
+                                </div>
+
+                                {/* Cuerpo y barra de progreso sin estilos inline (Fix a11y/style) */}
+                                <div className="mt-4 pt-3 border-t border-slate-50">
+                                    <div className="flex justify-between text-xs text-slate-500 mb-1">
+                                        <span>Progreso</span>
+                                        <span className="font-bold text-blue-600">{course.progress}%</span>
+                                    </div>
+                                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
+                                        <div
+                                            className="bg-blue-600 h-full transition-all duration-500"
+                                            style={{ width: `${course.progress}%` }}
+                                        />
+                                    </div>
+                                    <button className="w-full bg-slate-800 hover:bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1">
+                                        <span>Continuar</span>
+                                        <ArrowRight size={14} />
+                                    </button>
+                                </div>
+                            </GenericCard>
                         ))}
                     </div>
                 </div>
@@ -81,24 +93,34 @@ const StudentDashboard = () => {
 
                     <div className="flex flex-col gap-3">
                         {recommendations.map((rec) => (
-                            <GenericCard
-                                key={rec.id}
-                                tag={rec.category}
-                                tagColorClass="bg-blue-50 text-blue-700"
-                                title={rec.title}
-                                subtitle={`Prof. ${rec.instructor}`}
-                                extraHeaderElement={
-                                    <div className="flex items-center gap-0.5 text-amber-500 text-xs font-bold">
-                                        <Star size={10} fill="currentColor" />
-                                        <span>{rec.rating}</span>
+                            /* SEGUNDA REFRACTORIZACIÓN: Tarjeta elástica orientada al contenido */
+                            <GenericCard key={rec.id}>
+                                {/* Encabezado flexible con puntuación */}
+                                <div className="mb-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-blue-50 text-blue-700">
+                                            {rec.category}
+                                        </span>
+                                        <div className="flex items-center gap-0.5 text-amber-500 text-xs font-bold">
+                                            <Star size={10} fill="currentColor" />
+                                            <span>{rec.rating}</span>
+                                        </div>
                                     </div>
-                                }
-                                footerChildren={
+                                    <h3 className="text-base font-bold text-slate-800 leading-tight">
+                                        {rec.title}
+                                    </h3>
+                                    <p className="text-xs text-slate-400 mt-1">
+                                        Prof. {rec.instructor}
+                                    </p>
+                                </div>
+
+                                {/* Pie de recomendación semántico */}
+                                <div className="mt-4 pt-3 border-t border-slate-50">
                                     <p className="text-[10px] text-amber-800 bg-amber-50/50 p-2 rounded border border-amber-100/30">
                                         💡 {rec.reason}
                                     </p>
-                                }
-                            />
+                                </div>
+                            </GenericCard>
                         ))}
                     </div>
                 </div>

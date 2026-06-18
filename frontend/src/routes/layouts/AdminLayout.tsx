@@ -8,7 +8,7 @@ interface AdminLayoutProps {
 
 const AdminLayout = ({ children }: AdminLayoutProps) => {
     return (
-        <DashboardLayout className="max-w-md mx-auto px-4 pt-24 pb-12">
+        <DashboardLayout className="max-w-6xl mx-auto px-4 pt-24 pb-12">
             {/* Si el día de mañana añades un panel de control lateral o logs críticos para el Admin, irán aquí */}
             {children}
         </DashboardLayout>
