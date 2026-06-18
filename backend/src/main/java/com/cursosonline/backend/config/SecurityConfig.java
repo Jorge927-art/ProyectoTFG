@@ -20,52 +20,44 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
 
-/**
- * Clase de configuración de seguridad optimizada para la aplicación.
- * Implementa un modelo puro Stateless basado al 100% en tokens JWT,
- * eliminando duplicidades y residuos del sistema de sesiones HTTP.
- */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    // Inyección limpia del filtro administrado por Spring como componente
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
-    /**
-     * Configura la cadena de seguridad HTTP en modo estricto STATELESS.
-     */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable()) // Deshabilitado para APIs REST Stateless
+                .csrf(csrf -> csrf.disable())
 
-                // SEGURIDAD PURA JWT: El servidor ya no guarda estados de sesión bajo ningún
-                // concepto
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        // Endpoints públicos de autenticación y búsqueda base de usuarios
+
+                        // Endpoints públicos de autenticación
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/{username}").permitAll()
 
-                        // Endpoint para obtener información del usuario autenticado
+                        // Endpoint para información del usuario autenticado
                         .requestMatchers("/api/auth/me").authenticated()
 
-                        // EXCLUSIVO ADMINISTRADOR: Asegura el endpoint de cambio de rol
-                        // /api/auth/users/**
+                        // CONFIGURACIÓN PERFIL: Permite a cualquier usuario autenticado gestionar su
+                        // propio perfil
+                        .requestMatchers("/api/v1/profile/**").hasAnyAuthority("STUDENT", "PROFESSOR", "ADMIN")
+
+                        // Exclusivo Administrador
                         .requestMatchers("/api/auth/users/**").hasAuthority("ADMIN")
                         .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
                         .requestMatchers("/api/users/**").hasAuthority("ADMIN")
 
-                        // Rutas protegidas para profesores y administradores
+                        // Rutas protegidas por rol específico
                         .requestMatchers("/api/professor/**").hasAnyAuthority("PROFESSOR", "ADMIN")
-                        // Rutas protegidas para estudiantes y administradores
                         .requestMatchers("/api/student/**").hasAnyAuthority("STUDENT", "ADMIN")
 
                         // Cualquier otra solicitud requiere autenticación
@@ -73,21 +65,15 @@ public class SecurityConfig {
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable());
 
-        // Registramos el filtro JWT limpio antes del filtro de credenciales estándar
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    /**
-     * Configura CORS permitiendo solicitudes asíncronas completas desde React.
-     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of("http://localhost:5173"));
-
-        // Agregado "PATCH" para permitir los cambios parciales de rol desde el frontend
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
@@ -97,9 +83,6 @@ public class SecurityConfig {
         return source;
     }
 
-    /**
-     * Bean para el cifrado de contraseñas utilizando BCrypt.
-     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

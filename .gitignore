@@ -10,3 +10,5 @@ dist/
 .env.*.local
 *.jar
 build/
+# Carpeta de subidas local para fotos y documentos
+/uploads/

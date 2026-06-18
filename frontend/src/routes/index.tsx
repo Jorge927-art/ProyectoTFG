@@ -6,7 +6,8 @@ import AccessDenied from "./pages/public/AccessDenied";
 import StudentDashboard from "./pages/student/StudentDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ProfessorDashboard from "./pages/professor/ProfessorDashboard";
-import { useAuth } from "@/auth"; // <-- Importamos el Hook de autenticación global
+import StudentProfilePage from "./pages/student/StudentProfilePage"; // <-- Importamos la nueva página del alumno
+import { useAuth } from "@/auth"; // <-- Escuchamos la fuente de verdad global
 
 const AppRoutes = () => {
     const { user, isAuthenticated } = useAuth(); // <-- Escuchamos la fuente de verdad global
@@ -40,6 +41,7 @@ const AppRoutes = () => {
                     {/* 2. PROTECCIÓN ALUMNO (Pedro / Jaime) */}
                     <Route element={<ProtectedRoute allowedRoles={['STUDENT']} />}>
                         <Route path="/student" element={<StudentDashboard />} />
+                        <Route path="/student/profile" element={<StudentProfilePage />} /> {/* <-- Registramos la URL del perfil */}
                     </Route>
 
                     {/* 3. PROTECCIÓN ADMINISTRADOR (Jorge) */}

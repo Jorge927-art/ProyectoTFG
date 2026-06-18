@@ -1,3 +1,2 @@
-export { AuthProvider } from './AuthProvider';
+export { AuthProvider } from './AuthProvider'; 
 export { useAuth } from './useAuth';
-export type { AuthUser, UserRole } from './authTypes';
