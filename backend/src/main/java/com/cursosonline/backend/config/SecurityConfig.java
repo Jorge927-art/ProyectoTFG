@@ -41,6 +41,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
+                        // ACCESO PÚBLICO EXCLUSIVO PARA RENDERIZAR IMÁGENES Y AVATARES DESDE EL
+                        // FRONTEND
+                        .requestMatchers("/uploads/**").permitAll()
+
                         // Endpoints públicos de autenticación
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/{username}").permitAll()
 

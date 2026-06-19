@@ -180,7 +180,8 @@ Cumplimiento estricto del principio Abierto/Cerrado (OCP) de SOLID. La tarjeta a
 
 ### Consecuencias
 
-- Erradicación total de abstracciones falsas y código muerto en el Frontend.
+* Erradicación total de abstracciones falsas y código muerto en el Frontend.
+
 * Logro de simetría geométrica bidireccional perfecta en la interfaz del Administrador.
 * Escalabilidad visual y de rendimiento garantizada frente a cientos de registros concurrentes.
 
@@ -208,6 +209,22 @@ Cumplimiento estricto del principio Abierto/Cerrado (OCP) de SOLID. La tarjeta a
   3. Vincular el selector interactivo `<select>` del frontend con el endpoint atómico parametrizado para salvaguardar el principio de menor privilegio.
 * **Justificación para el TFG:** Aporta un valor metodológico fundamental en términos de seguridad informática y optimización de recursos. Demuestra al tribunal la capacidad de erradicar duplicidades y de transicionar con éxito desde un modelo híbrido con estado (Stateful) hacia una arquitectura puramente desacoplada (Stateless / RESTful). El parseo directo de claims en memoria reduce drásticamente los accesos concurrentes a la base de datos PostgreSQL, mejorando los tiempos de respuesta y la escalabilidad de la plataforma frente a picos de tráfico simulados.
 * **Consecuencias:** Se elimina la degradación de rendimiento por dobles lecturas a disco en cada petición asegurada. El Administrador puede gestionar, auditar y reasignar los privilegios del alumnado y profesorado de forma instantánea y reactiva en la interfaz de usuario, garantizando una consistencia de datos atómica y libre de bloqueos cruzados en el servidor de preflight de los navegadores.
+
+---
+
+## [ADR-16] Desacoplamiento de Flujos de Redirección mediante Cohesión de Componentes y Sincronización Síncrona del Contexto JWT
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Al interactuar con el elemento de interfaz de usuario (`GenericButton`) que muestra el nombre del estudiante autenticado ("Luis") en el componente de cabecera, la aplicación de React omitía la ejecución del callback de navegación y bloqueaba el acceso de forma perenne en el Dashboard. Tras una auditoría del árbol de componentes, se detectaron tres anomalías estructurales: una discrepancia semántica en las firmas de tipos de TypeScript entre manejadores de eventos nativos de ratón (`MouseEventHandler`) y funciones puras (`() => void`), un acoplamiento innecesario por propagación vertical de propiedades (*Props Drilling*) desde `MainNavbar.tsx` hacia `NavbarUser.tsx`, y un rebote asíncrono destructivo en el guardia de seguridad (`ProtectedRoute.tsx`), el cual interpretaba el estado transitorio inicializado en `null` de la variable de sesión como un falso negativo de seguridad, expulsando al usuario debido a la regla comodín (`path="*"`) de la jerarquía de rutas virtuales.
+* **Decisión:** Reestructurar de forma integral la comunicación de los componentes de navegación y unificar los mecanismos de redirección del sistema:
+  1. Eliminar la propagación de funciones desde el componente padre y dotar a `NavbarUser.tsx` de plena autonomía contextual mediante el consumo directo del hook global de estado de autenticación (`useAuth`).
+  2. Implementar una función anónima flecha `() => handleProfileRedirect()` en el evento interactivo del botón genérico para aislar y resolver los conflictos de firmas de tipado estricto impuestos por el compilador con la directiva `verbatimModuleSyntax`.
+  3. Sustituir el enrutamiento virtual asíncrono (`navigate`) por una navegación imperativa física de infraestructura utilizando `window.location.href`. Esto fuerza un ciclo de hidratación limpio desde la raíz que obliga al componente guardián a respetar el estado de bloqueo tecnológico preventivo (`isLoading`) mientras se recupera el token del almacenamiento local.
+* **Justificación para el TFG:** Aporta un valor metodológico fundamental en el área de ingeniería de interfaces y patrones de arquitectura de software para Single Page Applications (SPA). Demuestra al tribunal el dominio práctico sobre el principio de **Cohesión y Autonomía de Componentes**, erradicando el acoplamiento rígido de herencia de callbacks. Además, expone la capacidad de diagnosticar y solventar conflictos de concurrencia y desincronización en el renderizado asíncrono de interfaces que consumen estados hidratados mediante tokens criptográficos JWT, garantizando una consistencia de navegación determinista y robusta.
+* **Consecuencias:** Se elimina por completo la transferencia de propiedades muertas y la generación de variables no utilizadas en el linter (`eslint`). El flujo de acceso al perfil del estudiante se homologa y sincroniza con el mecanismo nativo e indestructible del módulo de inicio de sesión (`AuthModal.tsx`). El usuario puede transicionar desde la zona pública y el Dashboard general hacia la vista extendida de su perfil (`/student/profile`) con total fluidez, permitiendo que la capa de persistencia relacional `1:1` de PostgreSQL se pinte en la interfaz sin sufrir bloqueos ni rebotes del enrutador de React.
+
+---
 
 # Notas de Migración: Transición a JWT y Compatibilidad
 

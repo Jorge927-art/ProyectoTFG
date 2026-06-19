@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, MapPin, Upload, RefreshCw, CheckCircle } from 'lucide-react';
+import { User, Phone, MapPin, Upload, RefreshCw, CheckCircle, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import GenericCard from '../genericCard/GenericCard';
 import { getProfile, updateProfileData, uploadAvatarFile } from '../../../services/profileService';
-// Solución ts(1484): Importación de tipo estricta para verbatimModuleSyntax
 import type { ProfileData } from '../../../services/profileService';
 
 export default function ProfileSettings() {
+    const navigate = useNavigate();
     const [profile, setProfile] = useState<ProfileData | null>(null);
     const [formData, setFormData] = useState({ email: '', phoneNumber: '', homeAddress: '' });
     const [loading, setLoading] = useState<boolean>(true);
@@ -58,7 +59,7 @@ export default function ProfileSettings() {
 
     const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
-        const file = e.target.files[0]; // Corrección menor de índice para el archivo binario
+        const file = e.target.files[0];
 
         setUpdatingAvatar(true);
         setMessage(null);
@@ -83,22 +84,31 @@ export default function ProfileSettings() {
     const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
     const avatarUrl = profile?.avatarPath
         ? `${BACKEND_URL}/uploads/${profile.avatarPath}`
-        : 'https://unsplash.com';
-
+        : `data:image/svg+xml;utf8,<svg xmlns="http://w3.org" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%23cbd5e1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
     return (
         <div className="max-w-4xl mx-auto space-y-6">
-            <header className="border-b border-slate-100 pb-4">
-                <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                    <User size={22} className="text-blue-600" />
-                    <span>Configuración de mi Perfil</span>
-                </h1>
-                <p className="text-xs text-slate-400 mt-1">Amplía tus datos de contacto y gestiona tu imagen de usuario</p>
+            <header className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <User size={22} className="text-blue-600" />
+                        <span>Configuración de mi Perfil</span>
+                    </h1>
+                    <p className="text-xs text-slate-400 mt-1">Amplía tus datos de contacto y gestiona tu imagen de usuario</p>
+                </div>
+
+                <button
+                    onClick={() => navigate('/student')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors shadow-sm self-start sm:self-center cursor-pointer border border-transparent"
+                >
+                    <ArrowLeft size={14} />
+                    <span>Volver al Panel</span>
+                </button>
             </header>
 
             {message && (
                 <div className={`p-3 rounded-lg text-xs font-bold flex items-center gap-2 border ${message.type === 'success'
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-100'
-                        : 'bg-rose-50 text-rose-800 border-rose-100'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-100'
+                    : 'bg-rose-50 text-rose-800 border-rose-100'
                     }`}>
                     {message.type === 'success' && <CheckCircle size={16} />}
                     <span>{message.text}</span>
@@ -109,7 +119,7 @@ export default function ProfileSettings() {
                 <div className="md:col-span-1">
                     <GenericCard>
                         <div className="p-5 flex flex-col items-center text-center space-y-4">
-                            <div className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-slate-100 shadow-inner">
+                            <div className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-slate-100 shadow-inner bg-slate-50">
                                 <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                                 {updatingAvatar && (
                                     <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center">
@@ -136,25 +146,43 @@ export default function ProfileSettings() {
                     <GenericCard>
                         <form onSubmit={handleSubmitText} className="p-5 space-y-4">
                             <h3 className="text-sm font-bold text-slate-800 border-b border-slate-50 pb-2">Datos Personales y de Contacto</h3>
+
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-600">Correo Electrónico</label>
                                 <input type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full border border-slate-200 rounded-lg py-1.5 px-3 text-sm focus:outline-none focus:border-blue-600 text-slate-700 bg-slate-50/50" placeholder="tu-correo@ejemplo.com" />
                             </div>
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-600 flex items-center gap-1"><Phone size={12} className="text-slate-400" /><span>Teléfono</span></label>
+                                    <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                                        <Phone size={12} className="text-slate-400" />
+                                        <span>Teléfono</span>
+                                    </label>
                                     <input type="text" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} className="w-full border border-slate-200 rounded-lg py-1.5 px-3 text-sm focus:outline-none focus:border-blue-600 text-slate-700" placeholder="Ej: +34 600 000 000" />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-600 flex items-center gap-1"><MapPin size={12} className="text-slate-400" /><span>Dirección Postal</span></label>
-                                    <input type="text" name="homeAddress" value={formData.homeAddress} onChange={handleInputChange} className="w-full border border-slate-200 rounded-lg py-1.5 px-3 text-sm focus:outline-none focus:border-blue-600 text-slate-700" placeholder="Calle, Número, Piso, Ciudad" />
+                                    <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                                        <MapPin size={12} className="text-slate-400" />
+                                        <span>Dirección</span>
+                                    </label>
+                                    <input type="text" name="homeAddress" value={formData.homeAddress} onChange={handleInputChange} className="w-full border border-slate-200 rounded-lg py-1.5 px-3 text-sm focus:outline-none focus:border-blue-600 text-slate-700" placeholder="Ej: Calle Mayor 12, Madrid" />
                                 </div>
                             </div>
-                            <div className="pt-2 text-right">
-                                {/* Solución cssConflict: dejamos únicamente inline-flex para corregir el linter de CSS */}
-                                <button type="submit" disabled={updatingText} className="bg-slate-800 hover:bg-blue-600 text-white text-xs font-bold py-2 px-4 rounded-lg transition-colors inline-flex items-center justify-center gap-1.5 ml-auto">
-                                    {updatingText && <RefreshCw size={12} className="animate-spin" />}
-                                    <span>{updatingText ? 'Guardando...' : 'Guardar Cambios'}</span>
+
+                            <div className="flex justify-end pt-2">
+                                <button
+                                    type="submit"
+                                    disabled={updatingText}
+                                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-bold py-2 px-4 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                                >
+                                    {updatingText ? (
+                                        <>
+                                            <RefreshCw size={14} className="animate-spin" />
+                                            <span>Guardando...</span>
+                                        </>
+                                    ) : (
+                                        <span>Guardar Cambios</span>
+                                    )}
                                 </button>
                             </div>
                         </form>

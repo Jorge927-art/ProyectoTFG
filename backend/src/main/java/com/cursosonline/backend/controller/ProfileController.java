@@ -5,7 +5,7 @@ import com.cursosonline.backend.dto.ProfileUpdateDTO;
 import com.cursosonline.backend.entities.UserProfile;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.repository.UserProfileRepository;
-import com.cursosonline.backend.repository.UserRepository; // Necesario para buscar el usuario
+import com.cursosonline.backend.repository.UserRepository;
 import com.cursosonline.backend.services.FileStorageService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,7 +22,7 @@ public class ProfileController {
 
         private final FileStorageService fileStorageService;
         private final UserProfileRepository profileRepository;
-        private final UserRepository userRepository; // Inyección del repositorio de usuarios
+        private final UserRepository userRepository;
 
         public ProfileController(FileStorageService fileStorageService,
                         UserProfileRepository profileRepository,
@@ -46,7 +46,6 @@ public class ProfileController {
                                                                 debugLog.toString()));
                         }
 
-                        // Extrae el username guardado en el JWT durante el filtro de autenticación
                         String username = authentication.getName();
                         Users currentUser = userRepository.findByUsername(username)
                                         .orElseThrow(() -> new RuntimeException("Usuario no encontrado en BD"));
@@ -79,63 +78,99 @@ public class ProfileController {
                 }
         }
 
-        // 2. ENDPOINT POST AVATAR REFACTORIZADO
+        // 2. ENDPOINT POST AVATAR OPTIMIZADO (Protección contra fallos y validación)
         @PostMapping("/avatar")
         public ResponseEntity<?> uploadAvatar(
                         Authentication authentication,
                         @RequestParam("file") MultipartFile file) {
 
-                if (authentication == null) {
-                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("No autenticado");
+                try {
+                        if (authentication == null || !authentication.isAuthenticated()) {
+                                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                                .body(Map.of("error", "No autenticado"));
+                        }
+
+                        // Validación del archivo adjunto
+                        if (file == null || file.isEmpty()) {
+                                return ResponseEntity.badRequest()
+                                                .body(Map.of("error", "El archivo no puede estar vacío"));
+                        }
+
+                        // Validación del formato de imagen básico para el TFG
+                        String contentType = file.getContentType();
+                        if (contentType == null || !contentType.startsWith("image/")) {
+                                return ResponseEntity.badRequest()
+                                                .body(Map.of("error", "El archivo debe ser una imagen válida"));
+                        }
+
+                        Users currentUser = userRepository.findByUsername(authentication.getName())
+                                        .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+                        // Almacenamiento físico del archivo binario
+                        String relativePath = fileStorageService.storeFile(file, "avatars");
+
+                        // Mutación atómica del perfil
+                        UserProfile profile = profileRepository.findById(currentUser.getUser_id()).orElse(null);
+                        if (profile == null) {
+                                profile = new UserProfile();
+                                profile.setId(currentUser.getUser_id());
+                                profile.setUser(currentUser);
+                        }
+
+                        profile.setAvatarPath(relativePath);
+                        profileRepository.save(profile);
+
+                        return ResponseEntity.ok(Map.of(
+                                        "message", "Foto de perfil actualizada con éxito",
+                                        "path", relativePath));
+
+                } catch (Exception e) {
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                                        "error", "Error al procesar la subida del avatar",
+                                        "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
                 }
-
-                Users currentUser = userRepository.findByUsername(authentication.getName())
-                                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
-                String relativePath = fileStorageService.storeFile(file, "avatars");
-
-                UserProfile profile = profileRepository.findById(currentUser.getUser_id()).orElse(null);
-                if (profile == null) {
-                        profile = new UserProfile();
-                        profile.setId(currentUser.getUser_id());
-                        profile.setUser(currentUser);
-                }
-
-                profile.setAvatarPath(relativePath);
-                profileRepository.save(profile);
-
-                return ResponseEntity.ok(Map.of(
-                                "message", "Foto de perfil actualizada con éxito",
-                                "path", relativePath));
         }
 
-        // 3. ENDPOINT PUT UPDATE REFACTORIZADO (Resuelve el Error 500)
+        // 3. ENDPOINT PUT UPDATE CON EXTENSIÓN ATÓMICA A LA TABLA USERS
         @PutMapping("/update")
         public ResponseEntity<?> updateProfileData(
                         Authentication authentication,
                         @RequestBody ProfileUpdateDTO updateDTO) {
 
-                if (authentication == null) {
-                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("No autenticado");
+                try {
+                        if (authentication == null || !authentication.isAuthenticated()) {
+                                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                                .body(Map.of("error", "No autenticado"));
+                        }
+
+                        Users currentUser = userRepository.findByUsername(authentication.getName())
+                                        .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+                        // Sincronización del email en la tabla 'users' (si viene en el DTO)
+                        if (updateDTO.getEmail() != null && !updateDTO.getEmail().isBlank()) {
+                                currentUser.setEmail(updateDTO.getEmail());
+                                userRepository.save(currentUser);
+                        }
+
+                        // Sincronización del perfil extendido en la tabla 'user_profiles'
+                        UserProfile profile = profileRepository.findById(currentUser.getUser_id()).orElse(null);
+                        if (profile == null) {
+                                profile = new UserProfile();
+                                profile.setId(currentUser.getUser_id());
+                                profile.setUser(currentUser);
+                        }
+
+                        profile.setPhoneNumber(updateDTO.getPhoneNumber());
+                        profile.setHomeAddress(updateDTO.getHomeAddress());
+                        profileRepository.save(profile);
+
+                        return ResponseEntity.ok(Map.of(
+                                        "message", "Datos de perfil extendido guardados correctamente"));
+
+                } catch (Exception e) {
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                                        "error", "Error al actualizar los datos del perfil",
+                                        "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
                 }
-
-                // Recuperamos al usuario directamente por el identificador único de su sesión
-                // JWT
-                Users currentUser = userRepository.findByUsername(authentication.getName())
-                                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
-                UserProfile profile = profileRepository.findById(currentUser.getUser_id()).orElse(null);
-                if (profile == null) {
-                        profile = new UserProfile();
-                        profile.setId(currentUser.getUser_id());
-                        profile.setUser(currentUser);
-                }
-
-                profile.setPhoneNumber(updateDTO.getPhoneNumber());
-                profile.setHomeAddress(updateDTO.getHomeAddress());
-                profileRepository.save(profile);
-
-                return ResponseEntity.ok(Map.of(
-                                "message", "Datos de perfil extendido guardados correctamente"));
         }
 }

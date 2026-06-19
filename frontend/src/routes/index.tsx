@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, Outlet } from "react-router-dom";
 import ProtectedRoute from "./guards/ProtectedRoute";
 import MainNavbar from "../components/navbar/MainNavbar";
 import LandingPage from "./pages/public/LandingPage";
@@ -38,20 +38,29 @@ const AppRoutes = () => {
                     />
                     <Route path="/acceso-denegado" element={<AccessDenied />} />
 
-                    {/* 2. PROTECCIÓN ALUMNO (Pedro / Jaime) */}
+                    {/* 2. PROTECCIÓN ALUMNO (Estructura de Layout Limpia) */}
                     <Route element={<ProtectedRoute allowedRoles={['STUDENT']} />}>
-                        <Route path="/student" element={<StudentDashboard />} />
-                        <Route path="/student/profile" element={<StudentProfilePage />} /> {/* <-- Registramos la URL del perfil */}
+                        {/* El MainNavbar solo se monta una vez para toda la sección del estudiante */}
+                        <Route element={<><MainNavbar /><div className="pt-16"><Outlet /></div></>}>
+                            <Route path="/student" element={<StudentDashboard />} />
+                            <Route path="/student/profile" element={<StudentProfilePage />} />
+                        </Route>
                     </Route>
 
-                    {/* 3. PROTECCIÓN ADMINISTRADOR (Jorge) */}
+                    {/* 3. PROTECCIÓN ADMINISTRADOR (Estructura de Layout Limpia) */}
                     <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
-                        <Route path="/admin" element={<AdminDashboard />} />
+                        <Route element={<><MainNavbar /><div className="pt-16"><Outlet /></div></>}>
+                            <Route path="/admin" element={<AdminDashboard />} />
+                            {/* Aquí colgará tu <Route path="/admin/profile" ... /> en el futuro */}
+                        </Route>
                     </Route>
 
-                    {/* 4. PROTECCIÓN PROFESOR */}
+                    {/* 4. PROTECCIÓN PROFESOR (Estructura de Layout Limpia) */}
                     <Route element={<ProtectedRoute allowedRoles={['PROFESSOR']} />}>
-                        <Route path="/professor" element={<ProfessorDashboard />} />
+                        <Route element={<><MainNavbar /><div className="pt-16"><Outlet /></div></>}>
+                            <Route path="/professor" element={<ProfessorDashboard />} />
+                            {/* Aquí colgará tu <Route path="/professor/profile" ... /> en el futuro */}
+                        </Route>
                     </Route>
 
                     {/* Fallback automático de seguridad para rutas inexistentes */}

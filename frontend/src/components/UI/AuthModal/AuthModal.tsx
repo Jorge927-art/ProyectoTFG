@@ -72,8 +72,10 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
                 if (isLoginView) {
                     const tokenData = response.data as AuthTokenResponse;
 
-                    if (!tokenData.role) {
-                        tokenData.role = 'STUDENT';
+                    if (!tokenData.role || tokenData.role.trim() === '') {
+                        setError('El servidor emitió un token de autenticación corrupto o sin privilegios asignados.');
+                        setLoading(false);
+                        return;
                     }
 
                     // 1. Almacenamos la sesión en el estado global

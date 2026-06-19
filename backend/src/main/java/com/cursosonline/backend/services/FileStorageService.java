@@ -16,7 +16,6 @@ public class FileStorageService {
 
     private final Path rootLocation;
 
-    // Modifica la inyección del constructor para usar la propiedad nativa de Spring
     public FileStorageService(@Value("${spring.servlet.multipart.location}") String uploadDir) {
         this.rootLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
     }
@@ -46,8 +45,6 @@ public class FileStorageService {
             Path targetLocation = this.rootLocation.resolve(subFolder).resolve(uniqueFileName);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
 
-            // Devolvemos la ruta relativa limpia para la base de datos (ej:
-            // "avatars/uuid_foto.png")
             return subFolder + "/" + uniqueFileName;
         } catch (IOException e) {
             throw new RuntimeException("Error al almacenar el archivo " + originalFileName, e);

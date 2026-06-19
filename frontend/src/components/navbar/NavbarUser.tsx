@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { Home, User, LogOut, GraduationCap, ShieldAlert, BookOpen } from 'lucide-react'; // <-- Añadido BookOpen para el Profesor
+import { useNavigate } from 'react-router-dom';
+import { Home, User, LogOut, GraduationCap, ShieldAlert, BookOpen } from 'lucide-react';
 import GenericButton from "../ui/genericButton/GenericButton";
-import { useAuth } from '@/auth'; // <-- Importamos useAuth para leer el rol real en tiempo real
+import { useAuth } from '@/auth';
 
 /**
  * Props del componente NavbarUser.
@@ -10,15 +11,23 @@ interface NavbarUserProps {
     username: string;
     userPhoto?: string;
     onLogout?: () => void;
-    onProfileClick?: () => void;
+    // Eliminamos onProfileClick de las propiedades obligatorias
 }
 
 /**
- * Barra de navegación inteligente con indicador dinámico de modo (Alumno / Profesor / Administrador).
+ * Barra de navegación inteligente con indicador dinámico de modo.
  */
-const NavbarUser = ({ username, userPhoto, onLogout, onProfileClick }: NavbarUserProps) => {
-    const { user } = useAuth(); // 🔍 Leemos el usuario logueado actualmente de la fuente de verdad
+const NavbarUser = ({ username, userPhoto, onLogout }: NavbarUserProps) => {
+    const { user } = useAuth();
+    const navigate = useNavigate();
     const currentRole = user?.role?.toUpperCase().trim() || 'STUDENT';
+
+    // FUNCIÓN DE REDIRECCIÓN INTERNA AUTÓNOMA (Sin intermediarios)
+    const handleProfileRedirect = () => {
+        if (currentRole === 'STUDENT') {
+            navigate('/student/profile');
+        }
+    };
 
     const avatarIcon: ReactNode = userPhoto ? (
         <img
@@ -33,10 +42,10 @@ const NavbarUser = ({ username, userPhoto, onLogout, onProfileClick }: NavbarUse
     );
 
     return (
-        <nav className="fixed top-0 left-0 w-full bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 py-1.5 z-50 flex justify-between items-center">
+        <nav className="fixed top-0 left-0 w-full bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 py-1.5 z-50 flex justify-between items-center h-16">
 
-            {/* 1. SECCIÓN IZQUIERDA: Botón "Inicio" */}
-            <div className="w-1/4 flex justify-start">
+            {/* 1. SECCIÓN IZQUIERDA */}
+            <div className="w-1/3 flex justify-start">
                 <GenericButton
                     label="Inicio"
                     icon={<Home size={16} />}
@@ -44,12 +53,11 @@ const NavbarUser = ({ username, userPhoto, onLogout, onProfileClick }: NavbarUse
                 />
             </div>
 
-            {/* 2. SECCIÓN CENTRAL: Indicador del modo dinámico e inteligente */}
-            <div className="flex items-center justify-center">
+            {/* 2. SECCIÓN CENTRAL */}
+            <div className="w-1/3 flex items-center justify-center">
                 {(() => {
                     if (currentRole === 'ADMIN') {
                         return (
-                            /* 🔴 INDICADOR MODO ADMINISTRADOR: Estilo rojo/slate corporativo de gestión */
                             <div className="bg-red-50 px-3 py-1 rounded-full border border-red-100 flex items-center gap-1.5 text-red-800 font-bold text-[11px] uppercase tracking-wider shadow-sm animate-in fade-in duration-300">
                                 <ShieldAlert size={14} className="text-red-600" />
                                 <span>Administrador</span>
@@ -57,7 +65,6 @@ const NavbarUser = ({ username, userPhoto, onLogout, onProfileClick }: NavbarUse
                         );
                     } else if (currentRole === 'PROFESSOR') {
                         return (
-                            /* 🟢 INDICADOR MODO PROFESOR: Estilo esmeralda corporativo docente */
                             <div className="bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 flex items-center gap-1.5 text-emerald-800 font-bold text-[11px] uppercase tracking-wider shadow-sm animate-in fade-in duration-300">
                                 <BookOpen size={14} className="text-emerald-600" />
                                 <span>Profesor</span>
@@ -65,7 +72,6 @@ const NavbarUser = ({ username, userPhoto, onLogout, onProfileClick }: NavbarUse
                         );
                     } else {
                         return (
-                            /* 🔵 INDICADOR MODO ALUMNO: Estilo azul académico */
                             <div className="bg-blue-50 px-3 py-1 rounded-full border border-blue-100 flex items-center gap-1.5 text-blue-800 font-bold text-[11px] uppercase tracking-wider shadow-sm animate-in fade-in duration-300">
                                 <GraduationCap size={14} className="text-blue-600" />
                                 <span>Alumno</span>
@@ -75,10 +81,10 @@ const NavbarUser = ({ username, userPhoto, onLogout, onProfileClick }: NavbarUse
                 })()}
             </div>
 
-            {/* 3. SECCIÓN DERECHA: Perfil + Logout */}
-            <div className="w-1/4 flex items-center justify-end gap-4">
+            {/* 3. SECCIÓN DERECHA: Ejecuta directamente la función local */}
+            <div className="w-1/3 flex items-center justify-end gap-4">
                 <GenericButton
-                    onClick={onProfileClick}
+                    onClick={handleProfileRedirect}
                     variant="white"
                     label={username}
                     icon={avatarIcon}
@@ -98,4 +104,3 @@ const NavbarUser = ({ username, userPhoto, onLogout, onProfileClick }: NavbarUse
 };
 
 export default NavbarUser;
-
