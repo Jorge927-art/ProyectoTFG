@@ -7,12 +7,20 @@ import type { ProfileData } from '../../../services/profileService';
 
 export default function ProfileSettings() {
     const navigate = useNavigate();
+
+    // BANDERAS DE ENTRADA AL COMPONENTE REUTILIZABLE
+    console.log("[F1_PROFILE_COMP]: El componente ProfileSettings se está intentando montar en pantalla.");
+
     const [profile, setProfile] = useState<ProfileData | null>(null);
     const [formData, setFormData] = useState({ email: '', phoneNumber: '', homeAddress: '' });
     const [loading, setLoading] = useState<boolean>(true);
     const [updatingText, setUpdatingText] = useState<boolean>(false);
     const [updatingAvatar, setUpdatingAvatar] = useState<boolean>(false);
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+    // BANDERAS DE TRAZA ARRIBA (Seguras y validadas por TypeScript)
+    console.log("[F1_PROFILE_COMP]: Intentando montar. Estado loading ->", loading);
+    console.log("[F2_PROFILE_COMP]: Datos cargados actualmente ->", profile?.username || "Ninguno (Cargando...)");
 
     useEffect(() => {
         const loadProfileData = async () => {
@@ -97,12 +105,20 @@ export default function ProfileSettings() {
                 </div>
 
                 <button
-                    onClick={() => navigate('/student')}
+                    onClick={() => {
+                        if (profile?.role === 'ADMIN') navigate('/admin');
+                        else if (profile?.role === 'PROFESSOR') navigate('/professor');
+                        else navigate('/student');
+                    }}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors shadow-sm self-start sm:self-center cursor-pointer border border-transparent"
                 >
                     <ArrowLeft size={14} />
                     <span>Volver al Panel</span>
                 </button>
+
+
+
+
             </header>
 
             {message && (

@@ -32,31 +32,21 @@ public class ProfileController {
                 this.userRepository = userRepository;
         }
 
-        // 1. ENDPOINT GET REFACTORIZADO CON EXTRACCIÓN SEGURA
+        // 1. ENDPOINT GET REFACTORIZADO
         @GetMapping
         public ResponseEntity<?> getProfile(Authentication authentication) {
-                StringBuilder debugLog = new StringBuilder();
-                debugLog.append("[B1: Entrando en método] ");
-
                 try {
                         if (authentication == null || !authentication.isAuthenticated()) {
-                                debugLog.append("[B2: ¡Authentication es NULL!] ");
                                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                                                .body(Map.of("error", "No autenticado", "mapa_banderas",
-                                                                debugLog.toString()));
+                                                .body(Map.of("error", "No autenticado"));
                         }
 
                         String username = authentication.getName();
                         Users currentUser = userRepository.findByUsername(username)
                                         .orElseThrow(() -> new RuntimeException("Usuario no encontrado en BD"));
 
-                        debugLog.append("[B2: ID Usuario = " + currentUser.getUser_id() + "] ");
-                        debugLog.append("[B3: Ejecutando findById en PostgreSQL...] ");
-
                         UserProfile profile = profileRepository.findById(currentUser.getUser_id()).orElse(null);
-                        debugLog.append("[B4: Repositorio OK. ¿Existe perfil?: " + (profile != null) + "] ");
 
-                        debugLog.append("[B5: Construyendo Response DTO...] ");
                         ProfileResponseDTO response = new ProfileResponseDTO(
                                         currentUser.getUsername(),
                                         currentUser.getEmail(),
@@ -65,20 +55,16 @@ public class ProfileController {
                                         (profile != null) ? profile.getPhoneNumber() : null,
                                         (profile != null) ? profile.getHomeAddress() : null);
 
-                        debugLog.append("[B6: Todo Correcto. Enviando 200]");
                         return ResponseEntity.ok(response);
 
                 } catch (Exception e) {
-                        debugLog.append("[B_ERROR: " + e.getClass().getSimpleName() + " -> " + e.getMessage() + "]");
                         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                                         "error", "Internal Server Error en Java",
-                                        "traza_excepcion",
-                                        e.getMessage() != null ? e.getMessage() : "NullPointerException",
-                                        "mapa_banderas", debugLog.toString()));
+                                        "traza_excepcion", e.getMessage() != null ? e.getMessage() : "Desconocido"));
                 }
         }
 
-        // 2. ENDPOINT POST AVATAR OPTIMIZADO (Protección contra fallos y validación)
+        // 2. ENDPOINT POST AVATAR
         @PostMapping("/avatar")
         public ResponseEntity<?> uploadAvatar(
                         Authentication authentication,
@@ -90,13 +76,11 @@ public class ProfileController {
                                                 .body(Map.of("error", "No autenticado"));
                         }
 
-                        // Validación del archivo adjunto
                         if (file == null || file.isEmpty()) {
                                 return ResponseEntity.badRequest()
                                                 .body(Map.of("error", "El archivo no puede estar vacío"));
                         }
 
-                        // Validación del formato de imagen básico para el TFG
                         String contentType = file.getContentType();
                         if (contentType == null || !contentType.startsWith("image/")) {
                                 return ResponseEntity.badRequest()
@@ -106,14 +90,11 @@ public class ProfileController {
                         Users currentUser = userRepository.findByUsername(authentication.getName())
                                         .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-                        // Almacenamiento físico del archivo binario
                         String relativePath = fileStorageService.storeFile(file, "avatars");
 
-                        // Mutación atómica del perfil
                         UserProfile profile = profileRepository.findById(currentUser.getUser_id()).orElse(null);
                         if (profile == null) {
                                 profile = new UserProfile();
-                                profile.setId(currentUser.getUser_id());
                                 profile.setUser(currentUser);
                         }
 
@@ -131,7 +112,7 @@ public class ProfileController {
                 }
         }
 
-        // 3. ENDPOINT PUT UPDATE CON EXTENSIÓN ATÓMICA A LA TABLA USERS
+        // 3. ENDPOINT PUT UPDATE CON LA CORRECCIÓN DE REASOCIACIÓN DE NOTEBOOKLM
         @PutMapping("/update")
         public ResponseEntity<?> updateProfileData(
                         Authentication authentication,
@@ -146,26 +127,32 @@ public class ProfileController {
                         Users currentUser = userRepository.findByUsername(authentication.getName())
                                         .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-                        // Sincronización del email en la tabla 'users' (si viene en el DTO)
+                        // LA CLAVE DE NOTEBOOKLM: Forzamos la reasociación y el merge() en la sesión
+                        // actual
+                        currentUser = userRepository.saveAndFlush(currentUser);
+
+                        // 1. Sincronización del email en la entidad principal
                         if (updateDTO.getEmail() != null && !updateDTO.getEmail().isBlank()) {
                                 currentUser.setEmail(updateDTO.getEmail());
-                                userRepository.save(currentUser);
                         }
 
-                        // Sincronización del perfil extendido en la tabla 'user_profiles'
+                        // 2. Sincronización del perfil extendido
                         UserProfile profile = profileRepository.findById(currentUser.getUser_id()).orElse(null);
+
                         if (profile == null) {
                                 profile = new UserProfile();
-                                profile.setId(currentUser.getUser_id());
-                                profile.setUser(currentUser);
+                                profile.setUser(currentUser); // @MapsId se encarga del ID automáticamente
                         }
 
                         profile.setPhoneNumber(updateDTO.getPhoneNumber());
                         profile.setHomeAddress(updateDTO.getHomeAddress());
-                        profileRepository.save(profile);
 
-                        return ResponseEntity.ok(Map.of(
-                                        "message", "Datos de perfil extendido guardados correctamente"));
+                        // 3. Persistencia de datos
+                        profileRepository.save(profile);
+                        userRepository.save(currentUser);
+
+                        return ResponseEntity
+                                        .ok(Map.of("message", "Datos de perfil extendido guardados correctamente"));
 
                 } catch (Exception e) {
                         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(

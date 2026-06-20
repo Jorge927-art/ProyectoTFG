@@ -22,6 +22,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -53,7 +54,7 @@ public class SecurityConfig {
 
                         // CONFIGURACIÓN PERFIL: Permite a cualquier usuario autenticado gestionar su
                         // propio perfil
-                        .requestMatchers("/api/v1/profile/**").hasAnyAuthority("STUDENT", "PROFESSOR", "ADMIN")
+                        .requestMatchers("/api/v1/profile/**").authenticated()
 
                         // Exclusivo Administrador
                         .requestMatchers("/api/auth/users/**").hasAuthority("ADMIN")

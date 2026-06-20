@@ -11,7 +11,6 @@ interface NavbarUserProps {
     username: string;
     userPhoto?: string;
     onLogout?: () => void;
-    // Eliminamos onProfileClick de las propiedades obligatorias
 }
 
 /**
@@ -22,12 +21,24 @@ const NavbarUser = ({ username, userPhoto, onLogout }: NavbarUserProps) => {
     const navigate = useNavigate();
     const currentRole = user?.role?.toUpperCase().trim() || 'STUDENT';
 
-    // FUNCIÓN DE REDIRECCIÓN INTERNA AUTÓNOMA (Sin intermediarios)
+    // FUNCIÓN DE REDIRECCIÓN INTERNA AUTÓNOMA MULTIRROL OPTIMIZADA
     const handleProfileRedirect = () => {
-        if (currentRole === 'STUDENT') {
-            navigate('/student/profile');
-        }
+        // 1. Usamos la variable normalizada que ya tienes en el código
+        const roleCleaned = currentRole.trim().toUpperCase();
+        console.log("[NAVBAR]: Redirigiendo perfil para rol ->", roleCleaned);
+
+        // 2. Mapeo dinámico de rutas de perfil
+        const profileRoutes: Record<string, string> = {
+            'STUDENT': '/student/profile',
+            'PROFESSOR': '/professor/profile',
+            'ADMIN': '/admin/profile'
+        };
+
+        // 3. Ejecución de la navegación segura
+        const targetPath = profileRoutes[roleCleaned] || '/student/profile';
+        navigate(targetPath);
     };
+
 
     const avatarIcon: ReactNode = userPhoto ? (
         <img

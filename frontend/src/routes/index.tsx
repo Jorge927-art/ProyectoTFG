@@ -6,8 +6,12 @@ import AccessDenied from "./pages/public/AccessDenied";
 import StudentDashboard from "./pages/student/StudentDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ProfessorDashboard from "./pages/professor/ProfessorDashboard";
-import StudentProfilePage from "./pages/student/StudentProfilePage"; // <-- Importamos la nueva página del alumno
-import { useAuth } from "@/auth"; // <-- Escuchamos la fuente de verdad global
+import StudentProfilePage from "./pages/student/StudentProfilePage";
+import ProfessorProfilePage from "./pages/professor/ProfessorProfilePage";
+import AdminProfilePage from "./pages/admin/AdminProfilePage";
+
+
+import { useAuth } from "../auth"; // <-- Escuchamos la fuente de verdad global
 
 const AppRoutes = () => {
     const { user, isAuthenticated } = useAuth(); // <-- Escuchamos la fuente de verdad global
@@ -47,19 +51,24 @@ const AppRoutes = () => {
                         </Route>
                     </Route>
 
-                    {/* 3. PROTECCIÓN ADMINISTRADOR (Estructura de Layout Limpia) */}
+                    {/* 3. PROTECCIÓN ADMINISTRADOR */}
                     <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
                         <Route element={<><MainNavbar /><div className="pt-16"><Outlet /></div></>}>
                             <Route path="/admin" element={<AdminDashboard />} />
-                            {/* Aquí colgará tu <Route path="/admin/profile" ... /> en el futuro */}
+
+                            {/* AÑADE ESTA LÍNEA EXACTA REUTILIZANDO TU COMPONENTE DE PERFIL: */}
+                            <Route path="/admin/profile" element={<AdminProfilePage />} />
+
                         </Route>
                     </Route>
+
 
                     {/* 4. PROTECCIÓN PROFESOR (Estructura de Layout Limpia) */}
                     <Route element={<ProtectedRoute allowedRoles={['PROFESSOR']} />}>
                         <Route element={<><MainNavbar /><div className="pt-16"><Outlet /></div></>}>
                             <Route path="/professor" element={<ProfessorDashboard />} />
-                            {/* Aquí colgará tu <Route path="/professor/profile" ... /> en el futuro */}
+                            {/* REGISTRO DE LA RUTA DEL PROFESOR USANDO EL DASHBOARD DIRECTAMENTE */}
+                            <Route path="/professor/profile" element={<ProfessorProfilePage />} />
                         </Route>
                     </Route>
 

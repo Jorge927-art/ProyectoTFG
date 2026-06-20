@@ -34,6 +34,12 @@ const ProfessorDashboard = () => {
 
     return (
         <ProfessorLayout>
+            {/* CABECERA EXCLUSIVA DEL PANEL LIMPIA (Sin botones duplicados) */}
+            <div className="border-b border-slate-100 pb-4 mb-6">
+                <h1 className="text-xl font-bold text-slate-800">Panel de Control Docente</h1>
+                <p className="text-xs text-slate-400 mt-0.5">Gestiona el progreso de tus asignaturas asignadas y revisa las entregas</p>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
                 {/* COLUMNA IZQUIERDA: ASIGNATURAS QUE IMPARTE */}
@@ -65,9 +71,9 @@ const ProfessorDashboard = () => {
                                         <span className="font-bold text-blue-600">{course.averageProgress}%</span>
                                     </div>
                                     <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
-                                        {/* Eliminamos el atributo style por completo para silenciar el linter de Edge */}
                                         <div
-                                            className={`bg-blue-600 h-full transition-all duration-500 w-[${course.averageProgress}%]`}
+                                            className="bg-blue-600 h-full transition-all duration-500"
+                                            style={{ width: `${course.averageProgress}%` }}
                                         />
                                     </div>
                                     <button className="w-full bg-slate-800 hover:bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1">

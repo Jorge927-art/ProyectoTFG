@@ -17,7 +17,9 @@ public class UserProfile {
     private Long id;
 
     @OneToOne
-    @PrimaryKeyJoinColumn // <-- LE DICE A HIBERNATE QUE LA CLAVE FORÁNEA ES LA MISMA CLAVE PRIMARIA
+    @MapsId // <-- DICE A HIBERNATE QUE USE LA CLAVE PRIMARIA DE LA ENTIDAD 'USERS' COMO
+            // CLAVE PRIMARIA DE ESTA TABLA
+    @JoinColumn(name = "user_id") // <-- MAPEA FÍSICAMENTE LA COLUMNA DE UNIÓN EN POSTGRESQL
     private Users user;
 
     @Column(name = "avatar_path", nullable = true, length = 512)
