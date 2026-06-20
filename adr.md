@@ -212,19 +212,77 @@ Cumplimiento estricto del principio Abierto/Cerrado (OCP) de SOLID. La tarjeta a
 
 ---
 
-## [ADR-16] Desacoplamiento de Flujos de Redirección mediante Cohesión de Componentes y Sincronización Síncrona del Contexto JWT
+## [ADR-16] Unificación del Perfil Universal Atómico y Desacoplamiento de Flujos de Redirección mediante Cohesión de Componentes y Sincronización Síncrona del Contexto JWT
 
 * **Fecha:** Junio 2026
 * **Estatus:** Aceptado
-* **Contexto:** Al interactuar con el elemento de interfaz de usuario (`GenericButton`) que muestra el nombre del estudiante autenticado ("Luis") en el componente de cabecera, la aplicación de React omitía la ejecución del callback de navegación y bloqueaba el acceso de forma perenne en el Dashboard. Tras una auditoría del árbol de componentes, se detectaron tres anomalías estructurales: una discrepancia semántica en las firmas de tipos de TypeScript entre manejadores de eventos nativos de ratón (`MouseEventHandler`) y funciones puras (`() => void`), un acoplamiento innecesario por propagación vertical de propiedades (*Props Drilling*) desde `MainNavbar.tsx` hacia `NavbarUser.tsx`, y un rebote asíncrono destructivo en el guardia de seguridad (`ProtectedRoute.tsx`), el cual interpretaba el estado transitorio inicializado en `null` de la variable de sesión como un falso negativo de seguridad, expulsando al usuario debido a la regla comodín (`path="*"`) de la jerarquía de rutas virtuales.
-* **Decisión:** Reestructurar de forma integral la comunicación de los componentes de navegación y unificar los mecanismos de redirección del sistema:
-  1. Eliminar la propagación de funciones desde el componente padre y dotar a `NavbarUser.tsx` de plena autonomía contextual mediante el consumo directo del hook global de estado de autenticación (`useAuth`).
-  2. Implementar una función anónima flecha `() => handleProfileRedirect()` en el evento interactivo del botón genérico para aislar y resolver los conflictos de firmas de tipado estricto impuestos por el compilador con la directiva `verbatimModuleSyntax`.
-  3. Sustituir el enrutamiento virtual asíncrono (`navigate`) por una navegación imperativa física de infraestructura utilizando `window.location.href`. Esto fuerza un ciclo de hidratación limpio desde la raíz que obliga al componente guardián a respetar el estado de bloqueo tecnológico preventivo (`isLoading`) mientras se recupera el token del almacenamiento local.
-* **Justificación para el TFG:** Aporta un valor metodológico fundamental en el área de ingeniería de interfaces y patrones de arquitectura de software para Single Page Applications (SPA). Demuestra al tribunal el dominio práctico sobre el principio de **Cohesión y Autonomía de Componentes**, erradicando el acoplamiento rígido de herencia de callbacks. Además, expone la capacidad de diagnosticar y solventar conflictos de concurrencia y desincronización en el renderizado asíncrono de interfaces que consumen estados hidratados mediante tokens criptográficos JWT, garantizando una consistencia de navegación determinista y robusta.
-* **Consecuencias:** Se elimina por completo la transferencia de propiedades muertas y la generación de variables no utilizadas en el linter (`eslint`). El flujo de acceso al perfil del estudiante se homologa y sincroniza con el mecanismo nativo e indestructible del módulo de inicio de sesión (`AuthModal.tsx`). El usuario puede transicionar desde la zona pública y el Dashboard general hacia la vista extendida de su perfil (`/student/profile`) con total fluidez, permitiendo que la capa de persistencia relacional `1:1` de PostgreSQL se pinte en la interfaz sin sufrir bloqueos ni rebotes del enrutador de React.
+* **Contexto:** Gestión de Perfil de Usuario (STUDENT, PROFESSOR, ADMIN) e Infraestructura de Navegación SPA.
+* **Autores:** Luis (Desarrollador) / Laura / Jorge / Tutor TFG
 
 ---
+
+## 1. Contexto y Problema
+
+El sistema presentaba dos desafíos críticos interconectados que afectaban la experiencia de usuario y la integridad de los datos entre React (Vite, TSX) y el backend (Spring Boot 3 + PostgreSQL):
+
+1. **Cortocircuito de Persistencia Backend (Excepción Hibernate):** El filtro de seguridad (`JwtAuthenticationFilter`) inyectaba un objeto `UserDetails` desvinculado de la sesión activa de Hibernate (*Detached*). Al enviar un payload `PUT` genérico (`/api/v1/profile/update`) para actualizar datos del perfil, Hibernate lanzaba sistemáticamente la excepción de infraestructura `org.hibernate.AssertionFailure: null identifier (UserProfile)`. El mecanismo `@MapsId` fallaba al derivar la clave de la entidad débil `user_profiles` debido al estado transaccional inestable de la entidad fuerte `users` en transacciones de actualización concurrentes.
+
+2. **Bloqueo y Rebote Asíncrono en el Frontend (Navegación SPA):** Al interactuar con el elemento de interfaz de usuario (`GenericButton`) que muestra el nombre del estudiante autenticado ("Luis") en el componente de cabecera, la aplicación omitía el callback de navegación y bloqueaba el acceso de forma perenne. Se detectaron tres anomalías: una discrepancia semántica en TypeScript entre manejadores `MouseEventHandler` y funciones puras (`() => void`) bajo la directiva `verbatimModuleSyntax`, un acoplamiento innecesario por propagación vertical de propiedades (*Props Drilling*) desde `MainNavbar.tsx` hacia `NavbarUser.tsx`, y un rebote asíncrono destructivo en el guardia de seguridad (`ProtectedRoute.tsx`), el cual interpretaba el estado transitorio inicializado en `null` de la sesión como un falso negativo, expulsando al usuario debido a la regla comodín (`path="*"`) antes de terminar la hidratación del token JWT.
+
+---
+
+## 2. Decisión Arquitectónica
+
+Para garantizar un diseño de software robusto, limpio y genérico alineado con las exigencias metodológicas del TFG, se rechazó cualquier duplicidad de endpoints o consultas nativas, implementando una estrategia estructural doble:
+
+1. **Sincronización Avanzada de Persistencia Backend:** Inyectar la instrucción `userRepository.saveAndFlush(currentUser)` en la cabecera del procesamiento del controlador. Esto obliga a Spring Data JPA a capturar la entidad desacoplada, integrarla en la sesión activa (`EntityManager.merge()`) y vaciar los cambios síncronamente. Se invierte el orden físico, ejecutando primero `profileRepository.save(profile)` y luego `userRepository.save(currentUser)` para estabilizar el mecanismo `@MapsId`.
+2. **Simetría y Composición por Roles en el Frontend:** Crear páginas contenedoras por rol (`StudentProfilePage`, `ProfessorProfilePage`, `AdminProfilePage`) compartiendo por composición el mismo formulario dinámico en `ProfileSettings.tsx`. El Navbar redirige correctamente mediante un mapeo de rutas según el rol.
+3. **Autonomía Contextual y Sincronización JWT:** Dotar a `NavbarUser.tsx` de plena autonomía contextual consumiendo directamente el hook global de autenticación (`useAuth`). Se implementa la función flecha `() => handleProfileRedirect()` para aislar conflictos de firmas de tipos, y se sustituye el enrutamiento virtual por una navegación imperativa física con `window.location.href`. Esto fuerza un ciclo de hidratación limpio desde la raíz que obliga al guardián a respetar el estado preventivo (`isLoading`) mientras se recupera el token del almacenamiento local.
+
+---
+
+## 3. Justificación para el TFG
+
+Aporta un valor metodológico fundamental en el área de ingeniería de interfaces y patrones de arquitectura de software para Single Page Applications (SPA). Demuestra al tribunal el dominio práctico sobre el principio de **Cohesión y Autonomía de Componentes**, erradicando el acoplamiento rígido de herencia de callbacks. En el backend, expone la capacidad de gestionar con éxito transacciones atómicas seguras y el ciclo de vida de entidades JPA acopladas (`1:1`) mediante claves compartidas en PostgreSQL.
+
+---
+
+## 4. Consecuencias
+
+* **Positivas:** Se elimina la transferencia de propiedades muertas y las advertencias del linter (`eslint`). El flujo de acceso se homologa con el mecanismo nativo del módulo de inicio de sesión (`AuthModal.tsx`). El endpoint genérico da soporte transparente e idéntico a los tres roles (Luis, Laura y Jorge). Se habilitó con éxito la subida de avatares mediante `Multipart/Form-Data` con identificadores UUID únicos. Además, se resolvió la deuda técnica del scroll lateral en la consola de administración (`UserScrollList.tsx`) indexando los badges en un diccionario estático y aplicando una clave compuesta triple (`key={item.userId || item.username || ...}`) que fulmina el warning de llaves duplicadas o indefinidas en React.
+* **Negativas / Deuda Técnica:** Ninguna detectada. El circuito de administración, enrutamiento y perfil universal queda cerrado y validado al 100%.
+
+---
+
+## [ADR-17] Arquitectura del Módulo de Gestión de Cursos y Modelado de Relaciones Unidireccionales para el Perfil Profesor
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Circuito del Profesor (Laura) - Creación y gestión de contenidos académicas.
+* **Autores:** Luis (Desarrollador) / Tutor TFG
+
+---
+
+## 1. Contexto y Problema
+
+Con el perfil unificado funcionando, el sistema requería implementar el circuito del profesor (Laura) para permitir la creación, edición y lectura de cursos en PostgreSQL. El desafío técnico radicaba en modelar las relaciones en Spring Boot 3 de forma **unidireccional** (para evitar referencias circulares e infinitas al serializar con Jackson a JSON) y asegurar que solo los usuarios con el rol `PROFESSOR` tengan privilegios de mutación en estos endpoints.
+
+---
+
+## 2. Decisión Arquitectónica
+
+Se implementaron las siguientes directrices de diseño:
+
+1. **Control de Acceso Basado en Roles (RBAC):** Asegurar los endpoints del controlador mediante anotaciones `@PreAuthorize("hasRole('PROFESSOR')")` a nivel de Spring Security.
+2. **Modelado Unidireccional Limpio:** La entidad `Curso` contiene la referencia al profesor (entidad `User`), pero la entidad `User` no conoce los cursos que imparte, evitando sobrecargar la memoria de la sesión de Hibernate.
+3. **Paginación e Interfaz en React:** Consumo del listado mediante Axios mapeando los estados en tarjetas escaneables dentro de `ProfessorDashboard.tsx`.
+
+---
+
+## 3. Consecuencias
+
+* **Positivas:** Seguridad estricta en la capa de servicios (Laura puede gestionar sus cursos, pero Luis el alumno solo tiene acceso de lectura). Respuestas JSON ligeras y limpias sin necesidad de usar `@JsonManagedReference` o `@JsonIgnore`.
+* **Negativas / Deuda Técnica:** Al usar relaciones unidireccionales, para obtener los cursos de un profesor específico se requiere una query personalizada en el repositorio (`findByProfesorId`), lo cual queda documentado y optimizado.
 
 # Notas de Migración: Transición a JWT y Compatibilidad
 
