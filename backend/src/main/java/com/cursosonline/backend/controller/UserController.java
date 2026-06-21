@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import java.time.Instant;
 import java.util.List;
+import java.security.Principal;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -118,4 +119,30 @@ public class UserController {
                 "role", updatedUser.getRole().name(),
                 "message", "El rol del usuario " + username + " fue actualizado a " + newRole.name() + " con éxito."));
     }
+
+    /**
+     * Endpoint para alternar el estado de acceso de un usuario (Borrado lógico /
+     * Reactivación).
+     * Restringido estrictamente a administradores. Evita el autoborrado.
+     */
+    @DeleteMapping("/users/{username}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deleteUserByAdmin(@PathVariable String username, Principal principal) {
+        // Protección absoluta: Bloquear autoborrado en el servidor
+        if (principal.getName().equalsIgnoreCase(username)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Acción denegada: No puedes modificar tu propia cuenta de administrador."));
+        }
+
+        // Ejecutamos la mutación en el servicio y capturamos la entidad actualizada
+        Users updatedUser = userService.deleteByUsername(username);
+
+        String accion = updatedUser.isEnabled() ? "reactivado y dado de alta" : "eliminado (baja lógica)";
+
+        // CRÍTICO PARA EL FRONTEND: Devolvemos el booleano exacto escrito en PostgreSQL
+        return ResponseEntity.ok(Map.of(
+                "enabled", updatedUser.isEnabled(),
+                "message", "El usuario '" + username + "' ha sido " + accion + " en PostgreSQL con éxito."));
+    }
+
 }
