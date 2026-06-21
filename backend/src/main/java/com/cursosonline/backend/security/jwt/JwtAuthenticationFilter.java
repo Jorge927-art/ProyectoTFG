@@ -17,15 +17,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Filtro de autenticación JWT de alto rendimiento y libre de duplicidades.
- * Extrae y valida la identidad y roles directamente desde el Token en memoria,
- * eliminando las consultas redundantes a PostgreSQL en cada petición HTTP.
+ * Bloquea y rechaza inmediatamente peticiones con tokens caducados o inválidos
+ * (401).
  */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
 
-    // Inyección limpia del servicio de tokens
     public JwtAuthenticationFilter(JwtService jwtService) {
         this.jwtService = jwtService;
     }
@@ -38,8 +37,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String jwt;
         final String username;
 
-        // Si no se suministra un token Bearer válido, delegamos a la cadena estándar
-        // (Stateless)
+        // Si no se suministra un token Bearer, delegamos a la cadena estándar (para
+        // rutas públicas)
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
@@ -48,41 +47,50 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         jwt = authHeader.substring(7);
 
         try {
+            // 1. Validar criptografía y EXPIRACIÓN de forma estricta primero
+            if (!jwtService.isTokenValid(jwt)) {
+                // BLINDAJE TFG: Si el token ha expirado, cortamos la petición aquí mismo con un
+                // 401
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\": \"Token expirado o inválido. Acceso denegado.\"}");
+                return; // Corta la cadena de filtros por completo
+            }
+
             username = jwtService.extractUsername(jwt);
 
-            // Si el token es válido y el contexto de seguridad actual se encuentra libre
+            // Si el contexto de seguridad actual se encuentra libre
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-                // 🔴 RENDIMIENTO PURO JWT: Extraemos el rol guardado en el token sin golpear la
-                // BBDD
                 String role = jwtService.extractRole(jwt);
 
-                // Si el token es estructural y criptográficamente válido
-                if (jwtService.isTokenValid(jwt)) {
+                // Reconstruimos la lista de autoridades autorizadas usando el rol del token
+                List<SimpleGrantedAuthority> authorities = (role != null)
+                        ? List.of(new SimpleGrantedAuthority(role))
+                        : List.of();
 
-                    // Reconstruimos la lista de autoridades autorizadas usando el rol del token
-                    List<SimpleGrantedAuthority> authorities = (role != null)
-                            ? List.of(new SimpleGrantedAuthority(role))
-                            : List.of();
+                // Instanciamos un UserDetails virtual ligero en memoria
+                UserDetails userDetails = new User(username, "", authorities);
 
-                    // Instanciamos un UserDetails virtual ligero en memoria
-                    UserDetails userDetails = new User(username, "", authorities);
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        userDetails, null, userDetails.getAuthorities());
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities());
-                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                    // Establecemos la identidad en el contexto de Spring Security para el ciclo de
-                    // vida de esta petición
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
-                }
+                // Establecemos la identidad en el contexto de Spring Security
+                SecurityContextHolder.getContext().setAuthentication(authToken);
             }
+
         } catch (Exception ex) {
-            // Salvaguarda: Si el token está corrupto o mal firmado, limpiamos el contexto
+            // Salvaguarda: Si ocurre un fallo inesperado, limpiamos el contexto y
+            // rechazamos
             SecurityContextHolder.clearContext();
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\": \"Error de autenticación criptográfica.\"}");
+            return;
         }
 
-        // Continuamos la cadena de filtros de forma limpia
+        // Solo si el token es 100% válido permitimos continuar hacia los controladores
         filterChain.doFilter(request, response);
     }
 }

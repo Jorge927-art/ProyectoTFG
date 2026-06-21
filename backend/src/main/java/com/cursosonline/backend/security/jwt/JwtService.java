@@ -180,15 +180,22 @@ public class JwtService {
         }
     }
 
+    // --- ENFOQUE CORREGIDO: VALIDACIÓN MATEMÁTICA INMUTABLE DEL VENCIMIENTO ---
     private boolean isExpired(Map<String, Object> claims) {
         Object expObj = claims.get("exp");
         if (expObj instanceof Number) {
+            // Convertimos de forma segura ignorando si el parser JSON manual metió un Long
+            // o un Double
             long expSeconds = ((Number) expObj).longValue();
             long skew = jwtProperties.getClockSkewSeconds();
-            Instant adjustedCurrentTime = Instant.now(clock).minusSeconds(skew);
+
+            // Un token está expirado si el instante de vencimiento (exp) es ANTES de la
+            // hora actual
+            // Aplicamos el margen de tolerancia (skew) sumándoselo a la hora de comparación
+            Instant adjustedCurrentTime = Instant.now(clock).plusSeconds(skew);
             return Instant.ofEpochSecond(expSeconds).isBefore(adjustedCurrentTime);
         }
-        return true;
+        return true; // Si no hay propiedad de expiración, se rechaza por seguridad
     }
 
     private String resolvePrimaryAuthority(Collection<? extends GrantedAuthority> authorities) {
@@ -229,7 +236,7 @@ public class JwtService {
         Matcher matcher = JSON_FIELD_PATTERN.matcher(json);
         while (matcher.find()) {
             String key = matcher.group(1);
-            String valueStr = matcher.group(2);
+            String valueStr = matcher.group(2).trim(); // Añadido trim() preventivo para limpiar el parseo manual
             if (valueStr.startsWith("\"")) {
                 map.put(key, matcher.group(3));
             } else if (valueStr.equals("true")) {

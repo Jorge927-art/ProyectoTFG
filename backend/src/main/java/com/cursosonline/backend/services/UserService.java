@@ -60,6 +60,7 @@ public class UserService {
 
     /**
      * Realiza el proceso de login verificando el nombre de usuario y la contraseña.
+     * Valida que la cuenta no se encuentre dada de baja lógicamente.
      * 
      * @param username
      * @param rawPassword
@@ -69,6 +70,12 @@ public class UserService {
     public Users login(String username, String rawPassword) {
         Users user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ServicesException("Usuario no encontrado"));
+
+        // Validación obligatoria TFG: Denegar el login a usuarios dados de baja
+        if (!user.isEnabled()) {
+            throw new ServicesException("Acceso denegada: La cuenta de este usuario ha sido dada de baja.");
+        }
+
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
             throw new ServicesException("Contraseña incorrecta");
         }
@@ -107,6 +114,30 @@ public class UserService {
 
         user.setRole(newRole);
         return userRepository.save(user);
+    }
+
+    /**
+     * Realiza el borrado lógico de un usuario desactivando su acceso.
+     * Preserva la integridad referencial en PostgreSQL evitando violaciones de FK.
+     * 
+     * @return El usuario con el estado de activación actualizado.
+     * @param username Nombre del usuario a dar de baja.
+     */
+    @Transactional
+    public Users deleteByUsername(String username) {
+        Users user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con el username: " + username));
+
+        // Conmutador inteligente: si está activo pasa a false, si está inactivo pasa a
+        // true
+        if (user.isEnabled()) {
+            user.setEnabled(false);
+        } else {
+            user.setEnabled(true);
+        }
+
+        // Guardamos y forzamos el volcado inmediato a PostgreSQL
+        return userRepository.saveAndFlush(user);
     }
 
 }

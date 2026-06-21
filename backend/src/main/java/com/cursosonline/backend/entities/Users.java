@@ -40,7 +40,15 @@ public class Users implements UserDetails {
     @Column(name = "email", nullable = true)
     private String email;
 
-    // --- MÉTODOS OBLIGATORIOS DE LA INTERFAZ USERDETAILS PARA SPRING SECURITY ---
+    // --- NUEVO CAMPO PARA EL BORRADO LÓGICO ---
+    @Column(nullable = false)
+    private boolean enabled = true; // Por defecto nace activo en PostgreSQL
+
+    @Override
+    public boolean isEnabled() {
+        // Conectamos Spring Security directamente con la columna de PostgreSQL
+        return this.enabled;
+    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -63,8 +71,4 @@ public class Users implements UserDetails {
         return true; // Las credenciales no expiran por defecto
     }
 
-    @Override
-    public boolean isEnabled() {
-        return true; // El usuario está activo por defecto
-    }
 }

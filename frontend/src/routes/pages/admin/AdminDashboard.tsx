@@ -9,6 +9,7 @@ interface UserEntity {
     userId?: number;
     username: string;
     role: string;
+    enabled: boolean; // Atributo integrado según auditoría
 }
 
 const AdminDashboard = () => {
@@ -17,6 +18,7 @@ const AdminDashboard = () => {
     const [loading, setLoading] = useState<boolean>(false);
     const [updatingId, setUpdatingId] = useState<number | null>(null);
     const [error, setError] = useState<string>('');
+    const [deleting, setDeleting] = useState<boolean>(false);
 
     // 1. FUNCIÓN DE BÚSQUEDA: Consulta directa al endpoint de Spring Boot
     const handleSearchUser = async (e: React.FormEvent) => {
@@ -69,6 +71,72 @@ const AdminDashboard = () => {
             setError(message);
         } finally {
             setUpdatingId(null);
+        }
+    };
+
+    // 3. FUNCIÓN DE BORRADO DESTRUCTIVO O CONMUTACIÓN DE ESTADO LÓGICO
+    const handleDeleteUser = async () => {
+        if (!foundUser) return;
+
+        // Obtenemos el objeto del usuario desde la persistencia que maneja tu AuthProvider
+        const storedAuth = localStorage.getItem('auth_user');
+        let currentAdminUsername = '';
+
+        if (storedAuth) {
+            try {
+                const parsedAuth = JSON.parse(storedAuth);
+                currentAdminUsername = parsedAuth.username || '';
+            } catch (errJson) {
+                console.error("Error al parsear el usuario autenticado:", errJson);
+            }
+        }
+
+        // Validación preventiva en UI contra autoborrado
+        if (foundUser.username.toLowerCase() === currentAdminUsername.toLowerCase()) {
+            setError("Acción denegada: El sistema bloquea el autoborrado por seguridad.");
+            return;
+        }
+
+        const operacionTexto = foundUser.enabled ? "dar de baja (borrado lógico)" : "reactivar y dar de alta";
+        const confirmed = window.confirm(`¿Estás seguro de cambiar el estado de acceso de ${foundUser.username} para ${operacionTexto}?`);
+        if (!confirmed) return;
+
+        setDeleting(true);
+        setError('');
+
+        try {
+            // PETICIÓN HTTP: Invoca al controlador conmutador de estado
+            const response = await apiClient.delete(`/api/auth/users/${foundUser.username}`);
+
+            if (response.status === 200) {
+                alert(response.data.message);
+
+                // SINCRONIZACIÓN SEGURA: Actualizamos la tarjeta con el valor real devuelto por el servidor
+                setFoundUser({
+                    ...foundUser,
+                    enabled: response.data.enabled // Sincroniza de forma atómica con el backend
+                });
+            }
+        } catch (errHttp) {
+            console.error("Error en la petición de borrado:", errHttp);
+            let message = "Error crítico: No se pudo modificar el estado del usuario.";
+            if (axios.isAxiosError(errHttp) && errHttp.response?.data?.error) {
+                message = errHttp.response.data.error;
+            }
+            setError(message);
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    // Auxiliar para obtener el nombre del admin actual directamente en la renderización
+    const getAdminUsername = (): string => {
+        const storedAuth = localStorage.getItem('auth_user');
+        if (!storedAuth) return '';
+        try {
+            return JSON.parse(storedAuth).username || '';
+        } catch {
+            return '';
         }
     };
 
@@ -152,7 +220,7 @@ const AdminDashboard = () => {
                                         <select
                                             id="role-selector"
                                             value={foundUser.role}
-                                            disabled={updatingId !== null}
+                                            disabled={updatingId !== null || deleting}
                                             onChange={(e) => handleRoleChange(foundUser.userId || 0, e.target.value)}
                                             className="flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all disabled:bg-slate-100"
                                         >
@@ -166,6 +234,41 @@ const AdminDashboard = () => {
                                             </div>
                                         )}
                                     </div>
+                                </div>
+
+                                {/* BOTÓN DE BORRADO DESTRUCTIVO BLINDADO */}
+                                <div className="mt-2 pt-3 border-t border-red-100">
+                                    {foundUser.username.toLowerCase() === getAdminUsername().toLowerCase() ? (
+                                        <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 p-2.5 rounded-xl text-center font-medium">
+                                            Esta es tu cuenta actual. No puedes eliminarte a ti mismo.
+                                        </div>
+                                    ) : foundUser.enabled === false ? (
+                                        <button
+                                            type="button"
+                                            onClick={handleDeleteUser}
+                                            disabled={deleting || updatingId !== null}
+                                            className="w-full py-2 bg-emerald-50 border-2 border-emerald-200 text-emerald-600 rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-emerald-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                                        >
+                                            {deleting ? (
+                                                <Loader2 size={14} className="animate-spin" />
+                                            ) : (
+                                                <>Reactivar y Dar de Alta Usuario</>
+                                            )}
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={handleDeleteUser}
+                                            disabled={deleting || updatingId !== null}
+                                            className="w-full py-2 bg-white border-2 border-red-200 text-red-600 rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-red-50 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                                        >
+                                            {deleting ? (
+                                                <Loader2 size={14} className="animate-spin" />
+                                            ) : (
+                                                <>Eliminar Usuario Definitivamente</>
+                                            )}
+                                        </button>
+                                    )}
                                 </div>
 
                             </div>

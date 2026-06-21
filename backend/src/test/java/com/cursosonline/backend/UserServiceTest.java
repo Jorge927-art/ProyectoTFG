@@ -19,10 +19,7 @@ import com.cursosonline.backend.services.UserService;
 /**
  * Clase de pruebas unitarias para UserService. Utiliza Mockito para simular el
  * comportamiento de UserRepository y PasswordEncoder, permitiendo probar la
- * lógica de negocio de UserService de forma aislada. Incluye pruebas para los
- * métodos findByUsername y registerUser, verificando tanto casos exitosos como
- * escenarios de error (como intentar registrar un usuario con un nombre de
- * usuario ya existente).
+ * lógica de negocio de UserService de forma aislada.
  */
 @ExtendWith(MockitoExtension.class)
 public class UserServiceTest {
@@ -37,15 +34,13 @@ public class UserServiceTest {
 
     /**
      * Prueba para el método findByUsername, verificando que retorne un usuario
-     * cuando existe en el repositorio. Se simula el comportamiento del repositorio
-     * para devolver un usuario específico cuando se busca por su nombre de usuario.
-     * Luego se verifica que el resultado sea correcto y que el nombre de usuario
-     * coincida con el esperado.
+     * cuando existe en el repositorio.
      */
     @Test
     void findByUsername_DebeRetornarUsuario_CuandoExiste() {
         String username = "Luis";
-        Users expectedUser = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com");
+        // Integrado: Se añade el valor 'true' al final para el campo 'enabled'
+        Users expectedUser = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true);
         when(userRepository.findByUsername("Luis")).thenReturn(Optional.of(expectedUser));
         Optional<Users> result = userService.findByUsername(username);
         assertTrue(result.isPresent());
@@ -54,17 +49,13 @@ public class UserServiceTest {
 
     /**
      * Prueba para el método registerUser, verificando que se registre un nuevo
-     * usuario correctamente. Se simula el comportamiento del repositorio para
-     * indicar que no existe un usuario con el mismo nombre de usuario, y se simula
-     * el cifrado de la contraseña. Luego se verifica que el usuario se registre
-     * correctamente, que se le asigne un ID y que se haya intentado cifrar la
-     * contraseña. Además, se confirma que el método save del repositorio haya sido
-     * llamado para guardar el nuevo usuario.
+     * usuario correctamente.
      */
     @Test
     void assignUser() {
-        Users newUser = new Users(null, "Luis", "jki", Role.STUDENT, "jose.gmail.com");
-        Users savedUser = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com");
+        // Integrado: Se añade 'true' al final para corregir el constructor de Lombok
+        Users newUser = new Users(null, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true);
+        Users savedUser = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true);
         when(userRepository.findByUsername("Luis")).thenReturn(Optional.empty());
         when(passwordEncoder.encode("jki")).thenReturn("encoded_jki");
         when(userRepository.save(any())).thenReturn(savedUser);
@@ -72,17 +63,12 @@ public class UserServiceTest {
         assertNotNull(newUser);
         assertEquals(1L, result.getUser_id());
         verify(userRepository).save(any());
-        verify(passwordEncoder).encode("jki"); // Verifica que se intentó cifrar
+        verify(passwordEncoder).encode("jki");
     }
 
     /**
      * Prueba para el método findByUsername, verificando que retorne un Optional
-     * vacío
-     * cuando el usuario no existe en el repositorio. Se simula el comportamiento
-     * del repositorio para devolver un Optional vacío cuando se busca por un nombre
-     * de usuario que no existe. Luego se verifica que el resultado sea
-     * efectivamente un Optional vacío y se confirma que se consultó al repositorio
-     * una vez con el nombre de usuario proporcionado.
+     * vacío cuando el usuario no existe.
      */
     @Test
     void findByUsername_ReturnEmpty() {
@@ -96,19 +82,15 @@ public class UserServiceTest {
 
     /**
      * Prueba para el método registerUser, verificando que se lance una excepción al
-     * intentar registrar un usuario con un nombre de usuario que ya existe. Se
-     * simula el comportamiento del repositorio para indicar que ya existe un
-     * usuario con el mismo nombre de usuario. Luego se verifica que se lance una
-     * excepción al intentar registrar el nuevo usuario, y se confirma que el
-     * mensaje de la excepción contenga el nombre de usuario conflictivo. Además, se
-     * verifica que el método save del repositorio nunca se haya llamado, ya que el
-     * registro debería fallar antes de intentar guardar el nuevo usuario.
+     * intentar registrar un usuario con un nombre de usuario que ya existe.
      */
     @Test
     void registerUser_DebeLanzarExcepcion_CuandoElNombreDeUsuarioYaExiste() {
         String username = "Luis";
-        Users new_user = new Users(null, username, "frgt", Role.STUDENT, "jose.gmail.com");
-        Users existing_user = new Users(1L, username, "frgt", Role.STUDENT, "jose.gmail.com");
+        // Integrado: Se añade 'true' al final para cumplir con el contrato de la
+        // entidad
+        Users new_user = new Users(null, username, "frgt", Role.STUDENT, "jose.gmail.com", true);
+        Users existing_user = new Users(1L, username, "frgt", Role.STUDENT, "jose.gmail.com", true);
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(existing_user));
         RuntimeException excepcion = assertThrows(RuntimeException.class, () -> {
             userService.registerUser(new_user);
