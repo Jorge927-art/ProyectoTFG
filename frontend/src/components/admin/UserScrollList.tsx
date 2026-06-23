@@ -1,13 +1,14 @@
 // src/components/admin/UserScrollList.tsx
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/services/apiClient';
-import { User, ShieldAlert, BookOpen, GraduationCap } from 'lucide-react';
+import { User, ShieldAlert, BookOpen, GraduationCap, CheckCircle2, XCircle } from 'lucide-react';
 
 interface UserListEntity {
     userId: number;
     username: string;
     email: string;
     role: 'ADMIN' | 'PROFESSOR' | 'STUDENT';
+    enabled: boolean; // <-- INTEGRADO: Mapeo de estado para la auditoría de borrado lógico
 }
 
 export const UserScrollList = () => {
@@ -65,10 +66,15 @@ export const UserScrollList = () => {
             ) : (
                 <div className="h-29 overflow-y-auto pr-1 space-y-2 mt-2 scrollbar-thin scrollbar-thumb-slate-200">
                     {users.map((item, index) => (
-                        /* Clave compuesta combinada para asegurar estabilidad total en el DOM virtual */
-                        <div key={item.userId || item.username || `usr-${index}`} className="flex items-center justify-between p-2.5 rounded-lg border border-slate-50 hover:bg-slate-50/50 transition-all shadow-2xs">
+                        /* Clave compuesta combinada y clase condicional de opacidad si el usuario está dado de baja */
+                        <div
+                            key={item.userId || item.username || `usr-${index}`}
+                            className={`flex items-center justify-between p-2.5 rounded-lg border border-slate-50 hover:bg-slate-50/50 transition-all shadow-2xs ${item.enabled === false ? 'opacity-60 bg-slate-50/40' : ''
+                                }`}
+                        >
+                            {/* JERARQUÍA 1: NOMBRE (Izquierda) */}
                             <div className="flex items-center gap-2.5">
-                                <div className="bg-slate-100 p-1.5 rounded-full text-slate-500">
+                                <div className={`p-1.5 rounded-full ${item.enabled === false ? 'bg-slate-200 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
                                     <User size={16} />
                                 </div>
                                 <div>
@@ -77,8 +83,25 @@ export const UserScrollList = () => {
                                 </div>
                             </div>
 
-                            {/* Renderizado seguro desde diccionario con fallback a Alumno */}
-                            {badges[item.role] || badges.STUDENT}
+                            {/* BLOQUE DERECHO: JERARQUÍA 2 (ROL) Y JERARQUÍA 3 (ENABLED) */}
+                            <div className="flex items-center gap-2">
+                                {/* JERARQUÍA 2: ROL */}
+                                {badges[item.role] || badges.STUDENT}
+
+                                {/* JERARQUÍA 3: PROPIEDAD ENABLED (ESTADO DE BORRADO LÓGICO) */}
+                                {item.enabled === false ? (
+                                    <div className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                        <XCircle size={10} className="text-slate-400" />
+                                        <span>Inactivo</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+                                        <CheckCircle2 size={10} className="text-emerald-500" />
+                                        <span>Activo</span>
+                                    </div>
+                                )}
+                            </div>
+
                         </div>
                     ))}
                 </div>
