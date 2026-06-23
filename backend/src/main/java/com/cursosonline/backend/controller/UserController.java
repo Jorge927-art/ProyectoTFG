@@ -6,7 +6,6 @@ import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.exception.ServicesException;
 import com.cursosonline.backend.security.jwt.JwtService;
-import com.cursosonline.backend.services.SessionAuthenticationService;
 import com.cursosonline.backend.services.UserService;
 import lombok.RequiredArgsConstructor;
 
@@ -26,7 +25,6 @@ import java.security.Principal;
 public class UserController {
 
     private final UserService userService;
-    private final SessionAuthenticationService sessionAuthenticationService;
     private final JwtService jwtService;
 
     /**
@@ -39,25 +37,22 @@ public class UserController {
 
     /**
      * Endpoint para el login de usuarios (JWT Stateless).
-     * Las excepciones de autenticación fluyen directamente al
-     * GlobalExceptionHandler.
+     * Centraliza la validación de credenciales y el estado de borrado lógico
+     * (enabled).
      */
     @PostMapping("/login")
     public ResponseEntity<AuthTokenResponse> login(@RequestBody LoginRequest loginRequest) {
-        // 1. Autenticar credenciales en la capa de servicio
-        sessionAuthenticationService.login(loginRequest.username(), loginRequest.password());
+        // 1. CORRECCIÓN AUDITORÍA: Validar credenciales Y estado 'enabled' en una sola
+        // llamada de negocio
+        Users user = userService.login(loginRequest.username(), loginRequest.password());
 
-        // 2. Buscar al usuario de manera limpia a través del servicio
-        Users user = userService.findByUsername(loginRequest.username())
-                .orElseThrow(() -> new ServicesException("Usuario no encontrado tras autenticación"));
-
-        // 3. Generar el token inyectando las propiedades en los Custom Claims
+        // 2. Generar el token inyectando las propiedades en los Custom Claims
         String jwtToken = jwtService.generateAccessToken(
                 (org.springframework.security.core.userdetails.UserDetails) user,
                 user.getUser_id(),
                 user.getEmail());
 
-        // 4. Calcular expiración
+        // 3. Calcular expiración
         Instant expirationInstant = jwtService.extractExpiration(jwtToken);
         long expiresInSeconds = expirationInstant != null
                 ? (expirationInstant.getEpochSecond() - Instant.now().getEpochSecond())

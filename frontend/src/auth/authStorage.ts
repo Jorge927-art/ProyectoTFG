@@ -3,6 +3,7 @@ import type { AuthUser } from './authTypes';
 const USER_KEY = 'user';
 const TOKEN_KEY = 'accessToken'; // Nueva clave para persistir el JWT de forma aislada
 
+
 function canUseBrowserStorage() {
     return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 }
@@ -28,7 +29,7 @@ export function writeStoredToken(token: string) {
 }
 
 /**
- * Lee la sesión del usuario guardada en el navegador.
+ * Lee la sesión del usuario guardada en el navegador validando estrictamente su tiempo de expiración.
  */
 export function readStoredAuthUser(): AuthUser | null {
     if (!canUseBrowserStorage()) {
@@ -41,10 +42,18 @@ export function readStoredAuthUser(): AuthUser | null {
     }
 
     try {
-        const parsedValue = JSON.parse(rawValue) as Partial<AuthUser>;
+        // Añadimos de forma segura la propiedad opcional expiresAt al parsear
+        const parsedValue = JSON.parse(rawValue) as Partial<AuthUser> & { expiresAt?: number };
 
         if (typeof parsedValue.username !== 'string' || !parsedValue.username.trim()) {
             return null;
+        }
+
+        // 🛡️ BLINDAJE TFG: Si existe el sello de tiempo y la hora actual superó la expiración, destruimos la sesión
+        if (parsedValue.expiresAt && Date.now() > parsedValue.expiresAt) {
+            console.warn("Sesión local caducada por límite temporal. Limpiando almacenamiento.");
+            clearStoredAuth();
+            return null; // Forzamos a React a inicializarse como no autenticado
         }
 
         return {

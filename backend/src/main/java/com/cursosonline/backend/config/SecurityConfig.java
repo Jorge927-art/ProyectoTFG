@@ -23,14 +23,35 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 
+/**
+ * Clase de configuración de seguridad para la aplicación.
+ * Configura la seguridad HTTP, CORS, CSRF, gestión de sesiones y filtros de
+ * autenticación.
+ * 
+ * @param http
+ * @return
+ * @throws Exception
+ */
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    /**
+     * Constructor de la clase SecurityConfig.
+     * 
+     * @param jwtAuthenticationFilter
+     */
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
+    /**
+     * Configura la cadena de filtros de seguridad para la aplicación.
+     * 
+     * @param http
+     * @return
+     * @throws Exception
+     */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -40,20 +61,22 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
+
+                        // Permitir solicitudes OPTIONS para CORS preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ACCESO PÚBLICO EXCLUSIVO PARA RENDERIZAR IMÁGENES Y AVATARES DESDE EL
-                        // FRONTEND
+                        // Rutas públicas para subidas de archivos
                         .requestMatchers("/uploads/**").permitAll()
 
-                        // Endpoints públicos de autenticación
+                        // Endpoints de autenticación pública (login y registro)
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/{username}").permitAll()
 
-                        // Endpoint para información del usuario autenticado
+                        // Endpoint para obtener el perfil del usuario autenticado (requiere
+                        // autenticación)
                         .requestMatchers("/api/auth/me").authenticated()
 
-                        // CONFIGURACIÓN PERFIL: Permite a cualquier usuario autenticado gestionar su
-                        // propio perfil
+                        // Endpoint para obtener el perfil de un usuario específico (requiere
+                        // autenticación)
                         .requestMatchers("/api/v1/profile/**").authenticated()
 
                         // Exclusivo Administrador
@@ -61,7 +84,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
                         .requestMatchers("/api/users/**").hasAuthority("ADMIN")
 
-                        // Rutas protegidas por rol específico
+                        // Exclusivo Profesor y Administrador
                         .requestMatchers("/api/professor/**").hasAnyAuthority("PROFESSOR", "ADMIN")
                         .requestMatchers("/api/student/**").hasAnyAuthority("STUDENT", "ADMIN")
 
@@ -69,12 +92,18 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable());
-
+        // Agrega el filtro de autenticación JWT antes del filtro de autenticación de
+        // nombre de usuario y contraseña
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
+    /**
+     * Configura la fuente de configuración CORS para la aplicación.
+     * 
+     * @return La fuente de configuración CORS configurada.
+     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
@@ -88,11 +117,24 @@ public class SecurityConfig {
         return source;
     }
 
+    /**
+     * Configura el codificador de contraseñas para la aplicación.
+     * 
+     * @return El codificador de contraseñas configurado.
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * Configura el administrador de autenticación para la aplicación.
+     * 
+     * @param configuration La configuración de autenticación.
+     * @return El administrador de autenticación configurado.
+     * @throws Exception si ocurre un error al obtener el administrador de
+     *                   autenticación.
+     */
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
         return configuration.getAuthenticationManager();

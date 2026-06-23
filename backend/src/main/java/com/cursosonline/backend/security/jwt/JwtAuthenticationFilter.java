@@ -25,10 +25,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
 
+    /**
+     * Constructor de la clase JwtAuthenticationFilter.
+     * 
+     * @param jwtService
+     */
     public JwtAuthenticationFilter(JwtService jwtService) {
         this.jwtService = jwtService;
     }
 
+    /**
+     * Filtra las solicitudes HTTP entrantes para autenticar usuarios mediante
+     * tokens JWT.
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -37,26 +46,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String jwt;
         final String username;
 
-        // Si no se suministra un token Bearer, delegamos a la cadena estándar (para
-        // rutas públicas)
+        // Si no hay encabezado de autorización o no comienza con "Bearer ",
+        // continuamos con la cadena de filtros sin autenticar
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
+        // Extraemos el token JWT del encabezado Authorization
         jwt = authHeader.substring(7);
 
         try {
-            // 1. Validar criptografía y EXPIRACIÓN de forma estricta primero
+            // Validamos el token JWT y extraemos el nombre de usuario
             if (!jwtService.isTokenValid(jwt)) {
-                // BLINDAJE TFG: Si el token ha expirado, cortamos la petición aquí mismo con un
-                // 401
+                // Si el token es inválido o ha expirado, respondemos con 401 Unauthorized
+                SecurityContextHolder.clearContext();
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
                 response.getWriter().write("{\"error\": \"Token expirado o inválido. Acceso denegado.\"}");
-                return; // Corta la cadena de filtros por completo
+                return;
             }
-
+            // Extraemos el nombre de usuario del token JWT
             username = jwtService.extractUsername(jwt);
 
             // Si el contexto de seguridad actual se encuentra libre
