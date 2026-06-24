@@ -140,4 +140,25 @@ public class UserController {
                 "message", "El usuario '" + username + "' ha sido " + accion + " en PostgreSQL con éxito."));
     }
 
+    /**
+     * Endpoint para guardar o actualizar los intereses y criterios de filtrado del
+     * alumno en sesión.
+     * Extrae la identidad de forma segura desde el Principal de Spring Security
+     * (Stateless).
+     */
+    @PostMapping("/my-interests")
+    public ResponseEntity<?> saveStudentInterests(@RequestBody com.cursosonline.backend.dto.InterestDTO interestDTO,
+            java.security.Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
+        // Delegamos la lógica de negocio y guardado transaccional al servicio de
+        // usuarios
+        userService.saveUserInterests(principal.getName(), interestDTO);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Tus preferencias de recomendación han sido guardadas con éxito en PostgreSQL."));
+    }
+
 }

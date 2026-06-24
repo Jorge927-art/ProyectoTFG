@@ -27,6 +27,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.cursosonline.backend.repository.InterestRepository interestRepository;
 
     /**
      * Busca un usuario por su nombre de usuario.
@@ -138,6 +139,43 @@ public class UserService {
 
         // Guardamos y forzamos el volcado inmediato a PostgreSQL
         return userRepository.saveAndFlush(user);
+    }
+
+    /**
+     * Guarda o actualiza de forma transaccional las preferencias de un estudiante.
+     * Si es la primera vez que configura sus intereses, se instancia una nueva
+     * entidad
+     * vinculada a su cuenta de PostgreSQL usando @MapsId.
+     * 
+     * @param username El nombre de usuario extraído del Token JWT
+     * @param dto      El objeto de transferencia de datos con los listados de
+     *                 preferencias
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public void saveUserInterests(String username, com.cursosonline.backend.dto.InterestDTO dto) {
+        // 1. Validar la existencia del usuario en el sistema
+        Users user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con el username: " + username));
+
+        // 2. Buscar si ya tiene un registro de intereses previo. Si no existe, creamos
+        // uno nuevo.
+        com.cursosonline.backend.entities.Interest interest = interestRepository.findById(user.getUser_id())
+                .orElseGet(() -> {
+                    com.cursosonline.backend.entities.Interest newInterest = new com.cursosonline.backend.entities.Interest();
+                    newInterest.setUser(user); // Establecemos la relación OneToOne para @MapsId
+                    return newInterest;
+                });
+
+        // 3. Mapear y actualizar los listados de preferencias dinámicas
+        interest.setCategory(dto.categories());
+        interest.setCourse_type(dto.levels()); // Mapeado semánticamente a la columna del catálogo de cursos
+        interest.setDuration(dto.durations());
+        interest.setLanguage(dto.languages());
+        interest.setSubtitle_languages(dto.subtitles()); // Mapeado semánticamente a la columna de subtítulos
+
+        // 4. Persistir los cambios forzando el volcado directo a PostgreSQL y sus 5
+        // tablas satélite
+        interestRepository.saveAndFlush(interest);
     }
 
 }

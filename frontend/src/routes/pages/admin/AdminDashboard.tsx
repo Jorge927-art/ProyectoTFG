@@ -3,13 +3,13 @@ import { Users, Search, Loader2, Shield } from 'lucide-react';
 import { apiClient } from '@/services/apiClient';
 import axios from 'axios';
 import AdminLayout from '../../layouts/AdminLayout';
-import { UserScrollList } from '../../../components/admin/UserScrollList'; // Componente de consola con scroll
+import { UserScrollList } from '../../../components/admin/UserScrollList';
 
 interface UserEntity {
     userId?: number;
     username: string;
     role: string;
-    enabled: boolean; // Atributo integrado según auditoría
+    enabled: boolean;
 }
 
 const AdminDashboard = () => {
