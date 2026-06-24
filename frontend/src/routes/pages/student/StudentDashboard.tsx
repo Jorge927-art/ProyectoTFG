@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { BookOpen, ArrowRight, Sparkles, Star, SlidersHorizontal } from 'lucide-react';
+import { BookOpen, ArrowRight, Sparkles, Star, SlidersHorizontal, Loader2 } from 'lucide-react';
 import GenericCard from '../../../components/ui/genericCard/GenericCard';
 import StudentLayout from '../../layouts/StudentLayout';
 import GenericButton from '../../../components/ui/genericButton/GenericButton';
 import { InterestsModal } from './InterestsModal';
+import { apiClient } from '@/services/apiClient'; // Aseguramos el cliente de red integrado
+import axios from 'axios';
 
 interface Course {
     id: number;
@@ -25,6 +27,8 @@ interface RecommendedCourse {
 const StudentDashboard = () => {
     // 1. CONTROL DE APERTURA DEL MODAL DE INTERESES
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+    const [saving, setSaving] = useState<boolean>(false);
+    const [error, setError] = useState<string>('');
 
     // 2. ESTADO DE ASIGNATURAS MATRICULADAS (Datos de prueba para el Alumno)
     const [courses] = useState<Course[]>([
@@ -38,10 +42,34 @@ const StudentDashboard = () => {
         { id: 102, title: "Gestión de Estados Avanzada en React", instructor: "Elena Perez", category: "Frontend", rating: 4.8, reason: "Ideal para tus proyectos SPA" }
     ]);
 
-    // 4. MANEJADOR GENÉRICO PARA SALVAR LAS PREFERENCIAS (Simula la futura llamada a Spring Boot)
-    const handleSavePreferences = (preferences: { categories: string[]; levels: string[]; durations: string[] }) => {
-        console.log("Preferencias recolectadas de forma genérica para enviar a PostgreSQL:", preferences);
-        // Aquí conectaremos mañana el apiClient.post('/api/recommendations/preferences', preferences)
+    // 4. CONEXIÓN REAL CON EL BACKEND (Auditoría de Persistencia TFG)
+    const handleSavePreferences = async (preferences: {
+        categories: string[];
+        levels: string[];
+        durations: string[];
+        languages: string[];
+        subtitles: string[];
+    }) => {
+        setSaving(true);
+        setError('');
+
+        try {
+            // Envío del JSON con las 5 listas al DTO de Spring Boot
+            const response = await apiClient.post('/api/auth/my-interests', preferences);
+
+            if (response.status === 200) {
+                alert(response.data.message || "Preferencias guardadas con éxito en PostgreSQL.");
+            }
+        } catch (err) {
+            console.error("Error al persistir intereses en el servidor:", err);
+            let message = "No se pudieron guardar tus preferencias de recomendación.";
+            if (axios.isAxiosError(err) && err.response?.data?.error) {
+                message = err.response.data.error;
+            }
+            setError(message);
+        } finally {
+            setSaving(false);
+        }
     };
     return (
         <StudentLayout>
@@ -55,11 +83,17 @@ const StudentDashboard = () => {
                         <span className="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-bold">{courses.length}</span>
                     </h2>
 
+                    {/* Alerta visual de error si falla la comunicación Stateless */}
+                    {error && (
+                        <div className="bg-red-50 border border-red-100 text-red-600 p-3 rounded-xl text-xs font-semibold mb-4 animate-in fade-in duration-200">
+                            ⚠️ {error}
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {courses.map((course) => (
-                            /* PRIMERA REFRACTORIZACIÓN: Tarjeta genérica pura por composición */
+                            /* Tarjeta genérica pura por composición */
                             <GenericCard key={course.id}>
-                                {/* Encabezado semántico */}
                                 <div className="mb-4">
                                     <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-slate-100 text-slate-600">
                                         {course.category}
@@ -72,7 +106,6 @@ const StudentDashboard = () => {
                                     </p>
                                 </div>
 
-                                {/* Cuerpo y barra de progreso sin estilos inline */}
                                 <div className="mt-4 pt-3 border-t border-slate-50">
                                     <div className="flex justify-between text-xs text-slate-500 mb-1">
                                         <span>Progreso</span>
@@ -83,7 +116,7 @@ const StudentDashboard = () => {
                                             className={`bg-blue-600 h-full transition-all duration-500 w-[${course.progress}%]`}
                                         />
                                     </div>
-                                    <button className="w-full bg-slate-800 hover:bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1">
+                                    <button className="w-full bg-slate-800 hover:bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer">
                                         <span>Continuar</span>
                                         <ArrowRight size={14} />
                                     </button>
@@ -96,12 +129,12 @@ const StudentDashboard = () => {
                 {/* COLUMNA DERECHA: SECCIÓN DE INTERESES Y RECOMENDACIONES */}
                 <div className="lg:col-span-1 flex flex-col gap-4">
 
-                    {/* INTEGRACIÓN DEL BOTÓN DE INTERESES REUTILIZABLE */}
+                    {/* INTEGRACIÓN DEL BOTÓN DE INTERESES REUTILIZABLE CON FEEDBACK DE CARGA */}
                     <div className="w-full flex">
                         <GenericButton
-                            label="Mis intereses"
-                            icon={<SlidersHorizontal size={14} />}
-                            onClick={() => setIsModalOpen(true)} // <-- Cambiado: Abre el modal de forma reactiva
+                            label={saving ? "Guardando..." : "Mis intereses"}
+                            icon={saving ? <Loader2 size={14} className="animate-spin" /> : <SlidersHorizontal size={14} />}
+                            onClick={() => setIsModalOpen(true)}
                             variant="white"
                         />
                     </div>
@@ -115,9 +148,8 @@ const StudentDashboard = () => {
 
                         <div className="flex flex-col gap-3">
                             {recommendations.map((rec) => (
-                                /* SEGUNDA REFRACTORIZACIÓN: Tarjeta elástica orientada al contenido */
+                                /* Tarjeta elástica orientada al contenido */
                                 <GenericCard key={rec.id}>
-                                    {/* Encabezado flexible con puntuación */}
                                     <div className="mb-4">
                                         <div className="flex items-center justify-between mb-2">
                                             <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-blue-50 text-blue-700">
@@ -136,7 +168,6 @@ const StudentDashboard = () => {
                                         </p>
                                     </div>
 
-                                    {/* Pie de recomendación semántico */}
                                     <div className="mt-4 pt-3 border-t border-slate-50">
                                         <p className="text-[10px] text-amber-800 bg-amber-50/50 p-2 rounded border border-amber-100/30">
                                             {rec.reason}
