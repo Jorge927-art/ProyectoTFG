@@ -284,6 +284,19 @@ Se implementaron las siguientes directrices de diseño:
 * **Positivas:** Seguridad estricta en la capa de servicios (Laura puede gestionar sus cursos, pero Luis el alumno solo tiene acceso de lectura). Respuestas JSON ligeras y limpias sin necesidad de usar `@JsonManagedReference` o `@JsonIgnore`.
 * **Negativas / Deuda Técnica:** Al usar relaciones unidireccionales, para obtener los cursos de un profesor específico se requiere una query personalizada en el repositorio (`findByProfesorId`), lo cual queda documentado y optimizado.
 
+---
+
+## [ADR-18] Diseño de Persistencia Normalizada Multivalor y Simetría Relacional para Intereses del Alumnado
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Al planificar la infraestructura del futuro módulo de recomendación inteligente en el frontend (`StudentDashboard.tsx`), se identificó la necesidad imperativa de capturar de forma genérica y multidimensional los intereses del estudiante en cinco ejes críticos: categorías temáticas, nivel, duración de cursos, idioma y subtítulos. El almacenamiento tradicional en columnas de texto plano (strings concatenados por comas) provocaría una degradación severa del rendimiento, obligando al servidor a ejecutar costosas operaciones de búsqueda de patrones con comodines (`LIKE`), anulando la utilidad de los índices y violando la Primera Forma Normal (1FN) de las bases de datos relacionales.
+* **Decisión:** Implementar un circuito de persistencia normalizado, desacoplado y simétrico estructurado en tres niveles técnicos: Incorporar la entidad `Interest.java` aplicando el patrón `@MapsId` en una relación `@OneToOne` con la tabla de usuarios para compartir de forma nativa la misma clave primaria (`user_id`), garantizando el borrado en cascada automático. Implementar la anotación `@ElementCollection` con carga proactiva (`FetchType.EAGER`) para generar de forma transparente cinco tablas satélite indexadas de forma vertical (`interest_categories`, `interest_course_types`, `interest_durations`, `interest_languages`, y `interest_subtitle_languages`). Configurar las propiedades utilizando de manera idéntica la nomenclatura de la entidad `Courses` (`category`, `course_type`, `duration`, `language`, `subtitle_languages`), capturando las listas a través del objeto de transferencia `InterestDTO.java` (`record`) inyectado en un endpoint POST asíncrono seguro y Stateless.
+* **Justificación para el TFG:** Aporta un valor metodológico fundamental en términos de diseño avanzado de bases de datos relacionales y optimización algorítmica. Demuestra al tribunal el cumplimiento riguroso de la teoría de normalización (1FN) al fragmentar colecciones dinámicas en casilleros elementales independientes. Esta simetría exacta entre el perfil de intereses del alumno y el catálogo de cursos anula la necesidad de capas de conversión intermedias en Spring Boot, lo que permitirá al futuro motor de recomendación ejecutar consultas de cruce ultra veloces mediante operaciones de conjunto indexadas (`JOIN` y cláusulas `IN`), maximizando la escalabilidad del sistema.
+* **Consecuencias:** Se elimina por completo el almacenamiento caótico de texto plano y el coste computacional de procesar expresiones regulares en disco. El estudiante puede interactuar de forma reactiva con el modal multiscroll de React para actualizar sus criterios preferentes en el mismo milisegundo. Los cambios se persisten de forma transaccional y consistente en PostgreSQL, proporcionando una base de datos perfectamente estructurada, limpia y lista para alimentar el motor de recomendaciones.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026
