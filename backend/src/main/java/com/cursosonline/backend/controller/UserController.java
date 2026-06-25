@@ -62,6 +62,25 @@ public class UserController {
     }
 
     /**
+     * Endpoint para recuperar los intereses y criterios de filtrado guardados del
+     * alumno en sesión.
+     * CRÍTICO: Se posiciona estratégicamente ANTES de /{username} para evitar
+     * conflictos de
+     * ambigüedad en el enrutamiento de Spring MVC (Error 400 / 404).
+     */
+    @GetMapping("/my-interests")
+    public ResponseEntity<?> getStudentInterests(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
+        // Consultamos el servicio que carga e inicializa las colecciones de Hibernate
+        com.cursosonline.backend.dto.InterestDTO interestDTO = userService.getUserInterests(principal.getName());
+
+        return ResponseEntity.ok(interestDTO);
+    }
+
+    /**
      * Endpoint para obtener el perfil de un usuario específico.
      */
     @GetMapping("/{username}")
@@ -148,7 +167,7 @@ public class UserController {
      */
     @PostMapping("/my-interests")
     public ResponseEntity<?> saveStudentInterests(@RequestBody com.cursosonline.backend.dto.InterestDTO interestDTO,
-            java.security.Principal principal) {
+            Principal principal) {
         if (principal == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
         }

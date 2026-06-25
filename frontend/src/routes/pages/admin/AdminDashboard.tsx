@@ -97,7 +97,7 @@ const AdminDashboard = () => {
             return;
         }
 
-        const operacionTexto = foundUser.enabled ? "dar de baja (borrado lógico)" : "reactivar y dar de alta";
+        const operacionTexto = foundUser.enabled ? "Baja temporal" : "reactivar y dar de alta";
         const confirmed = window.confirm(`¿Estás seguro de cambiar el estado de acceso de ${foundUser.username} para ${operacionTexto}?`);
         if (!confirmed) return;
 
@@ -118,7 +118,7 @@ const AdminDashboard = () => {
                 });
             }
         } catch (errHttp) {
-            console.error("Error en la petición de borrado:", errHttp);
+            console.error("Error en la petición de baja temporl:", errHttp);
             let message = "Error crítico: No se pudo modificar el estado del usuario.";
             if (axios.isAxiosError(errHttp) && errHttp.response?.data?.error) {
                 message = errHttp.response.data.error;
@@ -252,7 +252,7 @@ const AdminDashboard = () => {
                                             {deleting ? (
                                                 <Loader2 size={14} className="animate-spin" />
                                             ) : (
-                                                <>Reactivar y Dar de Alta Usuario</>
+                                                <>Reactivar y dar de alta usuario</>
                                             )}
                                         </button>
                                     ) : (
@@ -260,12 +260,12 @@ const AdminDashboard = () => {
                                             type="button"
                                             onClick={handleDeleteUser}
                                             disabled={deleting || updatingId !== null}
-                                            className="w-full py-2 bg-white border-2 border-red-200 text-red-600 rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-red-50 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                                            className="w-full py-2 bg-white border-2 border-blue-200 text-blue-600 rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-blue-50 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                                         >
                                             {deleting ? (
                                                 <Loader2 size={14} className="animate-spin" />
                                             ) : (
-                                                <>Eliminar Usuario Definitivamente</>
+                                                <>Baja Temporal Usuario</>
                                             )}
                                         </button>
                                     )}

@@ -96,14 +96,6 @@ public class UserService {
     /**
      * Actualiza el rol de un usuario específico en la plataforma.
      * 
-     * @param username El nombre de usuario al que se le cambiará el rol.
-     * @param newRole  El nuevo rol a asignar (ADMIN, PROFESSOR, STUDENT).
-     * @return El usuario con el rol actualizado.
-     */
-
-    /**
-     * Actualiza el rol de un usuario específico en la plataforma.
-     * 
      * @param username
      * @param newRole
      * @return
@@ -142,16 +134,65 @@ public class UserService {
     }
 
     /**
+     * Recupera de forma transaccional las preferencias de un estudiante desde
+     * PostgreSQL.
+     * Mapea las colecciones persistidas en las tablas satélite directamente hacia
+     * el
+     * InterestDTO para que el frontend de React las preseleccione al abrir el
+     * modal.
+     * 
+     * @param username El nombre de usuario extraído del Token JWT
+     * @return El objeto de transferencia de datos con las preferencias del alumno
+     */
+    @Transactional(readOnly = true)
+    public com.cursosonline.backend.dto.InterestDTO getUserInterests(String username) {
+        // 1. Validar la existencia del usuario en el sistema
+        Users user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con el username: " + username));
+
+        // 2. Buscar el registro de intereses usando su ID asignado por @MapsId
+        com.cursosonline.backend.entities.Interest interest = interestRepository.findById(user.getUser_id())
+                .orElse(null);
+
+        // 3. Si no existe configuración previa, devolvemos listas vacías seguras
+        if (interest == null) {
+            return new com.cursosonline.backend.dto.InterestDTO(
+                    java.util.Collections.emptyList(),
+                    java.util.Collections.emptyList(),
+                    java.util.Collections.emptyList(),
+                    java.util.Collections.emptyList(),
+                    java.util.Collections.emptyList());
+        }
+
+        // 🚨 CRÍTICO: Forzar la inicialización de los proxies de Hibernate para las 5
+        // tablas satélite.
+        // Esto previene que los campos @ElementCollection se envíen vacíos debido al
+        // Lazy Loading transaccional.
+        org.hibernate.Hibernate.initialize(interest.getCategory());
+        org.hibernate.Hibernate.initialize(interest.getCourse_type());
+        org.hibernate.Hibernate.initialize(interest.getDuration());
+        org.hibernate.Hibernate.initialize(interest.getLanguage());
+        org.hibernate.Hibernate.initialize(interest.getSubtitle_languages());
+
+        // 4. Mapear la entidad con las colecciones ya cargadas al Record InterestDTO
+        return new com.cursosonline.backend.dto.InterestDTO(
+                interest.getCategory(),
+                interest.getCourse_type(),
+                interest.getDuration(),
+                interest.getLanguage(),
+                interest.getSubtitle_languages());
+    }
+
+    /**
      * Guarda o actualiza de forma transaccional las preferencias de un estudiante.
      * Si es la primera vez que configura sus intereses, se instancia una nueva
-     * entidad
-     * vinculada a su cuenta de PostgreSQL usando @MapsId.
+     * entidad vinculada a su cuenta de PostgreSQL usando @MapsId.
      * 
      * @param username El nombre de usuario extraído del Token JWT
      * @param dto      El objeto de transferencia de datos con los listados de
      *                 preferencias
      */
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public void saveUserInterests(String username, com.cursosonline.backend.dto.InterestDTO dto) {
         // 1. Validar la existencia del usuario en el sistema
         Users user = userRepository.findByUsername(username)
@@ -177,5 +218,4 @@ public class UserService {
         // tablas satélite
         interestRepository.saveAndFlush(interest);
     }
-
 }
