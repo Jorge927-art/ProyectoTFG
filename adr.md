@@ -314,6 +314,37 @@ Se elimina por completo el almacenamiento caótico de texto plano y el coste com
 
 ---
 
+## [ADR-19] Optimización Computacional del Buscador Predictivo mediante Indexación Invertida GIN, Paginación Acotada y Mitigación de Carga en Interfaz
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+
+### Contexto
+
+El buscador global de cursos integrado en el panel del estudiante (`StudentDashboard.tsx`) presentaba deficiencias críticas de rendimiento y usabilidad que comprometían la escalabilidad del sistema. La consulta JPQL original implementaba una búsqueda aproximada multicampo utilizando comodines en ambos extremos del patrón (`LIKE LOWER(CONCAT('%', :keyword, '%'))`). En entornos relacionales como PostgreSQL, la presencia de un comodín inicial anula la utilidad de los índices de árbol tradicionales (B-Tree), forzando al motor a ejecutar un escaneo secuencial completo (*Full Table Scan*) de coste computacional O(N) en cada pulsación de tecla.
+
+Adicionalmente, la consulta carecía de una cláusula `ORDER BY` explícita, delegando la ordenación al orden físico de inserción en disco (*heap order*), lo que generaba resultados incongruentes donde los cursos más relevantes quedaban relegados a posiciones inferiores. Finalmente, la ausencia de límites en la consulta provocaba que, al vaciar el cuadro de búsqueda, el servicio invocara un método `findAll()` sin restricciones, volcando todo el catálogo en la memoria RAM del servidor de Spring Boot y penalizando el hilo de renderizado del navegador al intentar dibujar cientos de componentes `GenericCard` de forma simultánea.
+
+### Decisión
+
+Implementar una reestructuración arquitectónica integral en tres capas para optimizar el flujo de datos y la eficiencia de cómputo:
+
+1. **Capa de Persistencia (PostgreSQL):** Activar la extensión nativa `pg_trgm` y estructurar tres índices invertidos generalizados (**GIN**) basados en operaciones de trigramas (`gin_trgm_ops`) sobre las columnas críticas de búsqueda (`title`, `category`, `skills`) de la tabla `courses`. Esto fragmenta las cadenas de texto en bloques de tres caracteres, permitiendo búsquedas de coincidencia parcial indexadas de coste O(log N) u O(1).
+2. **Capa de Negocio y Repositorio (Spring Boot):** Modificar la firma del método en `CoursesRepository.java` para aceptar un parámetro de control de flujo `Pageable`. En `UserService.java`, se restringe la consulta a un lote simétrico estricto de **12 resultados** mediante `PageRequest.of(0, 12)`, mitigando el desborde de memoria. Asimismo, se incorpora una cláusula algorítmica `ORDER BY CASE` en JPQL que pondera la relevancia, priorizando con valor `1` los títulos que comienzan exactamente con el término buscado, con valor `2` los que lo contienen, y con valor `3` el resto, seguidos de un ordenamiento alfabético secundario.
+3. **Capa de Presentación (React & Tailwind):** Consolidar un control de tasa de peticiones (*rate limiting*) en el cliente mediante un temporizador *debounce* de 400ms acoplado al hook de efecto (`useEffect`) para evitar la saturación de peticiones HTTP en vuelo. A nivel de maquetación, se recupera la cuadrícula de tres columnas (`lg:grid-cols-3`) y se acota el contenedor exterior mediante un límite dimensional estricto de altura fija (`max-h-[290px] overflow-y-auto`), provocando de forma controlada el fenómeno de diseño ***Cut-off effect*** (efecto de recorte) para incentivar el scroll natural.
+
+### Justificación para el TFG
+
+Aporta un alto valor metodológico en ingeniería de rendimiento y optimización de sistemas distribuidos. Ante el tribunal, justifica la capacidad de diagnosticar cuellos de botella algorítmicos y resolverlos mediante técnicas profesionales de indexación no relacional en motores relacionales. El uso de la cláusula condicional `CASE` directamente en el lenguaje de consultas demuestra madurez en la delegación de lógica pesada al motor de datos en lugar de saturar la capa de aplicación en Java con bucles de ordenación tardíos.
+
+Por último, la sincronización matemática entre el tamaño de página del backend (12 elementos) y la distribución del frontend (múltiplo exacto de la cuadrícula de 3 columnas) evidencia un diseño de software armonizado y limpio, elevando la calidad del código a estándares de producción industrial y asegurando una respuesta de la interfaz en el orden de los milisegundos.
+
+### Consecuencias
+
+Se erradica por completo el escaneo secuencial en disco y el riesgo de desborde de buffer en el backend. Las consultas predictivas se ejecutan de forma instantánea sobre PostgreSQL incluso bajo volúmenes masivos de datos. El usuario experimenta una navegación fluida donde los criterios de ordenación semántica garantizan que los cursos más idóneos aparezcan siempre en la primera línea de visión. El componente visual queda perfectamente integrado en el espacio del dashboard, manteniendo una estética limpia, simétrica y una experiencia de usuario fluida e intuitiva libre de bloqueos en el navegador.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026

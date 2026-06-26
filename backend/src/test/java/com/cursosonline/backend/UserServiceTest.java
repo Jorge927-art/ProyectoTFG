@@ -40,7 +40,8 @@ public class UserServiceTest {
     void findByUsername_DebeRetornarUsuario_CuandoExiste() {
         String username = "Luis";
         // Integrado: Se añade el valor 'true' al final para el campo 'enabled'
-        Users expectedUser = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true);
+        Users expectedUser = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true,
+                new java.util.ArrayList<>());
         when(userRepository.findByUsername("Luis")).thenReturn(Optional.of(expectedUser));
         Optional<Users> result = userService.findByUsername(username);
         assertTrue(result.isPresent());
@@ -54,8 +55,10 @@ public class UserServiceTest {
     @Test
     void assignUser() {
         // Integrado: Se añade 'true' al final para corregir el constructor de Lombok
-        Users newUser = new Users(null, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true);
-        Users savedUser = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true);
+        Users newUser = new Users(null, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true,
+                new java.util.ArrayList<>());
+        Users savedUser = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true,
+                new java.util.ArrayList<>());
         when(userRepository.findByUsername("Luis")).thenReturn(Optional.empty());
         when(passwordEncoder.encode("jki")).thenReturn("encoded_jki");
         when(userRepository.save(any())).thenReturn(savedUser);
@@ -89,8 +92,10 @@ public class UserServiceTest {
         String username = "Luis";
         // Integrado: Se añade 'true' al final para cumplir con el contrato de la
         // entidad
-        Users new_user = new Users(null, username, "frgt", Role.STUDENT, "jose.gmail.com", true);
-        Users existing_user = new Users(1L, username, "frgt", Role.STUDENT, "jose.gmail.com", true);
+        Users new_user = new Users(null, username, "frgt", Role.STUDENT, "jose.gmail.com", true,
+                new java.util.ArrayList<>());
+        Users existing_user = new Users(1L, username, "frgt", Role.STUDENT, "jose.gmail.com", true,
+                new java.util.ArrayList<>());
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(existing_user));
         RuntimeException excepcion = assertThrows(RuntimeException.class, () -> {
             userService.registerUser(new_user);

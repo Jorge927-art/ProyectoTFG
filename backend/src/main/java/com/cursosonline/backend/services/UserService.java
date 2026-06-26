@@ -5,6 +5,8 @@ import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.exception.ServicesException;
 import com.cursosonline.backend.exception.UserAlreadyExistsException;
 import com.cursosonline.backend.repository.UserRepository;
+import com.cursosonline.backend.repository.CoursesRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 
@@ -16,10 +18,7 @@ import java.util.List;
 
 /**
  * Servicio que maneja la lógica de negocio relacionada con los usuarios de la
- * plataforma. Incluye métodos para registrar nuevos usuarios, realizar login y
- * obtener la lista de usuarios registrados. Utiliza UserRepository para
- * interactuar con la base de datos y PasswordEncoder para cifrar las
- * contraseñas.
+ * plataforma.
  */
 @Service
 @RequiredArgsConstructor
@@ -28,6 +27,8 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final com.cursosonline.backend.repository.InterestRepository interestRepository;
+    private final CoursesRepository coursesRepository;
+    private final EnrollmentRepository enrollmentRepository;
 
     /**
      * Busca un usuario por su nombre de usuario.
@@ -121,40 +122,27 @@ public class UserService {
         Users user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado con el username: " + username));
 
-        // Conmutador inteligente: si está activo pasa a false, si está inactivo pasa a
-        // true
         if (user.isEnabled()) {
             user.setEnabled(false);
         } else {
             user.setEnabled(true);
         }
 
-        // Guardamos y forzamos el volcado inmediato a PostgreSQL
         return userRepository.saveAndFlush(user);
     }
 
     /**
      * Recupera de forma transaccional las preferencias de un estudiante desde
      * PostgreSQL.
-     * Mapea las colecciones persistidas en las tablas satélite directamente hacia
-     * el
-     * InterestDTO para que el frontend de React las preseleccione al abrir el
-     * modal.
-     * 
-     * @param username El nombre de usuario extraído del Token JWT
-     * @return El objeto de transferencia de datos con las preferencias del alumno
      */
     @Transactional(readOnly = true)
     public com.cursosonline.backend.dto.InterestDTO getUserInterests(String username) {
-        // 1. Validar la existencia del usuario en el sistema
         Users user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado con el username: " + username));
 
-        // 2. Buscar el registro de intereses usando su ID asignado por @MapsId
         com.cursosonline.backend.entities.Interest interest = interestRepository.findById(user.getUser_id())
                 .orElse(null);
 
-        // 3. Si no existe configuración previa, devolvemos listas vacías seguras
         if (interest == null) {
             return new com.cursosonline.backend.dto.InterestDTO(
                     java.util.Collections.emptyList(),
@@ -164,17 +152,12 @@ public class UserService {
                     java.util.Collections.emptyList());
         }
 
-        // 🚨 CRÍTICO: Forzar la inicialización de los proxies de Hibernate para las 5
-        // tablas satélite.
-        // Esto previene que los campos @ElementCollection se envíen vacíos debido al
-        // Lazy Loading transaccional.
         org.hibernate.Hibernate.initialize(interest.getCategory());
         org.hibernate.Hibernate.initialize(interest.getCourse_type());
         org.hibernate.Hibernate.initialize(interest.getDuration());
         org.hibernate.Hibernate.initialize(interest.getLanguage());
         org.hibernate.Hibernate.initialize(interest.getSubtitle_languages());
 
-        // 4. Mapear la entidad con las colecciones ya cargadas al Record InterestDTO
         return new com.cursosonline.backend.dto.InterestDTO(
                 interest.getCategory(),
                 interest.getCourse_type(),
@@ -217,5 +200,65 @@ public class UserService {
         // 4. Persistir los cambios forzando el volcado directo a PostgreSQL y sus 5
         // tablas satélite
         interestRepository.saveAndFlush(interest);
+    }
+
+    /**
+     * Consulta predictiva y paginada en el catálogo de cursos.
+     * Si la palabra clave está vacía, devuelve de forma segura solo los primeros 10
+     * cursos.
+     * Limita los resultados concurrentes para optimizar la red y la memoria del
+     * servidor.
+     * 
+     * @param keyword Término de búsqueda introducido por el estudiante.
+     * @return Lista optimizada con un máximo de 10 cursos ordenados por relevancia.
+     */
+    @Transactional(readOnly = true)
+    public List<com.cursosonline.backend.entities.Courses> searchCourses(String keyword) {
+        // Configuramos un límite estricto de 10 resultados para el TFG (Página 0,
+        // Tamaño 10)
+        org.springframework.data.domain.Pageable topTen = org.springframework.data.domain.PageRequest.of(0, 12);
+
+        // Si el buscador está vacío, evitamos volcar toda la tabla y devolvemos los 10
+        // primeros
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return coursesRepository.findAll(topTen).getContent();
+        }
+
+        // Ejecutamos la consulta predictiva pasando el término limpio y el paginador
+        return coursesRepository.searchCoursesPredictive(keyword.trim(), topTen);
+    }
+
+    /**
+     * Matricula de forma segura a un estudiante en un curso utilizando la entidad
+     * intermedia Enrollment.
+     * Valida preventivamente en PostgreSQL para evitar registros duplicados.
+     */
+    @Transactional
+    public void enrollStudentInCourse(String username, Long courseId) {
+        // 1. Validar precondición de existencia de usuario
+        Users user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new com.cursosonline.backend.exception.ServicesException("Usuario no encontrado"));
+
+        // 2. Validar precondición de existencia de curso
+        com.cursosonline.backend.entities.Courses course = coursesRepository.findById(courseId)
+                .orElseThrow(() -> new com.cursosonline.backend.exception.ServicesException(
+                        "Curso no encontrado en el catálogo"));
+
+        // 3. Control estricto de duplicidad antes de efectuar la persistencia
+        java.util.Optional<com.cursosonline.backend.entities.Enrollment> existingEnrollment = enrollmentRepository
+                .findByUserIdAndCourseId(user.getUser_id(), course.getCourse_id());
+
+        if (existingEnrollment.isPresent()) {
+            throw new com.cursosonline.backend.exception.ServicesException(
+                    "Acción inválida: Ya te encuentras matriculado en este curso.");
+        }
+
+        // 4. Instanciar y configurar el objeto de matrícula explícito
+        com.cursosonline.backend.entities.Enrollment enrollment = new com.cursosonline.backend.entities.Enrollment();
+        enrollment.setUser(user);
+        enrollment.setCourse(course);
+
+        // 5. Volcar de forma transaccional directa a PostgreSQL
+        enrollmentRepository.saveAndFlush(enrollment);
     }
 }

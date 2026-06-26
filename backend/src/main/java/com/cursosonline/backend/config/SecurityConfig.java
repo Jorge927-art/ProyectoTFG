@@ -22,15 +22,10 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-
 /**
  * Clase de configuración de seguridad para la aplicación.
  * Configura la seguridad HTTP, CORS, CSRF, gestión de sesiones y filtros de
  * autenticación.
- * 
- * @param http
- * @return
- * @throws Exception
  */
 public class SecurityConfig {
 
@@ -39,7 +34,7 @@ public class SecurityConfig {
     /**
      * Constructor de la clase SecurityConfig.
      * 
-     * @param jwtAuthenticationFilter
+     * @param jwtAuthenticationFilter Filtro interceptor del token JWT
      */
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
@@ -48,9 +43,9 @@ public class SecurityConfig {
     /**
      * Configura la cadena de filtros de seguridad para la aplicación.
      * 
-     * @param http
-     * @return
-     * @throws Exception
+     * @param http Componente inyectado de HttpSecurity
+     * @return La cadena de filtros configurada
+     * @throws Exception Si ocurre un error de configuración
      */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -70,6 +65,12 @@ public class SecurityConfig {
 
                         // Endpoints de autenticación pública (login y registro)
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/{username}").permitAll()
+
+                        // 🚨 CONTROL DE ACCESO CRÍTICO: NUEVOS ENDPOINTS DE CURSOS Y MATRÍCULAS
+                        // Permitimos el acceso para que el buscador predictivo funcione en tiempo real
+                        .requestMatchers(HttpMethod.GET, "/api/courses/search").permitAll()
+                        // Protegemos la matrícula exigiendo obligatoriamente sesión activa (JWT)
+                        .requestMatchers(HttpMethod.POST, "/api/courses/enroll/**").authenticated()
 
                         // Endpoint para obtener el perfil del usuario autenticado (requiere
                         // autenticación)
@@ -92,8 +93,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable());
-        // Agrega el filtro de autenticación JWT antes del filtro de autenticación de
-        // nombre de usuario y contraseña
+
+        // Agrega el filtro de autenticación JWT antes del filtro estándar de Spring
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

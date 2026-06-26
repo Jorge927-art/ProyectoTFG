@@ -10,18 +10,13 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.ArrayList;
 
 @Entity
 @Table(name = "users")
-@Data // Genera getters, setters, toString, etc. automáticamente
-@NoArgsConstructor // Constructor vacío para JPA
-@AllArgsConstructor // Constructor con todos los campos
-/**
- * Entidad que representa a los usuarios de la plataforma, adaptada
- * estructuralmente
- * para implementar UserDetails de Spring Security y unificar persistencia y
- * seguridad.
- */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class Users implements UserDetails {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,31 +39,33 @@ public class Users implements UserDetails {
     @Column(nullable = false)
     private boolean enabled = true; // Por defecto nace activo en PostgreSQL
 
+    // Relación bidireccional: Permite al usuario conocer su historial de matrículas
+    // sin romper rendimiento
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Enrollment> enrollments = new ArrayList<>();
+
     @Override
     public boolean isEnabled() {
-        // Conectamos Spring Security directamente con la columna de PostgreSQL
         return this.enabled;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Transformamos el ENUM del rol en un Authority que Spring Security entienda
         return List.of(new SimpleGrantedAuthority(role.name()));
     }
 
     @Override
     public boolean isAccountNonExpired() {
-        return true; // La cuenta no expira por defecto
+        return true;
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        return true; // La cuenta no se bloquea por defecto
+        return true;
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return true; // Las credenciales no expiran por defecto
+        return true;
     }
-
 }
