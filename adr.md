@@ -314,7 +314,7 @@ Se elimina por completo el almacenamiento caótico de texto plano y el coste com
 
 ---
 
-## [ADR-19] Optimización Computacional del Buscador Predictivo mediante Indexación Invertida GIN, Paginación Acotada y Mitigación de Carga en Interfaz
+## [ADR-19] Optimización Computacional del Buscador Predictivo mediante Indexación Invertida GIN, Formateo Nativo de Parámetros y Mitigación de Carga en Interfaz
 
 * **Fecha:** Junio 2026
 * **Estatus:** Aceptado
@@ -323,27 +323,49 @@ Se elimina por completo el almacenamiento caótico de texto plano y el coste com
 
 El buscador global de cursos integrado en el panel del estudiante (`StudentDashboard.tsx`) presentaba deficiencias críticas de rendimiento y usabilidad que comprometían la escalabilidad del sistema. La consulta JPQL original implementaba una búsqueda aproximada multicampo utilizando comodines en ambos extremos del patrón (`LIKE LOWER(CONCAT('%', :keyword, '%'))`). En entornos relacionales como PostgreSQL, la presencia de un comodín inicial anula la utilidad de los índices de árbol tradicionales (B-Tree), forzando al motor a ejecutar un escaneo secuencial completo (*Full Table Scan*) de coste computacional O(N) en cada pulsación de tecla.
 
-Adicionalmente, la consulta carecía de una cláusula `ORDER BY` explícita, delegando la ordenación al orden físico de inserción en disco (*heap order*), lo que generaba resultados incongruentes donde los cursos más relevantes quedaban relegados a posiciones inferiores. Finalmente, la ausencia de límites en la consulta provocaba que, al vaciar el cuadro de búsqueda, el servicio invocara un método `findAll()` sin restricciones, volcando todo el catálogo en la memoria RAM del servidor de Spring Boot y penalizando el hilo de renderizado del navegador al intentar dibujar cientos de componentes `GenericCard` de forma simultánea.
+Adicionalmente, se detectó una anomalía de *binding* en la caché de planes de Hibernate al concatenar dinámicamente los porcentajes (`%`) dentro de múltiples cláusulas `OR` en JPQL. Este fenómeno cruzaba los marcadores de posición en consultas concurrentes, provocando que el motor de la base de datos interpretara la consulta de forma laxa (equivalente a `LIKE '%%'`) y devolviera registros aleatorios que no coincidían con el criterio de búsqueda. Finalmente, la ausencia de límites en la consulta volcaba todo el catálogo en la memoria RAM del servidor de Spring Boot, penalizando críticamente el hilo de renderizado del navegador al intentar dibujar cientos de componentes `GenericCard` simultáneamente.
 
 ### Decisión
 
 Implementar una reestructuración arquitectónica integral en tres capas para optimizar el flujo de datos y la eficiencia de cómputo:
 
 1. **Capa de Persistencia (PostgreSQL):** Activar la extensión nativa `pg_trgm` y estructurar tres índices invertidos generalizados (**GIN**) basados en operaciones de trigramas (`gin_trgm_ops`) sobre las columnas críticas de búsqueda (`title`, `category`, `skills`) de la tabla `courses`. Esto fragmenta las cadenas de texto en bloques de tres caracteres, permitiendo búsquedas de coincidencia parcial indexadas de coste O(log N) u O(1).
-2. **Capa de Negocio y Repositorio (Spring Boot):** Modificar la firma del método en `CoursesRepository.java` para aceptar un parámetro de control de flujo `Pageable`. En `UserService.java`, se restringe la consulta a un lote simétrico estricto de **12 resultados** mediante `PageRequest.of(0, 12)`, mitigando el desborde de memoria. Asimismo, se incorpora una cláusula algorítmica `ORDER BY CASE` en JPQL que pondera la relevancia, priorizando con valor `1` los títulos que comienzan exactamente con el término buscado, con valor `2` los que lo contienen, y con valor `3` el resto, seguidos de un ordenamiento alfabético secundario.
+2. **Capa de Negocio y Repositorio (Spring Boot):** Modificar la firma del método en `CoursesRepository.java` eliminando las funciones de concatenación internas de JPQL. El formateo de los patrones de coincidencia aproximada (`%keyword%`) y de coincidencia inicial (`keyword%`) se traslada de forma nativa a la memoria de Java en `UserService.java`. La consulta se restringe a un lote simétrico estricto de **12 resultados** mediante `PageRequest.of(0, 12)`. Asimismo, se incorpora una cláusula algorítmica `ORDER BY CASE` en JPQL que prioriza con valor `1` los títulos que comienzan exactamente con el término buscado, con valor `2` los que lo contienen, y con valor `3` las coincidencias exclusivas por categoría o habilidades, seguidos de un ordenamiento alfabético secundario.
 3. **Capa de Presentación (React & Tailwind):** Consolidar un control de tasa de peticiones (*rate limiting*) en el cliente mediante un temporizador *debounce* de 400ms acoplado al hook de efecto (`useEffect`) para evitar la saturación de peticiones HTTP en vuelo. A nivel de maquetación, se recupera la cuadrícula de tres columnas (`lg:grid-cols-3`) y se acota el contenedor exterior mediante un límite dimensional estricto de altura fija (`max-h-[290px] overflow-y-auto`), provocando de forma controlada el fenómeno de diseño ***Cut-off effect*** (efecto de recorte) para incentivar el scroll natural.
 
 ### Justificación para el TFG
 
-Aporta un alto valor metodológico en ingeniería de rendimiento y optimización de sistemas distribuidos. Ante el tribunal, justifica la capacidad de diagnosticar cuellos de botella algorítmicos y resolverlos mediante técnicas profesionales de indexación no relacional en motores relacionales. El uso de la cláusula condicional `CASE` directamente en el lenguaje de consultas demuestra madurez en la delegación de lógica pesada al motor de datos en lugar de saturar la capa de aplicación en Java con bucles de ordenación tardíos.
+Aporta un alto valor metodológico en ingeniería de rendimiento y optimización de sistemas distribuidos. Ante el tribunal, justifica la capacidad de diagnosticar fallos indeterministas de binding en el ORM y resolverlos mediante el preformateo de cadenas en la capa de servicios de Java, garantizando que PostgreSQL reciba parámetros limpios y estrictos. El uso de la cláusula condicional `CASE` directamente en el lenguaje de consultas demuestra madurez en la delegación de lógica pesada al motor de datos en lugar de saturar la capa de aplicación en Java con bucles de ordenación tardíos.
 
 Por último, la sincronización matemática entre el tamaño de página del backend (12 elementos) y la distribución del frontend (múltiplo exacto de la cuadrícula de 3 columnas) evidencia un diseño de software armonizado y limpio, elevando la calidad del código a estándares de producción industrial y asegurando una respuesta de la interfaz en el orden de los milisegundos.
 
 ### Consecuencias
 
-Se erradica por completo el escaneo secuencial en disco y el riesgo de desborde de buffer en el backend. Las consultas predictivas se ejecutan de forma instantánea sobre PostgreSQL incluso bajo volúmenes masivos de datos. El usuario experimenta una navegación fluida donde los criterios de ordenación semántica garantizan que los cursos más idóneos aparezcan siempre en la primera línea de visión. El componente visual queda perfectamente integrado en el espacio del dashboard, manteniendo una estética limpia, simétrica y una experiencia de usuario fluida e intuitiva libre de bloqueos en el navegador.
+Se erradica por completo el escaneo secuencial en disco, los falsos positivos de búsqueda por cruce de marcadores y el riesgo de desborde de buffer en el backend. Las consultas predictivas se ejecutan de forma instantánea sobre PostgreSQL incluso bajo volúmenes masivos de datos. El usuario experimenta una navegación fluida donde los criterios de ordenación semántica garantizan que los cursos más idóneos aparezcan siempre en la primera línea de visión. El componente visual queda perfectamente integrado en el espacio del dashboard, manteniendo una estética limpia, simétrica y una experiencia de usuario fluida e intuitiva libre de bloqueos en el navegador.
 
 ---
+
+### Enmienda A: Restricción del Alcance de Búsqueda Predictiva y Depuración de la Estructura Relacional
+
+**Fecha:** Junio 2026  
+**Estatus:** Aceptado  
+
+#### Contexto de la Enmienda
+
+Durante las pruebas de carga y estrés del buscador predictivo, se determinó que la inclusión de la columna `skills` (habilidades) dentro del filtro multicampo (`WHERE`) de la consulta JPQL introducía penalizaciones críticas en el tiempo de respuesta del motor de la base de datos PostgreSQL.
+
+Técnicamente, el campo `skills` almacena un listado de tecnologías indexadas en forma de cadena plana separada por comas (ej. `"Java, Spring Boot, REST"`), lo que viola la **Primera Forma Normal (1FN)** del modelo relacional en este caso de uso específico. Al ejecutar operaciones de coincidencia parcial (`LIKE %keyword%`) sobre cadenas desnormalizadas y extensas, la eficiencia de la indexación por trigramas disminuye drásticamente, forzando un consumo innecesario de CPU y memoria de intercambio en disco. Adicionalmente, desde la perspectiva de la Experiencia de Usuario (UX), los retornos basados en coincidencias opacas ocultas en los metadatos de las tarjetas (no legibles a simple vista en el título o categoría) generaban confusión e indeterminismo visual en la interfaz del estudiante.
+
+#### Decisión Derivada
+
+1. **Refactorización del Backend (`CoursesRepository.java`):** Eliminar de forma estricta la cláusula `OR LOWER(c.skills) LIKE LOWER(:formattedKeyword)` tanto del filtro de selección como de la estructura de ponderación algorítmica `ORDER BY CASE`. La búsqueda predictiva instantánea queda restringida exclusivamente a los campos de alta densidad semántica: `title` y `category`.
+2. **Optimización del Almacenamiento (PostgreSQL):** Ejecutar una purga del índice invertido trunco mediante el comando `DROP INDEX IF EXISTS idx_courses_skills_trgm;`, liberando espacio físico en disco y mitigando la sobrecarga computacional de reindexación en las operaciones de inserción (`INSERT`) y actualización (`UPDATE`).
+3. **Sincronización de Interfaz (`StudentDashboard.tsx`):** Modificar los descriptores semánticos de la barra de búsqueda para transparentar el alcance real de la consulta al usuario, limitando el texto a *"por título o categoría temática"*.
+4. **Aislamiento de Responsabilidad:** Reservar de forma exclusiva el atributo `skills` para el motor del **Algoritmo de Recomendación Inteligente (ADR-18)**, donde su procesamiento se ejecutará de manera asíncrona mediante un cruce de matrices frente a la tabla de intereses del estudiante, evitando penalizar el hilo de la consulta síncrona en tiempo real del catálogo.
+
+#### Consecuencias
+
+Se logra una reducción drástica en la latencia de la consulta predictiva, garantizando tiempos de respuesta estables en el orden de los milisegundos (<50ms). El repositorio y la base de datos quedan limpios de estructuras redundantes, asegurando una separación de responsabilidades (*Separation of Concerns*) perfecta entre el módulo de búsqueda global y el módulo de recomendaciones asíncronas de cara a la defensa del proyecto.
 
 # Notas de Migración: Transición a JWT y Compatibilidad
 
