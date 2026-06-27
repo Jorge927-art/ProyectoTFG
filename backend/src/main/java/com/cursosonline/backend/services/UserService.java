@@ -13,12 +13,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
 
 /**
  * Servicio que maneja la lógica de negocio relacionada con los usuarios de la
- * plataforma.
+ * plataforma. Optimized for TFG.
  */
 @Service
 @RequiredArgsConstructor
@@ -36,7 +38,7 @@ public class UserService {
      * @param username
      * @return
      */
-    @Transactional(readOnly = true) // optimización para lecturas
+    @Transactional(readOnly = true)
     public Optional<Users> findByUsername(String username) {
         return userRepository.findByUsername(username);
     }
@@ -73,7 +75,6 @@ public class UserService {
         Users user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ServicesException("Usuario no encontrado"));
 
-        // Validación obligatoria TFG: Denegar el login a usuarios dados de baja
         if (!user.isEnabled()) {
             throw new ServicesException("Acceso denegada: La cuenta de este usuario ha sido dada de baja.");
         }
@@ -112,10 +113,6 @@ public class UserService {
 
     /**
      * Realiza el borrado lógico de un usuario desactivando su acceso.
-     * Preserva la integridad referencial en PostgreSQL evitando violaciones de FK.
-     * 
-     * @return El usuario con el estado de activación actualizado.
-     * @param username Nombre del usuario a dar de baja.
      */
     @Transactional
     public Users deleteByUsername(String username) {
@@ -203,29 +200,31 @@ public class UserService {
     }
 
     /**
-     * Consulta predictiva y paginada en el catálogo de cursos.
-     * Si la palabra clave está vacía, devuelve de forma segura solo los primeros 10
-     * cursos.
-     * Limita los resultados concurrentes para optimizar la red y la memoria del
-     * servidor.
-     * 
+     * Consulta predictiva corregida. Formatea los comodines en Java para evitar
+     * colisiones de binding en el ORM de PostgreSQL y limita el resultado a 12
+     * elementos.
+     *
      * @param keyword Término de búsqueda introducido por el estudiante.
-     * @return Lista optimizada con un máximo de 10 cursos ordenados por relevancia.
+     * @return Lista optimizada con un máximo de 12 cursos relevantes.
      */
     @Transactional(readOnly = true)
     public List<com.cursosonline.backend.entities.Courses> searchCourses(String keyword) {
-        // Configuramos un límite estricto de 10 resultados para el TFG (Página 0,
-        // Tamaño 10)
-        org.springframework.data.domain.Pageable topTen = org.springframework.data.domain.PageRequest.of(0, 12);
+        // Configuramos el límite exacto a 12 elementos solicitados para la UI (Página
+        // 0, Tamaño 12)
+        Pageable pageSize = PageRequest.of(0, 12);
 
-        // Si el buscador está vacío, evitamos volcar toda la tabla y devolvemos los 10
-        // primeros
+        // Si el buscador está vacío, devolvemos los 12 primeros de forma segura
         if (keyword == null || keyword.trim().isEmpty()) {
-            return coursesRepository.findAll(topTen).getContent();
+            return coursesRepository.findAll(pageSize).getContent();
         }
 
-        // Ejecutamos la consulta predictiva pasando el término limpio y el paginador
-        return coursesRepository.searchCoursesPredictive(keyword.trim(), topTen);
+        String cleanKeyword = keyword.trim();
+        // Creamos los dos patrones de coincidencia de forma nativa en Java
+        String formattedKeyword = "%" + cleanKeyword + "%"; // Para buscar en cualquier parte
+        String startKeyword = cleanKeyword + "%"; // Para priorizar si empieza por la palabra
+
+        // Enviamos los parámetros limpios al repositorio
+        return coursesRepository.searchCoursesPredictive(formattedKeyword, startKeyword, pageSize);
     }
 
     /**

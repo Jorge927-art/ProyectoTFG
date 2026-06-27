@@ -10,17 +10,18 @@ import java.util.List;
 public interface CoursesRepository extends JpaRepository<Courses, Long> {
 
     /**
-     * Búsqueda predictiva optimizada.
-     * Prioriza coincidencias al inicio del título y limita los resultados mediante
-     * Pageable.
+     * Búsqueda predictiva optimizada y corregida.
+     * Evalúa el título y la categoría en simetría estricta con el Service de Java.
      */
     @Query("SELECT c FROM Courses c WHERE " +
-            "LOWER(c.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(c.category) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(c.skills) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+            "LOWER(c.title) LIKE LOWER(:formattedKeyword) OR " +
+            "LOWER(c.category) LIKE LOWER(:formattedKeyword) " +
             "ORDER BY " +
-            "CASE WHEN LOWER(c.title) LIKE LOWER(CONCAT(:keyword, '%')) THEN 1 " + // Empieza por la palabra
-            "     WHEN LOWER(c.title) LIKE LOWER(CONCAT('%', :keyword, '%')) THEN 2 " + // Contiene la palabra
+            "CASE WHEN LOWER(c.title) LIKE LOWER(:startKeyword) THEN 1 " +
+            "     WHEN LOWER(c.title) LIKE LOWER(:formattedKeyword) THEN 2 " +
             "     ELSE 3 END, c.title ASC")
-    List<Courses> searchCoursesPredictive(@Param("keyword") String keyword, Pageable pageable);
+    List<Courses> searchCoursesPredictive(
+            @Param("formattedKeyword") String formattedKeyword,
+            @Param("startKeyword") String startKeyword,
+            Pageable pageable);
 }
