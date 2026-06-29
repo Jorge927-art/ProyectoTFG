@@ -81,15 +81,11 @@ public class ProfileController {
                                                 .body(Map.of("error", "El archivo no puede estar vacío"));
                         }
 
-                        String contentType = file.getContentType();
-                        if (contentType == null || !contentType.startsWith("image/")) {
-                                return ResponseEntity.badRequest()
-                                                .body(Map.of("error", "El archivo debe ser una imagen válida"));
-                        }
-
                         Users currentUser = userRepository.findByUsername(authentication.getName())
                                         .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
+                        // El servicio se encarga de las validaciones de tipo MIME y extensión de manera
+                        // estricta
                         String relativePath = fileStorageService.storeFile(file, "avatars");
 
                         UserProfile profile = profileRepository.findById(currentUser.getUser_id()).orElse(null);
@@ -105,6 +101,9 @@ public class ProfileController {
                                         "message", "Foto de perfil actualizada con éxito",
                                         "path", relativePath));
 
+                } catch (IllegalArgumentException e) {
+                        // Captura controlada de errores de validación de formato (Bad Request)
+                        return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
                 } catch (Exception e) {
                         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                                         "error", "Error al procesar la subida del avatar",

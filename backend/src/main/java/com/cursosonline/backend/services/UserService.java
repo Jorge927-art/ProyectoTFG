@@ -2,21 +2,29 @@ package com.cursosonline.backend.services;
 
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Users;
-import com.cursosonline.backend.exception.ServicesException;
-import com.cursosonline.backend.exception.UserAlreadyExistsException;
+import com.cursosonline.backend.entities.Interest;
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.dto.InterestDTO;
 import com.cursosonline.backend.repository.UserRepository;
 import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
-import java.util.Optional;
-import lombok.RequiredArgsConstructor;
+import com.cursosonline.backend.repository.InterestRepository;
+import com.cursosonline.backend.exception.ServicesException;
+import com.cursosonline.backend.exception.UserAlreadyExistsException;
+import com.cursosonline.backend.exception.ResourceNotFoundException; // Auditoría: Importación semántica para errores 404
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
+import org.hibernate.Hibernate;
 
+import java.util.Optional;
 import java.util.List;
+import java.util.Collections;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Servicio que maneja la lógica de negocio relacionada con los usuarios de la
@@ -28,15 +36,12 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final com.cursosonline.backend.repository.InterestRepository interestRepository;
+    private final InterestRepository interestRepository;
     private final CoursesRepository coursesRepository;
     private final EnrollmentRepository enrollmentRepository;
 
     /**
      * Busca un usuario por su nombre de usuario.
-     * 
-     * @param username
-     * @return
      */
     @Transactional(readOnly = true)
     public Optional<Users> findByUsername(String username) {
@@ -47,9 +52,6 @@ public class UserService {
      * Registra un nuevo usuario en la plataforma.
      * Verifica que el nombre de usuario no exista previamente, cifra la contraseña
      * y asigna el rol de student por defecto.
-     * 
-     * @param user
-     * @return
      */
     @Transactional
     public Users registerUser(Users user) {
@@ -65,10 +67,6 @@ public class UserService {
     /**
      * Realiza el proceso de login verificando el nombre de usuario y la contraseña.
      * Valida que la cuenta no se encuentre dada de baja lógicamente.
-     * 
-     * @param username
-     * @param rawPassword
-     * @return
      */
     @Transactional(readOnly = true)
     public Users login(String username, String rawPassword) {
@@ -87,8 +85,6 @@ public class UserService {
 
     /**
      * Obtiene una lista de todos los usuarios registrados en la plataforma.
-     * 
-     * @return
      */
     @Transactional(readOnly = true)
     public List<Users> getAllUsers() {
@@ -97,10 +93,6 @@ public class UserService {
 
     /**
      * Actualiza el rol de un usuario específico en la plataforma.
-     * 
-     * @param username
-     * @param newRole
-     * @return
      */
     @Transactional
     public Users updateUserRole(String username, Role newRole) {
@@ -113,11 +105,13 @@ public class UserService {
 
     /**
      * Realiza el borrado lógico de un usuario desactivando su acceso.
+     * Auditoría NotebookLM: Lanzamiento de ResourceNotFoundException (HTTP 404) en
+     * lugar de RuntimeException.
      */
     @Transactional
     public Users deleteByUsername(String username) {
         Users user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con el username: " + username));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
 
         if (user.isEnabled()) {
             user.setEnabled(false);
@@ -131,31 +125,33 @@ public class UserService {
     /**
      * Recupera de forma transaccional las preferencias de un estudiante desde
      * PostgreSQL.
+     * Auditoría NotebookLM: Lanzamiento de ResourceNotFoundException (HTTP 404) en
+     * lugar de RuntimeException.
      */
     @Transactional(readOnly = true)
-    public com.cursosonline.backend.dto.InterestDTO getUserInterests(String username) {
+    public InterestDTO getUserInterests(String username) {
         Users user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con el username: " + username));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
 
-        com.cursosonline.backend.entities.Interest interest = interestRepository.findById(user.getUser_id())
+        Interest interest = interestRepository.findById(user.getUser_id())
                 .orElse(null);
 
         if (interest == null) {
-            return new com.cursosonline.backend.dto.InterestDTO(
-                    java.util.Collections.emptyList(),
-                    java.util.Collections.emptyList(),
-                    java.util.Collections.emptyList(),
-                    java.util.Collections.emptyList(),
-                    java.util.Collections.emptyList());
+            return new InterestDTO(
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Collections.emptyList());
         }
 
-        org.hibernate.Hibernate.initialize(interest.getCategory());
-        org.hibernate.Hibernate.initialize(interest.getCourse_type());
-        org.hibernate.Hibernate.initialize(interest.getDuration());
-        org.hibernate.Hibernate.initialize(interest.getLanguage());
-        org.hibernate.Hibernate.initialize(interest.getSubtitle_languages());
+        Hibernate.initialize(interest.getCategory());
+        Hibernate.initialize(interest.getCourse_type());
+        Hibernate.initialize(interest.getDuration());
+        Hibernate.initialize(interest.getLanguage());
+        Hibernate.initialize(interest.getSubtitle_languages());
 
-        return new com.cursosonline.backend.dto.InterestDTO(
+        return new InterestDTO(
                 interest.getCategory(),
                 interest.getCourse_type(),
                 interest.getDuration(),
@@ -167,22 +163,20 @@ public class UserService {
      * Guarda o actualiza de forma transaccional las preferencias de un estudiante.
      * Si es la primera vez que configura sus intereses, se instancia una nueva
      * entidad vinculada a su cuenta de PostgreSQL usando @MapsId.
-     * 
-     * @param username El nombre de usuario extraído del Token JWT
-     * @param dto      El objeto de transferencia de datos con los listados de
-     *                 preferencias
+     * Auditoría NotebookLM: Lanzamiento de ResourceNotFoundException (HTTP 404) en
+     * lugar de RuntimeException.
      */
     @Transactional
-    public void saveUserInterests(String username, com.cursosonline.backend.dto.InterestDTO dto) {
-        // 1. Validar la existencia del usuario en el sistema
+    public void saveUserInterests(String username, InterestDTO dto) {
+        // 1. Validar la existencia del usuario en el sistema con excepción semántica
         Users user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con el username: " + username));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
 
         // 2. Buscar si ya tiene un registro de intereses previo. Si no existe, creamos
         // uno nuevo.
-        com.cursosonline.backend.entities.Interest interest = interestRepository.findById(user.getUser_id())
+        Interest interest = interestRepository.findById(user.getUser_id())
                 .orElseGet(() -> {
-                    com.cursosonline.backend.entities.Interest newInterest = new com.cursosonline.backend.entities.Interest();
+                    Interest newInterest = new Interest();
                     newInterest.setUser(user); // Establecemos la relación OneToOne para @MapsId
                     return newInterest;
                 });
@@ -203,12 +197,9 @@ public class UserService {
      * Consulta predictiva corregida. Formatea los comodines en Java para evitar
      * colisiones de binding en el ORM de PostgreSQL y limita el resultado a 12
      * elementos.
-     *
-     * @param keyword Término de búsqueda introducido por el estudiante.
-     * @return Lista optimizada con un máximo de 12 cursos relevantes.
      */
     @Transactional(readOnly = true)
-    public List<com.cursosonline.backend.entities.Courses> searchCourses(String keyword) {
+    public List<Courses> searchCourses(String keyword) {
         // Configuramos el límite exacto a 12 elementos solicitados para la UI (Página
         // 0, Tamaño 12)
         Pageable pageSize = PageRequest.of(0, 12);
@@ -229,31 +220,29 @@ public class UserService {
 
     /**
      * Matricula de forma segura a un estudiante en un curso utilizando la entidad
-     * intermedia Enrollment.
-     * Valida preventivamente en PostgreSQL para evitar registros duplicados.
+     * intermedia Enrollment. Valida preventivamente en PostgreSQL para evitar
+     * registros duplicados.
      */
     @Transactional
     public void enrollStudentInCourse(String username, Long courseId) {
         // 1. Validar precondición de existencia de usuario
         Users user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new com.cursosonline.backend.exception.ServicesException("Usuario no encontrado"));
+                .orElseThrow(() -> new ServicesException("Usuario no encontrado"));
 
         // 2. Validar precondición de existencia de curso
-        com.cursosonline.backend.entities.Courses course = coursesRepository.findById(courseId)
-                .orElseThrow(() -> new com.cursosonline.backend.exception.ServicesException(
-                        "Curso no encontrado en el catálogo"));
+        Courses course = coursesRepository.findById(courseId)
+                .orElseThrow(() -> new ServicesException("Curso no encontrado en el catálogo"));
 
         // 3. Control estricto de duplicidad antes de efectuar la persistencia
-        java.util.Optional<com.cursosonline.backend.entities.Enrollment> existingEnrollment = enrollmentRepository
+        Optional<Enrollment> existingEnrollment = enrollmentRepository
                 .findByUserIdAndCourseId(user.getUser_id(), course.getCourse_id());
 
         if (existingEnrollment.isPresent()) {
-            throw new com.cursosonline.backend.exception.ServicesException(
-                    "Acción inválida: Ya te encuentras matriculado en este curso.");
+            throw new ServicesException("Acción inválida: Ya te encuentras matriculado en este curso.");
         }
 
         // 4. Instanciar y configurar el objeto de matrícula explícito
-        com.cursosonline.backend.entities.Enrollment enrollment = new com.cursosonline.backend.entities.Enrollment();
+        Enrollment enrollment = new Enrollment();
         enrollment.setUser(user);
         enrollment.setCourse(course);
 

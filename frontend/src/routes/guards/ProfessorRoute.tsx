@@ -1,7 +1,9 @@
 import ProtectedRoute from "./ProtectedRoute";
 
+import { ROLES } from "../../auth/authTypes";
+
 // Política de acceso específica para la zona de profesor.
-const PROFESSOR_ALLOWED_ROLES = ["PROFESSOR"];
+const PROFESSOR_ALLOWED_ROLES = [ROLES.PROFESSOR];
 const REDIRECT_IF_UNAUTHORIZED = "/acceso-denegado";
 
 const ProfessorRoute = () => {

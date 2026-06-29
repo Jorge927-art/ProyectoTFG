@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Users, Search, Loader2, Shield } from 'lucide-react';
 import { apiClient } from '@/services/apiClient';
 import axios from 'axios';
-import AdminLayout from '../../layouts/AdminLayout';
+import AdminLayout from '../../layouts/DashboardLayout';
 import { UserScrollList } from '../../../components/admin/UserScrollList';
 
 interface UserEntity {

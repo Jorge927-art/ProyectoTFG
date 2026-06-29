@@ -25,14 +25,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }, []);
 
     /**
- * Procesa el inicio de sesión con JWT.
- */
+     * Procesa el inicio de sesión con JWT.
+     */
     const login = (tokenData: AuthTokenResponse) => {
-        // SOLUCIÓN DEFINITIVA TS: Pasamos por 'unknown' antes de castear a Record para saltar la restricción ts(2352)
-        const rawToken = tokenData as unknown as Record<string, unknown>;
-        const seconds = rawToken['expiresInSeconds'];
+        // Corrección de Auditoría: Se consume directamente 'expiresIn' del contrato del Backend.
+        const seconds = tokenData.expiresIn;
 
-        // Calcular el instante exacto de expiración (15 min por defecto si falla)
+        // Calcular el instante exacto de expiración (15 min por defecto si falla o no viene el dato)
         const lifespanMs = (typeof seconds === 'number' && seconds > 0) ? seconds * 1000 : 15 * 60 * 1000;
         const expiresAt = Date.now() + lifespanMs;
 
@@ -52,32 +51,48 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
 
     /**
-     * BLINDAJE TFG (Auditoría NotebookLM): Desconexión Proactiva por Tiempo.
-     * Monitorea el TTL del token y expulsa al usuario al cumplir el tiempo límite.
+     * BLINDAJE TFG ESTRÉPITO (Auditoría NotebookLM): Desconexión Proactiva Anti-Congelación.
+     * Combina verificación por visibilidad de pestaña e intervalos cortos para evitar la evasión de temporizadores.
      */
     useEffect(() => {
         const userWithExpiry = user as (AuthUser & { expiresAt?: number }) | null;
 
         if (!userWithExpiry || !userWithExpiry.expiresAt) return;
 
-        const timeLeft = userWithExpiry.expiresAt - Date.now();
+        const expiresAt = userWithExpiry.expiresAt;
 
-        // SOLUCIÓN INTERMITENCIA ESLINT: Si ya expiró al arrancar el efecto, usamos un micro-timeout 
-        // para sacarlo del ciclo de render síncrono y evitar el error "set-state-in-effect"
-        if (timeLeft <= 0) {
-            const systemTimeout = setTimeout(() => {
+        // Función centralizada para verificar si el token ya ha expirado
+        const checkTokenExpiration = () => {
+            if (Date.now() >= expiresAt) {
+                console.warn("Sesión expirada proactivamente (Límite TTL alcanzado).");
                 logout();
-            }, 0);
-            return () => clearTimeout(systemTimeout);
-        }
+                return true;
+            }
+            return false;
+        };
 
-        // Configuramos el temporizador exacto para expulsar al usuario al cumplir el TTL
-        const timer = setTimeout(() => {
-            console.warn("Sesión expirada por inactividad (TTL alcanzado). Redirigiendo...");
-            logout();
-        }, timeLeft);
+        // 1. Control instantáneo al montar el efecto o cambiar el usuario
+        if (checkTokenExpiration()) return;
 
-        return () => clearTimeout(timer);
+        // 2. Control reactivo cuando el usuario cambia de pestaña y regresa (Evita congelación del navegador)
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                checkTokenExpiration();
+            }
+        };
+
+        // 3. Verificación cíclica a intervalos cortos (Frecuencia de muestreo segura cada 5 segundos)
+        const intervalId = setInterval(() => {
+            checkTokenExpiration();
+        }, 5000);
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Limpieza de listeners e intervalos al desmontar el efecto
+        return () => {
+            clearInterval(intervalId);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [user, logout]);
 
     /**

@@ -103,17 +103,17 @@ Este documento centraliza las decisiones técnicas críticas tomadas durante el 
 
 ---
 
-## [ADR-10] Arquitectura de Layouts Modulares por Composición Especializada
+## [ADR-10] Unificación de Layouts Mediante Composición Paramétrica Reactiva al Rol
 
 * **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** La plataforma web integra tres perfiles de usuario diferenciados (Administrador, Profesor y Estudiante). Cada rol demanda disposiciones espaciales, densidades de información y geometrías visuales asimétricas (por ejemplo, búsquedas en contenedores contenidos frente a métricas y cursos en grids multi-columna). Se requiere una solución arquitectónica en el frontend que centralice los elementos globales invariables (la barra de navegación, la inyección del contexto de sesión y los estilos base de la aplicación) sin condicionar la flexibilidad de diseño ni acoplar los paneles entre sí.
-* **Decisión:** Implementar un patrón de diseño estructural basado en un Layout Base abstracto (`DashboardLayout.tsx`) acoplado de forma autónoma al hook de autenticación global (`useAuth`), y derivar de él tres Layouts Especializados mediante composición de software (`AdminLayout.tsx`, `ProfessorLayout.tsx` y `StudentLayout.tsx`). Cada página de rol se envuelve exclusivamente en su layout correspondiente, delegando la maquetación geométrica general.
-* **Justificación para el TFG:** Demuestra la aplicación rigurosa de los principios SOLID de la ingeniería del software. Al utilizar composición en lugar de herencia rígida o layouts monolíticos condicionales, se cumple con el *Single Responsibility Principle (SRP)* y el *Open/Closed Principle (OCP)*. El Layout Base queda cerrado a modificaciones estructurales pero abierto a la extensión táctica de cada rol. Si las necesidades del negocio exigen incorporar barras laterales (Sidebars) para el administrador o menús flotantes de IA para el estudiante, el radio de impacto y fallo queda estrictamente aislado, garantizando la inmunidad de las demás vistas del sistema.
+* **Estatus:** Superado (Rectificado)
+* **Contexto:** La arquitectura original propuesta en este registro planteaba una segregación física de archivos (`AdminLayout.tsx`, `ProfessorLayout.tsx` y `StudentLayout.tsx`) bajo la premisa de anticipar necesidades futuras de "composición especializada". Sin embargo, tras una auditoría técnica orientada al despliegue, se evidenció un escenario de sobreingeniería y deuda técnica: los tres componentes compartían el 98% de su infraestructura lógica y directivas estéticas de Tailwind CSS, divergiendo únicamente en parámetros milimétricos de espaciado lateral (`px-4` frente a `px-6`). Mantener esta dispersión multiplicaba el riesgo de desincronización ante actualizaciones globales del diseño perimetral.
+* **Decisión:** Deprecar y eliminar del sistema los tres archivos redundantes de diseño por rol. Toda la infraestructura visual del frontend se centraliza de manera absoluta en un único componente inteligente: `DashboardLayout.tsx`. Este elemento se redefine como un contenedor paramétrico que autodetecta en tiempo real el rol del usuario autenticado a través del contexto global de `useAuth`, inyectando dinámicamente las clases geométricas correspondientes.
+* **Justificación para el TFG:** Esta rectificación prioriza de forma rigurosa el principio fundamental *DRY (Don't Repeat Yourself)* sobre asunciones de diseño tempranas y desacopladas de la realidad del código fuente. Al consolidar la interfaz perimetral en un único punto de control, se optimiza la mantenibilidad del software. Cualquier modificación estructural (como la futura adición de pies de página o menús laterales) requiere una única edición centralizada, reduciendo a cero el radio de fallo por omisión en vistas satélite y eliminando la redundancia estructural en el árbol de componentes de React.
 * **Consecuencias:**
-  * **Principio DRY Global:** Las directrices estéticas de Tailwind CSS (`min-h-screen`, `bg-slate-50`, `font-sans`) y la orquestación de la barra `<NavbarUser />` se gestionan en un único punto del proyecto, simplificando el mantenimiento general.
-  * **Garantía de Accesibilidad (a11y):** Se introducen enlaces explícitos y semánticos mediante el atributo `htmlFor` e identificadores únicos (`id`) en los componentes interactivos de los layouts (como selectores de rol), cumpliendo de forma nativa con los estándares WCAG y garantizando la compatibilidad con lectores de pantalla.
-  * **Carga de Trabajo Desacoplada:** Las páginas del cliente (`AdminDashboard`, `ProfessorDashboard`, `StudentDashboard`) quedan completamente liberadas de ruido visual e infraestructura estructural, focalizando su código de forma pura en la lógica de estado de React, efectos secundarios y peticiones Axios hacia Spring Boot.
+  * **Mitigación de Deuda Técnica:** Reducción drástica del volumen de archivos huérfanos de lógica propia en el directorio de layouts, simplificando la auditoría de código del frontend.
+  * **Coherencia Geométrica Garantizada:** La paridad visual entre los paneles de control queda blindada de forma nativa por el compilador, aplicando los espaciados específicos reactivos únicamente bajo la condición estricta de jerarquía (como el perfil del administrador).
+  * **Optimización del Enrutamiento:** Simplificación en la integración de las vistas del cliente (`StudentDashboard`, `StudentProfilePage`, etc.), las cuales migran hacia el consumo de un único envoltorio homogéneo, facilitando el mantenimiento de las importaciones y la legibilidad en los módulos de navegación.
 
   ---
 
@@ -408,6 +408,71 @@ Esta decisión se ejecuta bajo las siguientes directrices técnicas:
 ### Negativas
 
 * **Incremento en el Volumen de Archivos:** El panel del estudiante pasa de constar de un único archivo a estructurarse en un conjunto distribuido de 5 archivos especializados.
+
+---
+
+## [ADR-21] Contrato de Expiración del Token con Tipado Estricto (TTL Centralizado)
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Existía una inconsistencia crítica en la gestión del tiempo de vida de la sesión (*Time-To-Live* o TTL) entre ambas capas de la aplicación. El backend calculaba la expiración de forma correcta, pero el frontend aplicaba parches de maquetación de tipos mediante un casting forzado a `unknown` para acceder a una propiedad inexistente denominada `expiresInSeconds`. Al fallar esta lectura por discrepancia de contratos, el sistema activaba de forma silenciosa un temporizador de emergencia fijo de 15 minutos, lo que comprometía la integridad del sistema de autenticación y provocaba desconexiones prematuras o estados inconsistentes en la interfaz de usuario.
+* **Decisión:** Estandarizar de forma estricta el contrato de transferencia de datos eliminando los artificios de tipado condicional en el archivo `AuthProvider.tsx`. El campo `expiresIn` se mapea ahora de manera homogénea entre el registro de Java del servidor y su correspondiente interfaz en TypeScript como un tipo numérico estricto. El cliente calcula el instante de expiración consumiendo directamente este valor sin transformaciones ambiguas ni escapes en el compilador.
+* **Justificación para el TFG:** Sigue de manera rigurosa los principios de diseño guiado por contratos en arquitecturas desacopladas cliente/servidor. Al forzar una paridad absoluta entre los tipos del backend y el frontend, se elimina la deuda técnica y se garantiza que el flujo de control matemático del TTL sea exacto. Esto evita que el compilador ignore discrepancias en las estructuras de datos compartidas y eleva la robustez perimetral del sistema de sesiones.
+* **Consecuencias:**
+  * **Consistencia Operacional Total:** Eliminación definitiva de los errores de desincronización en la sesión y pantallas congeladas, asegurando que el ciclo de vida del usuario en el navegador coincida exactamente con la validez del token en el servidor.
+  * **Flujo de Persistencia Seguro:** Garantía de un tipado seguro en todo el flujo de autenticación, blindando la integridad de los datos desde la respuesta HTTP original hasta su almacenamiento en las capas de persistencia local (*localStorage*).
+
+---
+
+## [ADR-22] Externalización y Seguridad de Políticas CORS mediante Variables de Entorno
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** La configuración de la seguridad perimetral en la clase `SecurityConfig.java` del backend restringía las solicitudes entrantes permitiendo únicamente el origen estático `http://localhost:5173`. Esta codificación rígida (*hardcodeada*) en el código fuente constituía un acoplamiento crítico con el entorno de desarrollo local, lo que impedía por completo el despliegue del sistema en servidores productivos reales bajo políticas de navegador (*Cross-Origin Resource Sharing*) a menos que se realizaran modificaciones manuales propensas a errores antes de compilar.
+* **Decisión:** Migrar la directiva de orígenes permitidos de CORS hacia un modelo de inyección de dependencias dinámica en Spring Boot. Se implementa el uso de la anotación `@Value` ligada a una variable de entorno del sistema, configurando un mecanismo de respaldo (*fallback*) adaptativo que emplea la ruta local por defecto si la variable externa se encuentra ausente en el sistema operativo.
+* **Justificación para el TFG:** Cumple de manera rigurosa con los principios de portabilidad y desacoplamiento de la metodología de las *Twelve-Factor Apps* para sistemas nativos de la nube. Al externalizar las directrices de red del código compilado, el archivo de seguridad de Spring Security queda cerrado a modificaciones físicas de infraestructura, permitiendo canalizar despliegues automáticos y parametrizables en entornos de desarrollo, pruebas o producción sin alterar un solo byte del artefacto compilado.
+* **Consecuencias:**
+  * **Portabilidad y Automatización:** Mejora inmediata en la portabilidad del sistema, permitiendo su despliegue inmediato en cualquier proveedor PaaS o la nube (como Render, AWS o Heroku) configurando la dirección web del frontend de forma puramente operativa.
+  * **Seguridad y Limpieza del IDE:** Cumplimiento de las mejores prácticas de seguridad operativa, evitando la exposición de configuraciones locales y silenciando las advertencias o avisos amarillos del editor de código en el archivo `application.properties` al delegar el flujo de datos sobre variables del entorno.
+
+---
+
+## [ADR-23] Validación Perimetral de Archivos y Mitigación de Ataques RCE
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** El servicio de almacenamiento en el servidor permitía la subida y persistencia de recursos en disco limitando únicamente el tamaño máximo de los ficheros a 5MB a través de la directiva del servlet. No obstante, la ausencia total de validaciones sobre el tipo de contenido representaba una vulnerabilidad crítica de seguridad. Un atacante autenticado o un usuario malintencionado podría evadir el propósito de la funcionalidad cargando scripts ejecutables (como shells o scripts `.php`), obteniendo la capacidad de comprometer el servidor mediante la ejecución remota de código (*Remote Code Execution* o RCE).
+* **Decisión:** Implementar un mecanismo imperativo de validación perimetral dual dentro de la clase `FileStorageService.java`. Antes de escribir cualquier flujo de datos en el disco, el sistema extrae de forma segura la extensión real del nombre del fichero y valida la cabecera `Content-Type` (*MIME Type*). Esta restricción se aplica mediante una arquitectura segregada por el contexto de la carpeta de destino: la subcarpeta `avatars` acepta estrictamente formatos gráficos autorizados (`.jpg`, `.jpeg`, `.png`, `.webp`), mientras que la subcarpeta `documents` se restringe de forma exclusiva a extensiones `.pdf`.
+* **Justificación para el TFG:** Sigue las directrices de la guía OWASP y el principio de defensa en profundidad en sistemas web. Validar de forma combinada la extensión y el tipo MIME mitiga los ataques de suplantación de identidad de archivos (*MIME-sniffing*). Cualquier intento de alteración o desajuste con las listas blancas de formatos permitidos detiene la transacción de inmediato lanzando una excepción controlada, impidiendo que material potencialmente destructivo alcance el sistema de archivos local.
+* **Consecuencias:**
+  * **Inmunización frente a RCE:** Blindaje absoluto del servidor ante la persistencia de archivos maliciosos, neutralizando vectores de ataque orientados al secuestro de recursos o ejecución de comandos en el host.
+  * **Centralización de Reglas de Negocio:** Los controladores de la aplicación (como `ProfileController.java`) delegan la responsabilidad del control de formatos en el servicio de almacenamiento, garantizando que cualquier nuevo módulo de subida en el futuro herede nativamente estas directivas de seguridad.
+
+---
+
+## [ADR-24] Gestión de Sesión Robusta mediante la Visibility API del Navegador
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** La desconexión proactiva por tiempo en el frontend delegaba el control de la expiración de la sesión en un temporizador lineal `setTimeout` en el cliente. Sin embargo, los navegadores web modernos (como Chrome, Edge o Safari) aplican políticas agresivas de ahorro de energía que suspenden o ralentizan los hilos de temporizadores en pestañas inactivas o en segundo plano. Esto provocaba que el reloj de la aplicación se detuviera, generando "sesiones fantasma" donde el usuario regresaba horas después viendo una interfaz falsamente autenticada que solo fallaba al intentar interactuar y colisionar contra el backend.
+* **Decisión:** Migrar la lógica de desconexión proactiva en el archivo `AuthProvider.tsx` para utilizar un enfoque basado en eventos de ciclo de vida del navegador a través de la *Visibility API*. Se implementa la escucha del evento nativo `visibilitychange` combinado con una rutina ligera de muestreo cíclico de alta frecuencia (`setInterval` cada 5 segundos). En el momento exacto en que el usuario reactiva o enfoca la pestaña, el sistema ejecuta una auditoría de tiempo inmediata recalculando la validez del token frente al tiempo real del sistema operativo (`Date.now() >= expiresAt`).
+* **Justificación para el TFG:** Demuestra una comprensión avanzada del entorno de ejecución asíncrono en los motores de renderizado de JavaScript y las limitaciones físicas del hardware actual. En lugar de confiar ciegamente en temporizadores lineales vulnerables a la congelación del navegador, el frontend se vuelve autoconsciente de su estado de visualización, blindando el perímetro de autenticación en el cliente y garantizando la sincronización con el tiempo absoluto de expiración definido por el servidor.
+* **Consecuencias:**
+  * **Eliminación de Sesiones Fantasma:** Cierre de sesión preciso e inmediato en el milisegundo en que el usuario regresa a la aplicación, impidiendo la exposición visual de datos sensibles en interfaces obsoletas tras periodos prolongados de inactividad.
+  * **Consistencia de Estado:** Desaparición de estados de autenticación inconsistentes en la interfaz de usuario, mejorando la experiencia del estudiante al sincronizar de forma determinista el estado de la SPA con el ciclo de vida real del token JWT.
+
+---
+
+## [ADR-25] Normalización Semántica de Errores en la API REST
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Múltiples operaciones críticas en la capa de servicios del backend (como en la clase `UserService.java`) recurrían al lanzamiento directo de la excepción genérica `RuntimeException` al no localizar registros en la base de datos o ante fallos de validación. Aunque el servidor dispone de un componente interceptor centralizado (`GlobalExceptionHandler.java`), el uso de excepciones sin tipar impedía que el manejador pudiera discernir el origen del fallo, forzando a que el sistema procesara de forma homogénea cualquier anomalía bajo el mismo código genérico HTTP 500 (*Internal Server Error*), lo que deterioraba gravemente el rigor semántico y la claridad de la API REST.
+* **Decisión:** Desterrar por completo el uso de excepciones genéricas e incorporar una arquitectura de excepciones semánticas personalizadas de grano fino. Se procede a la adopción y sobrecarga de clases específicas como `ResourceNotFoundException` y `UserAlreadyExistsException`. Estas excepciones se vinculan directamente a códigos de estado HTTP específicos (`404 Not Found` y `409 Conflict`, respectivamente) utilizando las directivas de Spring Boot y el mapeo de respuestas estructuradas.
+* **Justificación para el TFG:** Sigue de manera rigurosa las especificaciones del protocolo HTTP y las mejores prácticas en el diseño de arquitecturas RESTful profesionales. Al dotar a la capa de servicios de la capacidad de comunicar anomalías de datos con nombres propios, el interceptor global puede traducir el fallo en un objeto JSON homogéneo y con el código de estado correspondiente. Esto previene fugas de información del sistema en las trazas de error y proporciona un contrato predecible para el consumo del cliente.
+* **Consecuencias:**
+  * **API REST Semántica y Estándar:** Las peticiones por recursos inexistentes o conflictos de datos devuelven códigos HTTP semánticos (404 y 409) limpios en lugar de alarmantes y opacos errores internos 500, profesionalizando la interfaz del servidor.
+  * **Facilidad de Depuración e Integración:** Proporciona al frontend mensajes de error claros, estructurados y consistentes, agilizando el diagnóstico en fases de pruebas y mejorando drásticamente la comunicación entre las capas del sistema mediante el uso correcto de los estándares de la industria.
 
 ---
 

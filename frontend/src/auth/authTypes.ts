@@ -1,4 +1,12 @@
-export type UserRole = 'ADMIN' | 'PROFESSOR' | 'STUDENT' | string;
+// Auditoría NotebookLM: Definición estricta de tipos de rol. Se elimina el comodín '| string' para evitar fallos.
+export type UserRole = 'ADMIN' | 'PROFESSOR' | 'STUDENT';
+
+// Objeto de constantes fijo para mapear los roles en el código y evitar errores tipográficos
+export const ROLES = {
+    ADMIN: 'ADMIN' as UserRole,
+    PROFESSOR: 'PROFESSOR' as UserRole,
+    STUDENT: 'STUDENT' as UserRole,
+} as const;
 
 /**
  * Forma estándar del usuario autenticado dentro del frontend.

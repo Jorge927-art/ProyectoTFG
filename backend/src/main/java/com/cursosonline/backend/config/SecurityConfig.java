@@ -1,6 +1,7 @@
 package com.cursosonline.backend.config;
 
 import com.cursosonline.backend.security.jwt.JwtAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -30,6 +31,11 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    // Sincronizado con application.properties usando la estructura estandar
+    // 'app.cors.allowed-origins'
+    @Value("${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}")
+    private List<String> allowedOrigins;
 
     /**
      * Constructor de la clase SecurityConfig.
@@ -108,7 +114,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5173"));
+        // Asignamos la lista inyectada directamente
+        config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

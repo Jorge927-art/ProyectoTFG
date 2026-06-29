@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BookOpen, ArrowRight, Activity } from 'lucide-react';
 import GenericCard from '../../../components/ui/genericCard/GenericCard';
-import ProfessorLayout from '../../layouts/ProfessorLayout';
+import ProfessorLayout from '../../layouts/DashboardLayout';
 
 interface TaughtCourse {
     id: number;

@@ -1,8 +1,10 @@
-import type { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home, User, LogOut, GraduationCap, ShieldAlert, BookOpen } from 'lucide-react';
 import GenericButton from "../ui/genericButton/GenericButton";
 import { useAuth } from '@/auth';
+// Auditoría NotebookLM: Importación de la constante centralizada para mitigar hardcoding de roles.
+import { ROLES } from '@/auth/authTypes';
 
 /**
  * Props del componente NavbarUser.
@@ -19,26 +21,23 @@ interface NavbarUserProps {
 const NavbarUser = ({ username, userPhoto, onLogout }: NavbarUserProps) => {
     const { user } = useAuth();
     const navigate = useNavigate();
-    const currentRole = user?.role?.toUpperCase().trim() || 'STUDENT';
+    const currentRole = user?.role?.toUpperCase().trim() || ROLES.STUDENT;
 
     // FUNCIÓN DE REDIRECCIÓN INTERNA AUTÓNOMA MULTIRROL OPTIMIZADA
     const handleProfileRedirect = () => {
-        // 1. Usamos la variable normalizada que ya tienes en el código
         const roleCleaned = currentRole.trim().toUpperCase();
         console.log("[NAVBAR]: Redirigiendo perfil para rol ->", roleCleaned);
 
-        // 2. Mapeo dinámico de rutas de perfil
+        // Auditoría NotebookLM: Mapeo de rutas indexado mediante claves del objeto ROLES
         const profileRoutes: Record<string, string> = {
-            'STUDENT': '/student/profile',
-            'PROFESSOR': '/professor/profile',
-            'ADMIN': '/admin/profile'
+            [ROLES.STUDENT]: '/student/profile',
+            [ROLES.PROFESSOR]: '/professor/profile',
+            [ROLES.ADMIN]: '/admin/profile'
         };
 
-        // 3. Ejecución de la navegación segura
         const targetPath = profileRoutes[roleCleaned] || '/student/profile';
         navigate(targetPath);
     };
-
 
     const avatarIcon: ReactNode = userPhoto ? (
         <img
@@ -64,17 +63,17 @@ const NavbarUser = ({ username, userPhoto, onLogout }: NavbarUserProps) => {
                 />
             </div>
 
-            {/* 2. SECCIÓN CENTRAL */}
+            {/* 2. SECCIÓN CENTRAL - CONTROL DE INSIGNIAS POR ROL CON RIESGO CERO */}
             <div className="w-1/3 flex items-center justify-center">
                 {(() => {
-                    if (currentRole === 'ADMIN') {
+                    if (currentRole === ROLES.ADMIN) {
                         return (
                             <div className="bg-red-50 px-3 py-1 rounded-full border border-red-100 flex items-center gap-1.5 text-red-800 font-bold text-[11px] uppercase tracking-wider shadow-sm animate-in fade-in duration-300">
                                 <ShieldAlert size={14} className="text-red-600" />
                                 <span>Administrador</span>
                             </div>
                         );
-                    } else if (currentRole === 'PROFESSOR') {
+                    } else if (currentRole === ROLES.PROFESSOR) {
                         return (
                             <div className="bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 flex items-center gap-1.5 text-emerald-800 font-bold text-[11px] uppercase tracking-wider shadow-sm animate-in fade-in duration-300">
                                 <BookOpen size={14} className="text-emerald-600" />
@@ -92,7 +91,7 @@ const NavbarUser = ({ username, userPhoto, onLogout }: NavbarUserProps) => {
                 })()}
             </div>
 
-            {/* 3. SECCIÓN DERECHA: Ejecuta directamente la función local */}
+            {/* 3. SECCIÓN DERECHA */}
             <div className="w-1/3 flex items-center justify-end gap-4">
                 <GenericButton
                     onClick={handleProfileRedirect}

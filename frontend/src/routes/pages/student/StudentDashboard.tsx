@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Sparkles, SlidersHorizontal } from 'lucide-react';
-import StudentLayout from '../../layouts/StudentLayout';
+import StudentLayout from '../../layouts/DashboardLayout';
 import { InterestsModal } from './InterestsModal';
 
 import { CourseCatalog } from './components/CourseCatalog';
@@ -9,7 +9,8 @@ import { SmartRecommendations } from './components/SmartRecommendations';
 import { useEnrolledCourses } from './components/useEnrolledCourses';
 import type { DBModelCourse } from './components/useCourseCatalog';
 
-interface RecommendedCourse {
+// Auditoría NotebookLM: Añadido 'export' para que sea la única fuente de verdad compartida.
+export interface RecommendedCourse {
     id: number;
     title: string;
     instructor: string;

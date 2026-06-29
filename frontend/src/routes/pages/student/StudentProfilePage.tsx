@@ -1,10 +1,11 @@
-import StudentLayout from '../../layouts/StudentLayout';
+import DashboardLayout from '../../layouts/DashboardLayout';
 import ProfileSettings from '../../../components/ui/profileSettings/ProfileSettings';
 
 export default function StudentProfilePage() {
     return (
-        <StudentLayout>
+        <DashboardLayout>
             <ProfileSettings />
-        </StudentLayout>
+        </DashboardLayout>
     );
 }
+

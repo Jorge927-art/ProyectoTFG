@@ -32,6 +32,11 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments }: EnrolledCo
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {enrolledList.map((enroll) => {
                         const progressPct = enroll.progress_percentage || 0;
+
+                        // Corrección de Auditoría: Estructuración limpia del estilo dinámico.
+                        // Corrige el fallo de Tailwind con variables y silencia la alerta de Microsoft Edge.
+                        const barWidthStyle = { width: `${progressPct}%` };
+
                         return (
                             <GenericCard key={enroll.enrollmentid}>
                                 <div className="mb-4">
@@ -52,9 +57,10 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments }: EnrolledCo
                                         <span className="font-bold text-blue-600">{progressPct}%</span>
                                     </div>
                                     <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
-                                        {/* Inyección nativa por interpolación de clases en Tailwind (Cero estilos inline) */}
+                                        {/* Renderizado reactivo exacto usando la variable de estilo */}
                                         <div
-                                            className={`bg-blue-600 h-full transition-all duration-500 w-[${progressPct}%]`}
+                                            className="bg-blue-600 h-full transition-all duration-500"
+                                            style={barWidthStyle}
                                         />
                                     </div>
 

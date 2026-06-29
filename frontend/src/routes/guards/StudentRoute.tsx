@@ -1,7 +1,9 @@
 import ProtectedRoute from "./ProtectedRoute";
 
+import { ROLES } from "../../auth/authTypes";
+
 // Política de acceso específica para la zona de estudiante.
-const STUDENT_ALLOWED_ROLES = ["STUDENT"];
+const STUDENT_ALLOWED_ROLES = [ROLES.STUDENT];
 const REDIRECT_IF_UNAUTHORIZED = "/acceso-denegado";
 
 const StudentRoute = () => {

@@ -9,7 +9,15 @@ package com.cursosonline.backend.exception;
  * coherente en la capa de servicios.
  */
 public class ResourceNotFoundException extends ServicesException {
+
+    // Constructor original: Se mantiene para búsquedas por ID numérico
     public ResourceNotFoundException(String resource, Long id) {
         super(resource + " con ID " + id + " no encontrado.");
+    }
+
+    // Auditoría NotebookLM: Nuevo constructor sobrecargado para permitir
+    // mensajes directos basados en texto (ej. búsquedas por username).
+    public ResourceNotFoundException(String message) {
+        super(message);
     }
 }
