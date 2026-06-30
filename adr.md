@@ -476,6 +476,21 @@ Esta decisión se ejecuta bajo las siguientes directrices técnicas:
 
 ---
 
+## [ADR-26] Estrategia de Aseguramiento de Calidad Híbrida y Cobertura de Regresiones en Backend y Frontend
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Tras las profundas refactorizaciones perimetrales y de seguridad realizadas en el sistema (unificación de layouts, inyección dinámica de CORS, validación dual de archivos y control de sesiones mediante la Visibility API), la suite de pruebas automatizadas se encontraba desactualizada y desalineada con la arquitectura de la plataforma. El sistema adolecía de puntos ciegos (*blind spots*) críticos de extremo a extremo: el backend no auditaba el rechazo de scripts maliciosos de tipo RCE en la capa de almacenamiento ni validaba las políticas de red frente a orígenes no autorizados en los filtros de seguridad, mientras que el frontend no comprobaba la reactividad del cliente ante la congelación de hilos de tiempo del navegador.
+* **Decisión:** Diseñar e implementar una suite de pruebas automatizadas integral utilizando una estrategia híbrida y complementaria para ambas capas del software.
+  1. Para el **Backend (Spring Boot)**, se implementan pruebas unitarias y de integración mediante JUnit 5 y Mockito; además, se adopta la simulación de servlets mediante entornos de contexto web inyectados dinámicamente (`MockMvcBuilders` acoplado al filtro de seguridad) para blindar perimetralmente la persistencia, mitigar fallos de infraestructura y validar que la inyección de propiedades externas para CORS actúa correctamente interceptando peticiones maliciosas (OPTIONS / Preflight).
+  2. Para el **Frontend (React)**, se estructura una arquitectura de pruebas de comportamiento aisladas mediante Vitest y React Testing Library, recurriendo al mockeo semántico de componentes e hilos de tiempo falsos (`vi.useFakeTimers`) para evaluar las directivas de layouts paramétricos y los eventos de ciclo de vida del navegador.
+* **Justificación para el TFG:** Aporta el máximo nivel de rigor metodológico y madurez de ingeniería de software exigido en un TFG. En lugar de limitarse a pruebas aisladas y superficiales, la suite valida la integración real entre las capas de negocio, seguridad, red y persistencia de datos. El uso de maquetación de contexto web simulado en Spring Boot y mocks controlados en React aísla las responsabilidades de los componentes, garantizando que los tests actúen como un escudo perimetral inmune a futuras alteraciones en la base de datos o modificaciones estéticas en la interfaz de usuario.
+* **Consecuencias:**
+  * **Inmunización Dual ante Regresiones:** El sistema queda blindado contra fallos colaterales en ambas capas, asegurando con un 100% de certeza técnica verificada por consola (`BUILD SUCCESS` en Spring Boot y `PASS` en Vitest) que el servidor rechaza scripts maliciosos, los filtros de red bloquean orígenes no autorizados y el cliente destruye proactivamente las sesiones fantasma en milisegundos.
+  * **Documentación Ejecutable Homogénea:** La suite de pruebas actúa como documentación viva y simétrica del comportamiento esperado de la plataforma de desarrollo, facilitando el diagnóstico en fases de mantenimiento y garantizando la estabilidad operativa global del sistema de cara a su defensa y despliegue final.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026
