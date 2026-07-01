@@ -549,6 +549,20 @@ Esta decisión se ejecuta bajo las siguientes directrices técnicas:
 
 ---
 
+## [ADR-32] Algoritmo de Filtrado Basado en Contenido para el Motor de Recomendaciones
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Se requería un motor de sugerencias personalizado dentro del panel del estudiante que priorizara la afinidad temática, las competencias académicas y la disponibilidad de tiempo del alumno. El backend original carecía de lógica predictiva y el frontend dependía de datos estáticos (*mocks*), lo que reducía el valor tecnológico de la plataforma de cara a la defensa del proyecto.
+* **Decisión:** Diseñar y desarrollar un servicio especializado (`RecommendationService.java`) que implementa un algoritmo de Filtrado Basado en Contenido (*Content-Based Filtering*). El motor opera de forma determinista bajo una matriz de pesos en memoria (30% Categoría, 25% Historial, 20% Nivel, 15% Idioma, 10% Duración). El enrutamiento se expone de forma segura en `/api/courses/recommendations` resolviendo la identidad mediante el Claim del token JWT y el cliente React se conecta de forma reactiva a través del gancho personalizado `useSmartRecommendations.ts`.
+* **Justificación para el TFG:** Demuestra madurez de ingeniería al resolver el acoplamiento y la eficiencia del grafo de persistencia. En lugar de delegar el cálculo matemático de ponderación a PostgreSQL mediante costosos procedimientos almacenados o consultas complejas con subconsultas cíclicas, se adopta una **Estrategia Stateless**. Los datos se recuperan atómicamente mediante proyecciones nativas e indexadas de clave primaria (`findEnrolledCourseIdsByUserId`) y se procesan a alta velocidad en memoria utilizando *Java Streams*, liberando por completo de carga computacional al servidor de la base de datos.
+* **Consecuencias:**
+  * **Sugerencias predictivas dinámicas:** El frontend renderiza en tiempo real recomendaciones justificadas con un porqué explicícito (`reason`) de forma transparente para el estudiante.
+  * **Aislamiento e Inmunidad ante Regresiones:** El algoritmo queda blindado metodológicamente mediante una suite de pruebas de comportamiento automatizadas en JUnit 5 y Mockito (`RecommendationServiceTest`), certificando con un 100% de éxito en consola (`BUILD SUCCESS`) que el sistema descarta cursos irrelevantes y excluye de forma estricta las asignaturas en las que el alumno ya está matriculado.
+  * **Arquitectura Altamente Reactiva:** La UI del frontend se sincroniza automáticamente e invalida el feed en milisegundos en cuanto el estudiante efectúa una nueva matrícula, disparando una recarga limpia de red sin necesidad de refrescar el navegador.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026
