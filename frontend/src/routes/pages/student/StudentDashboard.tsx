@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, SlidersHorizontal, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Sparkles, SlidersHorizontal, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 // Importación del Layout unificado según [ADR-10]
 import DashboardLayout from '../../layouts/DashboardLayout';
@@ -12,9 +12,8 @@ import { SmartRecommendations } from './components/SmartRecommendations';
 
 // Hooks de lógica distribuida para evitar el "God Component" [ADR-20]
 import { useEnrolledCourses } from './components/useEnrolledCourses';
+import { useSmartRecommendations } from './components/useSmartRecommendations';
 import type { DBModelCourse } from '../../../services/courseTypes';
-import type { RecommendedCourse } from '../../../services/userDomains';
-
 
 const StudentDashboard = () => {
     // --- ESTADOS DE UI Y FEEDBACK ---
@@ -25,25 +24,14 @@ const StudentDashboard = () => {
     /** 
      * HOOK DE ASIGNATURAS MATRICULADAS:
      * Gestiona de forma autónoma la carga desde el backend.
-     * El 'successMessage' actúa como trigger para refrescar la lista tras matricularse [6, 7].
      */
     const { enrolledList, loadingEnrollments, enrollmentError } = useEnrolledCourses(successMessage);
 
     /** 
-     * MOCK DE RECOMENDACIONES:
-     * En la fase final del TFG, este estado se alimentará del RecommendationService
-     * basado en Filtrado por Contenido [ADR-30].
+     * HOOK DE RECOMENDACIONES ALGORÍTMICAS:
+     * Consume dinámicamente el motor de filtrado basado en contenido de Spring Boot [ADR-30].
      */
-    const [recommendations] = useState<RecommendedCourse[]>([
-        {
-            id: 101,
-            title: "Machine Learning Avanzado",
-            instructor: "Dr. Aranda",
-            category: "Ciencia de Datos",
-            rating: 4.9,
-            reason: "Basado en tu interés por Python"
-        }
-    ]);
+    const { recommendations, loadingRecommendations, recommendationsError } = useSmartRecommendations(successMessage);
 
     /**
      * MANEJADOR DE ÉXITO EN MATRÍCULA:
@@ -58,7 +46,6 @@ const StudentDashboard = () => {
 
     /**
      * MANEJADOR DE GUARDADO DE INTERESES:
-     * Satisface el contrato estricto exigido por InterestsModalProps.
      */
     const handleSaveInterests = (preferences: {
         categories: string[];
@@ -67,7 +54,6 @@ const StudentDashboard = () => {
         languages: string[];
         subtitles: string[];
     }) => {
-        // En fases posteriores se sincronizará con la persistencia en PostgreSQL
         console.log("Preferencias del estudiante capturadas para el TFG:", preferences);
         setIsModalOpen(false);
         setSuccessMessage("¡Intereses guardados y actualizados correctamente!");
@@ -92,12 +78,12 @@ const StudentDashboard = () => {
                     </button>
                 </div>
 
-                {/* Mensajes de Estado Operacionales (Evaluación directa y declarativa solicitada) */}
-                {(error || enrollmentError) && (
+                {/* Mensajes de Estado Operacionales */}
+                {(error || enrollmentError || recommendationsError) && (
                     <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-r-md flex items-start gap-3" role="alert">
                         <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
                         <p className="text-sm font-medium text-red-700">
-                            {error || enrollmentError}
+                            {error || enrollmentError || recommendationsError}
                         </p>
                     </div>
                 )}
@@ -117,7 +103,14 @@ const StudentDashboard = () => {
                         <Sparkles className="h-5 w-5 text-amber-600" />
                         <h2 className="text-lg font-semibold text-gray-900">Recomendaciones para ti</h2>
                     </div>
-                    <SmartRecommendations recommendations={recommendations} />
+
+                    {loadingRecommendations ? (
+                        <div className="p-4 flex justify-center items-center">
+                            <Loader2 size={20} className="animate-spin text-amber-600" />
+                        </div>
+                    ) : (
+                        <SmartRecommendations recommendations={recommendations} />
+                    )}
                 </div>
 
                 {/* Grid de Cursos Matriculados y Catálogo */}

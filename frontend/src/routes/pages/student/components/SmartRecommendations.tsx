@@ -1,6 +1,6 @@
 import { Sparkles, Star } from 'lucide-react';
 // Auditoría NotebookLM: Importación directa del Dashboard padre para cumplir el principio DRY.
-import type { RecommendedCourse } from '../StudentDashboard';
+import type { RecommendedCourse } from '../../../../services/userDomains';
 
 interface SmartRecommendationsProps {
     recommendations: RecommendedCourse[];
