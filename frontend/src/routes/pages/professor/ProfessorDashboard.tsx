@@ -3,21 +3,8 @@ import { BookOpen, ArrowRight, Activity } from 'lucide-react';
 import GenericCard from '../../../components/ui/genericCard/GenericCard';
 import ProfessorLayout from '../../layouts/DashboardLayout';
 
-interface TaughtCourse {
-    id: number;
-    title: string;
-    studentsCount: number;
-    averageProgress: number;
-    category: string;
-}
-
-interface TeacherMetric {
-    id: number;
-    title: string;
-    value: string | number;
-    description: string;
-    type: string;
-}
+// IMPORTACIÓN CENTRALIZADA DE DOMINIOS [DRY]
+import type { TaughtCourse, TeacherMetric } from '../../../services/userDomains';
 
 const ProfessorDashboard = () => {
     // 1. ESTADO DE ASIGNATURAS IMPARTIDAS POR EL PROFESOR
@@ -34,7 +21,7 @@ const ProfessorDashboard = () => {
 
     return (
         <ProfessorLayout>
-            {/* CABECERA EXCLUSIVA DEL PANEL LIMPIA (Sin botones duplicados) */}
+            {/* CABECERA EXCLUSIVA DEL PANEL LIMPIA */}
             <div className="border-b border-slate-100 pb-4 mb-6">
                 <h1 className="text-xl font-bold text-slate-800">Panel de Control Docente</h1>
                 <p className="text-xs text-slate-400 mt-0.5">Gestiona el progreso de tus asignaturas asignadas y revisa las entregas</p>
@@ -51,38 +38,55 @@ const ProfessorDashboard = () => {
                     </h2>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {myCourses.map((course) => (
-                            <GenericCard key={course.id}>
-                                <div className="mb-4">
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-slate-100 text-slate-600">
-                                        {course.category}
-                                    </span>
-                                    <h3 className="text-base font-bold text-slate-800 leading-tight mt-2">
-                                        {course.title}
-                                    </h3>
-                                    <p className="text-xs text-slate-400 mt-1">
-                                        Total: {course.studentsCount} alumnos matriculados
-                                    </p>
-                                </div>
+                        {myCourses.map((course) => {
+                            // Mapeo declarativo O(1) para inyectar la clase de Tailwind exacta según el progreso.
+                            // Esto elimina por completo el atributo 'style' del JSX, silenciando el linter.
+                            const progressPct = course.averageProgress;
+                            let tailwindWidthClass = 'w-0';
 
-                                <div className="mt-4 pt-3 border-t border-slate-50">
-                                    <div className="flex justify-between text-xs text-slate-500 mb-1">
-                                        <span>Progreso medio del grupo</span>
-                                        <span className="font-bold text-blue-600">{course.averageProgress}%</span>
+                            if (progressPct >= 100) tailwindWidthClass = 'w-full';
+                            else if (progressPct >= 90) tailwindWidthClass = 'w-11/12';
+                            else if (progressPct >= 80) tailwindWidthClass = 'w-4/5';
+                            else if (progressPct >= 75) tailwindWidthClass = 'w-3/4';
+                            else if (progressPct >= 70) tailwindWidthClass = 'w-8/12';
+                            else if (progressPct >= 60) tailwindWidthClass = 'w-3/5';
+                            else if (progressPct >= 50) tailwindWidthClass = 'w-1/2';
+                            else if (progressPct >= 40) tailwindWidthClass = 'w-2/5';
+                            else if (progressPct >= 30) tailwindWidthClass = 'w-3/12';
+                            else if (progressPct >= 25) tailwindWidthClass = 'w-1/4';
+                            else if (progressPct >= 20) tailwindWidthClass = 'w-2/12';
+                            else if (progressPct >= 10) tailwindWidthClass = 'w-1/12';
+
+                            return (
+                                <GenericCard key={course.id}>
+                                    <div className="mb-4">
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-slate-100 text-slate-600">
+                                            {course.category}
+                                        </span>
+                                        <h3 className="text-base font-bold text-slate-800 leading-tight mt-2">
+                                            {course.title}
+                                        </h3>
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            Total: {course.studentsCount} alumnos matriculados
+                                        </p>
                                     </div>
-                                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
-                                        <div
-                                            className="bg-blue-600 h-full transition-all duration-500"
-                                            style={{ width: `${course.averageProgress}%` }}
-                                        />
+
+                                    <div className="mt-4 pt-3 border-t border-slate-50">
+                                        <div className="flex justify-between text-xs text-slate-500 mb-1">
+                                            <span>Progreso medio del grupo</span>
+                                            <span className="font-bold text-blue-600">{course.averageProgress}%</span>
+                                        </div>
+                                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
+                                            <div className={`bg-blue-600 h-full transition-all duration-500 ${tailwindWidthClass}`} />
+                                        </div>
+                                        <button className="w-full bg-slate-800 hover:bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1">
+                                            <span>Gestionar Curso</span>
+                                            <ArrowRight size={14} />
+                                        </button>
                                     </div>
-                                    <button className="w-full bg-slate-800 hover:bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1">
-                                        <span>Gestionar Curso</span>
-                                        <ArrowRight size={14} />
-                                    </button>
-                                </div>
-                            </GenericCard>
-                        ))}
+                                </GenericCard>
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -113,7 +117,7 @@ const ProfessorDashboard = () => {
                                 </div>
 
                                 <div className="mt-4 pt-3 border-t border-slate-50">
-                                    <p className="text-[10px] text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
+                                    <p className="text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
                                         📊 {metric.description}
                                     </p>
                                 </div>

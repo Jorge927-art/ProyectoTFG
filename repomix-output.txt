@@ -95,6 +95,7 @@ backend/src/main/resources/application-dev.properties
 backend/src/main/resources/application-prod.properties
 backend/src/main/resources/application.properties
 backend/src/test/java/com/cursosonline/backend/BackendApplicationTests.java
+backend/src/test/java/com/cursosonline/backend/controller/UserControllerTest.java
 backend/src/test/java/com/cursosonline/backend/FileStorageServiceTest.java
 backend/src/test/java/com/cursosonline/backend/security/jwt/CorsIntegrationTest.java
 backend/src/test/java/com/cursosonline/backend/security/jwt/JwtServiceTest.java
@@ -2413,56 +2414,6 @@ public class CustomUserDetailsService implements UserDetailsService {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/controller/CourseController.java
-================
-package com.cursosonline.backend.controller;
-
-import com.cursosonline.backend.entities.Courses;
-import com.cursosonline.backend.services.UserService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.security.Principal;
-import java.util.List;
-import java.util.Map;
-
-@RestController
-@RequestMapping("/api/courses")
-@RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
-public class CourseController {
-
-    private final UserService userService;
-
-    /**
-     * Endpoint de búsqueda aproximada y predictiva.
-     * GET /api/courses/search?keyword=data
-     */
-    @GetMapping("/search")
-    public ResponseEntity<List<Courses>> searchCatalog(
-            @RequestParam(required = false, defaultValue = "") String keyword) {
-        return ResponseEntity.ok(userService.searchCourses(keyword));
-    }
-
-    /**
-     * Endpoint transaccional seguro para procesar la matrícula de un estudiante.
-     * POST /api/courses/enroll/1
-     */
-    @PostMapping("/enroll/{courseId}")
-    public ResponseEntity<?> enrollInCourse(@PathVariable Long courseId, Principal principal) {
-        if (principal == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
-        }
-
-        userService.enrollStudentInCourse(principal.getName(), courseId);
-
-        return ResponseEntity.ok(Map.of(
-                "message", "Te has matriculado en el curso con éxito de forma persistente."));
-    }
-}
-
-================
 File: backend/src/main/java/com/cursosonline/backend/dto/AuthResponse.java
 ================
 package com.cursosonline.backend.dto;
@@ -2474,43 +2425,6 @@ public record AuthResponse(Long userId, String username, Role role, String email
 
     public static AuthResponse from(Users user) {
         return new AuthResponse(user.getUser_id(), user.getUsername(), user.getRole(), user.getEmail());
-    }
-}
-
-================
-File: backend/src/main/java/com/cursosonline/backend/dto/AuthTokenResponse.java
-================
-package com.cursosonline.backend.dto;
-
-import com.cursosonline.backend.entities.Role;
-import com.cursosonline.backend.entities.Users;
-import java.util.List;
-
-// Definición canónica del Record con sus campos correctamente separados por comas
-public record AuthTokenResponse(
-        String accessToken,
-        String tokenType,
-        long expiresIn,
-        Long userId,
-        String username,
-        Role role,
-        String email,
-        List<Long> enrolledCourseIds) {
-    /**
-     * Método estático de factoría corregido.
-     * Se añade 'List<Long> enrolledCourseIds' en los parámetros de entrada
-     * para mapear la hidratación de matrículas.
-     */
-    public static AuthTokenResponse from(Users user, String token, long expirationTime, List<Long> enrolledCourseIds) {
-        return new AuthTokenResponse(
-                token,
-                "Bearer",
-                expirationTime,
-                user.getUser_id(),
-                user.getUsername(),
-                user.getRole(),
-                user.getEmail(),
-                enrolledCourseIds);
     }
 }
 
@@ -2652,58 +2566,6 @@ public class Courses {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/entities/Enrollment.java
-================
-package com.cursosonline.backend.entities;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty; // Importación obligatoria para el contrato JSON
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import java.time.LocalDateTime;
-
-@Entity
-@Table(name = "enrollment")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class Enrollment {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long enrollmentid;
-
-    @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    private Users user;
-
-    /**
-     * Relación con el curso.
-     * Se fuerza mediante @JsonProperty que la propiedad JSON sea "course" (en
-     * singular)
-     * para asegurar compatibilidad absoluta con la interfaz de TypeScript del
-     * Frontend,
-     * independientemente del tipo de clase 'Courses' en plural del compilador.
-     */
-    @JsonProperty("course")
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "course_id")
-    private Courses course;
-
-    @Column(nullable = false)
-    private LocalDateTime enrolled_at = LocalDateTime.now();
-
-    @Column(nullable = false)
-    private String status = "EN_PROGRESO";
-
-    @Column(name = "progress", nullable = false)
-    private int progress_percentage = 0;
-}
-
-================
 File: backend/src/main/java/com/cursosonline/backend/entities/Interest.java
 ================
 package com.cursosonline.backend.entities;
@@ -2766,36 +2628,6 @@ public class Interest {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/repository/EnrollmentRepository.java
-================
-package com.cursosonline.backend.repository;
-
-import com.cursosonline.backend.entities.Enrollment;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import java.util.List;
-import java.util.Optional;
-
-public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
-
-    @Query("SELECT e.course.course_id FROM Enrollment e WHERE e.user.user_id = :userId")
-    List<Long> findEnrolledCourseIdsByUserId(@Param("userId") Long userId);
-
-    @Query("SELECT e FROM Enrollment e WHERE e.user.user_id = :userId AND e.course.course_id = :courseId")
-    Optional<Enrollment> findByUserIdAndCourseId(@Param("userId") Long userId, @Param("courseId") Long courseId);
-
-    /**
-     * Dictamen NotebookLM: Recupera las matrículas activas filtrando por ID
-     * numérico.
-     * El JOIN FETCH inicializa la relación 'course' mitigando la
-     * LazyInitializationException.
-     */
-    @Query("SELECT e FROM Enrollment e JOIN FETCH e.course WHERE e.user.user_id = :userId")
-    List<Enrollment> findAllByUserIdWithCourses(@Param("userId") Long userId);
-}
-
-================
 File: backend/src/main/java/com/cursosonline/backend/repository/InterestRepository.java
 ================
 package com.cursosonline.backend.repository;
@@ -2846,6 +2678,107 @@ spring.datasource.password=${SPRING_DATASOURCE_PASSWORD}
 
 # En producción no se recomienda modificar esquema automáticamente.
 spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
+
+================
+File: backend/src/test/java/com/cursosonline/backend/controller/UserControllerTest.java
+================
+package com.cursosonline.backend.controller;
+
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.security.jwt.JwtService;
+import com.cursosonline.backend.services.UserService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@ExtendWith(MockitoExtension.class)
+class UserControllerTest {
+
+    @Mock
+    private UserService userService;
+
+    @Mock
+    private JwtService jwtService;
+
+    @Mock
+    private EnrollmentRepository enrollmentRepository;
+
+    @InjectMocks
+    private UserController userController;
+
+    private MockMvc mockMvc;
+
+    @BeforeEach
+    void setUp() {
+        mockMvc = MockMvcBuilders.standaloneSetup(userController).build();
+    }
+
+    @Test
+    void loginDebeIncluirLasMatriculasDelUsuario() throws Exception {
+        Users user = new Users(1L, "Luis", "encoded", Role.STUDENT, "luis@example.com", true,
+                new java.util.ArrayList<>());
+        when(userService.login("Luis", "secret123")).thenReturn(user);
+        when(enrollmentRepository.findEnrolledCourseIdsByUserId(1L)).thenReturn(List.of(101L));
+        when(jwtService.generateAccessToken(user, 1L, "luis@example.com")).thenReturn("jwt-token");
+        when(jwtService.extractExpiration("jwt-token")).thenReturn(Instant.now().plusSeconds(900));
+
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"Luis\",\"password\":\"secret123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("Luis"))
+                .andExpect(jsonPath("$.enrolledCourseIds[0]").value(101));
+    }
+
+    @Test
+    void myActiveCoursesDebeDevolverLaMatrículaConElCurso() throws Exception {
+        Users user = new Users(1L, "Luis", "encoded", Role.STUDENT, "luis@example.com", true,
+                new java.util.ArrayList<>());
+        Courses course = new Courses();
+        course.setCourse_id(101L);
+        course.setTitle("Introduction to Data Science Specialization");
+        course.setCategory("Data Science");
+        course.setInstructors("John Doe");
+
+        Enrollment enrollment = new Enrollment();
+        enrollment.setEnrollmentid(77L);
+        enrollment.setUser(user);
+        enrollment.setCourse(course);
+        enrollment.setStatus("EN_PROGRESO");
+        enrollment.setProgress_percentage(25);
+
+        when(userService.findByUsername("Luis")).thenReturn(Optional.of(user));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(List.of(enrollment));
+
+        mockMvc.perform(get("/api/auth/my-active-courses")
+                .param("username", "Luis"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].enrollmentid").value(77))
+                .andExpect(jsonPath("$[0].status").value("EN_PROGRESO"))
+                .andExpect(jsonPath("$[0].course.course_id").value(101))
+                .andExpect(jsonPath("$[0].course.title").value("Introduction to Data Science Specialization"));
+    }
+}
 
 ================
 File: backend/src/test/java/com/cursosonline/backend/FileStorageServiceTest.java
@@ -5326,102 +5259,6 @@ File: frontend/src/index.css
 @import "tailwindcss";
 
 ================
-File: frontend/src/routes/AppRoutes.test.tsx
-================
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
-import AppRoutes from "./index";
-import { AuthContext } from "@/auth/AuthContext";
-import type { AuthContextValue } from "@/auth/AuthContext";
-import type { AuthUser } from "@/auth";
-
-const buildAuthValue = (user: AuthUser | null): AuthContextValue => ({
-    user,
-    isAuthenticated: Boolean(user),
-    login: vi.fn(),
-    logout: vi.fn(),
-});
-
-const renderWithRouteAndAuth = (route: string, user: AuthUser | null) => {
-    return render(
-        <AuthContext.Provider value={buildAuthValue(user)}>
-            <MemoryRouter initialEntries={[route]}>
-                <AppRoutes />
-            </MemoryRouter>
-        </AuthContext.Provider>
-    );
-};
-
-describe("AppRoutes - autorizacion por rol", () => {
-    it("redirecciona a landing cuando el usuario no esta autenticado e intenta /student", () => {
-        renderWithRouteAndAuth("/student", null);
-
-        expect(screen.getByRole("button", { name: /Entrar \/ Registro/i })).toBeInTheDocument();
-        expect(screen.queryByText(/Panel del estudiante/i)).not.toBeInTheDocument();
-    });
-
-    it("permite acceso a /student cuando el rol es STUDENT", () => {
-        renderWithRouteAndAuth("/student", {
-            username: "student_user",
-            role: "STUDENT",
-        });
-
-        expect(screen.getByText(/Panel del estudiante/i)).toBeInTheDocument();
-    });
-
-    it("bloquea acceso a /admin para rol STUDENT y muestra acceso denegado", () => {
-        renderWithRouteAndAuth("/admin", {
-            username: "student_user",
-            role: "STUDENT",
-        });
-
-        expect(screen.getByText(/Acceso denegado/i)).toBeInTheDocument();
-    });
-
-    it("permite acceso a /admin cuando el rol es ADMIN", () => {
-        renderWithRouteAndAuth("/admin", {
-            username: "admin_user",
-            role: "ADMIN",
-        });
-
-        expect(screen.getByText(/Panel de administrador/i)).toBeInTheDocument();
-    });
-
-    it("permite acceso a /professor cuando el rol es PROFESSOR", () => {
-        renderWithRouteAndAuth("/professor", {
-            username: "prof_user",
-            role: "PROFESSOR",
-        });
-
-        expect(screen.getByText(/Panel del profesor/i)).toBeInTheDocument();
-    });
-
-    it("bloquea /student cuando el usuario autenticado no tiene rol", () => {
-        renderWithRouteAndAuth("/student", {
-            username: "sin_rol",
-        });
-
-        expect(screen.getByText(/Acceso denegado/i)).toBeInTheDocument();
-    });
-
-    it("permite /student aunque el rol venga en minusculas", () => {
-        renderWithRouteAndAuth("/student", {
-            username: "student_lowercase",
-            role: "student",
-        });
-
-        expect(screen.getByText(/Panel del estudiante/i)).toBeInTheDocument();
-    });
-
-    it("redirecciona a landing cuando la ruta no existe", () => {
-        renderWithRouteAndAuth("/ruta-inexistente", null);
-
-        expect(screen.getByRole("button", { name: /Entrar \/ Registro/i })).toBeInTheDocument();
-    });
-});
-
-================
 File: frontend/src/routes/guards/index.ts
 ================
 export { default as ProtectedRoute } from "./ProtectedRoute";
@@ -5559,365 +5396,6 @@ const LandingPage = () => {
 };
 
 export default LandingPage;
-
-================
-File: frontend/src/routes/pages/student/components/CourseCatalog.tsx
-================
-import { Search, Loader2, Star, PlusCircle, CheckCircle2 } from 'lucide-react';
-import { useCourseCatalog } from './useCourseCatalog';
-import type { DBModelCourse } from './useCourseCatalog';
-import GenericCard from '../../../../components/ui/genericCard/GenericCard';
-import { useAuth } from '../../../../auth/useAuth';
-
-interface EnrollmentInfo {
-    course: {
-        course_id?: number;
-        title: string;
-    };
-}
-
-
-interface CourseCatalogProps {
-    enrolledList: EnrollmentInfo[];
-    onEnrollSuccess: (course: DBModelCourse) => void;
-    onSetGlobalError: (message: string) => void;
-    onSetGlobalSuccess: (message: string) => void;
-}
-
-export const CourseCatalog = ({
-    enrolledList,
-    onEnrollSuccess,
-    onSetGlobalError,
-    onSetGlobalSuccess
-}: CourseCatalogProps) => {
-    // Consumimos el contexto global de sesión hidratado desde el backend (ADR-28)
-    const { user } = useAuth();
-
-    const {
-        searchKeyword,
-        setSearchKeyword,
-        catalogCourses,
-        loadingCatalog,
-        enrollingId,
-        catalogError,
-        handleEnrollCourse
-    } = useCourseCatalog((course) => {
-        onEnrollSuccess(course);
-        onSetGlobalSuccess("¡Te has matriculado en el curso correctamente!");
-    });
-
-    if (catalogError) {
-        onSetGlobalError(catalogError);
-    }
-
-    /**
-     * Evalúa de forma determinista O(1) si el alumno está matriculado en el curso.
-     * Implementa una validación dual estricta: por ID numérico (fuente de verdad global)
-     * y por nombre de cadena en la lista local (compatibilidad reactiva).
-     */
-    const isUserEnrolled = (course: DBModelCourse): boolean => {
-        // 1. Validación prioritaria por ID indexado en la sesión JWT
-        if (user?.enrolledCourseIds?.includes(course.course_id)) {
-            return true;
-        }
-        // 2. Validación secundaria por coincidencia de títulos para mutaciones en caliente de la vista
-        if (enrolledList && enrolledList.length > 0) {
-            return enrolledList.some(enroll =>
-                enroll.course?.course_id === course.course_id ||
-                enroll.course?.title?.trim().toLowerCase() === course.title?.trim().toLowerCase()
-            );
-        }
-        return false;
-    };
-
-    return (
-        <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm mb-8 max-w-5xl mt-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                    <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                        <Search size={18} className="text-blue-600" />
-                        <span>Catálogo Global de Cursos</span>
-                    </h2>
-                    <p className="text-xs text-slate-500 font-medium">Encuentra asignaturas de forma aproximada por título o categoría temática</p>
-                </div>
-                <div className="relative w-full sm:w-72">
-                    <input
-                        type="text"
-                        value={searchKeyword}
-                        onChange={(e) => setSearchKeyword(e.target.value)}
-                        placeholder="Buscar cursos..."
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 pl-3 pr-8 text-xs font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-                    />
-                    {loadingCatalog && (
-                        <Loader2 size={14} className="animate-spin text-slate-400 absolute right-3 top-2.5" />
-                    )}
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-5 max-h-72 overflow-y-auto p-1 scrollbar-thin">
-                {catalogCourses.length === 0 && !loadingCatalog ? (
-                    <p className="text-xs font-medium text-slate-400 italic py-2 col-span-full">No se encontraron cursos que coincidan con el criterio introducido.</p>
-                ) : (
-                    catalogCourses.map((course) => {
-                        const enrolled = isUserEnrolled(course);
-
-                        return (
-                            <GenericCard key={course.course_id}>
-                                <div className="flex flex-col h-full justify-between">
-                                    <div>
-                                        <span className="text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-blue-50 text-blue-700">
-                                            {course.category || "General"}
-                                        </span>
-                                        <h4 className="text-xs font-bold text-slate-800 mt-2 line-clamp-2 min-h-8">
-                                            {course.title}
-                                        </h4>
-                                        <p className="text-[11px] text-slate-400 mt-1 truncate">
-                                            Instructores: {course.instructors || "Por asignar"}
-                                        </p>
-                                    </div>
-                                    <div className="mt-4 pt-2 border-t border-slate-50 flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-0.5 text-amber-500 text-xs font-bold">
-                                            <Star size={11} fill="currentColor" />
-                                            <span>{course.rating ? course.rating.toFixed(1) : "5.0"}</span>
-                                        </div>
-
-                                        {enrolled ? (
-                                            <button
-                                                type="button"
-                                                disabled
-                                                className="bg-emerald-50 text-emerald-700 text-[10px] font-bold py-1.5 px-3 rounded-lg flex items-center gap-1 border border-emerald-200 cursor-not-allowed w-fit"
-                                            >
-                                                <CheckCircle2 size={12} className="text-emerald-600" />
-                                                <span>✓ Inscrito</span>
-                                            </button>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                disabled={enrollingId === course.course_id}
-                                                onClick={() => handleEnrollCourse(course.course_id)}
-                                                className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:bg-slate-300 disabled:cursor-not-allowed w-fit"
-                                            >
-                                                {enrollingId === course.course_id ? (
-                                                    <Loader2 size={12} className="animate-spin" />
-                                                ) : (
-                                                    <PlusCircle size={12} />
-                                                )}
-                                                <span>Matricularme</span>
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            </GenericCard>
-                        );
-                    })
-                )}
-            </div>
-        </div>
-    );
-};
-
-================
-File: frontend/src/routes/pages/student/components/useCourseCatalog.ts
-================
-import { useState, useEffect } from 'react';
-import { apiClient } from '@/services/apiClient';
-import axios from 'axios';
-
-export interface DBModelCourse {
-    course_id: number;
-    title: string;
-    url?: string;
-    shortIntro?: string;
-    category: string;
-    subCategory?: string;
-    courseType?: string;
-    language?: string;
-    subtitleLanguages?: string;
-    skills?: string;
-    instructors?: string;
-    rating?: number;
-    numOfViewers?: number;
-    duration?: number;
-    site?: string;
-}
-
-export const useCourseCatalog = (onEnrollSuccess: (course: DBModelCourse) => void) => {
-    const [searchKeyword, setSearchKeyword] = useState<string>('');
-    const [catalogCourses, setCatalogCourses] = useState<DBModelCourse[]>([]);
-    const [loadingCatalog, setLoadingCatalog] = useState<boolean>(false);
-    const [enrollingId, setEnrollingId] = useState<number | null>(null);
-    const [catalogError, setCatalogError] = useState<string>('');
-
-    useEffect(() => {
-        const delayDebounceFn = setTimeout(() => {
-            fetchCatalogData(searchKeyword);
-        }, 400);
-
-        return () => clearTimeout(delayDebounceFn);
-    }, [searchKeyword]);
-
-    const fetchCatalogData = async (keyword: string) => {
-        setLoadingCatalog(true);
-        setCatalogError('');
-        try {
-            const response = await apiClient.get(`/api/courses/search?keyword=${encodeURIComponent(keyword)}`);
-            if (response.status === 200 && response.data) {
-                setCatalogCourses(response.data as DBModelCourse[]);
-            }
-        } catch (err) {
-            console.error("Error al consultar el catálogo predictivo:", err);
-            setCatalogError("No se pudo sincronizar el catálogo de cursos en tiempo real.");
-        } finally {
-            setLoadingCatalog(false);
-        }
-    };
-
-    const handleEnrollCourse = async (courseId: number) => {
-        setEnrollingId(courseId);
-        setCatalogError('');
-
-        try {
-            const response = await apiClient.post(`/api/courses/enroll/${courseId}`);
-            if (response.status === 200) {
-                const enrolledCourse = catalogCourses.find(c => c.course_id === courseId);
-                if (enrolledCourse) {
-                    onEnrollSuccess(enrolledCourse);
-                }
-                fetchCatalogData(searchKeyword);
-            }
-        } catch (err) {
-            console.error("Error al procesar la matrícula del estudiante:", err);
-            let message = "Ocurrió un error inesperado al procesar tu matrícula.";
-            if (axios.isAxiosError(err) && err.response?.data?.message) {
-                message = err.response.data.message;
-            }
-            setCatalogError(message);
-        } finally {
-            setEnrollingId(null);
-        }
-    };
-
-    return {
-        searchKeyword,
-        setSearchKeyword,
-        catalogCourses,
-        loadingCatalog,
-        enrollingId,
-        catalogError,
-        handleEnrollCourse
-    };
-};
-
-================
-File: frontend/src/routes/pages/student/components/useEnrolledCourses.ts
-================
-import { useState, useEffect } from 'react';
-import { apiClient } from '../../../../services/apiClient';
-import type { DBModelCourse } from './useCourseCatalog';
-
-export interface EnrollmentInfo {
-    enrollmentid: number;
-    enrolled_at: string;
-    status: string;
-    progress_percentage: number;
-    course: DBModelCourse;
-}
-
-export const useEnrolledCourses = (successTrigger: string) => {
-    const [enrolledList, setEnrolledList] = useState<EnrollmentInfo[]>([]);
-    const [loadingEnrollments, setLoadingEnrollments] = useState<boolean>(false);
-    const [enrollmentError, setEnrollmentError] = useState<string>('');
-
-    /**
-     * Recupera las asignaturas activas del estudiante pasando el username como parámetro.
-     * Sincroniza el contrato de red con el endpoint especializado del Backend.
-     */
-    const fetchStudentEnrollments = async () => {
-        setLoadingEnrollments(true);
-        setEnrollmentError('');
-        try {
-            // 1. Extraer la identidad de la sesión de forma segura
-            const authUser = localStorage.getItem('auth_user');
-            let currentUsername = "luis"; // Fallback defensivo por defecto
-
-            if (authUser) {
-                try {
-                    const parsedUser = JSON.parse(authUser);
-                    if (parsedUser?.username) {
-                        currentUsername = parsedUser.username;
-                    }
-                } catch {
-                    console.warn("No se pudo parsear el objeto auth_user, usando fallback.");
-                }
-            }
-
-            // 2. Línea integrada del chat anterior pasando el parámetro en la URL
-            const response = await apiClient.get<Record<string, unknown>[]>('/api/auth/my-active-courses', {
-                params: { username: currentUsername }
-            });
-
-            if (response.status === 200 && response.data) {
-                // 3. Mapeo adaptativo tolerante a la nomenclatura del ORM (course vs courses)
-                const normalizedData = response.data.map((enrollment) => {
-                    const courseData = (enrollment.course || enrollment.courses || enrollment) as Record<string, unknown>;
-                    
-                    return {
-                        enrollmentid: Number(enrollment.enrollmentid || Date.now()),
-                        enrolled_at: String(enrollment.enrolled_at || new Date().toISOString()),
-                        status: String(enrollment.status || "EN_PROGRESO"),
-                        progress_percentage: Number(enrollment.progress_percentage ?? enrollment.progress ?? 0),
-                        course: {
-                            course_id: Number(courseData.course_id || courseData.id || 0),
-                            title: String(courseData.title || ""),
-                            category: String(courseData.category || "General"),
-                            instructors: String(courseData.instructors || "Por asignar")
-                        }
-                    };
-                });
-
-                setEnrolledList(normalizedData);
-            }
-        } catch (err) {
-            console.error("Error crítico en la pasarela HTTP de matrículas:", err);
-            setEnrollmentError("No se pudieron sincronizar tus asignaturas activas desde PostgreSQL.");
-        } finally {
-            setLoadingEnrollments(false);
-        }
-    };
-
-    // Reactividad: Se ejecuta al montar el componente y cada vez que cambia el successTrigger
-    useEffect(() => {
-        fetchStudentEnrollments();
-    }, [successTrigger]);
-
-    /**
-     * Inyecta de forma optimista la matrícula en caliente en el estado local
-     */
-    const injectLocalEnrollment = (course: DBModelCourse) => {
-        setEnrolledList((prev) => {
-            const exists = prev.some(e => e.course.course_id === course.course_id);
-            if (exists) return prev;
-
-            return [
-                ...prev,
-                {
-                    enrollmentid: Date.now(),
-                    enrolled_at: new Date().toISOString(),
-                    status: "EN_PROGRESO",
-                    progress_percentage: 0,
-                    course: course
-                }
-            ];
-        });
-    };
-
-    return {
-        enrolledList,
-        loadingEnrollments,
-        enrollmentError,
-        injectLocalEnrollment
-    };
-};
 
 ================
 File: frontend/src/services/profileService.ts
@@ -6299,6 +5777,62 @@ public class JwtProperties {
 }
 
 ================
+File: backend/src/main/java/com/cursosonline/backend/controller/CourseController.java
+================
+package com.cursosonline.backend.controller;
+
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.services.UserService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.security.Principal;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/courses")
+@RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:5173")
+public class CourseController {
+
+    private final UserService userService;
+
+    /**
+     * Endpoint de búsqueda aproximada y predictiva.
+     * GET /api/courses/search?keyword=data
+     */
+    @GetMapping("/search")
+    public ResponseEntity<List<Courses>> searchCatalog(
+            @RequestParam(required = false, defaultValue = "") String keyword) {
+        return ResponseEntity.ok(userService.searchCourses(keyword));
+    }
+
+    /**
+     * Endpoint transaccional seguro para procesar la matrícula de un estudiante.
+     * POST /api/courses/enroll/1
+     */
+    @PostMapping("/enroll/{courseId}")
+    public ResponseEntity<?> enrollInCourse(@PathVariable Long courseId, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
+        Enrollment enrollment = userService.enrollStudentInCourse(principal.getName(), courseId);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "message", "Te has matriculado en el curso con éxito de forma persistente.",
+                "enrollmentId", enrollment.getEnrollmentid(),
+                "userId", enrollment.getUser().getUser_id(),
+                "courseId", enrollment.getCourse().getCourse_id(),
+                "status", enrollment.getStatus()));
+    }
+}
+
+================
 File: backend/src/main/java/com/cursosonline/backend/controller/TestController.java
 ================
 package com.cursosonline.backend.controller;
@@ -6325,6 +5859,95 @@ public class TestController {
         logger.info(">>> Test de conexión: recibido desde el Frontend (React/Vite)");
         return Map.of("mensaje", "Conexión establecida con Java 21 y PostgreSQL");
     }
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/dto/AuthTokenResponse.java
+================
+package com.cursosonline.backend.dto;
+
+import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.entities.Users;
+import java.util.List;
+
+// Definición canónica del Record con sus campos correctamente separados por comas
+public record AuthTokenResponse(
+        String accessToken,
+        String tokenType,
+        long expiresIn,
+        Long userId,
+        String username,
+        Role role,
+        String email,
+        List<Long> enrolledCourseIds) {
+    /**
+     * Método estático de factoría corregido.
+     * Se añade 'List<Long> enrolledCourseIds' en los parámetros de entrada
+     * para mapear la hidratación de matrículas.
+     */
+    public static AuthTokenResponse from(Users user, String token, long expirationTime, List<Long> enrolledCourseIds) {
+        return new AuthTokenResponse(
+                token,
+                "Bearer",
+                expirationTime,
+                user.getUser_id(),
+                user.getUsername(),
+                user.getRole(),
+                user.getEmail(),
+                enrolledCourseIds);
+    }
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/entities/Enrollment.java
+================
+package com.cursosonline.backend.entities;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty; // Importación obligatoria para el contrato JSON
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "enrollment")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Enrollment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long enrollmentid;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private Users user;
+
+    /**
+     * Relación con el curso.
+     * Se fuerza mediante @JsonProperty que la propiedad JSON sea "course" (en
+     * singular)
+     * para asegurar compatibilidad absoluta con la interfaz de TypeScript del
+     * Frontend,
+     * independientemente del tipo de clase 'Courses' en plural del compilador.
+     */
+    @JsonProperty("course")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "course_id")
+    private Courses course;
+
+    @Column(nullable = false)
+    private LocalDateTime enrolled_at = LocalDateTime.now();
+
+    @Column(nullable = false)
+    private String status = "EN_PROGRESO";
+
+    @Column(name = "progress", nullable = false)
+    private int progress_percentage = 0;
 }
 
 ================
@@ -6461,6 +6084,36 @@ public class UserAlreadyExistsException extends ServicesException {
 }
 
 ================
+File: backend/src/main/java/com/cursosonline/backend/repository/EnrollmentRepository.java
+================
+package com.cursosonline.backend.repository;
+
+import com.cursosonline.backend.entities.Enrollment;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import java.util.List;
+import java.util.Optional;
+
+public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
+
+    @Query("SELECT e.course.course_id FROM Enrollment e WHERE e.user.user_id = :userId")
+    List<Long> findEnrolledCourseIdsByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT e FROM Enrollment e WHERE e.user.user_id = :userId AND e.course.course_id = :courseId")
+    Optional<Enrollment> findByUserIdAndCourseId(@Param("userId") Long userId, @Param("courseId") Long courseId);
+
+    /**
+     * Dictamen NotebookLM: Recupera las matrículas activas filtrando por ID
+     * numérico.
+     * El JOIN FETCH inicializa la relación 'course' mitigando la
+     * LazyInitializationException.
+     */
+    @Query("SELECT e FROM Enrollment e JOIN FETCH e.course WHERE e.user.user_id = :userId")
+    List<Enrollment> findAllByUserIdWithCourses(@Param("userId") Long userId);
+}
+
+================
 File: backend/src/main/java/com/cursosonline/backend/repository/UserProfileRepository.java
 ================
 package com.cursosonline.backend.repository;
@@ -6535,30 +6188,6 @@ File: frontend/index.html
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
-================
-File: frontend/src/auth/AuthContext.tsx
-================
-import { createContext } from 'react';
-import type { AuthContextType } from './authTypes';
-
-/**
- * Contexto básico de autenticación.
- * Define los valores por defecto del sistema antes de que el AuthProvider inyecte el estado real.
- */
-export const AuthContext = createContext<AuthContextType>({
-    user: null,
-    isAuthenticated: false,
-    isLoading: false,
-    login: () => { }, // Firma vacía por defecto adaptada al nuevo contrato de tipos
-    logout: () => { },
-});
-
-================
-File: frontend/src/auth/index.ts
-================
-export { AuthProvider } from './AuthProvider'; 
-export { useAuth } from './useAuth';
 
 ================
 File: frontend/src/components/Features.tsx
@@ -6736,6 +6365,103 @@ const Testimonials = () => {
 };
 
 export default Testimonials;
+
+================
+File: frontend/src/routes/AppRoutes.test.tsx
+================
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
+import AppRoutes from "./index";
+import { AuthContext } from "@/auth/AuthContext";
+import type { AuthContextValue } from "@/auth/AuthContext";
+import type { AuthUser } from "@/auth";
+
+const buildAuthValue = (user: AuthUser | null): AuthContextValue => ({
+    user,
+    isAuthenticated: Boolean(user),
+    isLoading: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+});
+
+const renderWithRouteAndAuth = (route: string, user: AuthUser | null) => {
+    return render(
+        <AuthContext.Provider value={buildAuthValue(user)}>
+            <MemoryRouter initialEntries={[route]}>
+                <AppRoutes />
+            </MemoryRouter>
+        </AuthContext.Provider>
+    );
+};
+
+describe("AppRoutes - autorizacion por rol", () => {
+    it("redirecciona a landing cuando el usuario no esta autenticado e intenta /student", () => {
+        renderWithRouteAndAuth("/student", null);
+
+        expect(screen.getByRole("button", { name: /Entrar \/ Registro/i })).toBeInTheDocument();
+        expect(screen.queryByText(/Panel del estudiante/i)).not.toBeInTheDocument();
+    });
+
+    it("permite acceso a /student cuando el rol es STUDENT", () => {
+        renderWithRouteAndAuth("/student", {
+            username: "student_user",
+            role: "STUDENT",
+        });
+
+        expect(screen.getByText(/Panel del estudiante/i)).toBeInTheDocument();
+    });
+
+    it("bloquea acceso a /admin para rol STUDENT y muestra acceso denegado", () => {
+        renderWithRouteAndAuth("/admin", {
+            username: "student_user",
+            role: "STUDENT",
+        });
+
+        expect(screen.getByText(/Acceso denegado/i)).toBeInTheDocument();
+    });
+
+    it("permite acceso a /admin cuando el rol es ADMIN", () => {
+        renderWithRouteAndAuth("/admin", {
+            username: "admin_user",
+            role: "ADMIN",
+        });
+
+        expect(screen.getByText(/Panel de administrador/i)).toBeInTheDocument();
+    });
+
+    it("permite acceso a /professor cuando el rol es PROFESSOR", () => {
+        renderWithRouteAndAuth("/professor", {
+            username: "prof_user",
+            role: "PROFESSOR",
+        });
+
+        expect(screen.getByText(/Panel del profesor/i)).toBeInTheDocument();
+    });
+
+    it("bloquea /student cuando el usuario autenticado no tiene rol", () => {
+        renderWithRouteAndAuth("/student", {
+            username: "sin_rol",
+        });
+
+        expect(screen.getByText(/Acceso denegado/i)).toBeInTheDocument();
+    });
+
+    it("permite /student aunque el rol venga en minusculas", () => {
+        renderWithRouteAndAuth("/student", {
+            username: "student_lowercase",
+            role: "student" as AuthUser["role"],
+        });
+
+        expect(screen.getByText(/Panel del estudiante/i)).toBeInTheDocument();
+    });
+
+    it("redirecciona a landing cuando la ruta no existe", () => {
+        renderWithRouteAndAuth("/ruta-inexistente", null);
+
+        expect(screen.getByRole("button", { name: /Entrar \/ Registro/i })).toBeInTheDocument();
+    });
+});
 
 ================
 File: frontend/src/routes/guards/AdminRoute.tsx
@@ -6952,6 +6678,186 @@ export default function ProfessorProfilePage() {
 }
 
 ================
+File: frontend/src/routes/pages/student/components/CourseCatalog.tsx
+================
+import { Search, Loader2, Star, PlusCircle, CheckCircle2 } from 'lucide-react';
+import { useMemo } from 'react';
+import { useCourseCatalog } from './useCourseCatalog';
+import type { DBModelCourse } from './useCourseCatalog';
+import GenericCard from '../../../../components/ui/genericCard/GenericCard';
+import { useAuth } from '../../../../auth/useAuth';
+
+interface EnrollmentInfo {
+    course: {
+        course_id?: number;
+        title: string;
+        category?: string;
+        instructors?: string;
+    };
+}
+
+
+interface CourseCatalogProps {
+    enrolledList: EnrollmentInfo[];
+    onEnrollSuccess: (course: DBModelCourse) => void;
+    onSetGlobalError: (message: string) => void;
+    onSetGlobalSuccess: (message: string) => void;
+}
+
+export const CourseCatalog = ({
+    enrolledList,
+    onEnrollSuccess,
+    onSetGlobalError,
+    onSetGlobalSuccess
+}: CourseCatalogProps) => {
+    // Consumimos el contexto global de sesión hidratado desde el backend (ADR-28)
+    const { user } = useAuth();
+
+    const {
+        searchKeyword,
+        setSearchKeyword,
+        catalogCourses,
+        loadingCatalog,
+        enrollingId,
+        catalogError,
+        handleEnrollCourse
+    } = useCourseCatalog((course) => {
+        onEnrollSuccess(course);
+        onSetGlobalSuccess("¡Te has matriculado en el curso correctamente!");
+    });
+
+    if (catalogError) {
+        onSetGlobalError(catalogError);
+    }
+
+    const visibleCatalogCourses = useMemo(() => {
+        const byId = new Map<number, DBModelCourse>();
+
+        catalogCourses.forEach((course) => {
+            byId.set(course.course_id, course);
+        });
+
+        enrolledList.forEach((enroll) => {
+            if (enroll.course?.course_id && !byId.has(enroll.course.course_id)) {
+                byId.set(enroll.course.course_id, {
+                    course_id: enroll.course.course_id,
+                    title: enroll.course.title,
+                    category: enroll.course.category || 'General',
+                    instructors: enroll.course.instructors,
+                });
+            }
+        });
+
+        return Array.from(byId.values());
+    }, [catalogCourses, enrolledList]);
+
+    /**
+     * Evalúa de forma determinista O(1) si el alumno está matriculado en el curso.
+     * Implementa una validación dual estricta: por ID numérico (fuente de verdad global)
+     * y por nombre de cadena en la lista local (compatibilidad reactiva).
+     */
+    const isUserEnrolled = (course: DBModelCourse): boolean => {
+        // 1. Validación prioritaria por ID indexado en la sesión JWT
+        if (user?.enrolledCourseIds?.includes(course.course_id)) {
+            return true;
+        }
+        // 2. Validación secundaria por coincidencia de títulos para mutaciones en caliente de la vista
+        if (enrolledList && enrolledList.length > 0) {
+            return enrolledList.some(enroll =>
+                enroll.course?.course_id === course.course_id ||
+                enroll.course?.title?.trim().toLowerCase() === course.title?.trim().toLowerCase()
+            );
+        }
+        return false;
+    };
+
+    return (
+        <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm mb-8 max-w-5xl mt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                    <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                        <Search size={18} className="text-blue-600" />
+                        <span>Catálogo Global de Cursos</span>
+                    </h2>
+                    <p className="text-xs text-slate-500 font-medium">Encuentra asignaturas de forma aproximada por título o categoría temática</p>
+                </div>
+                <div className="relative w-full sm:w-72">
+                    <input
+                        type="text"
+                        value={searchKeyword}
+                        onChange={(e) => setSearchKeyword(e.target.value)}
+                        placeholder="Buscar cursos..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 pl-3 pr-8 text-xs font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                    />
+                    {loadingCatalog && (
+                        <Loader2 size={14} className="animate-spin text-slate-400 absolute right-3 top-2.5" />
+                    )}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-5 max-h-72 overflow-y-auto p-1 scrollbar-thin">
+                {visibleCatalogCourses.length === 0 && !loadingCatalog ? (
+                    <p className="text-xs font-medium text-slate-400 italic py-2 col-span-full">No se encontraron cursos que coincidan con el criterio introducido.</p>
+                ) : (
+                    visibleCatalogCourses.map((course) => {
+                        const enrolled = isUserEnrolled(course);
+
+                        return (
+                            <GenericCard key={course.course_id}>
+                                <div className="flex flex-col h-full justify-between">
+                                    <div>
+                                        <span className="text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-blue-50 text-blue-700">
+                                            {course.category || "General"}
+                                        </span>
+                                        <h4 className="text-xs font-bold text-slate-800 mt-2 line-clamp-2 min-h-8">
+                                            {course.title}
+                                        </h4>
+                                        <p className="text-[11px] text-slate-400 mt-1 truncate">
+                                            Instructores: {course.instructors || "Por asignar"}
+                                        </p>
+                                    </div>
+                                    <div className="mt-4 pt-2 border-t border-slate-50 flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-0.5 text-amber-500 text-xs font-bold">
+                                            <Star size={11} fill="currentColor" />
+                                            <span>{course.rating ? course.rating.toFixed(1) : "5.0"}</span>
+                                        </div>
+
+                                        {enrolled ? (
+                                            <button
+                                                type="button"
+                                                disabled
+                                                className="bg-emerald-50 text-emerald-700 text-[10px] font-bold py-1.5 px-3 rounded-lg flex items-center gap-1 border border-emerald-200 cursor-not-allowed w-fit"
+                                            >
+                                                <CheckCircle2 size={12} className="text-emerald-600" />
+                                                <span>✓ Inscrito</span>
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                disabled={enrollingId === course.course_id}
+                                                onClick={() => handleEnrollCourse(course.course_id)}
+                                                className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:bg-slate-300 disabled:cursor-not-allowed w-fit"
+                                            >
+                                                {enrollingId === course.course_id ? (
+                                                    <Loader2 size={12} className="animate-spin" />
+                                                ) : (
+                                                    <PlusCircle size={12} />
+                                                )}
+                                                <span>Matricularme</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </GenericCard>
+                        );
+                    })
+                )}
+            </div>
+        </div>
+    );
+};
+
+================
 File: frontend/src/routes/pages/student/components/EnrolledCourses.tsx
 ================
 import { BookOpen, Loader2, ArrowRight } from 'lucide-react';
@@ -7084,6 +6990,203 @@ export const SmartRecommendations = ({ recommendations }: SmartRecommendationsPr
             </div>
         </div>
     );
+};
+
+================
+File: frontend/src/routes/pages/student/components/useCourseCatalog.ts
+================
+import { useState, useEffect } from 'react';
+import { apiClient } from '@/services/apiClient';
+import axios from 'axios';
+
+export interface DBModelCourse {
+    course_id: number;
+    title: string;
+    url?: string;
+    shortIntro?: string;
+    category: string;
+    subCategory?: string;
+    courseType?: string;
+    language?: string;
+    subtitleLanguages?: string;
+    skills?: string;
+    instructors?: string;
+    rating?: number;
+    numOfViewers?: number;
+    duration?: number;
+    site?: string;
+}
+
+export const useCourseCatalog = (onEnrollSuccess: (course: DBModelCourse) => void) => {
+    const [searchKeyword, setSearchKeyword] = useState<string>('');
+    const [catalogCourses, setCatalogCourses] = useState<DBModelCourse[]>([]);
+    const [loadingCatalog, setLoadingCatalog] = useState<boolean>(false);
+    const [enrollingId, setEnrollingId] = useState<number | null>(null);
+    const [catalogError, setCatalogError] = useState<string>('');
+
+    useEffect(() => {
+        const delayDebounceFn = setTimeout(() => {
+            fetchCatalogData(searchKeyword);
+        }, 400);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchKeyword]);
+
+    const fetchCatalogData = async (keyword: string) => {
+        setLoadingCatalog(true);
+        setCatalogError('');
+        try {
+            const response = await apiClient.get(`/api/courses/search?keyword=${encodeURIComponent(keyword)}`);
+            if (response.status === 200 && response.data) {
+                setCatalogCourses(response.data as DBModelCourse[]);
+            }
+        } catch (err) {
+            console.error("Error al consultar el catálogo predictivo:", err);
+            setCatalogError("No se pudo sincronizar el catálogo de cursos en tiempo real.");
+        } finally {
+            setLoadingCatalog(false);
+        }
+    };
+
+    const handleEnrollCourse = async (courseId: number) => {
+        setEnrollingId(courseId);
+        setCatalogError('');
+
+        try {
+            const response = await apiClient.post(`/api/courses/enroll/${courseId}`);
+            if (response.status >= 200 && response.status < 300) {
+                const enrolledCourse = catalogCourses.find(c => c.course_id === courseId);
+                if (enrolledCourse) {
+                    onEnrollSuccess(enrolledCourse);
+                }
+                fetchCatalogData(searchKeyword);
+            }
+        } catch (err) {
+            console.error("Error al procesar la matrícula del estudiante:", err);
+            let message = "Ocurrió un error inesperado al procesar tu matrícula.";
+            if (axios.isAxiosError(err) && err.response?.data?.message) {
+                message = err.response.data.message;
+            }
+            setCatalogError(message);
+        } finally {
+            setEnrollingId(null);
+        }
+    };
+
+    return {
+        searchKeyword,
+        setSearchKeyword,
+        catalogCourses,
+        loadingCatalog,
+        enrollingId,
+        catalogError,
+        handleEnrollCourse
+    };
+};
+
+================
+File: frontend/src/routes/pages/student/components/useEnrolledCourses.ts
+================
+import { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '../../../../services/apiClient';
+import { useAuth } from '../../../../auth/useAuth';
+import { readStoredAuthUser } from '../../../../auth/authStorage';
+import type { DBModelCourse } from './useCourseCatalog';
+
+export interface EnrollmentInfo {
+    enrollmentid: number;
+    enrolled_at: string;
+    status: string;
+    progress_percentage: number;
+    course: DBModelCourse;
+}
+
+export const useEnrolledCourses = (successTrigger: string) => {
+    const { user } = useAuth();
+    const [enrolledList, setEnrolledList] = useState<EnrollmentInfo[]>([]);
+    const [loadingEnrollments, setLoadingEnrollments] = useState<boolean>(false);
+    const [enrollmentError, setEnrollmentError] = useState<string>('');
+
+    /**
+     * Recupera las asignaturas activas del estudiante pasando el username como parámetro.
+     * Sincroniza el contrato de red con el endpoint especializado del Backend.
+     */
+    const fetchStudentEnrollments = useCallback(async () => {
+        setLoadingEnrollments(true);
+        setEnrollmentError('');
+        try {
+            const currentUsername = user?.username?.trim() ?? readStoredAuthUser()?.username?.trim();
+
+            if (!currentUsername) {
+                setEnrollmentError('No se pudo identificar al estudiante autenticado.');
+                return;
+            }
+
+            const response = await apiClient.get<Record<string, unknown>[]>('/api/auth/my-active-courses', {
+                params: { username: currentUsername }
+            });
+
+            if (response.status === 200 && response.data) {
+                // 3. Mapeo adaptativo tolerante a la nomenclatura del ORM (course vs courses)
+                const normalizedData = response.data.map((enrollment) => {
+                    const courseData = (enrollment.course || enrollment.courses || enrollment) as Record<string, unknown>;
+                    
+                    return {
+                        enrollmentid: Number(enrollment.enrollmentid || Date.now()),
+                        enrolled_at: String(enrollment.enrolled_at || new Date().toISOString()),
+                        status: String(enrollment.status || "EN_PROGRESO"),
+                        progress_percentage: Number(enrollment.progress_percentage ?? enrollment.progress ?? 0),
+                        course: {
+                            course_id: Number(courseData.course_id || courseData.id || 0),
+                            title: String(courseData.title || ""),
+                            category: String(courseData.category || "General"),
+                            instructors: String(courseData.instructors || "Por asignar")
+                        }
+                    };
+                });
+
+                setEnrolledList(normalizedData);
+            }
+        } catch (err) {
+            console.error("Error crítico en la pasarela HTTP de matrículas:", err);
+            setEnrollmentError("No se pudieron sincronizar tus asignaturas activas desde PostgreSQL.");
+        } finally {
+            setLoadingEnrollments(false);
+        }
+    }, [user?.username]);
+
+    // Reactividad: Se ejecuta al montar el componente y cada vez que cambia el successTrigger
+    useEffect(() => {
+        fetchStudentEnrollments();
+    }, [successTrigger, fetchStudentEnrollments]);
+
+    /**
+     * Inyecta de forma optimista la matrícula en caliente en el estado local
+     */
+    const injectLocalEnrollment = (course: DBModelCourse) => {
+        setEnrolledList((prev) => {
+            const exists = prev.some(e => e.course.course_id === course.course_id);
+            if (exists) return prev;
+
+            return [
+                ...prev,
+                {
+                    enrollmentid: Date.now(),
+                    enrolled_at: new Date().toISOString(),
+                    status: "EN_PROGRESO",
+                    progress_percentage: 0,
+                    course: course
+                }
+            ];
+        });
+    };
+
+    return {
+        enrolledList,
+        loadingEnrollments,
+        enrollmentError,
+        injectLocalEnrollment
+    };
 };
 
 ================
@@ -7485,96 +7588,31 @@ class BackendApplicationTests {
 }
 
 ================
-File: frontend/src/auth/authStorage.ts
+File: frontend/src/auth/AuthContext.tsx
 ================
-import type { AuthUser } from './authTypes';
-
-const USER_KEY = 'user';
-const TOKEN_KEY = 'accessToken'; // Nueva clave para persistir el JWT de forma aislada
-
-
-function canUseBrowserStorage() {
-    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
-}
+import { createContext } from 'react';
+import type { AuthContextType } from './authTypes';
 
 /**
- * Lee el token JWT guardado en el navegador de forma aislada.
+ * Contexto básico de autenticación.
+ * Define los valores por defecto del sistema antes de que el AuthProvider inyecte el estado real.
  */
-export function readStoredToken(): string | null {
-    if (!canUseBrowserStorage()) {
-        return null;
-    }
-    return window.localStorage.getItem(TOKEN_KEY);
-}
+export const AuthContext = createContext<AuthContextType>({
+    user: null,
+    isAuthenticated: false,
+    isLoading: false,
+    login: () => { }, // Firma vacía por defecto adaptada al nuevo contrato de tipos
+    logout: () => { },
+});
 
-/**
- * Persiste el token de acceso JWT en el navegador de forma segura.
- */
-export function writeStoredToken(token: string) {
-    if (!canUseBrowserStorage()) {
-        return;
-    }
-    window.localStorage.setItem(TOKEN_KEY, token);
-}
+export type AuthContextValue = AuthContextType;
 
-/**
- * Lee la sesión del usuario guardada en el navegador validando estrictamente su tiempo de expiración.
- */
-export function readStoredAuthUser(): AuthUser | null {
-    if (!canUseBrowserStorage()) {
-        return null;
-    }
-
-    const rawValue = window.localStorage.getItem(USER_KEY);
-    if (!rawValue) {
-        return null;
-    }
-
-    try {
-        // Añadimos de forma segura la propiedad opcional expiresAt al parsear
-        const parsedValue = JSON.parse(rawValue) as Partial<AuthUser> & { expiresAt?: number };
-
-        if (typeof parsedValue.username !== 'string' || !parsedValue.username.trim()) {
-            return null;
-        }
-
-        // 🛡️ BLINDAJE TFG: Si existe el sello de tiempo y la hora actual superó la expiración, destruimos la sesión
-        if (parsedValue.expiresAt && Date.now() > parsedValue.expiresAt) {
-            console.warn("Sesión local caducada por límite temporal. Limpiando almacenamiento.");
-            clearStoredAuth();
-            return null; // Forzamos a React a inicializarse como no autenticado
-        }
-
-        return {
-            ...parsedValue,
-            username: parsedValue.username,
-        } as AuthUser;
-    } catch {
-        return null;
-    }
-}
-
-/**
- * Persiste el usuario autenticado junto con su estructura básica de datos.
- */
-export function writeStoredAuthUser(user: AuthUser) {
-    if (!canUseBrowserStorage()) {
-        return;
-    }
-
-    window.localStorage.setItem(USER_KEY, JSON.stringify(user));
-}
-
-/**
- * Elimina completamente los rastros de la sesión (Usuario y JWT) al cerrar sesión.
- */
-export function clearStoredAuth() {
-    if (!canUseBrowserStorage()) {
-        return;
-    }
-    window.localStorage.removeItem(USER_KEY);
-    window.localStorage.removeItem(TOKEN_KEY); // Limpieza absoluta del token
-}
+================
+File: frontend/src/auth/index.ts
+================
+export { AuthProvider } from './AuthProvider'; 
+export { useAuth } from './useAuth';
+export type { AuthUser, AuthContextType } from './authTypes';
 
 ================
 File: frontend/src/components/Hero.tsx
@@ -8442,56 +8480,104 @@ public class JwtService {
 }
 
 ================
-File: frontend/src/auth/authTypes.ts
+File: frontend/src/auth/authStorage.ts
 ================
-// Auditoría NotebookLM: Definición estricta de tipos de rol. Se elimina el comodín '| string' para evitar fallos.
-export type UserRole = 'ADMIN' | 'PROFESSOR' | 'STUDENT';
+import type { AuthUser } from './authTypes';
 
-// Objeto de constantes fijo para mapear los roles en el código y evitar errores tipográficos
-export const ROLES = {
-    ADMIN: 'ADMIN' as UserRole,
-    PROFESSOR: 'PROFESSOR' as UserRole,
-    STUDENT: 'STUDENT' as UserRole,
-} as const;
+const USER_KEY = 'user';
+const LEGACY_USER_KEY = 'auth_user';
+const TOKEN_KEY = 'accessToken'; // Nueva clave para persistir el JWT de forma aislada
 
-/**
- * Forma estándar del usuario autenticado dentro del frontend.
- * Mantiene compatibilidad y permite extender metadatos visuales.
- */
-export interface AuthUser {
-    username: string;
-    photo?: string;
-    role?: UserRole;
-    userId?: number;
-    email?: string;
-    enrolledCourseIds?: number[]; // Fuente de verdad reactiva en memoria del cliente
-    [key: string]: unknown;
+
+function canUseBrowserStorage() {
+    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 }
 
 /**
- * Contrato que modela la respuesta del backend tras un login exitoso con JWT.
- * Coincide exactamente con el registro AuthTokenResponse.java del servidor.
+ * Lee el token JWT guardado en el navegador de forma aislada.
  */
-export interface AuthTokenResponse {
-    accessToken: string;
-    tokenType: string;
-    expiresIn: number;
-    userId: number;
-    username: string;
-    role: UserRole;
-    email: string;
-    enrolledCourseIds: number[]; // Coincidencia exacta con la hidratación de Spring Boot
+export function readStoredToken(): string | null {
+    if (!canUseBrowserStorage()) {
+        return null;
+    }
+    return window.localStorage.getItem(TOKEN_KEY);
 }
 
 /**
- * Interfaz que define el estado y los métodos globales que expondrá nuestro contexto de autenticación.
+ * Persiste el token de acceso JWT en el navegador de forma segura.
  */
-export interface AuthContextType {
-    user: AuthUser | null;
-    isAuthenticated: boolean;
-    isLoading: boolean;
-    login: (tokenData: AuthTokenResponse) => void;
-    logout: () => void;
+export function writeStoredToken(token: string) {
+    if (!canUseBrowserStorage()) {
+        return;
+    }
+    window.localStorage.setItem(TOKEN_KEY, token);
+}
+
+/**
+ * Lee la sesión del usuario guardada en el navegador validando estrictamente su tiempo de expiración.
+ */
+export function readStoredAuthUser(): AuthUser | null {
+    if (!canUseBrowserStorage()) {
+        return null;
+    }
+
+    const rawValue = window.localStorage.getItem(USER_KEY) ?? window.localStorage.getItem(LEGACY_USER_KEY);
+    if (!rawValue) {
+        return null;
+    }
+
+    try {
+        // Añadimos de forma segura la propiedad opcional expiresAt al parsear
+        const parsedValue = JSON.parse(rawValue) as Partial<AuthUser> & { expiresAt?: number };
+
+        if (typeof parsedValue.username !== 'string' || !parsedValue.username.trim()) {
+            return null;
+        }
+
+        // 🛡️ BLINDAJE TFG: Si existe el sello de tiempo y la hora actual superó la expiración, destruimos la sesión
+        if (parsedValue.expiresAt && Date.now() > parsedValue.expiresAt) {
+            console.warn("Sesión local caducada por límite temporal. Limpiando almacenamiento.");
+            clearStoredAuth();
+            return null; // Forzamos a React a inicializarse como no autenticado
+        }
+
+        const normalizedUser = {
+            ...parsedValue,
+            username: parsedValue.username,
+        } as AuthUser;
+
+        if (!window.localStorage.getItem(USER_KEY) && window.localStorage.getItem(LEGACY_USER_KEY)) {
+            writeStoredAuthUser(normalizedUser);
+        }
+
+        return normalizedUser;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Persiste el usuario autenticado junto con su estructura básica de datos.
+ */
+export function writeStoredAuthUser(user: AuthUser) {
+    if (!canUseBrowserStorage()) {
+        return;
+    }
+
+    window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+    window.localStorage.setItem(LEGACY_USER_KEY, JSON.stringify(user));
+}
+
+/**
+ * Elimina completamente los rastros de la sesión (Usuario y JWT) al cerrar sesión.
+ */
+export function clearStoredAuth() {
+    if (!canUseBrowserStorage()) {
+        return;
+    }
+    window.localStorage.removeItem(USER_KEY);
+    window.localStorage.removeItem(LEGACY_USER_KEY);
+    window.localStorage.removeItem(TOKEN_KEY); // Limpieza absoluta del token
 }
 
 ================
@@ -8744,6 +8830,59 @@ File: frontend/package.json
     "vite": "^7.3.1",
     "vitest": "^4.1.0"
   }
+}
+
+================
+File: frontend/src/auth/authTypes.ts
+================
+// Auditoría NotebookLM: Definición estricta de tipos de rol. Se elimina el comodín '| string' para evitar fallos.
+export type UserRole = 'ADMIN' | 'PROFESSOR' | 'STUDENT';
+
+// Objeto de constantes fijo para mapear los roles en el código y evitar errores tipográficos
+export const ROLES = {
+    ADMIN: 'ADMIN' as UserRole,
+    PROFESSOR: 'PROFESSOR' as UserRole,
+    STUDENT: 'STUDENT' as UserRole,
+} as const;
+
+/**
+ * Forma estándar del usuario autenticado dentro del frontend.
+ * Mantiene compatibilidad y permite extender metadatos visuales.
+ */
+export interface AuthUser {
+    username: string;
+    photo?: string;
+    role?: UserRole;
+    userId?: number;
+    email?: string;
+    enrolledCourseIds?: number[]; // Fuente de verdad reactiva en memoria del cliente
+    [key: string]: unknown;
+}
+
+/**
+ * Contrato que modela la respuesta del backend tras un login exitoso con JWT.
+ * Coincide exactamente con el registro AuthTokenResponse.java del servidor.
+ */
+export interface AuthTokenResponse {
+    accessToken: string;
+    tokenType: string;
+    expiresIn: number;
+    userId: number;
+    username: string;
+    role: UserRole;
+    email: string;
+    enrolledCourseIds: number[]; // Coincidencia exacta con la hidratación de Spring Boot
+}
+
+/**
+ * Interfaz que define el estado y los métodos globales que expondrá nuestro contexto de autenticación.
+ */
+export interface AuthContextType {
+    user: AuthUser | null;
+    isAuthenticated: boolean;
+    isLoading: boolean;
+    login: (tokenData: AuthTokenResponse) => void;
+    logout: () => void;
 }
 
 ================
@@ -9042,87 +9181,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 };
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/entities/Users.java
-================
-package com.cursosonline.backend.entities;
-
-// CAMBIO: Importación estándar compatible con el motor de serialización de Spring Boot
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
-
-import java.util.Collection;
-import java.util.List;
-import java.util.ArrayList;
-
-@Entity
-@Table(name = "users")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class Users implements UserDetails {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long user_id;
-
-    @Column(nullable = false, unique = true)
-    private String username;
-
-    @Column(nullable = false)
-    private String password;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Role role;
-
-    @Column(name = "email", nullable = true)
-    private String email;
-
-    @Column(nullable = false)
-    private boolean enabled = true;
-
-    /**
-     * Relación bidireccional con el historial de matrículas.
-     * Blindada con la anotación canónica de Jackson para evitar
-     * LazyInitializationException.
-     */
-    @JsonIgnore
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Enrollment> enrollments = new ArrayList<>();
-
-    @Override
-    public boolean isEnabled() {
-        return this.enabled;
-    }
-
-    @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority(role.name()));
-    }
-
-    @Override
-    public boolean isAccountNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isAccountNonLocked() {
-        return true;
-    }
-
-    @Override
-    public boolean isCredentialsNonExpired() {
-        return true;
-    }
-}
-
-================
 File: frontend/src/routes/pages/professor/ProfessorDashboard.tsx
 ================
 import { useState } from 'react';
@@ -9255,6 +9313,87 @@ const ProfessorDashboard = () => {
 };
 
 export default ProfessorDashboard;
+
+================
+File: backend/src/main/java/com/cursosonline/backend/entities/Users.java
+================
+package com.cursosonline.backend.entities;
+
+// CAMBIO: Importación estándar compatible con el motor de serialización de Spring Boot
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.ArrayList;
+
+@Entity
+@Table(name = "users")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Users implements UserDetails {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long user_id;
+
+    @Column(nullable = false, unique = true)
+    private String username;
+
+    @Column(nullable = false)
+    private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role;
+
+    @Column(name = "email", nullable = true)
+    private String email;
+
+    @Column(nullable = false)
+    private boolean enabled = true;
+
+    /**
+     * Relación bidireccional con el historial de matrículas.
+     * Blindada con la anotación canónica de Jackson para evitar
+     * LazyInitializationException.
+     */
+    @JsonIgnore
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Enrollment> enrollments = new ArrayList<>();
+
+    @Override
+    public boolean isEnabled() {
+        return this.enabled;
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of(new SimpleGrantedAuthority(role.name()));
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+}
 
 ================
 File: frontend/src/components/navbar/NavbarUser.tsx
@@ -9729,378 +9868,6 @@ logging.level.org.hibernate.SQL=DEBUG
 
 # Muestra los errores de serialización de Jackson en consola
 logging.level.org.springframework.http.converter.json=TRACE
-
-================
-File: frontend/src/routes/pages/student/StudentDashboard.tsx
-================
-import { useState } from 'react';
-import { Sparkles, SlidersHorizontal } from 'lucide-react';
-import StudentLayout from '../../layouts/DashboardLayout';
-import { InterestsModal } from './InterestsModal';
-
-import { CourseCatalog } from './components/CourseCatalog';
-import { EnrolledCourses } from './components/EnrolledCourses';
-import { SmartRecommendations } from './components/SmartRecommendations';
-import { useEnrolledCourses } from './components/useEnrolledCourses';
-import type { DBModelCourse } from './components/useCourseCatalog';
-
-export interface RecommendedCourse {
-    id: number;
-    title: string;
-    instructor: string;
-    category: string;
-    rating: number;
-    reason: string;
-}
-
-const StudentDashboard = () => {
-    const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-    const [error, setError] = useState<string>('');
-    const [successMessage, setSuccessMessage] = useState<string>('');
-    const [refreshCount, setRefreshCount] = useState<number>(0);
-
-    // Hook unificado consumiendo el disparador reactivo corregido
-    const {
-        enrolledList,
-        loadingEnrollments,
-        enrollmentError
-    } = useEnrolledCourses(`${successMessage}_${refreshCount}`);
-
-    if (enrollmentError && !error) {
-        setError(enrollmentError);
-    }
-
-    const [recommendations] = useState<RecommendedCourse[]>([
-        { id: 101, title: "Microservicios con Spring Cloud", instructor: "Carlos Garcia", category: "Arquitectura", rating: 4.9, reason: "Basado en tu avance en Spring Boot" },
-        { id: 102, title: "Gestión de Estados Avanzada en React", instructor: "Elena Perez", category: "Frontend", rating: 4.8, reason: "Ideal para tus proyectos SPA" }
-    ]);
-
-    // ÚNICA DECLARACIÓN: Manejador del éxito de la matrícula desde el catálogo
-    const handleEnrollSuccessFromCatalog = (course: DBModelCourse) => {
-        setRefreshCount(prev => prev + 1);
-        setSuccessMessage(`¡Te has matriculado en el curso ${course.title} correctamente!`);
-    };
-
-    return (
-        <StudentLayout>
-            <div className="p-6 max-w-7xl mx-auto min-h-screen bg-slate-50/50">
-
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-                    <div>
-                        <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                            <span>Panel de Aprendizaje</span>
-                            <Sparkles size={20} className="text-amber-500 fill-currentColor" />
-                        </h1>
-                        <p className="text-xs text-slate-400 font-medium mt-0.5">Sincronización académica transaccional en tiempo real</p>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={() => setIsModalOpen(true)}
-                        className="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs py-2 px-4 rounded-xl flex items-center gap-2 border border-slate-200 shadow-sm transition-all cursor-pointer"
-                    >
-                        <SlidersHorizontal size={14} className="text-slate-500" />
-                        <span>Configurar Intereses</span>
-                    </button>
-                </div>
-
-                {error && (
-                    <div className="mt-4 p-3 bg-rose-50 border border-rose-100 text-rose-700 text-xs font-semibold rounded-xl flex items-center gap-2">
-                        <span>⚠️ {error}</span>
-                    </div>
-                )}
-                {successMessage && (
-                    <div className="mt-4 p-3 bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-semibold rounded-xl flex items-center gap-2">
-                        <span>✓ {successMessage}</span>
-                    </div>
-                )}
-
-                <CourseCatalog
-                    enrolledList={enrolledList}
-                    onEnrollSuccess={handleEnrollSuccessFromCatalog}
-                    onSetGlobalError={setError}
-                    onSetGlobalSuccess={setSuccessMessage}
-                />
-
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
-                    <EnrolledCourses
-                        enrolledList={enrolledList}
-                        loadingEnrollments={loadingEnrollments}
-                    />
-                    <SmartRecommendations
-                        recommendations={recommendations}
-                    />
-                </div>
-            </div>
-
-            <InterestsModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSave={async () => {
-                    setSuccessMessage("Preferencias guardadas con éxito en PostgreSQL.");
-                }}
-            />
-        </StudentLayout>
-    );
-};
-
-export default StudentDashboard;
-
-================
-File: backend/src/main/java/com/cursosonline/backend/services/UserService.java
-================
-package com.cursosonline.backend.services;
-
-import com.cursosonline.backend.entities.Role;
-import com.cursosonline.backend.entities.Users;
-import com.cursosonline.backend.entities.Interest;
-import com.cursosonline.backend.entities.Courses;
-import com.cursosonline.backend.entities.Enrollment;
-import com.cursosonline.backend.dto.InterestDTO;
-import com.cursosonline.backend.repository.UserRepository;
-import com.cursosonline.backend.repository.CoursesRepository;
-import com.cursosonline.backend.repository.EnrollmentRepository;
-import com.cursosonline.backend.repository.InterestRepository;
-import com.cursosonline.backend.exception.ServicesException;
-import com.cursosonline.backend.exception.UserAlreadyExistsException;
-import com.cursosonline.backend.exception.ResourceNotFoundException; // Auditoría: Importación semántica para errores 404
-
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.PageRequest;
-import org.hibernate.Hibernate;
-
-import java.util.Optional;
-import java.util.List;
-import java.util.Collections;
-import lombok.RequiredArgsConstructor;
-
-/**
- * Servicio que maneja la lógica de negocio relacionada con los usuarios de la
- * plataforma. Optimized for TFG.
- */
-@Service
-@RequiredArgsConstructor
-public class UserService {
-
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final InterestRepository interestRepository;
-    private final CoursesRepository coursesRepository;
-    private final EnrollmentRepository enrollmentRepository;
-
-    /**
-     * Busca un usuario por su nombre de usuario.
-     */
-    @Transactional(readOnly = true)
-    public Optional<Users> findByUsername(String username) {
-        return userRepository.findByUsername(username);
-    }
-
-    /**
-     * Registra un nuevo usuario en la plataforma.
-     * Verifica que el nombre de usuario no exista previamente, cifra la contraseña
-     * y asigna el rol de student por defecto.
-     */
-    @Transactional
-    public Users registerUser(Users user) {
-        if (userRepository.findByUsername(user.getUsername()).isPresent()) {
-            throw new UserAlreadyExistsException(user.getUsername());
-        }
-        String encodedPassword = passwordEncoder.encode(user.getPassword());
-        user.setPassword(encodedPassword);
-        user.setRole(Role.STUDENT);
-        return userRepository.save(user);
-    }
-
-    /**
-     * Realiza el proceso de login verificando el nombre de usuario y la contraseña.
-     * Valida que la cuenta no se encuentre dada de baja lógicamente.
-     */
-    @Transactional(readOnly = true)
-    public Users login(String username, String rawPassword) {
-        Users user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ServicesException("Usuario no encontrado"));
-
-        if (!user.isEnabled()) {
-            throw new ServicesException("Acceso denegada: La cuenta de este usuario ha sido dada de baja.");
-        }
-
-        if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
-            throw new ServicesException("Contraseña incorrecta");
-        }
-        return user;
-    }
-
-    /**
-     * Obtiene una lista de todos los usuarios registrados en la plataforma.
-     */
-    @Transactional(readOnly = true)
-    public List<Users> getAllUsers() {
-        return userRepository.findAll();
-    }
-
-    /**
-     * Actualiza el rol de un usuario específico en la plataforma.
-     */
-    @Transactional
-    public Users updateUserRole(String username, Role newRole) {
-        Users user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ServicesException("Usuario no encontrado para actualizar el rol"));
-
-        user.setRole(newRole);
-        return userRepository.save(user);
-    }
-
-    /**
-     * Realiza el borrado lógico de un usuario desactivando su acceso.
-     * Auditoría NotebookLM: Lanzamiento de ResourceNotFoundException (HTTP 404) en
-     * lugar de RuntimeException.
-     */
-    @Transactional
-    public Users deleteByUsername(String username) {
-        Users user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
-
-        if (user.isEnabled()) {
-            user.setEnabled(false);
-        } else {
-            user.setEnabled(true);
-        }
-
-        return userRepository.saveAndFlush(user);
-    }
-
-    /**
-     * Recupera de forma transaccional las preferencias de un estudiante desde
-     * PostgreSQL.
-     * Auditoría NotebookLM: Lanzamiento de ResourceNotFoundException (HTTP 404) en
-     * lugar de RuntimeException.
-     */
-    @Transactional(readOnly = true)
-    public InterestDTO getUserInterests(String username) {
-        Users user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
-
-        Interest interest = interestRepository.findById(user.getUser_id())
-                .orElse(null);
-
-        if (interest == null) {
-            return new InterestDTO(
-                    Collections.emptyList(),
-                    Collections.emptyList(),
-                    Collections.emptyList(),
-                    Collections.emptyList(),
-                    Collections.emptyList());
-        }
-
-        Hibernate.initialize(interest.getCategory());
-        Hibernate.initialize(interest.getCourse_type());
-        Hibernate.initialize(interest.getDuration());
-        Hibernate.initialize(interest.getLanguage());
-        Hibernate.initialize(interest.getSubtitle_languages());
-
-        return new InterestDTO(
-                interest.getCategory(),
-                interest.getCourse_type(),
-                interest.getDuration(),
-                interest.getLanguage(),
-                interest.getSubtitle_languages());
-    }
-
-    /**
-     * Guarda o actualiza de forma transaccional las preferencias de un estudiante.
-     * Si es la primera vez que configura sus intereses, se instancia una nueva
-     * entidad vinculada a su cuenta de PostgreSQL usando @MapsId.
-     * Auditoría NotebookLM: Lanzamiento de ResourceNotFoundException (HTTP 404) en
-     * lugar de RuntimeException.
-     */
-    @Transactional
-    public void saveUserInterests(String username, InterestDTO dto) {
-        // 1. Validar la existencia del usuario en el sistema con excepción semántica
-        Users user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
-
-        // 2. Buscar si ya tiene un registro de intereses previo. Si no existe, creamos
-        // uno nuevo.
-        Interest interest = interestRepository.findById(user.getUser_id())
-                .orElseGet(() -> {
-                    Interest newInterest = new Interest();
-                    newInterest.setUser(user); // Establecemos la relación OneToOne para @MapsId
-                    return newInterest;
-                });
-
-        // 3. Mapear y actualizar los listados de preferencias dinámicas
-        interest.setCategory(dto.categories());
-        interest.setCourse_type(dto.levels()); // Mapeado semánticamente a la columna del catálogo de cursos
-        interest.setDuration(dto.durations());
-        interest.setLanguage(dto.languages());
-        interest.setSubtitle_languages(dto.subtitles()); // Mapeado semánticamente a la columna de subtítulos
-
-        // 4. Persistir los cambios forzando el volcado directo a PostgreSQL y sus 5
-        // tablas satélite
-        interestRepository.saveAndFlush(interest);
-    }
-
-    /**
-     * Consulta predictiva corregida. Formatea los comodines en Java para evitar
-     * colisiones de binding en el ORM de PostgreSQL y limita el resultado a 12
-     * elementos.
-     */
-    @Transactional(readOnly = true)
-    public List<Courses> searchCourses(String keyword) {
-        // Configuramos el límite exacto a 12 elementos solicitados para la UI (Página
-        // 0, Tamaño 12)
-        Pageable pageSize = PageRequest.of(0, 12);
-
-        // Si el buscador está vacío, devolvemos los 12 primeros de forma segura
-        if (keyword == null || keyword.trim().isEmpty()) {
-            return coursesRepository.findAll(pageSize).getContent();
-        }
-
-        String cleanKeyword = keyword.trim();
-        // Creamos los dos patrones de coincidencia de forma nativa en Java
-        String formattedKeyword = "%" + cleanKeyword + "%"; // Para buscar en cualquier parte
-        String startKeyword = cleanKeyword + "%"; // Para priorizar si empieza por la palabra
-
-        // Enviamos los parámetros limpios al repositorio
-        return coursesRepository.searchCoursesPredictive(formattedKeyword, startKeyword, pageSize);
-    }
-
-    /**
-     * Matricula de forma segura a un estudiante en un curso utilizando la entidad
-     * intermedia Enrollment. Valida preventivamente en PostgreSQL para evitar
-     * registros duplicados.
-     */
-    @Transactional
-    public void enrollStudentInCourse(String username, Long courseId) {
-        // 1. Validar precondición de existencia de usuario
-        Users user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ServicesException("Usuario no encontrado"));
-
-        // 2. Validar precondición de existencia de curso
-        Courses course = coursesRepository.findById(courseId)
-                .orElseThrow(() -> new ServicesException("Curso no encontrado en el catálogo"));
-
-        // 3. Control estricto de duplicidad antes de efectuar la persistencia
-        Optional<Enrollment> existingEnrollment = enrollmentRepository
-                .findByUserIdAndCourseId(user.getUser_id(), course.getCourse_id());
-
-        if (existingEnrollment.isPresent()) {
-            throw new ServicesException("Acción inválida: Ya te encuentras matriculado en este curso.");
-        }
-
-        // 4. Instanciar y configurar el objeto de matrícula explícito
-        Enrollment enrollment = new Enrollment();
-        enrollment.setUser(user);
-        enrollment.setCourse(course);
-
-        // 5. Volcar de forma transaccional directa a PostgreSQL
-        enrollmentRepository.saveAndFlush(enrollment);
-    }
-}
 
 ================
 File: frontend/src/components/navbar/Navbar.tsx
@@ -10616,6 +10383,380 @@ const AdminDashboard = () => {
 export default AdminDashboard;
 
 ================
+File: frontend/src/routes/pages/student/StudentDashboard.tsx
+================
+import { useEffect, useState } from 'react';
+import { Sparkles, SlidersHorizontal } from 'lucide-react';
+import StudentLayout from '../../layouts/DashboardLayout';
+import { InterestsModal } from './InterestsModal';
+
+import { CourseCatalog } from './components/CourseCatalog';
+import { EnrolledCourses } from './components/EnrolledCourses';
+import { SmartRecommendations } from './components/SmartRecommendations';
+import { useEnrolledCourses } from './components/useEnrolledCourses';
+import type { DBModelCourse } from './components/useCourseCatalog';
+
+export interface RecommendedCourse {
+    id: number;
+    title: string;
+    instructor: string;
+    category: string;
+    rating: number;
+    reason: string;
+}
+
+const StudentDashboard = () => {
+    const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+    const [error, setError] = useState<string>('');
+    const [successMessage, setSuccessMessage] = useState<string>('');
+    const [refreshCount, setRefreshCount] = useState<number>(0);
+
+    // Hook unificado consumiendo el disparador reactivo corregido
+    const {
+        enrolledList,
+        loadingEnrollments,
+        enrollmentError
+    } = useEnrolledCourses(`${successMessage}_${refreshCount}`);
+
+    useEffect(() => {
+        if (enrollmentError) {
+            setError(enrollmentError);
+        }
+    }, [enrollmentError]);
+
+    const [recommendations] = useState<RecommendedCourse[]>([
+        { id: 101, title: "Microservicios con Spring Cloud", instructor: "Carlos Garcia", category: "Arquitectura", rating: 4.9, reason: "Basado en tu avance en Spring Boot" },
+        { id: 102, title: "Gestión de Estados Avanzada en React", instructor: "Elena Perez", category: "Frontend", rating: 4.8, reason: "Ideal para tus proyectos SPA" }
+    ]);
+
+    // ÚNICA DECLARACIÓN: Manejador del éxito de la matrícula desde el catálogo
+    const handleEnrollSuccessFromCatalog = (course: DBModelCourse) => {
+        setRefreshCount(prev => prev + 1);
+        setSuccessMessage(`¡Te has matriculado en el curso ${course.title} correctamente!`);
+    };
+
+    return (
+        <StudentLayout>
+            <div className="p-6 max-w-7xl mx-auto min-h-screen bg-slate-50/50">
+
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                    <div>
+                        <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                            <span>Panel de Aprendizaje</span>
+                            <Sparkles size={20} className="text-amber-500 fill-currentColor" />
+                        </h1>
+                        <p className="text-xs text-slate-400 font-medium mt-0.5">Sincronización académica transaccional en tiempo real</p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setIsModalOpen(true)}
+                        className="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs py-2 px-4 rounded-xl flex items-center gap-2 border border-slate-200 shadow-sm transition-all cursor-pointer"
+                    >
+                        <SlidersHorizontal size={14} className="text-slate-500" />
+                        <span>Configurar Intereses</span>
+                    </button>
+                </div>
+
+                {error && (
+                    <div className="mt-4 p-3 bg-rose-50 border border-rose-100 text-rose-700 text-xs font-semibold rounded-xl flex items-center gap-2">
+                        <span>⚠️ {error}</span>
+                    </div>
+                )}
+                {successMessage && (
+                    <div className="mt-4 p-3 bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-semibold rounded-xl flex items-center gap-2">
+                        <span>✓ {successMessage}</span>
+                    </div>
+                )}
+
+                <CourseCatalog
+                    enrolledList={enrolledList}
+                    onEnrollSuccess={handleEnrollSuccessFromCatalog}
+                    onSetGlobalError={setError}
+                    onSetGlobalSuccess={setSuccessMessage}
+                />
+
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
+                    <EnrolledCourses
+                        enrolledList={enrolledList}
+                        loadingEnrollments={loadingEnrollments}
+                    />
+                    <SmartRecommendations
+                        recommendations={recommendations}
+                    />
+                </div>
+            </div>
+
+            <InterestsModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSave={async () => {
+                    setSuccessMessage("Preferencias guardadas con éxito en PostgreSQL.");
+                }}
+            />
+        </StudentLayout>
+    );
+};
+
+export default StudentDashboard;
+
+================
+File: backend/src/main/java/com/cursosonline/backend/services/UserService.java
+================
+package com.cursosonline.backend.services;
+
+import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.entities.Interest;
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.dto.InterestDTO;
+import com.cursosonline.backend.repository.UserRepository;
+import com.cursosonline.backend.repository.CoursesRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.InterestRepository;
+import com.cursosonline.backend.exception.ServicesException;
+import com.cursosonline.backend.exception.UserAlreadyExistsException;
+import com.cursosonline.backend.exception.ResourceNotFoundException; // Auditoría: Importación semántica para errores 404
+
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.hibernate.Hibernate;
+
+import java.util.Optional;
+import java.util.List;
+import java.util.Collections;
+import lombok.RequiredArgsConstructor;
+
+/**
+ * Servicio que maneja la lógica de negocio relacionada con los usuarios de la
+ * plataforma. Optimized for TFG.
+ */
+@Service
+@RequiredArgsConstructor
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final InterestRepository interestRepository;
+    private final CoursesRepository coursesRepository;
+    private final EnrollmentRepository enrollmentRepository;
+
+    /**
+     * Busca un usuario por su nombre de usuario.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Users> findByUsername(String username) {
+        return userRepository.findByUsername(username);
+    }
+
+    /**
+     * Registra un nuevo usuario en la plataforma.
+     * Verifica que el nombre de usuario no exista previamente, cifra la contraseña
+     * y asigna el rol de student por defecto.
+     */
+    @Transactional
+    public Users registerUser(Users user) {
+        if (userRepository.findByUsername(user.getUsername()).isPresent()) {
+            throw new UserAlreadyExistsException(user.getUsername());
+        }
+        String encodedPassword = passwordEncoder.encode(user.getPassword());
+        user.setPassword(encodedPassword);
+        user.setRole(Role.STUDENT);
+        return userRepository.save(user);
+    }
+
+    /**
+     * Realiza el proceso de login verificando el nombre de usuario y la contraseña.
+     * Valida que la cuenta no se encuentre dada de baja lógicamente.
+     */
+    @Transactional(readOnly = true)
+    public Users login(String username, String rawPassword) {
+        Users user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ServicesException("Usuario no encontrado"));
+
+        if (!user.isEnabled()) {
+            throw new ServicesException("Acceso denegada: La cuenta de este usuario ha sido dada de baja.");
+        }
+
+        if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
+            throw new ServicesException("Contraseña incorrecta");
+        }
+        return user;
+    }
+
+    /**
+     * Obtiene una lista de todos los usuarios registrados en la plataforma.
+     */
+    @Transactional(readOnly = true)
+    public List<Users> getAllUsers() {
+        return userRepository.findAll();
+    }
+
+    /**
+     * Actualiza el rol de un usuario específico en la plataforma.
+     */
+    @Transactional
+    public Users updateUserRole(String username, Role newRole) {
+        Users user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ServicesException("Usuario no encontrado para actualizar el rol"));
+
+        user.setRole(newRole);
+        return userRepository.save(user);
+    }
+
+    /**
+     * Realiza el borrado lógico de un usuario desactivando su acceso.
+     * Auditoría NotebookLM: Lanzamiento de ResourceNotFoundException (HTTP 404) en
+     * lugar de RuntimeException.
+     */
+    @Transactional
+    public Users deleteByUsername(String username) {
+        Users user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
+
+        if (user.isEnabled()) {
+            user.setEnabled(false);
+        } else {
+            user.setEnabled(true);
+        }
+
+        return userRepository.saveAndFlush(user);
+    }
+
+    /**
+     * Recupera de forma transaccional las preferencias de un estudiante desde
+     * PostgreSQL.
+     * Auditoría NotebookLM: Lanzamiento de ResourceNotFoundException (HTTP 404) en
+     * lugar de RuntimeException.
+     */
+    @Transactional(readOnly = true)
+    public InterestDTO getUserInterests(String username) {
+        Users user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
+
+        Interest interest = interestRepository.findById(user.getUser_id())
+                .orElse(null);
+
+        if (interest == null) {
+            return new InterestDTO(
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Collections.emptyList());
+        }
+
+        Hibernate.initialize(interest.getCategory());
+        Hibernate.initialize(interest.getCourse_type());
+        Hibernate.initialize(interest.getDuration());
+        Hibernate.initialize(interest.getLanguage());
+        Hibernate.initialize(interest.getSubtitle_languages());
+
+        return new InterestDTO(
+                interest.getCategory(),
+                interest.getCourse_type(),
+                interest.getDuration(),
+                interest.getLanguage(),
+                interest.getSubtitle_languages());
+    }
+
+    /**
+     * Guarda o actualiza de forma transaccional las preferencias de un estudiante.
+     * Si es la primera vez que configura sus intereses, se instancia una nueva
+     * entidad vinculada a su cuenta de PostgreSQL usando @MapsId.
+     * Auditoría NotebookLM: Lanzamiento de ResourceNotFoundException (HTTP 404) en
+     * lugar de RuntimeException.
+     */
+    @Transactional
+    public void saveUserInterests(String username, InterestDTO dto) {
+        // 1. Validar la existencia del usuario en el sistema con excepción semántica
+        Users user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
+
+        // 2. Buscar si ya tiene un registro de intereses previo. Si no existe, creamos
+        // uno nuevo.
+        Interest interest = interestRepository.findById(user.getUser_id())
+                .orElseGet(() -> {
+                    Interest newInterest = new Interest();
+                    newInterest.setUser(user); // Establecemos la relación OneToOne para @MapsId
+                    return newInterest;
+                });
+
+        // 3. Mapear y actualizar los listados de preferencias dinámicas
+        interest.setCategory(dto.categories());
+        interest.setCourse_type(dto.levels()); // Mapeado semánticamente a la columna del catálogo de cursos
+        interest.setDuration(dto.durations());
+        interest.setLanguage(dto.languages());
+        interest.setSubtitle_languages(dto.subtitles()); // Mapeado semánticamente a la columna de subtítulos
+
+        // 4. Persistir los cambios forzando el volcado directo a PostgreSQL y sus 5
+        // tablas satélite
+        interestRepository.saveAndFlush(interest);
+    }
+
+    /**
+     * Consulta predictiva corregida. Formatea los comodines en Java para evitar
+     * colisiones de binding en el ORM de PostgreSQL y limita el resultado a 12
+     * elementos.
+     */
+    @Transactional(readOnly = true)
+    public List<Courses> searchCourses(String keyword) {
+        // Configuramos el límite exacto a 12 elementos solicitados para la UI (Página
+        // 0, Tamaño 12)
+        Pageable pageSize = PageRequest.of(0, 12);
+
+        // Si el buscador está vacío, devolvemos los 12 primeros de forma segura
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return coursesRepository.findAll(pageSize).getContent();
+        }
+
+        String cleanKeyword = keyword.trim();
+        // Creamos los dos patrones de coincidencia de forma nativa en Java
+        String formattedKeyword = "%" + cleanKeyword + "%"; // Para buscar en cualquier parte
+        String startKeyword = cleanKeyword + "%"; // Para priorizar si empieza por la palabra
+
+        // Enviamos los parámetros limpios al repositorio
+        return coursesRepository.searchCoursesPredictive(formattedKeyword, startKeyword, pageSize);
+    }
+
+    /**
+     * Matricula de forma segura a un estudiante en un curso utilizando la entidad
+     * intermedia Enrollment. Valida preventivamente en PostgreSQL para evitar
+     * registros duplicados.
+     */
+    @Transactional
+    public Enrollment enrollStudentInCourse(String username, Long courseId) {
+        // 1. Validar precondición de existencia de usuario
+        Users user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ServicesException("Usuario no encontrado"));
+
+        // 2. Validar precondición de existencia de curso
+        Courses course = coursesRepository.findById(courseId)
+                .orElseThrow(() -> new ServicesException("Curso no encontrado en el catálogo"));
+
+        // 3. Control estricto de duplicidad antes de efectuar la persistencia
+        Optional<Enrollment> existingEnrollment = enrollmentRepository
+                .findByUserIdAndCourseId(user.getUser_id(), course.getCourse_id());
+
+        if (existingEnrollment.isPresent()) {
+            throw new ServicesException("Acción inválida: Ya te encuentras matriculado en este curso.");
+        }
+
+        // 4. Instanciar y configurar el objeto de matrícula explícito
+        Enrollment enrollment = new Enrollment();
+        enrollment.setUser(user);
+        enrollment.setCourse(course);
+
+        // 5. Volcar de forma transaccional directa a PostgreSQL
+        return enrollmentRepository.saveAndFlush(enrollment);
+    }
+}
+
+================
 File: backend/src/main/java/com/cursosonline/backend/controller/UserController.java
 ================
 package com.cursosonline.backend.controller;
@@ -10789,8 +10930,9 @@ public class UserController {
             return ResponseEntity.badRequest().build();
         }
 
-        // 1. Normalización preventiva a minúsculas para emparejar con la base de datos
-        String normalizedUsername = username.trim().toLowerCase();
+        // 1. Conservamos el username exacto almacenado en sesión para respetar el
+        // contrato del repositorio
+        String normalizedUsername = username.trim();
 
         // 2. Resolución de identidad transaccional mediante el servicio
         Users user = userService.findByUsername(normalizedUsername)

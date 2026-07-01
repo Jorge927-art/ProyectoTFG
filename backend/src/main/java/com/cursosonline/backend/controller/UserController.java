@@ -74,16 +74,6 @@ public class UserController {
     }
 
     /**
-     * Endpoint para obtener el perfil de un usuario específico.
-     */
-    @GetMapping("/{username}")
-    public ResponseEntity<Users> getUserProfile(@PathVariable String username) {
-        Users user = userService.findByUsername(username)
-                .orElseThrow(() -> new ServicesException("Perfil de usuario no encontrado"));
-        return ResponseEntity.ok(user);
-    }
-
-    /**
      * Endpoint para obtener la lista de todos los usuarios.
      */
     @GetMapping
@@ -182,5 +172,15 @@ public class UserController {
         List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(user.getUser_id());
 
         return ResponseEntity.ok(enrollments);
+    }
+
+    /**
+     * Endpoint para obtener el perfil de un usuario específico.
+     */
+    @GetMapping("/{username}")
+    public ResponseEntity<Users> getUserProfile(@PathVariable String username) {
+        Users user = userService.findByUsername(username)
+                .orElseThrow(() -> new ServicesException("Perfil de usuario no encontrado"));
+        return ResponseEntity.ok(user);
     }
 }

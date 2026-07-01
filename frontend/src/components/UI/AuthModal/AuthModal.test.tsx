@@ -2,21 +2,26 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ReactElement } from 'react';
 import AuthModal from './AuthModal';
-import axios from 'axios';
-import { AxiosError } from 'axios';
 import { AuthProvider } from '@/auth';
+import { apiClient } from '@/services/apiClient';
 
-vi.mock('axios');
-const mockedAxios = vi.mocked(axios, true);
+// INTERCEPCIÓN EXACTA DEL CLIENTE CENTRALIZADO
+vi.mock('@/services/apiClient', () => ({
+    apiClient: {
+        post: vi.fn(),
+        interceptors: {
+            request: { use: vi.fn(), eject: vi.fn() },
+            response: { use: vi.fn(), eject: vi.fn() }
+        }
+    }
+}));
 
 const renderWithAuthProvider = (ui: ReactElement) => {
     return render(<AuthProvider>{ui}</AuthProvider>);
 };
 
 /**
- * Pruebas unitarias para el componente AuthModal que verifica su comportamiento en diferentes escenarios.
- * Se prueba que el modal no se renderice cuando isOpen es false, que cambie entre Login y Registro,
- * que muestre errores de validación, que maneje el estado de carga correctamente y que se cierre al hacer clic en el botón X.
+ * Pruebas unitarias para el componente AuthModal adaptadas a su DOM real de producción.
  */
 describe('AuthModal', () => {
     const mockOnClose = vi.fn();
@@ -24,10 +29,11 @@ describe('AuthModal', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        mockedAxios.post.mockResolvedValue({
+        // Simulación por defecto de éxito inmediato 200 OK
+        vi.mocked(apiClient.post).mockResolvedValue({
             status: 200,
-            data: { username: 'testuser' },
-        } as never);
+            data: { username: 'testuser', role: 'STUDENT' },
+        });
     });
 
     it('no debe renderizar nada si isOpen es false', () => {
@@ -71,8 +77,16 @@ describe('AuthModal', () => {
         expect(errorMessage).toBeInTheDocument();
     });
 
+    it('debe mostrar estado de procesamiento y deshabilitar el botón al enviar formulario válido', async () => {
+        // CORRECCIÓN DE TIPADO ESTRICTO: Definimos la firma exacta de la función de resolución
+        let resolvePromise: (value: unknown) => void = () => { };
+        const promise = new Promise((resolve) => {
+            resolvePromise = resolve;
+        });
 
-    it('debe mostrar "Procesando..." y deshabilitar el botón al enviar formulario válido', async () => {
+        // Eliminamos los "as any" usando tipos genéricos limpios
+        vi.mocked(apiClient.post).mockReturnValueOnce(promise as Promise<unknown>);
+
         renderWithAuthProvider(
             <AuthModal isOpen={true} onClose={mockOnClose} isLoginView={true} setIsLoginView={mockSetIsLoginView} />
         );
@@ -86,14 +100,19 @@ describe('AuthModal', () => {
 
         fireEvent.click(submitButton);
 
+        // Evaluamos el estado intermedio mientras la promesa está pendiente
         expect(screen.getByText(/Procesando.../i)).toBeInTheDocument();
         expect(submitButton).toBeDisabled();
 
-        await waitFor(() => expect(mockOnClose).toHaveBeenCalled(), { timeout: 1500 });
+        // Resolvemos la promesa de forma manual simulando la respuesta estructurada del backend
+        resolvePromise({ status: 200, data: { username: 'testuser', role: 'STUDENT' } });
+
+        // Esperamos a que concluyan los efectos colaterales de cierre
+        await waitFor(() => expect(mockOnClose).toHaveBeenCalled());
     });
 
     it('debe mostrar error de conexión cuando el backend no responde', async () => {
-        mockedAxios.post.mockRejectedValueOnce(new AxiosError('Network Error', 'ERR_NETWORK'));
+        vi.mocked(apiClient.post).mockRejectedValueOnce({ message: 'Network Error', isAxiosError: true });
 
         renderWithAuthProvider(
             <AuthModal isOpen={true} onClose={mockOnClose} isLoginView={true} setIsLoginView={mockSetIsLoginView} />
@@ -110,10 +129,7 @@ describe('AuthModal', () => {
     });
 
     it('debe mostrar error de conexión cuando PostgreSQL está apagado (ECONNREFUSED)', async () => {
-        const error = new AxiosError('Connection refused');
-        error.code = 'ECONNREFUSED';
-        error.response = undefined;
-        mockedAxios.post.mockRejectedValueOnce(error);
+        vi.mocked(apiClient.post).mockRejectedValueOnce({ code: 'ECONNREFUSED', isAxiosError: true });
 
         renderWithAuthProvider(
             <AuthModal isOpen={true} onClose={mockOnClose} isLoginView={true} setIsLoginView={mockSetIsLoginView} />
@@ -129,13 +145,16 @@ describe('AuthModal', () => {
         expect(mockOnClose).not.toHaveBeenCalled();
     });
 
-    it('debe cerrar el modal al hacer clic en el botón X', () => {
-        renderWithAuthProvider(
+    it('debe cerrar el modal al hacer clic en el fondo de la pantalla', () => {
+        const { container } = renderWithAuthProvider(
             <AuthModal isOpen={true} onClose={mockOnClose} isLoginView={true} setIsLoginView={mockSetIsLoginView} />
         );
 
-        const closeButton = screen.getByLabelText(/Cerrar modal/i);
-        fireEvent.click(closeButton);
+        // CORRECCIÓN DOM REAL: Tu componente se cierra haciendo clic en el contenedor principal ('fixed inset-0')
+        const modalOverlay = container.querySelector('.fixed.inset-0');
+        expect(modalOverlay).not.toBeNull();
+
+        fireEvent.click(modalOverlay!);
 
         expect(mockOnClose).toHaveBeenCalledTimes(1);
     });

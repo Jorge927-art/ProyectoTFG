@@ -1,113 +1,155 @@
-import { useEffect, useState } from 'react';
-import { Sparkles, SlidersHorizontal } from 'lucide-react';
-import StudentLayout from '../../layouts/DashboardLayout';
-import { InterestsModal } from './InterestsModal';
+import { useState } from 'react';
+import { Sparkles, SlidersHorizontal, AlertCircle, CheckCircle2 } from 'lucide-react';
 
+// Importación del Layout unificado según [ADR-10]
+import DashboardLayout from '../../layouts/DashboardLayout';
+
+// Componentes atómicos del dominio de estudiante [ADR-20]
+import { InterestsModal } from './InterestsModal';
 import { CourseCatalog } from './components/CourseCatalog';
 import { EnrolledCourses } from './components/EnrolledCourses';
 import { SmartRecommendations } from './components/SmartRecommendations';
-import { useEnrolledCourses } from './components/useEnrolledCourses';
-import type { DBModelCourse } from './components/useCourseCatalog';
 
-export interface RecommendedCourse {
-    id: number;
-    title: string;
-    instructor: string;
-    category: string;
-    rating: number;
-    reason: string;
-}
+// Hooks de lógica distribuida para evitar el "God Component" [ADR-20]
+import { useEnrolledCourses } from './components/useEnrolledCourses';
+import type { DBModelCourse } from '../../../services/courseTypes';
+import type { RecommendedCourse } from '../../../services/userDomains';
+
 
 const StudentDashboard = () => {
+    // --- ESTADOS DE UI Y FEEDBACK ---
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
     const [successMessage, setSuccessMessage] = useState<string>('');
-    const [refreshCount, setRefreshCount] = useState<number>(0);
 
-    // Hook unificado consumiendo el disparador reactivo corregido
-    const {
-        enrolledList,
-        loadingEnrollments,
-        enrollmentError
-    } = useEnrolledCourses(`${successMessage}_${refreshCount}`);
+    /** 
+     * HOOK DE ASIGNATURAS MATRICULADAS:
+     * Gestiona de forma autónoma la carga desde el backend.
+     * El 'successMessage' actúa como trigger para refrescar la lista tras matricularse [6, 7].
+     */
+    const { enrolledList, loadingEnrollments, enrollmentError } = useEnrolledCourses(successMessage);
 
-    useEffect(() => {
-        if (enrollmentError) {
-            setError(enrollmentError);
-        }
-    }, [enrollmentError]);
-
+    /** 
+     * MOCK DE RECOMENDACIONES:
+     * En la fase final del TFG, este estado se alimentará del RecommendationService
+     * basado en Filtrado por Contenido [ADR-30].
+     */
     const [recommendations] = useState<RecommendedCourse[]>([
-        { id: 101, title: "Microservicios con Spring Cloud", instructor: "Carlos Garcia", category: "Arquitectura", rating: 4.9, reason: "Basado en tu avance en Spring Boot" },
-        { id: 102, title: "Gestión de Estados Avanzada en React", instructor: "Elena Perez", category: "Frontend", rating: 4.8, reason: "Ideal para tus proyectos SPA" }
+        {
+            id: 101,
+            title: "Machine Learning Avanzado",
+            instructor: "Dr. Aranda",
+            category: "Ciencia de Datos",
+            rating: 4.9,
+            reason: "Basado en tu interés por Python"
+        }
     ]);
 
-    // ÚNICA DECLARACIÓN: Manejador del éxito de la matrícula desde el catálogo
-    const handleEnrollSuccessFromCatalog = (course: DBModelCourse) => {
-        setRefreshCount(prev => prev + 1);
-        setSuccessMessage(`¡Te has matriculado en el curso ${course.title} correctamente!`);
+    /**
+     * MANEJADOR DE ÉXITO EN MATRÍCULA:
+     * Centraliza el feedback visual para el estudiante tras una acción exitosa.
+     */
+    const handleEnrollSuccess = (course: DBModelCourse) => {
+        setSuccessMessage(`¡Éxito! Te has matriculado en: ${course.title}`);
+        setError('');
+        // Limpieza automática del banner de éxito tras 5 segundos
+        setTimeout(() => setSuccessMessage(''), 5000);
+    };
+
+    /**
+     * MANEJADOR DE GUARDADO DE INTERESES:
+     * Satisface el contrato estricto exigido por InterestsModalProps.
+     */
+    const handleSaveInterests = (preferences: {
+        categories: string[];
+        levels: string[];
+        durations: string[];
+        languages: string[];
+        subtitles: string[];
+    }) => {
+        // En fases posteriores se sincronizará con la persistencia en PostgreSQL
+        console.log("Preferencias del estudiante capturadas para el TFG:", preferences);
+        setIsModalOpen(false);
+        setSuccessMessage("¡Intereses guardados y actualizados correctamente!");
+        setTimeout(() => setSuccessMessage(''), 5000);
     };
 
     return (
-        <StudentLayout>
-            <div className="p-6 max-w-7xl mx-auto min-h-screen bg-slate-50/50">
-
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+        <DashboardLayout>
+            <div className="p-6 max-w-7xl mx-auto space-y-6">
+                {/* Cabecera Principal */}
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b pb-5">
                     <div>
-                        <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                            <span>Panel de Aprendizaje</span>
-                            <Sparkles size={20} className="text-amber-500 fill-currentColor" />
-                        </h1>
-                        <p className="text-xs text-slate-400 font-medium mt-0.5">Sincronización académica transaccional en tiempo real</p>
+                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Panel del Estudiante</h1>
+                        <p className="text-gray-500 mt-1">Gestiona tus matrículas, explora el catálogo y descubre recomendaciones.</p>
                     </div>
-
                     <button
-                        type="button"
                         onClick={() => setIsModalOpen(true)}
-                        className="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs py-2 px-4 rounded-xl flex items-center gap-2 border border-slate-200 shadow-sm transition-all cursor-pointer"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm transition-colors shadow-sm self-start md:self-auto"
                     >
-                        <SlidersHorizontal size={14} className="text-slate-500" />
+                        <SlidersHorizontal className="h-4 w-4" />
                         <span>Configurar Intereses</span>
                     </button>
                 </div>
 
-                {error && (
-                    <div className="mt-4 p-3 bg-rose-50 border border-rose-100 text-rose-700 text-xs font-semibold rounded-xl flex items-center gap-2">
-                        <span>⚠️ {error}</span>
+                {/* Mensajes de Estado Operacionales (Evaluación directa y declarativa solicitada) */}
+                {(error || enrollmentError) && (
+                    <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-r-md flex items-start gap-3" role="alert">
+                        <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+                        <p className="text-sm font-medium text-red-700">
+                            {error || enrollmentError}
+                        </p>
                     </div>
                 )}
+
                 {successMessage && (
-                    <div className="mt-4 p-3 bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-semibold rounded-xl flex items-center gap-2">
-                        <span>✓ {successMessage}</span>
+                    <div className="p-4 bg-green-50 border-l-4 border-green-500 rounded-r-md flex items-start gap-3" role="alert">
+                        <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                        <p className="text-sm font-medium text-green-700">
+                            {successMessage}
+                        </p>
                     </div>
                 )}
 
-                <CourseCatalog
-                    enrolledList={enrolledList}
-                    onEnrollSuccess={handleEnrollSuccessFromCatalog}
-                    onSetGlobalError={setError}
-                    onSetGlobalSuccess={setSuccessMessage}
-                />
-
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
-                    <EnrolledCourses
-                        enrolledList={enrolledList}
-                        loadingEnrollments={loadingEnrollments}
-                    />
-                    <SmartRecommendations
-                        recommendations={recommendations}
-                    />
+                {/* Sección de Recomendaciones Inteligentes */}
+                <div className="bg-linear-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-6 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Sparkles className="h-5 w-5 text-amber-600" />
+                        <h2 className="text-lg font-semibold text-gray-900">Recomendaciones para ti</h2>
+                    </div>
+                    <SmartRecommendations recommendations={recommendations} />
                 </div>
-            </div>
 
-            <InterestsModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSave={async () => {
-                    setSuccessMessage("Preferencias guardadas con éxito en PostgreSQL.");
-                }}
-            />
-        </StudentLayout>
+                {/* Grid de Cursos Matriculados y Catálogo */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    {/* Sección: Mis Cursos */}
+                    <div className="bg-white border rounded-2xl p-6 shadow-sm">
+                        <EnrolledCourses
+                            enrolledList={enrolledList}
+                            loadingEnrollments={loadingEnrollments}
+                        />
+                    </div>
+
+                    {/* Sección: Catálogo de Cursos Disponibles */}
+                    <div className="lg:col-span-2 bg-white border rounded-2xl p-6 shadow-sm">
+                        <h2 className="text-xl font-bold text-gray-900 mb-4">Catálogo de Cursos Disponibles</h2>
+                        <CourseCatalog
+                            enrolledList={enrolledList}
+                            onEnrollSuccess={handleEnrollSuccess}
+                            onSetGlobalError={setError}
+                            onSetGlobalSuccess={setSuccessMessage}
+                        />
+                    </div>
+                </div>
+
+                {/* Modal de Configuración de Intereses */}
+                <InterestsModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    onSave={handleSaveInterests}
+                />
+            </div>
+        </DashboardLayout>
     );
 };
 

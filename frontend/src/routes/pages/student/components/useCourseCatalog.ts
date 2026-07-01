@@ -1,24 +1,7 @@
 import { useState, useEffect } from 'react';
-import { apiClient } from '@/services/apiClient';
+import { apiClient } from '../../../../services/apiClient';
 import axios from 'axios';
-
-export interface DBModelCourse {
-    course_id: number;
-    title: string;
-    url?: string;
-    shortIntro?: string;
-    category: string;
-    subCategory?: string;
-    courseType?: string;
-    language?: string;
-    subtitleLanguages?: string;
-    skills?: string;
-    instructors?: string;
-    rating?: number;
-    numOfViewers?: number;
-    duration?: number;
-    site?: string;
-}
+import type { DBModelCourse } from '../../../../services/courseTypes';
 
 export const useCourseCatalog = (onEnrollSuccess: (course: DBModelCourse) => void) => {
     const [searchKeyword, setSearchKeyword] = useState<string>('');

@@ -126,7 +126,7 @@ public class UserService {
      * Recupera de forma transaccional las preferencias de un estudiante desde
      * PostgreSQL.
      * Auditoría NotebookLM: Lanzamiento de ResourceNotFoundException (HTTP 404) en
-     * lugar de RuntimeException.
+     * lugar de RuntimeException. Refactorizado con método privado para cumplir DRY.
      */
     @Transactional(readOnly = true)
     public InterestDTO getUserInterests(String username) {
@@ -145,11 +145,8 @@ public class UserService {
                     Collections.emptyList());
         }
 
-        Hibernate.initialize(interest.getCategory());
-        Hibernate.initialize(interest.getCourse_type());
-        Hibernate.initialize(interest.getDuration());
-        Hibernate.initialize(interest.getLanguage());
-        Hibernate.initialize(interest.getSubtitle_languages());
+        // Abstracción DRY recomendada por NotebookLM
+        initializeUserInterests(interest);
 
         return new InterestDTO(
                 interest.getCategory(),
@@ -157,6 +154,20 @@ public class UserService {
                 interest.getDuration(),
                 interest.getLanguage(),
                 interest.getSubtitle_languages());
+    }
+
+    /**
+     * Inicializa de forma segura y unificada las colecciones perezosas de la
+     * entidad Interest.
+     * Encapsula las operaciones de proxy de Hibernate para cumplir el principio
+     * DRY.
+     */
+    private void initializeUserInterests(Interest interest) {
+        Hibernate.initialize(interest.getCategory());
+        Hibernate.initialize(interest.getCourse_type());
+        Hibernate.initialize(interest.getDuration());
+        Hibernate.initialize(interest.getLanguage());
+        Hibernate.initialize(interest.getSubtitle_languages());
     }
 
     /**

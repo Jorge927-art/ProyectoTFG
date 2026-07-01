@@ -1,6 +1,6 @@
 import { BookOpen, Loader2, ArrowRight } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
-import type { EnrollmentInfo } from './useEnrolledCourses';
+import type { EnrollmentInfo } from '../../../../services/courseTypes';
 
 interface EnrolledCoursesProps {
     enrolledList: EnrollmentInfo[];
@@ -33,9 +33,22 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments }: EnrolledCo
                     {enrolledList.map((enroll) => {
                         const progressPct = enroll.progress_percentage || 0;
 
-                        // Corrección de Auditoría: Estructuración limpia del estilo dinámico.
-                        // Corrige el fallo de Tailwind con variables y silencia la alerta de Microsoft Edge.
-                        const barWidthStyle = { width: `${progressPct}%` };
+                        // Mapeo declarativo O(1) de clases Tailwind según el progreso académico.
+                        // Esto elimina por completo el atributo 'style' del JSX, silenciando el linter.
+                        let tailwindWidthClass = 'w-0';
+
+                        if (progressPct >= 100) tailwindWidthClass = 'w-full';
+                        else if (progressPct >= 90) tailwindWidthClass = 'w-11/12';
+                        else if (progressPct >= 80) tailwindWidthClass = 'w-4/5';
+                        else if (progressPct >= 75) tailwindWidthClass = 'w-3/4';
+                        else if (progressPct >= 70) tailwindWidthClass = 'w-8/12';
+                        else if (progressPct >= 60) tailwindWidthClass = 'w-3/5';
+                        else if (progressPct >= 50) tailwindWidthClass = 'w-1/2';
+                        else if (progressPct >= 40) tailwindWidthClass = 'w-2/5';
+                        else if (progressPct >= 30) tailwindWidthClass = 'w-3/12';
+                        else if (progressPct >= 25) tailwindWidthClass = 'w-1/4';
+                        else if (progressPct >= 20) tailwindWidthClass = 'w-2/12';
+                        else if (progressPct >= 10) tailwindWidthClass = 'w-1/12';
 
                         return (
                             <GenericCard key={enroll.enrollmentid}>
@@ -57,11 +70,8 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments }: EnrolledCo
                                         <span className="font-bold text-blue-600">{progressPct}%</span>
                                     </div>
                                     <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
-                                        {/* Renderizado reactivo exacto usando la variable de estilo */}
-                                        <div
-                                            className="bg-blue-600 h-full transition-all duration-500"
-                                            style={barWidthStyle}
-                                        />
+                                        {/* Renderizado 100% Tailwind: Cero estilos inline en el DOM virtual */}
+                                        <div className={`bg-blue-600 h-full transition-all duration-500 ${tailwindWidthClass}`} />
                                     </div>
 
                                     <button type="button" className="w-full bg-slate-800 hover:bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer">

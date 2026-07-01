@@ -2,15 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../../../../services/apiClient';
 import { useAuth } from '../../../../auth/useAuth';
 import { readStoredAuthUser } from '../../../../auth/authStorage';
-import type { DBModelCourse } from './useCourseCatalog';
+import type { EnrollmentInfo, DBModelCourse } from '../../../../services/courseTypes';
 
-export interface EnrollmentInfo {
-    enrollmentid: number;
-    enrolled_at: string;
-    status: string;
-    progress_percentage: number;
-    course: DBModelCourse;
-}
 
 export const useEnrolledCourses = (successTrigger: string) => {
     const { user } = useAuth();

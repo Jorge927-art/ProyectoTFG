@@ -491,6 +491,64 @@ Esta decisión se ejecuta bajo las siguientes directrices técnicas:
 
 ---
 
+## [ADR-27] Resolución de Identidad mediante Claims del Token (Stateless Identity)
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** El filtrado por cadenas de texto (`username`) presentaba fallos de integridad debido a la sensibilidad a mayúsculas de PostgreSQL ("Luis" vs "luis") y a la redundancia de consultas a la base de datos tras la validación del JWT.
+* **Decisión:** Se ha migrado la resolución de identidad en los controladores hacia el uso del Claim `userId` transportado en el payload del token. El sistema extrae el ID numérico (clave primaria inmutable) directamente del contexto de `Authentication`, evitando llamadas extra a `findByUsername`.
+* **Justificación para el TFG:** Aporta solidez técnica al alinearse con las especificaciones de seguridad modernas de OAuth2 y JWT. En lugar de forzar al backend a realizar búsquedas repetitivas por cadenas de texto vulnerables a fallos de capitalización, el uso del ID extraído directamente de los claims asegura una resolución atómica y determinista.
+* **Consecuencias:**
+  * **Eliminación de errores de capitalización:** La clave primaria numérica actúa como el único identificador unívoco e inmune a las variaciones de caracteres.
+  * **Reducción de la latencia de red:** Se optimizan las conexiones con PostgreSQL al suprimir las consultas repetitivas de verificación de usuario.
+  * **Cumplimiento estricto del patrón Stateless de REST:** El servidor no retiene estados de sesión, delegando de forma segura toda la identidad en el token cifrado.
+
+## [ADR-28] Hidratación Síncrona de Matrículas en el DTO de Sesión
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Tras aplicar `@JsonIgnore` en las relaciones de usuario para evitar recursiones infinitas y desbordamientos de memoria por bucles de serialización, el frontend perdió la capacidad de saber instantáneamente en qué cursos estaba inscrito el alumno tras iniciar sesión.
+* **Decisión:** Rediseñar el registro `AuthTokenResponse.java` para incluir de forma síncrona una lista de `enrolledCourseIds`. Este array se puebla durante el proceso de login mediante una consulta proyectada y optimizada en el repositorio.
+* **Justificación para el TFG:** Resuelve un problema clásico de asincronía y desacoplamiento en aplicaciones SPA. En lugar de obligar al frontend a disparar peticiones HTTP en cascada inmediatamente después del login para conocer el estado académico del alumno, el servidor inyecta proactivamente las referencias clave en la respuesta inicial de autenticación.
+* **Consecuencias:**
+  * **Mejora drástica en la UX:** Los componentes del catálogo y los botones de inscripción reaccionan de manera instantánea sin pantallas de carga adicionales.
+  * **Blindaje de serialización:** Se mantiene la protección contra la recursión infinita en las entidades JPA sin comprometer la entrega de datos esenciales al cliente.
+
+## [ADR-29] Estrategia de Carga Transaccional (Join Fetch vs OSIV)
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Con la directiva de configuración `spring.jpa.open-in-view=false` activa para evitar fugas de conexiones en el pool, el acceso a los detalles de un curso desde una matrícula disparaba errores 500 fuera de la capa de servicio debido a la naturaleza perezosa (*Lazy loading*) de Hibernate.
+* **Decisión:** Implementar consultas explícitas utilizando cláusulas `JOIN FETCH` en `EnrollmentRepository`. Esto fuerza al motor de persistencia a recuperar el curso asociado dentro del mismo ciclo transaccional de la base de datos.
+* **Justificación para el TFG:** Demuestra madurez de ingeniería en el manejo de ORMs y rendimiento de bases de datos relacionales. Evita caer en la mala práctica de habilitar OSIV (que mantiene hilos de conexión abiertos innecesariamente hacia PostgreSQL) y ataca directamente el problema desde la raíz del diseño de la consulta.
+* **Consecuencias:**
+  * **Garantía de datos completos:** El frontend recibe el grafo de objetos hidratado de forma segura y libre de excepciones transaccionales.
+  * **Optimización del rendimiento:** Se mitiga por completo el temido problema de las "N+1 consultas", unificando las lecturas en un único viaje a la base de datos.
+
+## [ADR-30] Algoritmo de Filtrado Basado en Contenido para el Motor de Recomendaciones
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Se requería un motor de sugerencias personalizado dentro del panel del estudiante que priorizara la afinidad temática, las competencias académicas y el historial de navegación previo del alumno en lugar de mostrar un catálogo estático.
+* **Decisión:** Desarrollar un servicio especializado (`RecommendationService`) que cruce los metadatos del catálogo (`Courses`) con el perfil de preferencias guardado (`Interest`) y las matrículas previas (`Enrollment`), aplicando una ponderación matemática de pesos (30% Categoría, 25% Historial, etc.).
+* **Justificación para el TFG:** Eleva el valor académico del proyecto al introducir una capa legítima de Inteligencia de Negocio y lógica algorítmica. Justifica técnicamente el diseño de la base de datos y la creación de las tablas satélite creadas mediante colecciones de elementos.
+* **Consecuencias:**
+  * **Sugerencias predictivas dinámicas:** El frontend pinta en tiempo real recomendaciones justificadas con un porqué explícito para el estudiante.
+  * **Aprovechamiento del modelo relacional:** Se saca el máximo partido a la normalización de metadatos (categorías, lenguajes, habilidades) estructurada en PostgreSQL.
+
+## [ADR-31] Estrategia de Carga de Preferencias: Robustez frente a Rendimiento en Colecciones
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** La entidad `Interest` mapea las colecciones de preferencias dinámicas del estudiante mediante la anotación `@ElementCollection`. Por defecto, Hibernate gestiona estas colecciones mediante una carga diferida (`FetchType.LAZY`). Sin embargo, debido a las múltiples transformaciones de DTOs en capas desacopladas fuera de la sesión transaccional y bajo el contexto de seguridad del filtro JWT, la persistencia se exponía a excepciones de tipo `LazyInitializationException`.
+* **Decisión:** Configurar estas colecciones de forma ansiosa utilizando `@ElementCollection(fetch = FetchType.EAGER)`. Esta aproximación prioriza la robustez frente al rendimiento en el ámbito del desarrollo de este TFG, garantizando que toda la hidratación del grafo de datos satélite del usuario se complete de manera atómica en una única consulta SQL de tipo `JOIN` dentro de PostgreSQL.
+* **Justificación para el TFG:** Refleja la capacidad del ingeniero para evaluar los compromisos de diseño (*trade-offs*) en la persistencia de datos. Ante el tribunal, se defiende como una decisión táctica y defensiva: se sacrifica una fracción marginal de rendimiento en lecturas para blindar la API contra fallos de proxy de Hibernate en entornos multihilo o filtros desacoplados.
+* **Consecuencias:**
+  * **Estabilidad absoluta de la API:** Se eliminan de raíz las excepciones de inicialización diferida al transformar los intereses del alumno a `InterestDTO`.
+  * **Deuda técnica declarada:** Se reconoce formalmente que esta solución penalizaría la latencia en un entorno productivo con miles de usuarios concurrentes. Como mitigación futura, se propone revertir a `LAZY` apoyándose en consultas dirigidas con `JOIN FETCH` o la incorporación de una capa de caché distribuida mediante Redis.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026

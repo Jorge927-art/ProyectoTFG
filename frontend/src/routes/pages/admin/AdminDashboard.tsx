@@ -4,13 +4,7 @@ import { apiClient } from '@/services/apiClient';
 import axios from 'axios';
 import AdminLayout from '../../layouts/DashboardLayout';
 import { UserScrollList } from '../../../components/admin/UserScrollList';
-
-interface UserEntity {
-    userId?: number;
-    username: string;
-    role: string;
-    enabled: boolean;
-}
+import type { UserEntity } from '../../../services/userDomains';
 
 const AdminDashboard = () => {
     const [searchName, setSearchName] = useState<string>('');
@@ -28,7 +22,6 @@ const AdminDashboard = () => {
         setLoading(true);
         setError('');
         setFoundUser(null);
-
         try {
             const cleanName = searchName.trim();
             const response = await apiClient.get(`/api/auth/${cleanName}`);

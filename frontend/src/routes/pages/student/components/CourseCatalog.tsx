@@ -1,7 +1,7 @@
 import { Search, Loader2, Star, PlusCircle, CheckCircle2 } from 'lucide-react';
 import { useMemo } from 'react';
 import { useCourseCatalog } from './useCourseCatalog';
-import type { DBModelCourse } from './useCourseCatalog';
+import type { DBModelCourse } from '../../../../services/courseTypes';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import { useAuth } from '../../../../auth/useAuth';
 
