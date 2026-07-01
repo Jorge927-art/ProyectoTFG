@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { apiClient } from '@/services/apiClient';
-import axios from 'axios';
+import { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '../../../../services/apiClient';
+import { useAuth } from '../../../../auth/useAuth';
+import { readStoredAuthUser } from '../../../../auth/authStorage';
 import type { DBModelCourse } from './useCourseCatalog';
 
 export interface EnrollmentInfo {
@@ -12,65 +13,83 @@ export interface EnrollmentInfo {
 }
 
 export const useEnrolledCourses = (successTrigger: string) => {
+    const { user } = useAuth();
     const [enrolledList, setEnrolledList] = useState<EnrollmentInfo[]>([]);
     const [loadingEnrollments, setLoadingEnrollments] = useState<boolean>(false);
     const [enrollmentError, setEnrollmentError] = useState<string>('');
 
-    const fetchStudentEnrollments = async () => {
+    /**
+     * Recupera las asignaturas activas del estudiante pasando el username como parámetro.
+     * Sincroniza el contrato de red con el endpoint especializado del Backend.
+     */
+    const fetchStudentEnrollments = useCallback(async () => {
         setLoadingEnrollments(true);
         setEnrollmentError('');
         try {
-            const authUser = localStorage.getItem('auth_user');
-            if (!authUser) return;
+            const currentUsername = user?.username?.trim() ?? readStoredAuthUser()?.username?.trim();
 
-            const parsedUser = JSON.parse(authUser);
-            const currentUsername = parsedUser?.username || "luis";
+            if (!currentUsername) {
+                setEnrollmentError('No se pudo identificar al estudiante autenticado.');
+                return;
+            }
 
-            const response = await apiClient.get(`/api/auth/${encodeURIComponent(currentUsername.trim().toLowerCase())}`);
+            const response = await apiClient.get<Record<string, unknown>[]>('/api/auth/my-active-courses', {
+                params: { username: currentUsername }
+            });
 
-            if (response.status === 200 && response.data.enrollments) {
-                setEnrolledList(response.data.enrollments as EnrollmentInfo[]);
+            if (response.status === 200 && response.data) {
+                // 3. Mapeo adaptativo tolerante a la nomenclatura del ORM (course vs courses)
+                const normalizedData = response.data.map((enrollment) => {
+                    const courseData = (enrollment.course || enrollment.courses || enrollment) as Record<string, unknown>;
+                    
+                    return {
+                        enrollmentid: Number(enrollment.enrollmentid || Date.now()),
+                        enrolled_at: String(enrollment.enrolled_at || new Date().toISOString()),
+                        status: String(enrollment.status || "EN_PROGRESO"),
+                        progress_percentage: Number(enrollment.progress_percentage ?? enrollment.progress ?? 0),
+                        course: {
+                            course_id: Number(courseData.course_id || courseData.id || 0),
+                            title: String(courseData.title || ""),
+                            category: String(courseData.category || "General"),
+                            instructors: String(courseData.instructors || "Por asignar")
+                        }
+                    };
+                });
+
+                setEnrolledList(normalizedData);
             }
         } catch (err) {
-            if (axios.isAxiosError(err) && err.response?.status === 400) {
-                setEnrolledList([
-                    {
-                        enrollmentid: 1,
-                        enrolled_at: new Date().toISOString(),
-                        status: "EN_PROGRESO",
-                        progress_percentage: 0,
-                        course: {
-                            course_id: 2,
-                            title: "Introduction to Data Science Specialization",
-                            category: "Data Science",
-                            instructors: "Raymond Xie"
-                        }
-                    }
-                ]);
-            } else {
-                console.error("Error al recuperar las matrículas:", err);
-                setEnrollmentError("No se pudieron sincronizar tus asignaturas activas.");
-            }
+            console.error("Error crítico en la pasarela HTTP de matrículas:", err);
+            setEnrollmentError("No se pudieron sincronizar tus asignaturas activas desde PostgreSQL.");
         } finally {
             setLoadingEnrollments(false);
         }
-    };
+    }, [user?.username]);
 
+    // Reactividad: Se ejecuta al montar el componente y cada vez que cambia el successTrigger
     useEffect(() => {
         fetchStudentEnrollments();
-    }, [successTrigger]);
+    }, [successTrigger, fetchStudentEnrollments]);
 
+    /**
+     * Inyecta de forma optimista la matrícula en caliente en el estado local
+     */
     const injectLocalEnrollment = (course: DBModelCourse) => {
-        setEnrolledList((prev) => [
-            ...prev,
-            {
-                enrollmentid: Date.now(),
-                enrolled_at: new Date().toISOString(),
-                status: "EN_PROGRESO",
-                progress_percentage: 0,
-                course: course
-            }
-        ]);
+        setEnrolledList((prev) => {
+            const exists = prev.some(e => e.course.course_id === course.course_id);
+            if (exists) return prev;
+
+            return [
+                ...prev,
+                {
+                    enrollmentid: Date.now(),
+                    enrolled_at: new Date().toISOString(),
+                    status: "EN_PROGRESO",
+                    progress_percentage: 0,
+                    course: course
+                }
+            ];
+        });
     };
 
     return {

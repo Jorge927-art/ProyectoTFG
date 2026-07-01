@@ -18,6 +18,7 @@ export interface AuthUser {
     role?: UserRole;
     userId?: number;
     email?: string;
+    enrolledCourseIds?: number[]; // Fuente de verdad reactiva en memoria del cliente
     [key: string]: unknown;
 }
 
@@ -33,6 +34,7 @@ export interface AuthTokenResponse {
     username: string;
     role: UserRole;
     email: string;
+    enrolledCourseIds: number[]; // Coincidencia exacta con la hidratación de Spring Boot
 }
 
 /**

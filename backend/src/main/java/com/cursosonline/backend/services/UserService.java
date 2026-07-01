@@ -224,7 +224,7 @@ public class UserService {
      * registros duplicados.
      */
     @Transactional
-    public void enrollStudentInCourse(String username, Long courseId) {
+    public Enrollment enrollStudentInCourse(String username, Long courseId) {
         // 1. Validar precondición de existencia de usuario
         Users user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ServicesException("Usuario no encontrado"));
@@ -247,6 +247,6 @@ public class UserService {
         enrollment.setCourse(course);
 
         // 5. Volcar de forma transaccional directa a PostgreSQL
-        enrollmentRepository.saveAndFlush(enrollment);
+        return enrollmentRepository.saveAndFlush(enrollment);
     }
 }

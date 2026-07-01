@@ -4,12 +4,15 @@ import com.cursosonline.backend.dto.AuthTokenResponse;
 import com.cursosonline.backend.dto.LoginRequest;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.exception.ServicesException;
 import com.cursosonline.backend.security.jwt.JwtService;
 import com.cursosonline.backend.services.UserService;
+import com.cursosonline.backend.repository.EnrollmentRepository;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.security.access.prepost.PreAuthorize;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,6 +29,7 @@ public class UserController {
 
     private final UserService userService;
     private final JwtService jwtService;
+    private final EnrollmentRepository enrollmentRepository;
 
     /**
      * Endpoint para el registro de nuevos usuarios.
@@ -37,46 +41,35 @@ public class UserController {
 
     /**
      * Endpoint para el login de usuarios (JWT Stateless).
-     * Centraliza la validación de credenciales y el estado de borrado lógico
-     * (enabled).
      */
     @PostMapping("/login")
     public ResponseEntity<AuthTokenResponse> login(@RequestBody LoginRequest loginRequest) {
-        // 1. CORRECCIÓN AUDITORÍA: Validar credenciales Y estado 'enabled' en una sola
-        // llamada de negocio
         Users user = userService.login(loginRequest.username(), loginRequest.password());
+        List<Long> enrolledCourseIds = enrollmentRepository.findEnrolledCourseIdsByUserId(user.getUser_id());
 
-        // 2. Generar el token inyectando las propiedades en los Custom Claims
         String jwtToken = jwtService.generateAccessToken(
                 (org.springframework.security.core.userdetails.UserDetails) user,
                 user.getUser_id(),
                 user.getEmail());
 
-        // 3. Calcular expiración
         Instant expirationInstant = jwtService.extractExpiration(jwtToken);
         long expiresInSeconds = expirationInstant != null
                 ? (expirationInstant.getEpochSecond() - Instant.now().getEpochSecond())
                 : 0;
 
-        return ResponseEntity.ok(AuthTokenResponse.from(user, jwtToken, expiresInSeconds));
+        return ResponseEntity.ok(AuthTokenResponse.from(user, jwtToken, expiresInSeconds, enrolledCourseIds));
     }
 
     /**
      * Endpoint para recuperar los intereses y criterios de filtrado guardados del
      * alumno en sesión.
-     * CRÍTICO: Se posiciona estratégicamente ANTES de /{username} para evitar
-     * conflictos de
-     * ambigüedad en el enrutamiento de Spring MVC (Error 400 / 404).
      */
     @GetMapping("/my-interests")
     public ResponseEntity<?> getStudentInterests(Principal principal) {
         if (principal == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
         }
-
-        // Consultamos el servicio que carga e inicializa las colecciones de Hibernate
         com.cursosonline.backend.dto.InterestDTO interestDTO = userService.getUserInterests(principal.getName());
-
         return ResponseEntity.ok(interestDTO);
     }
 
@@ -92,7 +85,6 @@ public class UserController {
 
     /**
      * Endpoint para obtener la lista de todos los usuarios.
-     * Restringido mediante anotación declarativa a nivel de método.
      */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -103,7 +95,6 @@ public class UserController {
     /**
      * Endpoint exclusivo para que el Administrador cambie el rol de cualquier
      * usuario.
-     * Delega la seguridad y la validación de errores semánticos al framework.
      */
     @PatchMapping("/users/{username}/role")
     @PreAuthorize("hasRole('ADMIN')")
@@ -111,13 +102,11 @@ public class UserController {
             @PathVariable String username,
             @RequestBody Map<String, String> requestBody) {
 
-        // 1. Validar precondición del cuerpo de la solicitud
         String roleStr = requestBody.get("role");
         if (roleStr == null || roleStr.trim().isEmpty()) {
             throw new IllegalArgumentException("El campo 'role' es requerido");
         }
 
-        // 2. Mapear de forma segura al ENUM Role
         Role newRole;
         try {
             newRole = Role.valueOf(roleStr.toUpperCase().trim());
@@ -125,7 +114,6 @@ public class UserController {
             throw new IllegalArgumentException("Rol inválido. Opciones válidas: STUDENT, PROFESSOR, ADMIN");
         }
 
-        // 3. Modificar el rol del usuario en PostgreSQL de forma transaccional
         Users updatedUser = userService.updateUserRole(username, newRole);
 
         return ResponseEntity.ok(Map.of(
@@ -137,23 +125,18 @@ public class UserController {
     /**
      * Endpoint para alternar el estado de acceso de un usuario (Borrado lógico /
      * Reactivación).
-     * Restringido estrictamente a administradores. Evita el autoborrado.
      */
     @DeleteMapping("/users/{username}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteUserByAdmin(@PathVariable String username, Principal principal) {
-        // Protección absoluta: Bloquear autoborrado en el servidor
         if (principal.getName().equalsIgnoreCase(username)) {
             return ResponseEntity.badRequest().body(Map.of(
                     "error", "Acción denegada: No puedes modificar tu propia cuenta de administrador."));
         }
 
-        // Ejecutamos la mutación en el servicio y capturamos la entidad actualizada
         Users updatedUser = userService.deleteByUsername(username);
-
         String accion = updatedUser.isEnabled() ? "reactivado y dado de alta" : "eliminado (baja lógica)";
 
-        // CRÍTICO PARA EL FRONTEND: Devolvemos el booleano exacto escrito en PostgreSQL
         return ResponseEntity.ok(Map.of(
                 "enabled", updatedUser.isEnabled(),
                 "message", "El usuario '" + username + "' ha sido " + accion + " en PostgreSQL con éxito."));
@@ -162,8 +145,6 @@ public class UserController {
     /**
      * Endpoint para guardar o actualizar los intereses y criterios de filtrado del
      * alumno en sesión.
-     * Extrae la identidad de forma segura desde el Principal de Spring Security
-     * (Stateless).
      */
     @PostMapping("/my-interests")
     public ResponseEntity<?> saveStudentInterests(@RequestBody com.cursosonline.backend.dto.InterestDTO interestDTO,
@@ -171,13 +152,35 @@ public class UserController {
         if (principal == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
         }
-
-        // Delegamos la lógica de negocio y guardado transaccional al servicio de
-        // usuarios
         userService.saveUserInterests(principal.getName(), interestDTO);
-
         return ResponseEntity.ok(Map.of(
                 "message", "Tus preferencias de recomendación han sido guardadas con éxito en PostgreSQL."));
     }
 
+    /**
+     * Endpoint especializado para la hidratación del bloque de asignaturas en
+     * progreso.
+     * Recibe el username de forma explícita para evitar fallos de inyección (HTTP
+     * 400) con el filtro JWT.
+     */
+    @GetMapping("/my-active-courses")
+    public ResponseEntity<List<Enrollment>> getMyActiveCourses(@RequestParam("username") String username) {
+        if (username == null || username.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        // 1. Conservamos el username exacto almacenado en sesión para respetar el
+        // contrato del repositorio
+        String normalizedUsername = username.trim();
+
+        // 2. Resolución de identidad transaccional mediante el servicio
+        Users user = userService.findByUsername(normalizedUsername)
+                .orElseThrow(
+                        () -> new ServicesException("Usuario no encontrado para el nombre: " + normalizedUsername));
+
+        // 3. Consulta indexada por clave primaria sobre la relación JOIN FETCH
+        List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(user.getUser_id());
+
+        return ResponseEntity.ok(enrollments);
+    }
 }

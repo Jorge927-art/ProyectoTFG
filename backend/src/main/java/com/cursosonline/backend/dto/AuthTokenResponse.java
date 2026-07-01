@@ -2,12 +2,9 @@ package com.cursosonline.backend.dto;
 
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Users;
+import java.util.List;
 
-/**
- * Record que extiende el contrato de autenticación para dar soporte a JWT.
- * Mantiene la compatibilidad semántica con los datos requeridos por el cliente
- * e incorpora el token de acceso junto a sus metadatos de expiración.
- */
+// Definición canónica del Record con sus campos correctamente separados por comas
 public record AuthTokenResponse(
         String accessToken,
         String tokenType,
@@ -15,10 +12,14 @@ public record AuthTokenResponse(
         Long userId,
         String username,
         Role role,
-        String email) {
-    // Método estático de factoría idéntico al que ya usas, facilitando la
-    // transición
-    public static AuthTokenResponse from(Users user, String token, long expirationTime) {
+        String email,
+        List<Long> enrolledCourseIds) {
+    /**
+     * Método estático de factoría corregido.
+     * Se añade 'List<Long> enrolledCourseIds' en los parámetros de entrada
+     * para mapear la hidratación de matrículas.
+     */
+    public static AuthTokenResponse from(Users user, String token, long expirationTime, List<Long> enrolledCourseIds) {
         return new AuthTokenResponse(
                 token,
                 "Bearer",
@@ -26,6 +27,7 @@ public record AuthTokenResponse(
                 user.getUser_id(),
                 user.getUsername(),
                 user.getRole(),
-                user.getEmail());
+                user.getEmail(),
+                enrolledCourseIds);
     }
 }

@@ -9,6 +9,7 @@ import type { AuthUser } from "@/auth";
 const buildAuthValue = (user: AuthUser | null): AuthContextValue => ({
     user,
     isAuthenticated: Boolean(user),
+    isLoading: false,
     login: vi.fn(),
     logout: vi.fn(),
 });
@@ -78,7 +79,7 @@ describe("AppRoutes - autorizacion por rol", () => {
     it("permite /student aunque el rol venga en minusculas", () => {
         renderWithRouteAndAuth("/student", {
             username: "student_lowercase",
-            role: "student",
+            role: "student" as AuthUser["role"],
         });
 
         expect(screen.getByText(/Panel del estudiante/i)).toBeInTheDocument();

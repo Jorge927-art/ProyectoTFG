@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Sparkles, SlidersHorizontal } from 'lucide-react';
 import StudentLayout from '../../layouts/DashboardLayout';
 import { InterestsModal } from './InterestsModal';
@@ -9,7 +9,6 @@ import { SmartRecommendations } from './components/SmartRecommendations';
 import { useEnrolledCourses } from './components/useEnrolledCourses';
 import type { DBModelCourse } from './components/useCourseCatalog';
 
-// Auditoría NotebookLM: Añadido 'export' para que sea la única fuente de verdad compartida.
 export interface RecommendedCourse {
     id: number;
     title: string;
@@ -23,26 +22,30 @@ const StudentDashboard = () => {
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
     const [successMessage, setSuccessMessage] = useState<string>('');
+    const [refreshCount, setRefreshCount] = useState<number>(0);
 
+    // Hook unificado consumiendo el disparador reactivo corregido
     const {
         enrolledList,
         loadingEnrollments,
-        enrollmentError,
-        injectLocalEnrollment
-    } = useEnrolledCourses(successMessage);
+        enrollmentError
+    } = useEnrolledCourses(`${successMessage}_${refreshCount}`);
 
-    if (enrollmentError && !error) {
-        setError(enrollmentError);
-    }
+    useEffect(() => {
+        if (enrollmentError) {
+            setError(enrollmentError);
+        }
+    }, [enrollmentError]);
 
     const [recommendations] = useState<RecommendedCourse[]>([
         { id: 101, title: "Microservicios con Spring Cloud", instructor: "Carlos Garcia", category: "Arquitectura", rating: 4.9, reason: "Basado en tu avance en Spring Boot" },
         { id: 102, title: "Gestión de Estados Avanzada en React", instructor: "Elena Perez", category: "Frontend", rating: 4.8, reason: "Ideal para tus proyectos SPA" }
     ]);
 
+    // ÚNICA DECLARACIÓN: Manejador del éxito de la matrícula desde el catálogo
     const handleEnrollSuccessFromCatalog = (course: DBModelCourse) => {
-        injectLocalEnrollment(course);
-        setSuccessMessage("¡Te has matriculado en el curso correctamente!");
+        setRefreshCount(prev => prev + 1);
+        setSuccessMessage(`¡Te has matriculado en el curso ${course.title} correctamente!`);
     };
 
     return (

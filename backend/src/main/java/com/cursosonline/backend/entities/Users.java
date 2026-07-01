@@ -1,5 +1,8 @@
 package com.cursosonline.backend.entities;
 
+// CAMBIO: Importación estándar compatible con el motor de serialización de Spring Boot
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -30,17 +33,20 @@ public class Users implements UserDetails {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Role role; // Enum para: ADMIN, PROFESSOR, STUDENT
+    private Role role;
 
     @Column(name = "email", nullable = true)
     private String email;
 
-    // --- NUEVO CAMPO PARA EL BORRADO LÓGICO ---
     @Column(nullable = false)
-    private boolean enabled = true; // Por defecto nace activo en PostgreSQL
+    private boolean enabled = true;
 
-    // Relación bidireccional: Permite al usuario conocer su historial de matrículas
-    // sin romper rendimiento
+    /**
+     * Relación bidireccional con el historial de matrículas.
+     * Blindada con la anotación canónica de Jackson para evitar
+     * LazyInitializationException.
+     */
+    @JsonIgnore
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Enrollment> enrollments = new ArrayList<>();
 

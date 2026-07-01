@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }, []);
 
     /**
-     * Procesa el inicio de sesión con JWT.
+     * Procesa el inicio de sesión con JWT e hidrata los metadatos de sesión.
      */
     const login = (tokenData: AuthTokenResponse) => {
         // Corrección de Auditoría: Se consume directamente 'expiresIn' del contrato del Backend.
@@ -35,12 +35,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const lifespanMs = (typeof seconds === 'number' && seconds > 0) ? seconds * 1000 : 15 * 60 * 1000;
         const expiresAt = Date.now() + lifespanMs;
 
-        // Extraer los datos e inyectar el sello de caducidad en el perfil
+        // Extraer los datos e inyectar el sello de caducidad y el array de cursos matriculados
         const nextUser: AuthUser & { expiresAt: number } = {
             userId: tokenData.userId,
             username: tokenData.username,
             role: tokenData.role,
             email: tokenData.email,
+            enrolledCourseIds: tokenData.enrolledCourseIds || [], // Hidratación síncrona en el cliente
             token: tokenData.accessToken,
             expiresAt: expiresAt
         };

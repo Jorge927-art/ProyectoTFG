@@ -1,8 +1,10 @@
 package com.cursosonline.backend.controller;
 
 import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.services.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,9 +40,13 @@ public class CourseController {
             return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
         }
 
-        userService.enrollStudentInCourse(principal.getName(), courseId);
+        Enrollment enrollment = userService.enrollStudentInCourse(principal.getName(), courseId);
 
-        return ResponseEntity.ok(Map.of(
-                "message", "Te has matriculado en el curso con éxito de forma persistente."));
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "message", "Te has matriculado en el curso con éxito de forma persistente.",
+                "enrollmentId", enrollment.getEnrollmentid(),
+                "userId", enrollment.getUser().getUser_id(),
+                "courseId", enrollment.getCourse().getCourse_id(),
+                "status", enrollment.getStatus()));
     }
 }

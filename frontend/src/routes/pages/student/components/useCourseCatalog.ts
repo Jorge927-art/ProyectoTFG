@@ -57,7 +57,7 @@ export const useCourseCatalog = (onEnrollSuccess: (course: DBModelCourse) => voi
 
         try {
             const response = await apiClient.post(`/api/courses/enroll/${courseId}`);
-            if (response.status === 200) {
+            if (response.status >= 200 && response.status < 300) {
                 const enrolledCourse = catalogCourses.find(c => c.course_id === courseId);
                 if (enrolledCourse) {
                     onEnrollSuccess(enrolledCourse);

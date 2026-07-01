@@ -1,6 +1,7 @@
 import type { AuthUser } from './authTypes';
 
 const USER_KEY = 'user';
+const LEGACY_USER_KEY = 'auth_user';
 const TOKEN_KEY = 'accessToken'; // Nueva clave para persistir el JWT de forma aislada
 
 
@@ -36,7 +37,7 @@ export function readStoredAuthUser(): AuthUser | null {
         return null;
     }
 
-    const rawValue = window.localStorage.getItem(USER_KEY);
+    const rawValue = window.localStorage.getItem(USER_KEY) ?? window.localStorage.getItem(LEGACY_USER_KEY);
     if (!rawValue) {
         return null;
     }
@@ -56,10 +57,16 @@ export function readStoredAuthUser(): AuthUser | null {
             return null; // Forzamos a React a inicializarse como no autenticado
         }
 
-        return {
+        const normalizedUser = {
             ...parsedValue,
             username: parsedValue.username,
         } as AuthUser;
+
+        if (!window.localStorage.getItem(USER_KEY) && window.localStorage.getItem(LEGACY_USER_KEY)) {
+            writeStoredAuthUser(normalizedUser);
+        }
+
+        return normalizedUser;
     } catch {
         return null;
     }
@@ -74,6 +81,7 @@ export function writeStoredAuthUser(user: AuthUser) {
     }
 
     window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+    window.localStorage.setItem(LEGACY_USER_KEY, JSON.stringify(user));
 }
 
 /**
@@ -84,5 +92,6 @@ export function clearStoredAuth() {
         return;
     }
     window.localStorage.removeItem(USER_KEY);
+    window.localStorage.removeItem(LEGACY_USER_KEY);
     window.localStorage.removeItem(TOKEN_KEY); // Limpieza absoluta del token
 }
