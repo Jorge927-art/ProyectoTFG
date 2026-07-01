@@ -11,8 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -77,8 +75,9 @@ public class RecommendationService {
         boolean hasThematicSuccess = false;
         if (enrolledCourseIds != null && !enrolledCourseIds.isEmpty() && course.getCategory() != null) {
             Set<String> myCategories = allCourses.stream()
-                    .filter(c -> enrolledCourseIds.contains(c.getCourse_id()) && c.getCategory() != null)
-                    .map(Courses::getCategory)
+                    .filter(c -> c != null && enrolledCourseIds.contains(c.getCourse_id()) && c.getCategory() != null)
+                    .map(c -> c.getCategory().trim()) // CORRECCIÓN: Lambda explícita que neutraliza el aviso de
+                                                      // seguridad de tipos
                     .collect(Collectors.toSet());
 
             if (myCategories.contains(course.getCategory())) {
