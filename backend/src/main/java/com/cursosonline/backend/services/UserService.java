@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
-import org.hibernate.Hibernate;
 
 import java.util.Optional;
 import java.util.List;
@@ -145,8 +144,9 @@ public class UserService {
                     Collections.emptyList());
         }
 
-        // Abstracción DRY recomendada por NotebookLM
-        initializeUserInterests(interest);
+        // CORRECCIÓN SEGURO: Eliminamos initializeUserInterests(interest) para liberar
+        // la sesión de Hibernate y permitir que el método POST/PUT posterior escriba en
+        // PostgreSQL.
 
         return new InterestDTO(
                 interest.getCategory(),
@@ -157,25 +157,11 @@ public class UserService {
     }
 
     /**
-     * Inicializa de forma segura y unificada las colecciones perezosas de la
-     * entidad Interest.
-     * Encapsula las operaciones de proxy de Hibernate para cumplir el principio
-     * DRY.
-     */
-    private void initializeUserInterests(Interest interest) {
-        Hibernate.initialize(interest.getCategory());
-        Hibernate.initialize(interest.getCourse_type());
-        Hibernate.initialize(interest.getDuration());
-        Hibernate.initialize(interest.getLanguage());
-        Hibernate.initialize(interest.getSubtitle_languages());
-    }
-
-    /**
      * Guarda o actualiza de forma transaccional las preferencias de un estudiante.
      * Si es la primera vez que configura sus intereses, se instancia una nueva
      * entidad vinculada a su cuenta de PostgreSQL usando @MapsId.
-     * Auditoría NotebookLM: Lanzamiento de ResourceNotFoundException (HTTP 404) en
-     * lugar de RuntimeException.
+     * Corregido bajo [ADR-18] para preservar los envoltorios PersistentBag de
+     * Hibernate.
      */
     @Transactional
     public void saveUserInterests(String username, InterestDTO dto) {
@@ -184,24 +170,39 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
 
         // 2. Buscar si ya tiene un registro de intereses previo. Si no existe, creamos
-        // uno nuevo.
+        // uno nuevo con ID síncrono.
         Interest interest = interestRepository.findById(user.getUser_id())
                 .orElseGet(() -> {
                     Interest newInterest = new Interest();
-                    newInterest.setUser(user); // Establecemos la relación OneToOne para @MapsId
-                    return newInterest;
+                    newInterest.setId(user.getUser_id()); // Sincronización manual requerida por @MapsId
+                    newInterest.setUser(user);
+                    return interestRepository.save(newInterest);
                 });
 
-        // 3. Mapear y actualizar los listados de preferencias dinámicas
-        interest.setCategory(dto.categories());
-        interest.setCourse_type(dto.levels()); // Mapeado semánticamente a la columna del catálogo de cursos
-        interest.setDuration(dto.durations());
-        interest.setLanguage(dto.languages());
-        interest.setSubtitle_languages(dto.subtitles()); // Mapeado semánticamente a la columna de subtítulos
+        // 3. Mapear y actualizar el contenido de los listados preservando las
+        // referencias de Hibernate [ADR-18]
+        updateCollection(interest.getCategory(), dto.categories());
+        updateCollection(interest.getCourse_type(), dto.levels());
+        updateCollection(interest.getDuration(), dto.durations());
+        updateCollection(interest.getLanguage(), dto.languages());
+        updateCollection(interest.getSubtitle_languages(), dto.subtitles());
 
         // 4. Persistir los cambios forzando el volcado directo a PostgreSQL y sus 5
         // tablas satélite
         interestRepository.saveAndFlush(interest);
+    }
+
+    /**
+     * Método auxiliar privado que implementa el mecanismo destructivo-limpio
+     * [ADR-18].
+     * Modifica el contenido de la lista gestionada por el ORM sin romper su
+     * envoltorio PersistentBag.
+     */
+    private void updateCollection(List<String> current, List<String> next) {
+        current.clear();
+        if (next != null) {
+            current.addAll(next);
+        }
     }
 
     /**

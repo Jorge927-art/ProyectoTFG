@@ -51,7 +51,7 @@ describe("AppRoutes - autorizacion por rol", () => {
             role: "STUDENT",
         });
 
-        expect(screen.getByText(/Panel del estudiante/i)).toBeInTheDocument();
+        expect(screen.getByText(/Intereses del estudiante/i)).toBeInTheDocument();
     });
 
     it("bloquea acceso a /admin para rol STUDENT y muestra acceso denegado", () => {
@@ -99,7 +99,7 @@ describe("AppRoutes - autorizacion por rol", () => {
             role: "student" as AuthUser["role"],
         });
 
-        expect(screen.getByText(/Panel del estudiante/i)).toBeInTheDocument();
+        expect(screen.getByText(/Intereses del estudiante/i)).toBeInTheDocument();
     });
 
     it("redirecciona a landing cuando la ruta no existe", () => {

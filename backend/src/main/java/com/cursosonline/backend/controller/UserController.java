@@ -133,17 +133,23 @@ public class UserController {
     }
 
     /**
-     * Endpoint para guardar o actualizar los intereses y criterios de filtrado del
-     * alumno en sesión.
+     * Endpoint unificado para guardar o actualizar los intereses y criterios de
+     * filtrado del alumno en sesión.
+     * Soporta POST y PUT de forma segura para evitar fallos de parpadeo (405 Method
+     * Not Allowed) en el frontend.
      */
-    @PostMapping("/my-interests")
+    @RequestMapping(value = "/my-interests", method = { RequestMethod.POST, RequestMethod.PUT })
     public ResponseEntity<?> saveStudentInterests(@RequestBody com.cursosonline.backend.dto.InterestDTO interestDTO,
             Principal principal) {
         if (principal == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
         }
+
+        // Invocación a tu servicio (que ya tiene la corrección de sincronización de ID)
         userService.saveUserInterests(principal.getName(), interestDTO);
+
         return ResponseEntity.ok(Map.of(
+                "success", true,
                 "message", "Tus preferencias de recomendación han sido guardadas con éxito en PostgreSQL."));
     }
 

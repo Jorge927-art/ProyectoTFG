@@ -66,8 +66,8 @@ const StudentDashboard = () => {
                 {/* Cabecera Principal */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b pb-5">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Panel del Estudiante</h1>
-                        <p className="text-gray-500 mt-1">Gestiona tus matrículas, explora el catálogo y descubre recomendaciones.</p>
+                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Intereses del Estudiante</h1>
+                        <p className="text-gray-500 mt-1">Configura tus intereses académicos para recibir sugerencias exclusivas y optimizar tu catálogo</p>
                     </div>
                     <button
                         onClick={() => setIsModalOpen(true)}

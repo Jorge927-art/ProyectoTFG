@@ -563,6 +563,28 @@ Esta decisión se ejecuta bajo las siguientes directrices técnicas:
 
 ---
 
+## [Enmienda Tecnológica a ADR-33] Evolución de la Persistencia Multidimensional de Intereses
+
+### Contexto Técnico
+
+Durante la integración del Motor de Recomendaciones Algorítmicas, se detectó un fallo de regresión en el guardado del modal de preferencias del estudiante. La tabla principal `interests` y sus 5 tablas satélite (ej. `interest_categories`) rechazaban las actualizaciones de forma silenciosa debido a dos fenómenos del ciclo de vida de Hibernate:
+
+1. **Identidad Huérfana:** Al usar `@MapsId` sin estrategias `@GeneratedValue`, el motor de persistencia requería la asignación explícita del ID del usuario en memoria antes de invocar al repositorio.
+2. **Violación de PersistentBag:** El uso de métodos *setter* convencionales reemplazaba los envoltorios nativos de las colecciones de Spring Data JPA por instancias estándar de `ArrayList`, inhabilitando la generación automática de sentencias SQL `DELETE` e `INSERT`.
+
+### Decisiones Adoptadas
+
+1. **Sincronización Manual de Identidad:** Se modificó el bloque constructivo `.orElseGet()` en la capa de servicios para forzar la inyección del ID físico del usuario (`newInterest.setId(user.getUser_id())`) previo al volcado atómico.
+2. **Patrón de Mutación Destructivo-Limpio [ADR-18]:** Se implementó una abstracción encapsulada mediante el método `updateCollection(current, next)`, aplicando operaciones estrictas de `.clear()` y `.addAll()` sobre las listas originales de Hibernate para preservar el rastreo del estado de persistencia (*dirty checking*).
+3. **Tolerancia Semántica en Endpoints:** Se expandió la anotación del controlador a un mapa `@RequestMapping` multitolerante para absorber de forma nativa peticiones `POST` y `PUT` sin alterar el contrato con la interfaz de usuario en React.
+
+### Consecuencias Positivas
+
+* Se restablece la suite de pruebas del frontend y backend en verde sin alterar las dependencias del `pom.xml`.
+* Se garantiza la integridad referencial en PostgreSQL en la Primera Forma Normal (1FN), asegurando que el motor algorítmico lea datos reales e impidiendo el parpadeo de estado local en la interfaz del alumno Luis.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026

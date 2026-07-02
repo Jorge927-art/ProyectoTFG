@@ -70,6 +70,7 @@ backend/src/main/java/com/cursosonline/backend/dto/InterestDTO.java
 backend/src/main/java/com/cursosonline/backend/dto/LoginRequest.java
 backend/src/main/java/com/cursosonline/backend/dto/ProfileResponseDTO.java
 backend/src/main/java/com/cursosonline/backend/dto/ProfileUpdateDTO.java
+backend/src/main/java/com/cursosonline/backend/dto/RecommendationDTO.java
 backend/src/main/java/com/cursosonline/backend/entities/Courses.java
 backend/src/main/java/com/cursosonline/backend/entities/Enrollment.java
 backend/src/main/java/com/cursosonline/backend/entities/Interest.java
@@ -89,6 +90,8 @@ backend/src/main/java/com/cursosonline/backend/repository/UserRepository.java
 backend/src/main/java/com/cursosonline/backend/security/jwt/JwtAuthenticationFilter.java
 backend/src/main/java/com/cursosonline/backend/security/jwt/JwtService.java
 backend/src/main/java/com/cursosonline/backend/services/FileStorageService.java
+backend/src/main/java/com/cursosonline/backend/services/RecommendationService.java
+backend/src/main/java/com/cursosonline/backend/services/SemanticNormalizer.java
 backend/src/main/java/com/cursosonline/backend/services/SessionAuthenticationService.java
 backend/src/main/java/com/cursosonline/backend/services/UserService.java
 backend/src/main/resources/application-dev.properties
@@ -99,6 +102,7 @@ backend/src/test/java/com/cursosonline/backend/controller/UserControllerTest.jav
 backend/src/test/java/com/cursosonline/backend/FileStorageServiceTest.java
 backend/src/test/java/com/cursosonline/backend/security/jwt/CorsIntegrationTest.java
 backend/src/test/java/com/cursosonline/backend/security/jwt/JwtServiceTest.java
+backend/src/test/java/com/cursosonline/backend/services/RecommendationServiceTest.java
 backend/src/test/java/com/cursosonline/backend/UserServiceTest.java
 frontend/docs/.nojekyll
 frontend/docs/assets/hierarchy.js
@@ -190,6 +194,7 @@ frontend/src/routes/pages/student/components/EnrolledCourses.tsx
 frontend/src/routes/pages/student/components/SmartRecommendations.tsx
 frontend/src/routes/pages/student/components/useCourseCatalog.ts
 frontend/src/routes/pages/student/components/useEnrolledCourses.ts
+frontend/src/routes/pages/student/components/useSmartRecommendations.ts
 frontend/src/routes/pages/student/InterestsModal.tsx
 frontend/src/routes/pages/student/StudentDashboard.tsx
 frontend/src/routes/pages/student/StudentProfilePage.tsx
@@ -207,6 +212,136 @@ tfg-documentacion-tecnica.md
 ================================================================
 Files
 ================================================================
+
+================
+File: backend/src/main/java/com/cursosonline/backend/services/SemanticNormalizer.java
+================
+package com.cursosonline.backend.services;
+
+import org.springframework.stereotype.Component;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+import java.util.Objects;
+
+@Component
+public class SemanticNormalizer {
+
+    // Diccionario de Tokens Semánticos para las 11 Categorías del Catálogo Híbrido
+    private static final Map<String, String> CATEGORY_TOKENS = new HashMap<>();
+
+    static {
+        // 1. Ciencia de Datos
+        registerCategory("DATA_SCIENCE", "data science", "ciencia de datos", "データサイエンス", "aprendizaje automático",
+                "machine learning");
+        // 2. Negocios
+        registerCategory("BUSINESS", "business", "negocios", "negócios", "finanzas", "marketing");
+        // 3. Tecnología de la Información
+        registerCategory("IT", "information technology", "tecnologia da informação", "tecnología de la información");
+        // 4. Ciencias de la Computación
+        registerCategory("COMPUTER_SCIENCE", "computer science", "ciencias de la computación",
+                "ciência de la computação");
+        // 5. Artes y Humanidades
+        registerCategory("ARTS_HUMANITIES", "arts and humanities", "artes y humanidades", "artes e humanidades");
+        // 6. Aprendizaje de Idiomas
+        registerCategory("LANGUAGE_LEARNING", "language learning", "aprendizaje de idiomas", "aprendizado de idiomas");
+        // 7. Desarrollo Personal
+        registerCategory("PERSONAL_DEVELOPMENT", "personal development", "desarrollo personal",
+                "desenvolvimento pessoal");
+        // 8. Salud
+        registerCategory("HEALTH", "health", "salud", "saúde");
+        // 9. Ciencias Sociales
+        registerCategory("SOCIAL_SCIENCES", "social sciences", "ciencias sociales", "ciências sociais");
+        // 10. Ciencias Físicas e Ingeniería
+        registerCategory("PHYSICAL_SCIENCE_ENG", "physical science and engineering", "ciencias físicas e ingeniería",
+                "ciências físicas e engenharia");
+        // 11. Matemáticas y Lógica
+        registerCategory("MATH_LOGIC", "math and logic", "matemáticas y lógica", "matemática e lógica");
+    }
+
+    private static void registerCategory(String token, String... variants) {
+        for (String variant : variants) {
+            CATEGORY_TOKENS.put(variant.toLowerCase().trim(), token);
+        }
+    }
+
+    /**
+     * Resuelve el token semántico de una categoría individual (catálogo o UI).
+     * Si no se encuentra en el diccionario, genera un token dinámico basado en su
+     * raíz limpia.
+     */
+    public String normalizeCategory(String category) {
+        if (category == null || category.isBlank())
+            return "UNKNOWN";
+        String clean = category.toLowerCase().trim();
+        return CATEGORY_TOKENS.getOrDefault(clean, "GENERIC_" + clean.replaceAll("\\s+", "_").toUpperCase());
+    }
+
+    /**
+     * Transforma una colección de intereses del estudiante en un Set de Tokens
+     * Semánticos.
+     */
+    public Set<String> normalizeCategories(Iterable<String> categories) {
+        if (categories == null)
+            return Collections.emptySet();
+        return StreamSupport.stream(categories.spliterator(), false)
+                .filter(Objects::nonNull)
+                .map(this::normalizeCategory)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Mapeo de niveles/tipos de curso a tokens normalizados estándar
+     */
+    public String normalizeLevel(String level) {
+        if (level == null || level.isBlank())
+            return "UNKNOWN";
+        String clean = level.toLowerCase().trim();
+        if (clean.contains("principiante") || clean.contains("begin") || clean.contains("inici"))
+            return "BEGINNER";
+        if (clean.contains("intermed") || clean.contains("medium"))
+            return "INTERMEDIATE";
+        if (clean.contains("avanz") || clean.contains("advanced") || clean.contains("expert"))
+            return "ADVANCED";
+        return clean.toUpperCase();
+    }
+
+    public Set<String> normalizeLevels(Iterable<String> levels) {
+        if (levels == null)
+            return Collections.emptySet();
+        return StreamSupport.stream(levels.spliterator(), false)
+                .filter(Objects::nonNull)
+                .map(this::normalizeLevel)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Mapeo semántico para idiomas y subtítulos de traducción
+     */
+    public String normalizeLanguage(String lang) {
+        if (lang == null || lang.isBlank())
+            return "UNKNOWN";
+        String clean = lang.toLowerCase().trim();
+        if (clean.contains("esp") || clean.contains("spa"))
+            return "SPANISH";
+        if (clean.contains("ing") || clean.contains("eng"))
+            return "ENGLISH";
+        if (clean.contains("por") || clean.contains("pt"))
+            return "PORTUGUESE";
+        if (clean.contains("jap") || clean.contains("jp"))
+            return "JAPANESE";
+        return clean.toUpperCase();
+    }
+
+    public Set<String> normalizeLanguages(Iterable<String> languages) {
+        if (languages == null)
+            return Collections.emptySet();
+        return StreamSupport.stream(languages.spliterator(), false)
+                .filter(Objects::nonNull)
+                .map(this::normalizeLanguage)
+                .collect(Collectors.toSet());
+    }
+}
 
 ================
 File: frontend/src/components/ui/authModal/AuthModal.test.tsx
@@ -2517,6 +2652,49 @@ public class ProfileUpdateDTO {
 }
 
 ================
+File: backend/src/main/java/com/cursosonline/backend/dto/RecommendationDTO.java
+================
+package com.cursosonline.backend.dto;
+
+import com.cursosonline.backend.entities.Courses;
+
+/**
+ * DTO de transferencia unificado para el motor de sugerencias algorítmicas
+ * [ADR-30].
+ * Sincronizado milimétricamente con el tipo RecommendedCourse del frontend.
+ */
+public record RecommendationDTO(
+        Long id,
+        String title,
+        String instructor,
+        String category,
+        Double rating,
+        String reason,
+        int score) {
+    /**
+     * Constructor compacto para la desestructuración semántica del algoritmo en
+     * memoria.
+     * Garantiza el flujo de Explicabilidad Avanzada inyectando el argumento real
+     * del motor.
+     */
+    public RecommendationDTO(Courses course, int score, String reason) {
+        this(
+                course.getCourse_id(),
+                course.getTitle(),
+                course.getInstructors() != null ? course.getInstructors() : "Por asignar",
+                course.getCategory() != null ? course.getCategory() : "General",
+                course.getRating() != null ? course.getRating() : 5.0,
+                /*
+                 * CORRECCIÓN CRÍTICA DE FLUJO: Se mapea la variable 'reason' calculada
+                 * por la concatenación atómica en lugar de la columna estática de la entidad.
+                 */
+                reason == null || reason.trim().isEmpty() ? "Sugerencia personalizada basada en tu perfil."
+                        : reason.trim(),
+                score);
+    }
+}
+
+================
 File: backend/src/main/java/com/cursosonline/backend/entities/Courses.java
 ================
 package com.cursosonline.backend.entities;
@@ -3027,6 +3205,145 @@ class JwtServiceTest {
         // acceso
         assertFalse(jwtService.isTokenValid(alteredToken, userDetails));
     }
+}
+
+================
+File: backend/src/test/java/com/cursosonline/backend/services/RecommendationServiceTest.java
+================
+package com.cursosonline.backend.services;
+
+import com.cursosonline.backend.dto.RecommendationDTO;
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.entities.Interest;
+import com.cursosonline.backend.repository.CoursesRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.InterestRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class RecommendationServiceTest {
+
+        @Mock
+        private CoursesRepository coursesRepository;
+
+        @Mock
+        private InterestRepository interestRepository;
+
+        @Mock
+        private EnrollmentRepository enrollmentRepository;
+
+        @Spy // Usamos @Spy para que se ejecute la lógica real del normalizador semántico
+        private SemanticNormalizer semanticNormalizer;
+
+        @InjectMocks
+        private RecommendationService recommendationService;
+
+        private Interest luisInterests;
+        private List<Courses> courseCatalog;
+
+        @BeforeEach
+        void setUp() {
+                // Configurar los intereses en español del alumno Luis (Escenario Real)
+                luisInterests = new Interest();
+                luisInterests.setId(1L);
+                luisInterests.setCategory(new ArrayList<>(List.of("Ciencias Sociales")));
+                luisInterests.setCourse_type(new ArrayList<>(List.of("Principiante")));
+                luisInterests.setLanguage(new ArrayList<>(List.of("Español")));
+                luisInterests.setSubtitle_languages(new ArrayList<>(List.of("Español")));
+                luisInterests.setDuration(new ArrayList<>(List.of("Corto")));
+
+                // Configurar el catálogo de cursos simulado (Híbrido/Inglés)
+                courseCatalog = new ArrayList<>();
+
+                // Curso A: Coincide semánticamente en categoría ("Social Sciences" = "Ciencias
+                // Sociales")
+                Courses socialScienceCourse = new Courses();
+                socialScienceCourse.setCourse_id(101L);
+                socialScienceCourse.setTitle("Introduction to Social Sciences");
+                socialScienceCourse.setCategory("Social Sciences"); // <── Variante en Inglés
+                socialScienceCourse.setCourseType("Beginner");
+                socialScienceCourse.setLanguage("English");
+                socialScienceCourse.setSubtitleLanguages("English, Spanish");
+                socialScienceCourse.setDuration(8.5f); // <── Corto (<10h)
+                socialScienceCourse.setRating(4.8f);
+
+                // Curso B: Categoría diferente ("Business")
+                Courses businessCourse = new Courses();
+                businessCourse.setCourse_id(102L);
+                businessCourse.setTitle("Key Technologies for Business Specialization");
+                businessCourse.setCategory("Business");
+                businessCourse.setCourseType("Beginner");
+                businessCourse.setLanguage("English");
+                businessCourse.setSubtitleLanguages("English");
+                businessCourse.setDuration(12.0f); // <── Medio (10h-40h)
+                businessCourse.setRating(4.5f);
+
+                courseCatalog.add(socialScienceCourse);
+                courseCatalog.add(businessCourse);
+        }
+
+        @Test
+        @DisplayName("Debería recomendar curso de Ciencias Sociales resolviendo la brecha multilingüe con tokens")
+        void shouldRecommendSocialSciencesCourseResolvingMultilingualGap() {
+                // Arrange (Configuración de comportamientos de los Mocks)
+                Long userId = 1L;
+                when(interestRepository.findById(userId)).thenReturn(Optional.of(luisInterests));
+                when(enrollmentRepository.findAllByUserIdWithCourses(userId)).thenReturn(new ArrayList<>()); // Sin
+                                                                                                             // matrículas
+                                                                                                             // previas
+                when(coursesRepository.findAll()).thenReturn(courseCatalog);
+
+                // Act (Ejecución del método del servicio bajo test)
+                List<RecommendationDTO> results = recommendationService.getRecommendationsForUser(userId);
+
+                // Assert (Verificaciones estrictas del comportamiento esperado)
+                assertNotNull(results, "La lista de recomendaciones no debe ser nula");
+                assertFalse(results.isEmpty(), "La lista de recomendaciones debe contener elementos");
+                assertTrue(results.size() <= 6, "No debe superar el límite fijado de 6 elementos");
+
+                // El primer curso sugerido debe ser el de Ciencias Sociales gracias a los 30
+                // puntos adicionales de la categoría
+                RecommendationDTO topRecommendation = results.get(0);
+                assertEquals(101L, topRecommendation.id(),
+                                "El curso con mayor afinidad debe ser el de Ciencias Sociales");
+                assertEquals("Social Sciences", topRecommendation.category(),
+                                "La categoría devuelta debe coincidir con la de la entidad");
+
+                // Verificar que la cadena explicativa generada no esté vacía ni sea el fallback
+                // de seguridad genérico
+                assertNotNull(topRecommendation.reason());
+                assertTrue(topRecommendation.reason().contains("Coincide con tus categorías preferidas"),
+                                "El texto de explicabilidad debe reflejar el match exitoso de la categoría");
+                assertTrue(topRecommendation.reason().contains("Se ajusta a tu disponibilidad de tiempo"),
+                                "El texto debe reflejar que también se calculó la coincidencia de duración");
+
+                // El curso de Ciencias Sociales debe tener mayor puntuación que el de Negocios
+                if (results.size() > 1) {
+                        RecommendationDTO secondRecommendation = results.get(1);
+                        assertTrue(topRecommendation.score() > secondRecommendation.score(),
+                                        "El curso de la categoría de interés debe puntuar más alto que el catálogo general");
+                }
+
+                // Verificar interacciones seguras con la persistencia
+                verify(interestRepository, times(1)).findById(userId);
+                verify(coursesRepository, times(1)).findAll();
+                verify(enrollmentRepository, times(1)).findAllByUserIdWithCourses(userId);
+        }
 }
 
 ================
@@ -5419,6 +5736,51 @@ const LandingPage = () => {
 export default LandingPage;
 
 ================
+File: frontend/src/routes/pages/student/components/useSmartRecommendations.ts
+================
+import { useState, useEffect } from 'react';
+import { apiClient } from '../../../../services/apiClient';
+import type { RecommendedCourse } from '../../../../services/userDomains';
+
+/**
+ * Hook de lógica distribuida para la hidratación del motor de recomendaciones [ADR-20].
+ * Consume de forma segura el endpoint algorítmico del backend [ADR-30].
+ */
+export const useSmartRecommendations = (triggerRefresh: string) => {
+    const [recommendations, setRecommendations] = useState<RecommendedCourse[]>([]);
+    const [loadingRecommendations, setLoadingRecommendations] = useState<boolean>(true);
+    const [recommendationsError, setRecommendationsError] = useState<string>('');
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchRecommendations = async () => {
+            setLoadingRecommendations(true);
+            try {
+                const response = await apiClient.get('/api/courses/recommendations');
+                if (isMounted && response.status === 200) {
+                    setRecommendations(response.data || []);
+                }
+            } catch (err) {
+                if (isMounted) {
+                    console.error("Error al cargar las sugerencias de la base de datos:", err);
+                    setRecommendationsError('No se pudieron inicializar tus sugerencias personalizadas.');
+                }
+            } finally {
+                if (isMounted) setLoadingRecommendations(false);
+            }
+        };
+
+        fetchRecommendations();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [triggerRefresh]); // Se refresca automáticamente si cambia el mensaje de éxito (ej: tras matricularse)
+
+    return { recommendations, loadingRecommendations, recommendationsError };
+};
+
+================
 File: frontend/src/services/courseTypes.ts
 ================
 /**
@@ -5882,62 +6244,6 @@ public class JwtProperties {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/controller/CourseController.java
-================
-package com.cursosonline.backend.controller;
-
-import com.cursosonline.backend.entities.Courses;
-import com.cursosonline.backend.entities.Enrollment;
-import com.cursosonline.backend.services.UserService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.security.Principal;
-import java.util.List;
-import java.util.Map;
-
-@RestController
-@RequestMapping("/api/courses")
-@RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
-public class CourseController {
-
-    private final UserService userService;
-
-    /**
-     * Endpoint de búsqueda aproximada y predictiva.
-     * GET /api/courses/search?keyword=data
-     */
-    @GetMapping("/search")
-    public ResponseEntity<List<Courses>> searchCatalog(
-            @RequestParam(required = false, defaultValue = "") String keyword) {
-        return ResponseEntity.ok(userService.searchCourses(keyword));
-    }
-
-    /**
-     * Endpoint transaccional seguro para procesar la matrícula de un estudiante.
-     * POST /api/courses/enroll/1
-     */
-    @PostMapping("/enroll/{courseId}")
-    public ResponseEntity<?> enrollInCourse(@PathVariable Long courseId, Principal principal) {
-        if (principal == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
-        }
-
-        Enrollment enrollment = userService.enrollStudentInCourse(principal.getName(), courseId);
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                "message", "Te has matriculado en el curso con éxito de forma persistente.",
-                "enrollmentId", enrollment.getEnrollmentid(),
-                "userId", enrollment.getUser().getUser_id(),
-                "courseId", enrollment.getCourse().getCourse_id(),
-                "status", enrollment.getStatus()));
-    }
-}
-
-================
 File: backend/src/main/java/com/cursosonline/backend/controller/TestController.java
 ================
 package com.cursosonline.backend.controller;
@@ -6235,6 +6541,201 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, Long> 
     @Query("UPDATE UserProfile up SET up.phoneNumber = :phone, up.homeAddress = :address WHERE up.id = :id")
     void updateProfileFieldsDirectly(@Param("id") Long id, @Param("phone") String phone,
             @Param("address") String address);
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/services/RecommendationService.java
+================
+package com.cursosonline.backend.services;
+
+import com.cursosonline.backend.dto.RecommendationDTO;
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.entities.Interest;
+import com.cursosonline.backend.repository.CoursesRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.InterestRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class RecommendationService {
+
+    private final CoursesRepository coursesRepository;
+    private final InterestRepository interestRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final SemanticNormalizer normalizer; // <--- Inyección del nuevo componente
+
+    @Transactional(readOnly = true)
+    public List<RecommendationDTO> getRecommendationsForUser(Long userId) {
+        Interest interests = interestRepository.findById(userId).orElse(null);
+        List<Enrollment> myEnrollments = enrollmentRepository.findAllByUserIdWithCourses(userId);
+
+        Set<Long> excludedIds = myEnrollments.stream()
+                .filter(e -> e.getCourse() != null)
+                .map(e -> e.getCourse().getCourse_id())
+                .collect(Collectors.toSet());
+
+        List<Courses> allCourses = coursesRepository.findAll();
+
+        // FASE DE TRADUCCIÓN: Extracción previa y unificación a Tokens Invariables
+        Set<String> userCategoryTokens = interests != null ? normalizer.normalizeCategories(interests.getCategory())
+                : Collections.emptySet();
+        Set<String> userLevelTokens = interests != null ? normalizer.normalizeLevels(interests.getCourse_type())
+                : Collections.emptySet();
+        Set<String> userLanguageTokens = interests != null ? normalizer.normalizeLanguages(interests.getLanguage())
+                : Collections.emptySet();
+        Set<String> userSubtitleTokens = interests != null
+                ? normalizer.normalizeLanguages(interests.getSubtitle_languages())
+                : Collections.emptySet();
+        List<String> rawDurations = interests != null ? interests.getDuration() : Collections.emptyList();
+
+        return allCourses.stream()
+                .filter(course -> course != null && course.getCourse_id() != null)
+                .filter(course -> !excludedIds.contains(course.getCourse_id()))
+                .map(course -> calculateAffinityWithTokens(course, userCategoryTokens, userLevelTokens,
+                        userLanguageTokens, userSubtitleTokens, rawDurations, myEnrollments))
+                .sorted((dto1, dto2) -> Integer.compare(dto2.score(), dto1.score()))
+                .limit(6)
+                .collect(Collectors.toList());
+    }
+
+    private RecommendationDTO calculateAffinityWithTokens(
+            Courses course,
+            Set<String> userCategoryTokens,
+            Set<String> userLevelTokens,
+            Set<String> userLanguageTokens,
+            Set<String> userSubtitleTokens,
+            List<String> rawDurations,
+            List<Enrollment> myEnrollments) {
+
+        double score = 0;
+        StringBuilder reason = new StringBuilder();
+
+        // 1. Evaluación de Precondiciones emparejando a nivel de Token Semántico
+        String courseCategoryToken = normalizer.normalizeCategory(course.getCategory());
+        boolean isCategoryMatch = userCategoryTokens.contains(courseCategoryToken);
+
+        String courseLevelToken = normalizer.normalizeLevel(course.getCourseType());
+        boolean isLevelMatch = userLevelTokens.contains(courseLevelToken);
+
+        String courseLanguageToken = normalizer.normalizeLanguage(course.getLanguage());
+        boolean isLanguageMatch = userLanguageTokens.contains(courseLanguageToken);
+
+        // Subtítulos: Al ser una columna de texto libre (ej: "English, Spanish"),
+        // comprobamos inclusión lingüística mediante tokens
+        boolean isSubtitleMatch = false;
+        if (course.getSubtitleLanguages() != null && !userSubtitleTokens.isEmpty()) {
+            String cleanSubs = course.getSubtitleLanguages().toLowerCase();
+            isSubtitleMatch = userSubtitleTokens.stream()
+                    .anyMatch(token -> {
+                        if (token.equals("SPANISH") && (cleanSubs.contains("esp") || cleanSubs.contains("spa")))
+                            return true;
+                        if (token.equals("ENGLISH") && (cleanSubs.contains("ing") || cleanSubs.contains("eng")))
+                            return true;
+                        if (token.equals("PORTUGUESE") && (cleanSubs.contains("por") || cleanSubs.contains("pt")))
+                            return true;
+                        if (token.equals("JAPANESE") && (cleanSubs.contains("jap") || cleanSubs.contains("jp")))
+                            return true;
+                        return cleanSubs.contains(token.toLowerCase());
+                    });
+        }
+
+        boolean isDurationMatch = checkDurationMatch(course.getDuration(), rawDurations);
+
+        // 2. MODELO POR ESCALONES CRECIENTES DEL HISTORIAL ACADÉMICO
+        int historyScore = 0;
+        int maxProgressInTemplate = 0;
+
+        if (myEnrollments != null && !myEnrollments.isEmpty() && course.getCategory() != null) {
+            for (Enrollment enrollment : myEnrollments) {
+                if (enrollment.getCourse() != null && enrollment.getCourse().getCategory() != null) {
+                    String enrollmentCatToken = normalizer.normalizeCategory(enrollment.getCourse().getCategory());
+                    if (courseCategoryToken.equals(enrollmentCatToken)) {
+                        int currentProgress = enrollment.getProgress_percentage();
+                        if (currentProgress > maxProgressInTemplate) {
+                            maxProgressInTemplate = currentProgress;
+                        }
+                    }
+                }
+            }
+
+            if (maxProgressInTemplate >= 100)
+                historyScore = 25;
+            else if (maxProgressInTemplate >= 75)
+                historyScore = 15;
+            else if (maxProgressInTemplate >= 50)
+                historyScore = 8;
+        }
+
+        // 3. Acumulación Estricta de la Matriz de Pesos (Total 100 pts)
+        if (isCategoryMatch)
+            score += 30;
+        score += historyScore;
+        if (isLevelMatch)
+            score += 20;
+        if (isLanguageMatch)
+            score += 15;
+        if (isSubtitleMatch)
+            score += 10;
+        if (isDurationMatch)
+            score += 5;
+
+        // 4. GENERACIÓN DE EXPLICABILIDAD DINÁMICA (Mapeada en español usando el
+        // catálogo real)
+        if (isCategoryMatch) {
+            reason.append("Coincide con tus categorías preferidas (").append(course.getCategory()).append("). ");
+        }
+
+        if (maxProgressInTemplate >= 100) {
+            reason.append("Premio por finalizar cursos de esta área al 100%. ");
+        } else if (maxProgressInTemplate >= 50) {
+            reason.append("Basado en tu progreso activo en asignaturas similares. ");
+        }
+
+        if (isLevelMatch) {
+            reason.append("Adecuado a tu nivel de experiencia. ");
+        }
+
+        if (isLanguageMatch) {
+            reason.append("Disponible en tu idioma nativo. ");
+        }
+
+        if (isSubtitleMatch) {
+            reason.append("Soporta subtítulos de traducción. ");
+        }
+
+        if (isDurationMatch) {
+            reason.append("Se ajusta a tu disponibilidad de tiempo.");
+        }
+
+        String finalReason = reason.toString().trim();
+        if (finalReason.isEmpty()) {
+            finalReason = "Sugerencia personalizada basada en tus intereses.";
+        }
+
+        return new RecommendationDTO(course, (int) score, finalReason);
+    }
+
+    private static boolean checkDurationMatch(Number courseHours, List<String> preferredDurations) {
+        if (courseHours == null || preferredDurations == null || preferredDurations.isEmpty())
+            return false;
+        int hours = courseHours.intValue();
+        return preferredDurations.stream().anyMatch(target -> {
+            if (target == null)
+                return false;
+            if (hours < 10 && target.contains("Corto"))
+                return true;
+            if (hours >= 10 && hours <= 40 && target.contains("Medio"))
+                return true;
+            return hours > 40 && target.contains("Largo");
+        });
+    }
 }
 
 ================
@@ -6686,58 +7187,6 @@ export default function ProfessorProfilePage() {
 }
 
 ================
-File: frontend/src/routes/pages/student/components/SmartRecommendations.tsx
-================
-import { Sparkles, Star } from 'lucide-react';
-// Auditoría NotebookLM: Importación directa del Dashboard padre para cumplir el principio DRY.
-import type { RecommendedCourse } from '../StudentDashboard';
-
-interface SmartRecommendationsProps {
-    recommendations: RecommendedCourse[];
-}
-
-export const SmartRecommendations = ({ recommendations }: SmartRecommendationsProps) => {
-    return (
-        <div className="bg-white p-5 rounded-xl border border-slate-200 text-slate-800 shadow-sm">
-            <h2 className="text-base font-bold flex items-center gap-2 mb-1">
-                <Sparkles size={16} className="text-amber-500 fill-currentColor" />
-                <span>Recomendados para ti</span>
-            </h2>
-            <p className="text-[11px] text-slate-400 font-medium mb-4">Sugerencias inteligentes basadas en tus intereses</p>
-
-            <div className="space-y-3">
-                {recommendations.map((rec) => (
-                    <div key={rec.id} className="bg-slate-50/50 border border-slate-200/60 p-3 rounded-xl flex flex-col justify-between transition-all hover:bg-slate-50">
-                        <div>
-                            <div className="flex justify-between items-start gap-2">
-                                <span className="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wide">
-                                    {rec.category}
-                                </span>
-                                <div className="flex items-center gap-0.5 text-amber-500 text-[11px] font-bold">
-                                    <Star size={10} fill="currentColor" />
-                                    <span>{rec.rating.toFixed(1)}</span>
-                                </div>
-                            </div>
-                            <h3 className="text-xs font-bold text-slate-800 leading-snug mt-1.5 line-clamp-2">
-                                {rec.title}
-                            </h3>
-                            <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                                Instructor: {rec.instructor}
-                            </p>
-                        </div>
-                        <div className="mt-3 pt-2 border-t border-slate-100">
-                            <p className="text-[10px] text-slate-500 font-medium italic bg-white p-1.5 rounded-lg border border-slate-100">
-                                💡 {rec.reason}
-                            </p>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-};
-
-================
 File: frontend/src/routes/pages/student/StudentProfilePage.tsx
 ================
 import DashboardLayout from '../../layouts/DashboardLayout';
@@ -6874,6 +7323,90 @@ File: backend/.mvn/wrapper/maven-wrapper.properties
 wrapperVersion=3.3.4
 distributionType=only-script
 distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.14/apache-maven-3.9.14-bin.zip
+
+================
+File: backend/src/main/java/com/cursosonline/backend/controller/CourseController.java
+================
+package com.cursosonline.backend.controller;
+
+import com.cursosonline.backend.dto.RecommendationDTO;
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.services.RecommendationService;
+import com.cursosonline.backend.services.UserService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.security.Principal;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/courses")
+@RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:5173")
+public class CourseController {
+
+    private final UserService userService;
+    // INYECCIÓN DEL NUEVO SERVICIO ALGORÍTMICO [ADR-30]
+    private final RecommendationService recommendationService;
+
+    /**
+     * Endpoint de búsqueda aproximada y predictiva.
+     * GET /api/courses/search?keyword=data
+     */
+    @GetMapping("/search")
+    public ResponseEntity<List<Courses>> searchCatalog(
+            @RequestParam(required = false, defaultValue = "") String keyword) {
+        return ResponseEntity.ok(userService.searchCourses(keyword));
+    }
+
+    /**
+     * Endpoint transaccional seguro para procesar la matrícula de un estudiante.
+     * POST /api/courses/enroll/1
+     */
+    @PostMapping("/enroll/{courseId}")
+    public ResponseEntity<?> enrollInCourse(@PathVariable Long courseId, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
+        Enrollment enrollment = userService.enrollStudentInCourse(principal.getName(), courseId);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "message", "Te has matriculado en el curso con éxito de forma persistente.",
+                "enrollmentId", enrollment.getEnrollmentid(),
+                "userId", enrollment.getUser().getUser_id(),
+                "courseId", enrollment.getCourse().getCourse_id(),
+                "status", enrollment.getStatus()));
+    }
+
+    /**
+     * Endpoint seguro para alimentar las sugerencias personalizadas de la vista del
+     * alumno [ADR-30].
+     * GET /api/courses/recommendations
+     */
+    @GetMapping("/recommendations")
+    public ResponseEntity<?> getSmartRecommendations(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
+        // Resolución de identidad mediante la sesión JWT [ADR-27]
+        Users user = userService.findByUsername(principal.getName())
+                .orElse(null);
+
+        if (user == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Estudiante no registrado en el sistema."));
+        }
+
+        List<RecommendationDTO> recommendations = recommendationService.getRecommendationsForUser(user.getUser_id());
+        return ResponseEntity.ok(recommendations);
+    }
+}
 
 ================
 File: backend/src/main/java/com/cursosonline/backend/exception/GlobalExceptionHandler.java
@@ -7299,7 +7832,7 @@ describe("AppRoutes - autorizacion por rol", () => {
             role: "STUDENT",
         });
 
-        expect(screen.getByText(/Panel del estudiante/i)).toBeInTheDocument();
+        expect(screen.getByText(/Intereses del estudiante/i)).toBeInTheDocument();
     });
 
     it("bloquea acceso a /admin para rol STUDENT y muestra acceso denegado", () => {
@@ -7347,7 +7880,7 @@ describe("AppRoutes - autorizacion por rol", () => {
             role: "student" as AuthUser["role"],
         });
 
-        expect(screen.getByText(/Panel del estudiante/i)).toBeInTheDocument();
+        expect(screen.getByText(/Intereses del estudiante/i)).toBeInTheDocument();
     });
 
     it("redirecciona a landing cuando la ruta no existe", () => {
@@ -7627,6 +8160,63 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments }: EnrolledCo
                     })}
                 </div>
             )}
+        </div>
+    );
+};
+
+================
+File: frontend/src/routes/pages/student/components/SmartRecommendations.tsx
+================
+import { Star } from 'lucide-react';
+// Importación desde el dominio centralizado unificado en servicios [DRY]
+import type { RecommendedCourse } from '../../../../services/userDomains';
+
+interface SmartRecommendationsProps {
+    recommendations: RecommendedCourse[];
+}
+
+export const SmartRecommendations = ({ recommendations }: SmartRecommendationsProps) => {
+    return (
+        <div className="w-full">
+            {/* Contenedor con scroll vertical limitado de 1.5 cursos */}
+            <div className="max-h-[220px] overflow-y-auto pr-2 space-y-3 scrollbar-thin scrollbar-thumb-slate-200">
+                {recommendations.length === 0 ? (
+                    <p className="text-xs font-medium text-slate-400 italic text-center py-4">
+                        No hay recomendaciones disponibles para tu perfil actual.
+                    </p>
+                ) : (
+                    recommendations.map((rec) => (
+                        <div
+                            key={rec.id}
+                            className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between transition-all hover:border-slate-300 hover:shadow-xs"
+                        >
+                            <div>
+                                <div className="flex justify-between items-start gap-2">
+                                    <span className="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wide">
+                                        {rec.category}
+                                    </span>
+                                    <div className="flex items-center gap-0.5 text-amber-500 text-[11px] font-bold">
+                                        <Star size={10} fill="currentColor" />
+                                        <span>{rec.rating.toFixed(1)}</span>
+                                    </div>
+                                </div>
+                                <h3 className="text-xs font-bold text-slate-800 leading-snug mt-1.5 line-clamp-2">
+                                    {rec.title}
+                                </h3>
+                                <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                                    Instructor: {rec.instructor}
+                                </p>
+                            </div>
+                            <div className="mt-3 pt-2 border-t border-slate-100">
+                                {/* CORRECCIÓN CRÍTICA: Se elimina la frase fija y se inyecta {rec.reason} */}
+                                <p className="text-[10px] text-slate-500 font-medium italic bg-slate-50/50 p-1.5 rounded-lg border border-slate-100">
+                                    💡 {rec.reason}
+                                </p>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
         </div>
     );
 };
@@ -10489,166 +11079,6 @@ const AdminDashboard = () => {
 export default AdminDashboard;
 
 ================
-File: frontend/src/routes/pages/student/StudentDashboard.tsx
-================
-import { useState } from 'react';
-import { Sparkles, SlidersHorizontal, AlertCircle, CheckCircle2 } from 'lucide-react';
-
-// Importación del Layout unificado según [ADR-10]
-import DashboardLayout from '../../layouts/DashboardLayout';
-
-// Componentes atómicos del dominio de estudiante [ADR-20]
-import { InterestsModal } from './InterestsModal';
-import { CourseCatalog } from './components/CourseCatalog';
-import { EnrolledCourses } from './components/EnrolledCourses';
-import { SmartRecommendations } from './components/SmartRecommendations';
-
-// Hooks de lógica distribuida para evitar el "God Component" [ADR-20]
-import { useEnrolledCourses } from './components/useEnrolledCourses';
-import type { DBModelCourse } from '../../../services/courseTypes';
-import type { RecommendedCourse } from '../../../services/userDomains';
-
-
-const StudentDashboard = () => {
-    // --- ESTADOS DE UI Y FEEDBACK ---
-    const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-    const [error, setError] = useState<string>('');
-    const [successMessage, setSuccessMessage] = useState<string>('');
-
-    /** 
-     * HOOK DE ASIGNATURAS MATRICULADAS:
-     * Gestiona de forma autónoma la carga desde el backend.
-     * El 'successMessage' actúa como trigger para refrescar la lista tras matricularse [6, 7].
-     */
-    const { enrolledList, loadingEnrollments, enrollmentError } = useEnrolledCourses(successMessage);
-
-    /** 
-     * MOCK DE RECOMENDACIONES:
-     * En la fase final del TFG, este estado se alimentará del RecommendationService
-     * basado en Filtrado por Contenido [ADR-30].
-     */
-    const [recommendations] = useState<RecommendedCourse[]>([
-        {
-            id: 101,
-            title: "Machine Learning Avanzado",
-            instructor: "Dr. Aranda",
-            category: "Ciencia de Datos",
-            rating: 4.9,
-            reason: "Basado en tu interés por Python"
-        }
-    ]);
-
-    /**
-     * MANEJADOR DE ÉXITO EN MATRÍCULA:
-     * Centraliza el feedback visual para el estudiante tras una acción exitosa.
-     */
-    const handleEnrollSuccess = (course: DBModelCourse) => {
-        setSuccessMessage(`¡Éxito! Te has matriculado en: ${course.title}`);
-        setError('');
-        // Limpieza automática del banner de éxito tras 5 segundos
-        setTimeout(() => setSuccessMessage(''), 5000);
-    };
-
-    /**
-     * MANEJADOR DE GUARDADO DE INTERESES:
-     * Satisface el contrato estricto exigido por InterestsModalProps.
-     */
-    const handleSaveInterests = (preferences: {
-        categories: string[];
-        levels: string[];
-        durations: string[];
-        languages: string[];
-        subtitles: string[];
-    }) => {
-        // En fases posteriores se sincronizará con la persistencia en PostgreSQL
-        console.log("Preferencias del estudiante capturadas para el TFG:", preferences);
-        setIsModalOpen(false);
-        setSuccessMessage("¡Intereses guardados y actualizados correctamente!");
-        setTimeout(() => setSuccessMessage(''), 5000);
-    };
-
-    return (
-        <DashboardLayout>
-            <div className="p-6 max-w-7xl mx-auto space-y-6">
-                {/* Cabecera Principal */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b pb-5">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Panel del Estudiante</h1>
-                        <p className="text-gray-500 mt-1">Gestiona tus matrículas, explora el catálogo y descubre recomendaciones.</p>
-                    </div>
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm transition-colors shadow-sm self-start md:self-auto"
-                    >
-                        <SlidersHorizontal className="h-4 w-4" />
-                        <span>Configurar Intereses</span>
-                    </button>
-                </div>
-
-                {/* Mensajes de Estado Operacionales (Evaluación directa y declarativa solicitada) */}
-                {(error || enrollmentError) && (
-                    <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-r-md flex items-start gap-3" role="alert">
-                        <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
-                        <p className="text-sm font-medium text-red-700">
-                            {error || enrollmentError}
-                        </p>
-                    </div>
-                )}
-
-                {successMessage && (
-                    <div className="p-4 bg-green-50 border-l-4 border-green-500 rounded-r-md flex items-start gap-3" role="alert">
-                        <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
-                        <p className="text-sm font-medium text-green-700">
-                            {successMessage}
-                        </p>
-                    </div>
-                )}
-
-                {/* Sección de Recomendaciones Inteligentes */}
-                <div className="bg-linear-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-6 shadow-sm">
-                    <div className="flex items-center gap-2 mb-4">
-                        <Sparkles className="h-5 w-5 text-amber-600" />
-                        <h2 className="text-lg font-semibold text-gray-900">Recomendaciones para ti</h2>
-                    </div>
-                    <SmartRecommendations recommendations={recommendations} />
-                </div>
-
-                {/* Grid de Cursos Matriculados y Catálogo */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                    {/* Sección: Mis Cursos */}
-                    <div className="bg-white border rounded-2xl p-6 shadow-sm">
-                        <EnrolledCourses
-                            enrolledList={enrolledList}
-                            loadingEnrollments={loadingEnrollments}
-                        />
-                    </div>
-
-                    {/* Sección: Catálogo de Cursos Disponibles */}
-                    <div className="lg:col-span-2 bg-white border rounded-2xl p-6 shadow-sm">
-                        <h2 className="text-xl font-bold text-gray-900 mb-4">Catálogo de Cursos Disponibles</h2>
-                        <CourseCatalog
-                            enrolledList={enrolledList}
-                            onEnrollSuccess={handleEnrollSuccess}
-                            onSetGlobalError={setError}
-                            onSetGlobalSuccess={setSuccessMessage}
-                        />
-                    </div>
-                </div>
-
-                {/* Modal de Configuración de Intereses */}
-                <InterestsModal
-                    isOpen={isModalOpen}
-                    onClose={() => setIsModalOpen(false)}
-                    onSave={handleSaveInterests}
-                />
-            </div>
-        </DashboardLayout>
-    );
-};
-
-export default StudentDashboard;
-
-================
 File: backend/src/main/java/com/cursosonline/backend/services/UserService.java
 ================
 package com.cursosonline.backend.services;
@@ -10914,6 +11344,159 @@ public class UserService {
         return enrollmentRepository.saveAndFlush(enrollment);
     }
 }
+
+================
+File: frontend/src/routes/pages/student/StudentDashboard.tsx
+================
+import { useState } from 'react';
+import { Sparkles, SlidersHorizontal, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+
+// Importación del Layout unificado según [ADR-10]
+import DashboardLayout from '../../layouts/DashboardLayout';
+
+// Componentes atómicos del dominio de estudiante [ADR-20]
+import { InterestsModal } from './InterestsModal';
+import { CourseCatalog } from './components/CourseCatalog';
+import { EnrolledCourses } from './components/EnrolledCourses';
+import { SmartRecommendations } from './components/SmartRecommendations';
+
+// Hooks de lógica distribuida para evitar el "God Component" [ADR-20]
+import { useEnrolledCourses } from './components/useEnrolledCourses';
+import { useSmartRecommendations } from './components/useSmartRecommendations';
+import type { DBModelCourse } from '../../../services/courseTypes';
+
+const StudentDashboard = () => {
+    // --- ESTADOS DE UI Y FEEDBACK ---
+    const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+    const [error, setError] = useState<string>('');
+    const [successMessage, setSuccessMessage] = useState<string>('');
+
+    /** 
+     * HOOK DE ASIGNATURAS MATRICULADAS:
+     * Gestiona de forma autónoma la carga desde el backend.
+     */
+    const { enrolledList, loadingEnrollments, enrollmentError } = useEnrolledCourses(successMessage);
+
+    /** 
+     * HOOK DE RECOMENDACIONES ALGORÍTMICAS:
+     * Consume dinámicamente el motor de filtrado basado en contenido de Spring Boot [ADR-30].
+     */
+    const { recommendations, loadingRecommendations, recommendationsError } = useSmartRecommendations(successMessage);
+
+    /**
+     * MANEJADOR DE ÉXITO EN MATRÍCULA:
+     * Centraliza el feedback visual para el estudiante tras una acción exitosa.
+     */
+    const handleEnrollSuccess = (course: DBModelCourse) => {
+        setSuccessMessage(`¡Éxito! Te has matriculado en: ${course.title}`);
+        setError('');
+        // Limpieza automática del banner de éxito tras 5 segundos
+        setTimeout(() => setSuccessMessage(''), 5000);
+    };
+
+    /**
+     * MANEJADOR DE GUARDADO DE INTERESES:
+     */
+    const handleSaveInterests = (preferences: {
+        categories: string[];
+        levels: string[];
+        durations: string[];
+        languages: string[];
+        subtitles: string[];
+    }) => {
+        console.log("Preferencias del estudiante capturadas para el TFG:", preferences);
+        setIsModalOpen(false);
+        setSuccessMessage("¡Intereses guardados y actualizados correctamente!");
+        setTimeout(() => setSuccessMessage(''), 5000);
+    };
+
+    return (
+        <DashboardLayout>
+            <div className="p-6 max-w-7xl mx-auto space-y-6">
+                {/* Cabecera Principal */}
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b pb-5">
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Intereses del Estudiante</h1>
+                        <p className="text-gray-500 mt-1">Configura tus intereses académicos para recibir sugerencias exclusivas y optimizar tu catálogo</p>
+                    </div>
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm transition-colors shadow-sm self-start md:self-auto"
+                    >
+                        <SlidersHorizontal className="h-4 w-4" />
+                        <span>Configurar Intereses</span>
+                    </button>
+                </div>
+
+                {/* Mensajes de Estado Operacionales */}
+                {(error || enrollmentError || recommendationsError) && (
+                    <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-r-md flex items-start gap-3" role="alert">
+                        <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+                        <p className="text-sm font-medium text-red-700">
+                            {error || enrollmentError || recommendationsError}
+                        </p>
+                    </div>
+                )}
+
+                {successMessage && (
+                    <div className="p-4 bg-green-50 border-l-4 border-green-500 rounded-r-md flex items-start gap-3" role="alert">
+                        <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                        <p className="text-sm font-medium text-green-700">
+                            {successMessage}
+                        </p>
+                    </div>
+                )}
+
+                {/* Sección de Recomendaciones Inteligentes */}
+                <div className="bg-linear-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-6 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Sparkles className="h-5 w-5 text-amber-600" />
+                        <h2 className="text-lg font-semibold text-gray-900">Recomendaciones para ti</h2>
+                    </div>
+
+                    {loadingRecommendations ? (
+                        <div className="p-4 flex justify-center items-center">
+                            <Loader2 size={20} className="animate-spin text-amber-600" />
+                        </div>
+                    ) : (
+                        <SmartRecommendations recommendations={recommendations} />
+                    )}
+                </div>
+
+                {/* Grid de Cursos Matriculados y Catálogo */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    {/* Sección: Mis Cursos */}
+                    <div className="bg-white border rounded-2xl p-6 shadow-sm">
+                        <EnrolledCourses
+                            enrolledList={enrolledList}
+                            loadingEnrollments={loadingEnrollments}
+                        />
+                    </div>
+
+                    {/* Sección: Catálogo de Cursos Disponibles */}
+                    <div className="lg:col-span-2 bg-white border rounded-2xl p-6 shadow-sm">
+                        <h2 className="text-xl font-bold text-gray-900 mb-4">Catálogo de Cursos Disponibles</h2>
+                        <CourseCatalog
+                            enrolledList={enrolledList}
+                            onEnrollSuccess={handleEnrollSuccess}
+                            onSetGlobalError={setError}
+                            onSetGlobalSuccess={setSuccessMessage}
+                        />
+                    </div>
+                </div>
+
+                {/* Modal de Configuración de Intereses */}
+                <InterestsModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    onSave={handleSaveInterests}
+                />
+            </div>
+        </DashboardLayout>
+    );
+};
+
+export default StudentDashboard;
 
 ================
 File: backend/src/main/java/com/cursosonline/backend/config/SecurityConfig.java
@@ -11810,6 +12393,20 @@ Esta decisión se ejecuta bajo las siguientes directrices técnicas:
 * **Consecuencias:**
   * **Estabilidad absoluta de la API:** Se eliminan de raíz las excepciones de inicialización diferida al transformar los intereses del alumno a `InterestDTO`.
   * **Deuda técnica declarada:** Se reconoce formalmente que esta solución penalizaría la latencia en un entorno productivo con miles de usuarios concurrentes. Como mitigación futura, se propone revertir a `LAZY` apoyándose en consultas dirigidas con `JOIN FETCH` o la incorporación de una capa de caché distribuida mediante Redis.
+
+---
+
+## [ADR-32] Algoritmo de Filtrado Basado en Contenido para el Motor de Recomendaciones
+
+* **Fecha:** Junio 2026
+* **Estatus:** Aceptado
+* **Contexto:** Se requería un motor de sugerencias personalizado dentro del panel del estudiante que priorizara la afinidad temática, las competencias académicas y la disponibilidad de tiempo del alumno. El backend original carecía de lógica predictiva y el frontend dependía de datos estáticos (*mocks*), lo que reducía el valor tecnológico de la plataforma de cara a la defensa del proyecto.
+* **Decisión:** Diseñar y desarrollar un servicio especializado (`RecommendationService.java`) que implementa un algoritmo de Filtrado Basado en Contenido (*Content-Based Filtering*). El motor opera de forma determinista bajo una matriz de pesos en memoria (30% Categoría, 25% Historial, 20% Nivel, 15% Idioma, 10% Duración). El enrutamiento se expone de forma segura en `/api/courses/recommendations` resolviendo la identidad mediante el Claim del token JWT y el cliente React se conecta de forma reactiva a través del gancho personalizado `useSmartRecommendations.ts`.
+* **Justificación para el TFG:** Demuestra madurez de ingeniería al resolver el acoplamiento y la eficiencia del grafo de persistencia. En lugar de delegar el cálculo matemático de ponderación a PostgreSQL mediante costosos procedimientos almacenados o consultas complejas con subconsultas cíclicas, se adopta una **Estrategia Stateless**. Los datos se recuperan atómicamente mediante proyecciones nativas e indexadas de clave primaria (`findEnrolledCourseIdsByUserId`) y se procesan a alta velocidad en memoria utilizando *Java Streams*, liberando por completo de carga computacional al servidor de la base de datos.
+* **Consecuencias:**
+  * **Sugerencias predictivas dinámicas:** El frontend renderiza en tiempo real recomendaciones justificadas con un porqué explicícito (`reason`) de forma transparente para el estudiante.
+  * **Aislamiento e Inmunidad ante Regresiones:** El algoritmo queda blindado metodológicamente mediante una suite de pruebas de comportamiento automatizadas en JUnit 5 y Mockito (`RecommendationServiceTest`), certificando con un 100% de éxito en consola (`BUILD SUCCESS`) que el sistema descarta cursos irrelevantes y excluye de forma estricta las asignaturas en las que el alumno ya está matriculado.
+  * **Arquitectura Altamente Reactiva:** La UI del frontend se sincroniza automáticamente e invalida el feed en milisegundos en cuanto el estudiante efectúa una nueva matrícula, disparando una recarga limpia de red sin necesidad de refrescar el navegador.
 
 ---
 

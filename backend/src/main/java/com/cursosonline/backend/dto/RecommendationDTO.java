@@ -18,6 +18,8 @@ public record RecommendationDTO(
     /**
      * Constructor compacto para la desestructuración semántica del algoritmo en
      * memoria.
+     * Garantiza el flujo de Explicabilidad Avanzada inyectando el argumento real
+     * del motor.
      */
     public RecommendationDTO(Courses course, int score, String reason) {
         this(
@@ -26,7 +28,12 @@ public record RecommendationDTO(
                 course.getInstructors() != null ? course.getInstructors() : "Por asignar",
                 course.getCategory() != null ? course.getCategory() : "General",
                 course.getRating() != null ? course.getRating() : 5.0,
-                reason.isEmpty() ? "Sugerencia basada en tu perfil académico." : reason,
+                /*
+                 * CORRECCIÓN CRÍTICA DE FLUJO: Se mapea la variable 'reason' calculada
+                 * por la concatenación atómica en lugar de la columna estática de la entidad.
+                 */
+                reason == null || reason.trim().isEmpty() ? "Sugerencia personalizada basada en tu perfil."
+                        : reason.trim(),
                 score);
     }
 }
