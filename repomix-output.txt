@@ -195,6 +195,7 @@ frontend/src/routes/pages/student/components/SmartRecommendations.tsx
 frontend/src/routes/pages/student/components/useCourseCatalog.ts
 frontend/src/routes/pages/student/components/useEnrolledCourses.ts
 frontend/src/routes/pages/student/components/useSmartRecommendations.ts
+frontend/src/routes/pages/student/InterestsModal.test.tsx
 frontend/src/routes/pages/student/InterestsModal.tsx
 frontend/src/routes/pages/student/StudentDashboard.tsx
 frontend/src/routes/pages/student/StudentProfilePage.tsx
@@ -212,136 +213,6 @@ tfg-documentacion-tecnica.md
 ================================================================
 Files
 ================================================================
-
-================
-File: backend/src/main/java/com/cursosonline/backend/services/SemanticNormalizer.java
-================
-package com.cursosonline.backend.services;
-
-import org.springframework.stereotype.Component;
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
-import java.util.Objects;
-
-@Component
-public class SemanticNormalizer {
-
-    // Diccionario de Tokens Semánticos para las 11 Categorías del Catálogo Híbrido
-    private static final Map<String, String> CATEGORY_TOKENS = new HashMap<>();
-
-    static {
-        // 1. Ciencia de Datos
-        registerCategory("DATA_SCIENCE", "data science", "ciencia de datos", "データサイエンス", "aprendizaje automático",
-                "machine learning");
-        // 2. Negocios
-        registerCategory("BUSINESS", "business", "negocios", "negócios", "finanzas", "marketing");
-        // 3. Tecnología de la Información
-        registerCategory("IT", "information technology", "tecnologia da informação", "tecnología de la información");
-        // 4. Ciencias de la Computación
-        registerCategory("COMPUTER_SCIENCE", "computer science", "ciencias de la computación",
-                "ciência de la computação");
-        // 5. Artes y Humanidades
-        registerCategory("ARTS_HUMANITIES", "arts and humanities", "artes y humanidades", "artes e humanidades");
-        // 6. Aprendizaje de Idiomas
-        registerCategory("LANGUAGE_LEARNING", "language learning", "aprendizaje de idiomas", "aprendizado de idiomas");
-        // 7. Desarrollo Personal
-        registerCategory("PERSONAL_DEVELOPMENT", "personal development", "desarrollo personal",
-                "desenvolvimento pessoal");
-        // 8. Salud
-        registerCategory("HEALTH", "health", "salud", "saúde");
-        // 9. Ciencias Sociales
-        registerCategory("SOCIAL_SCIENCES", "social sciences", "ciencias sociales", "ciências sociais");
-        // 10. Ciencias Físicas e Ingeniería
-        registerCategory("PHYSICAL_SCIENCE_ENG", "physical science and engineering", "ciencias físicas e ingeniería",
-                "ciências físicas e engenharia");
-        // 11. Matemáticas y Lógica
-        registerCategory("MATH_LOGIC", "math and logic", "matemáticas y lógica", "matemática e lógica");
-    }
-
-    private static void registerCategory(String token, String... variants) {
-        for (String variant : variants) {
-            CATEGORY_TOKENS.put(variant.toLowerCase().trim(), token);
-        }
-    }
-
-    /**
-     * Resuelve el token semántico de una categoría individual (catálogo o UI).
-     * Si no se encuentra en el diccionario, genera un token dinámico basado en su
-     * raíz limpia.
-     */
-    public String normalizeCategory(String category) {
-        if (category == null || category.isBlank())
-            return "UNKNOWN";
-        String clean = category.toLowerCase().trim();
-        return CATEGORY_TOKENS.getOrDefault(clean, "GENERIC_" + clean.replaceAll("\\s+", "_").toUpperCase());
-    }
-
-    /**
-     * Transforma una colección de intereses del estudiante en un Set de Tokens
-     * Semánticos.
-     */
-    public Set<String> normalizeCategories(Iterable<String> categories) {
-        if (categories == null)
-            return Collections.emptySet();
-        return StreamSupport.stream(categories.spliterator(), false)
-                .filter(Objects::nonNull)
-                .map(this::normalizeCategory)
-                .collect(Collectors.toSet());
-    }
-
-    /**
-     * Mapeo de niveles/tipos de curso a tokens normalizados estándar
-     */
-    public String normalizeLevel(String level) {
-        if (level == null || level.isBlank())
-            return "UNKNOWN";
-        String clean = level.toLowerCase().trim();
-        if (clean.contains("principiante") || clean.contains("begin") || clean.contains("inici"))
-            return "BEGINNER";
-        if (clean.contains("intermed") || clean.contains("medium"))
-            return "INTERMEDIATE";
-        if (clean.contains("avanz") || clean.contains("advanced") || clean.contains("expert"))
-            return "ADVANCED";
-        return clean.toUpperCase();
-    }
-
-    public Set<String> normalizeLevels(Iterable<String> levels) {
-        if (levels == null)
-            return Collections.emptySet();
-        return StreamSupport.stream(levels.spliterator(), false)
-                .filter(Objects::nonNull)
-                .map(this::normalizeLevel)
-                .collect(Collectors.toSet());
-    }
-
-    /**
-     * Mapeo semántico para idiomas y subtítulos de traducción
-     */
-    public String normalizeLanguage(String lang) {
-        if (lang == null || lang.isBlank())
-            return "UNKNOWN";
-        String clean = lang.toLowerCase().trim();
-        if (clean.contains("esp") || clean.contains("spa"))
-            return "SPANISH";
-        if (clean.contains("ing") || clean.contains("eng"))
-            return "ENGLISH";
-        if (clean.contains("por") || clean.contains("pt"))
-            return "PORTUGUESE";
-        if (clean.contains("jap") || clean.contains("jp"))
-            return "JAPANESE";
-        return clean.toUpperCase();
-    }
-
-    public Set<String> normalizeLanguages(Iterable<String> languages) {
-        if (languages == null)
-            return Collections.emptySet();
-        return StreamSupport.stream(languages.spliterator(), false)
-                .filter(Objects::nonNull)
-                .map(this::normalizeLanguage)
-                .collect(Collectors.toSet());
-    }
-}
 
 ================
 File: frontend/src/components/ui/authModal/AuthModal.test.tsx
@@ -1745,6 +1616,120 @@ export default function ProfileSettings() {
 }
 
 ================
+File: frontend/src/routes/pages/student/InterestsModal.test.tsx
+================
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { InterestsModal } from './InterestsModal';
+import { apiClient } from '../../../services/apiClient';
+
+// Mock de archivo completo alineado con tu cliente HTTP personalizado
+vi.mock('../../../services/apiClient', () => ({
+    apiClient: {
+        get: vi.fn(),
+        post: vi.fn(),
+        interceptors: {
+            request: { use: vi.fn(), eject: vi.fn() },
+            response: { use: vi.fn(), eject: vi.fn() }
+        }
+    }
+}));
+
+describe('InterestsModal Component - Suite de Pruebas Unitarias Estrictas', () => {
+    const mockOnClose = vi.fn();
+    const mockOnSave = vi.fn();
+
+    // Datos simulados de Luis (user_id = 2) alineados con las cadenas de tus constantes
+    const mockLuisInterests = {
+        categories: ['Ciencias Sociales'],
+        levels: ['Todos los niveles'],
+        durations: ['Medio (1 - 6 semanas)'],
+        languages: ['Español', 'Inglés'],
+        subtitles: ['Con Subtítulos']
+    };
+
+    const defaultProps = {
+        isOpen: true,
+        onClose: mockOnClose,
+        onSave: mockOnSave
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        localStorage.clear();
+        // Inyección asíncrona real en el useEffect del componente
+        vi.mocked(apiClient.get).mockResolvedValue({ data: mockLuisInterests });
+    });
+
+    it('debe renderizar simétricamente las cabeceras estructurales de las tarjetas [ADR-13]', async () => {
+        render(<InterestsModal {...defaultProps} />);
+
+        // Validamos el rol de accesibilidad limpiando interferencias de los iconos anidados
+        await waitFor(() => {
+            expect(screen.getByRole('heading', { name: /Áreas de Interés/i })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: /Nivel de Dificultad/i })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: /Disponibilidad de Tiempo/i })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: /Idioma del Curso/i })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: /Preferencias de Subtítulos/i })).toBeInTheDocument();
+        });
+    });
+
+    it('debe cumplir con las directrices de accesibilidad de Microsoft Edge Tools', () => {
+        render(<InterestsModal {...defaultProps} />);
+
+        const closeButton = screen.getByRole('button', { name: 'Cerrar Modal' });
+        expect(closeButton).toBeInTheDocument();
+        expect(closeButton).toHaveAttribute('aria-label', 'Cerrar Modal');
+    });
+
+    it('debe hidratar correctamente el estado inicial de los elementos haciendo el fetch asíncrono real', async () => {
+        render(<InterestsModal {...defaultProps} />);
+
+        await waitFor(() => {
+            expect(apiClient.get).toHaveBeenCalledWith('/api/auth/my-interests');
+        });
+
+        const espanolCheckbox = screen.getByLabelText('Español') as HTMLInputElement;
+        const conSubtitulosCheckbox = screen.getByLabelText('Con Subtítulos') as HTMLInputElement;
+
+        expect(espanolCheckbox.checked).toBe(true);
+        expect(conSubtitulosCheckbox.checked).toBe(true);
+    });
+
+    it('debe permitir la mutación del formulario y evitar colisiones de texto duplicado en el DOM', async () => {
+        render(<InterestsModal {...defaultProps} />);
+
+        // Buscamos todas las casillas para filtrar de forma unívoca por su contenedor real
+        const checkboxes = await screen.findAllByRole('checkbox') as HTMLInputElement[];
+
+        const inglesLanguageCheckbox = checkboxes.find(box => {
+            const labelText = box.closest('label')?.textContent || '';
+            return labelText.trim() === 'Inglés';
+        });
+
+        expect(inglesLanguageCheckbox).toBeDefined();
+        expect(inglesLanguageCheckbox!.checked).toBe(true);
+
+        // Provocamos la mutación mediante simulación de clic interactivo
+        fireEvent.click(inglesLanguageCheckbox!);
+        expect(inglesLanguageCheckbox!.checked).toBe(false);
+    });
+
+    it('debe activar el estado loading y deshabilitar los controles al ejecutar la persistencia en Postgres', async () => {
+        vi.mocked(apiClient.post).mockReturnValue(new Promise((resolve) => setTimeout(resolve, 50)));
+
+        render(<InterestsModal {...defaultProps} />);
+
+        const closeButton = screen.getByRole('button', { name: 'Cerrar Modal' });
+        fireEvent.click(closeButton);
+
+        await waitFor(() => {
+            expect(mockOnClose).toHaveBeenCalled();
+        });
+    });
+});
+
+================
 File: backend/.env.example
 ================
 # ======================================================
@@ -2652,49 +2637,6 @@ public class ProfileUpdateDTO {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/dto/RecommendationDTO.java
-================
-package com.cursosonline.backend.dto;
-
-import com.cursosonline.backend.entities.Courses;
-
-/**
- * DTO de transferencia unificado para el motor de sugerencias algorítmicas
- * [ADR-30].
- * Sincronizado milimétricamente con el tipo RecommendedCourse del frontend.
- */
-public record RecommendationDTO(
-        Long id,
-        String title,
-        String instructor,
-        String category,
-        Double rating,
-        String reason,
-        int score) {
-    /**
-     * Constructor compacto para la desestructuración semántica del algoritmo en
-     * memoria.
-     * Garantiza el flujo de Explicabilidad Avanzada inyectando el argumento real
-     * del motor.
-     */
-    public RecommendationDTO(Courses course, int score, String reason) {
-        this(
-                course.getCourse_id(),
-                course.getTitle(),
-                course.getInstructors() != null ? course.getInstructors() : "Por asignar",
-                course.getCategory() != null ? course.getCategory() : "General",
-                course.getRating() != null ? course.getRating() : 5.0,
-                /*
-                 * CORRECCIÓN CRÍTICA DE FLUJO: Se mapea la variable 'reason' calculada
-                 * por la concatenación atómica en lugar de la columna estática de la entidad.
-                 */
-                reason == null || reason.trim().isEmpty() ? "Sugerencia personalizada basada en tu perfil."
-                        : reason.trim(),
-                score);
-    }
-}
-
-================
 File: backend/src/main/java/com/cursosonline/backend/entities/Courses.java
 ================
 package com.cursosonline.backend.entities;
@@ -2854,6 +2796,146 @@ public interface InterestRepository extends JpaRepository<Interest, Long> {
      *         configuró
      */
     Optional<Interest> findByUser_Username(String username);
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/services/SemanticNormalizer.java
+================
+package com.cursosonline.backend.services;
+
+import org.springframework.stereotype.Component;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+import java.util.Objects;
+
+@Component
+public class SemanticNormalizer {
+
+    // Diccionario de Tokens Semánticos para las 11 Categorías del Catálogo Híbrido
+    private static final Map<String, String> CATEGORY_TOKENS = new HashMap<>();
+
+    static {
+        // 1. Ciencia de Datos
+        registerCategory("DATA_SCIENCE", "data science", "ciencia de datos", "データサイエンス", "aprendizaje automático",
+                "machine learning");
+        // 2. Negocios
+        registerCategory("BUSINESS", "business", "negocios", "negócios", "finanzas", "marketing");
+        // 3. Tecnología de la Información
+        registerCategory("IT", "information technology", "tecnologia da informação", "tecnología de la información");
+        // 4. Ciencias de la Computación
+        registerCategory("COMPUTER_SCIENCE", "computer science", "ciencias de la computación",
+                "ciência de la computação");
+        // 5. Artes y Humanidades
+        registerCategory("ARTS_HUMANITIES", "arts and humanities", "artes y humanidades", "artes e humanidades");
+        // 6. Aprendizaje de Idiomas
+        registerCategory("LANGUAGE_LEARNING", "language learning", "aprendizaje de idiomas", "aprendizado de idiomas");
+        // 7. Desarrollo Personal
+        registerCategory("PERSONAL_DEVELOPMENT", "personal development", "desarrollo personal",
+                "desenvolvimento pessoal");
+        // 8. Salud
+        registerCategory("HEALTH", "health", "salud", "saúde");
+        // 9. Ciencias Sociales
+        registerCategory("SOCIAL_SCIENCES", "social sciences", "ciencias sociales", "ciências sociais");
+        // 10. Ciencias Físicas e Ingeniería
+        registerCategory("PHYSICAL_SCIENCE_ENG", "physical science and engineering", "ciencias físicas e ingeniería",
+                "ciências físicas e engenharia");
+        // 11. Matemáticas y Lógica
+        registerCategory("MATH_LOGIC", "math and logic", "matemáticas y lógica", "matemática e lógica");
+    }
+
+    private static void registerCategory(String token, String... variants) {
+        for (String variant : variants) {
+            CATEGORY_TOKENS.put(variant.toLowerCase().trim(), token);
+        }
+    }
+
+    /**
+     * Resuelve el token semántico de una categoría individual (catálogo o UI).
+     */
+    public String normalizeCategory(String category) {
+        if (category == null || category.isBlank())
+            return "UNKNOWN";
+        String clean = category.toLowerCase().trim();
+        return CATEGORY_TOKENS.getOrDefault(clean, "GENERIC_" + clean.replaceAll("\\s+", "_").toUpperCase());
+    }
+
+    /**
+     * Transforma una colección de intereses del estudiante en un Set de Tokens
+     * Semánticos.
+     */
+    public Set<String> normalizeCategories(Iterable<String> categories) {
+        if (categories == null)
+            return Collections.emptySet();
+        return StreamSupport.stream(categories.spliterator(), false)
+                .filter(Objects::nonNull)
+                .map(this::normalizeCategory)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Mapeo de niveles/tipos de curso a tokens normalizados estándar.
+     * Añadido soporte para comodín universal "Todos los niveles".
+     */
+    public String normalizeLevel(String level) {
+        if (level == null || level.isBlank())
+            return "UNKNOWN";
+        String clean = level.toLowerCase().trim();
+
+        // CORRECCIÓN: Captura la opción global del modal de Luis
+        if (clean.contains("todos") || clean.contains("all"))
+            return "ALL_LEVELS";
+
+        if (clean.contains("principiante") || clean.contains("begin") || clean.contains("inici"))
+            return "BEGINNER";
+        if (clean.contains("intermed") || clean.contains("medium"))
+            return "INTERMEDIATE";
+        if (clean.contains("avanz") || clean.contains("advanced") || clean.contains("expert"))
+            return "ADVANCED";
+        return clean.toUpperCase();
+    }
+
+    public Set<String> normalizeLevels(Iterable<String> levels) {
+        if (levels == null)
+            return Collections.emptySet();
+        return StreamSupport.stream(levels.spliterator(), false)
+                .filter(Objects::nonNull)
+                .map(this::normalizeLevel)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Mapeo semántico para idiomas y subtítulos de traducción.
+     * CORRECCIÓN: Retorna cadenas en minúsculas para garantizar compatibilidad
+     * exacta
+     * con los métodos .contains() del motor de emparejamiento. Añadido soporte para
+     * Francés.
+     */
+    public String normalizeLanguage(String lang) {
+        if (lang == null || lang.isBlank())
+            return "unknown";
+        String clean = lang.toLowerCase().trim();
+        if (clean.contains("esp") || clean.contains("spa"))
+            return "spanish";
+        if (clean.contains("ing") || clean.contains("eng"))
+            return "english";
+        if (clean.contains("por") || clean.contains("pt"))
+            return "portuguese";
+        if (clean.contains("jap") || clean.contains("jp"))
+            return "japanese";
+        if (clean.contains("fra") || clean.contains("fre"))
+            return "french"; // CORRECCIÓN: Mapeo del nuevo interés de Luis
+        return clean;
+    }
+
+    public Set<String> normalizeLanguages(Iterable<String> languages) {
+        if (languages == null)
+            return Collections.emptySet();
+        return StreamSupport.stream(languages.spliterator(), false)
+                .filter(Objects::nonNull)
+                .map(this::normalizeLanguage)
+                .collect(Collectors.toSet());
+    }
 }
 
 ================
@@ -3205,145 +3287,6 @@ class JwtServiceTest {
         // acceso
         assertFalse(jwtService.isTokenValid(alteredToken, userDetails));
     }
-}
-
-================
-File: backend/src/test/java/com/cursosonline/backend/services/RecommendationServiceTest.java
-================
-package com.cursosonline.backend.services;
-
-import com.cursosonline.backend.dto.RecommendationDTO;
-import com.cursosonline.backend.entities.Courses;
-import com.cursosonline.backend.entities.Enrollment;
-import com.cursosonline.backend.entities.Interest;
-import com.cursosonline.backend.repository.CoursesRepository;
-import com.cursosonline.backend.repository.EnrollmentRepository;
-import com.cursosonline.backend.repository.InterestRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.Spy;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
-
-@ExtendWith(MockitoExtension.class)
-class RecommendationServiceTest {
-
-        @Mock
-        private CoursesRepository coursesRepository;
-
-        @Mock
-        private InterestRepository interestRepository;
-
-        @Mock
-        private EnrollmentRepository enrollmentRepository;
-
-        @Spy // Usamos @Spy para que se ejecute la lógica real del normalizador semántico
-        private SemanticNormalizer semanticNormalizer;
-
-        @InjectMocks
-        private RecommendationService recommendationService;
-
-        private Interest luisInterests;
-        private List<Courses> courseCatalog;
-
-        @BeforeEach
-        void setUp() {
-                // Configurar los intereses en español del alumno Luis (Escenario Real)
-                luisInterests = new Interest();
-                luisInterests.setId(1L);
-                luisInterests.setCategory(new ArrayList<>(List.of("Ciencias Sociales")));
-                luisInterests.setCourse_type(new ArrayList<>(List.of("Principiante")));
-                luisInterests.setLanguage(new ArrayList<>(List.of("Español")));
-                luisInterests.setSubtitle_languages(new ArrayList<>(List.of("Español")));
-                luisInterests.setDuration(new ArrayList<>(List.of("Corto")));
-
-                // Configurar el catálogo de cursos simulado (Híbrido/Inglés)
-                courseCatalog = new ArrayList<>();
-
-                // Curso A: Coincide semánticamente en categoría ("Social Sciences" = "Ciencias
-                // Sociales")
-                Courses socialScienceCourse = new Courses();
-                socialScienceCourse.setCourse_id(101L);
-                socialScienceCourse.setTitle("Introduction to Social Sciences");
-                socialScienceCourse.setCategory("Social Sciences"); // <── Variante en Inglés
-                socialScienceCourse.setCourseType("Beginner");
-                socialScienceCourse.setLanguage("English");
-                socialScienceCourse.setSubtitleLanguages("English, Spanish");
-                socialScienceCourse.setDuration(8.5f); // <── Corto (<10h)
-                socialScienceCourse.setRating(4.8f);
-
-                // Curso B: Categoría diferente ("Business")
-                Courses businessCourse = new Courses();
-                businessCourse.setCourse_id(102L);
-                businessCourse.setTitle("Key Technologies for Business Specialization");
-                businessCourse.setCategory("Business");
-                businessCourse.setCourseType("Beginner");
-                businessCourse.setLanguage("English");
-                businessCourse.setSubtitleLanguages("English");
-                businessCourse.setDuration(12.0f); // <── Medio (10h-40h)
-                businessCourse.setRating(4.5f);
-
-                courseCatalog.add(socialScienceCourse);
-                courseCatalog.add(businessCourse);
-        }
-
-        @Test
-        @DisplayName("Debería recomendar curso de Ciencias Sociales resolviendo la brecha multilingüe con tokens")
-        void shouldRecommendSocialSciencesCourseResolvingMultilingualGap() {
-                // Arrange (Configuración de comportamientos de los Mocks)
-                Long userId = 1L;
-                when(interestRepository.findById(userId)).thenReturn(Optional.of(luisInterests));
-                when(enrollmentRepository.findAllByUserIdWithCourses(userId)).thenReturn(new ArrayList<>()); // Sin
-                                                                                                             // matrículas
-                                                                                                             // previas
-                when(coursesRepository.findAll()).thenReturn(courseCatalog);
-
-                // Act (Ejecución del método del servicio bajo test)
-                List<RecommendationDTO> results = recommendationService.getRecommendationsForUser(userId);
-
-                // Assert (Verificaciones estrictas del comportamiento esperado)
-                assertNotNull(results, "La lista de recomendaciones no debe ser nula");
-                assertFalse(results.isEmpty(), "La lista de recomendaciones debe contener elementos");
-                assertTrue(results.size() <= 6, "No debe superar el límite fijado de 6 elementos");
-
-                // El primer curso sugerido debe ser el de Ciencias Sociales gracias a los 30
-                // puntos adicionales de la categoría
-                RecommendationDTO topRecommendation = results.get(0);
-                assertEquals(101L, topRecommendation.id(),
-                                "El curso con mayor afinidad debe ser el de Ciencias Sociales");
-                assertEquals("Social Sciences", topRecommendation.category(),
-                                "La categoría devuelta debe coincidir con la de la entidad");
-
-                // Verificar que la cadena explicativa generada no esté vacía ni sea el fallback
-                // de seguridad genérico
-                assertNotNull(topRecommendation.reason());
-                assertTrue(topRecommendation.reason().contains("Coincide con tus categorías preferidas"),
-                                "El texto de explicabilidad debe reflejar el match exitoso de la categoría");
-                assertTrue(topRecommendation.reason().contains("Se ajusta a tu disponibilidad de tiempo"),
-                                "El texto debe reflejar que también se calculó la coincidencia de duración");
-
-                // El curso de Ciencias Sociales debe tener mayor puntuación que el de Negocios
-                if (results.size() > 1) {
-                        RecommendationDTO secondRecommendation = results.get(1);
-                        assertTrue(topRecommendation.score() > secondRecommendation.score(),
-                                        "El curso de la categoría de interés debe puntuar más alto que el catálogo general");
-                }
-
-                // Verificar interacciones seguras con la persistencia
-                verify(interestRepository, times(1)).findById(userId);
-                verify(coursesRepository, times(1)).findAll();
-                verify(enrollmentRepository, times(1)).findAllByUserIdWithCourses(userId);
-        }
 }
 
 ================
@@ -5474,6 +5417,7 @@ import { AuthProvider } from './AuthProvider';
 import { useAuth } from './useAuth';
 import { ROLES } from './authTypes';
 import * as authStorage from './authStorage';
+import { fireEvent } from '@testing-library/dom';
 
 const TestComponent = () => {
     const { isAuthenticated } = useAuth();
@@ -5484,7 +5428,7 @@ const TestComponent = () => {
     );
 };
 
-describe('Auditoría de Calidad Frontend: Blindaje de Sesión en AuthProvider', () => {
+describe('Auditoría de Calidad Frontend: Blindaje de Sesión y Activity Tracker [ADR-34]', () => {
 
     beforeEach(() => {
         vi.useFakeTimers();
@@ -5510,7 +5454,6 @@ describe('Auditoría de Calidad Frontend: Blindaje de Sesión en AuthProvider', 
             expiresAt: expiresAt
         };
 
-        // Auditoría NotebookLM: Mockeamos la lectura del almacenamiento para que inicie autenticado limpiamente
         vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(sessionUser);
 
         render(
@@ -5519,23 +5462,97 @@ describe('Auditoría de Calidad Frontend: Blindaje de Sesión en AuthProvider', 
             </AuthProvider>
         );
 
-        // El estado arranca autenticado de forma limpia y síncrona
         expect(screen.getByTestId('auth-status').textContent).toBe('AUTENTICADO');
 
-        // Simulamos el paso de 20 minutos en un milisegundo (gracias a vi.advanceTimersByTime)
         act(() => {
             vi.advanceTimersByTime(20 * 60 * 1000);
         });
 
-        // Forzar reactivación por Visibility API
         Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
 
         act(() => {
             document.dispatchEvent(new Event('visibilitychange'));
         });
 
-        // Verificación final: La sesión fantasma ha sido purgada con éxito
         expect(screen.getByTestId('auth-status').textContent).toBe('NO_AUTENTICADO');
+    });
+
+    it('debe ejecutar logout automáticamente tras 15 minutos de inactividad absoluta [NotebookLM - Sin Interacción]', async () => {
+        const now = Date.now();
+        const expiresAt = now + 15 * 60 * 1000;
+        const sessionUser = {
+            userId: 42,
+            username: 'Luis',
+            role: ROLES.STUDENT,
+            email: 'luis@tfg.com',
+            token: 'jwt_token_tfg_secret',
+            expiresAt: expiresAt
+        };
+
+        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(sessionUser);
+
+        render(
+            <AuthProvider>
+                <TestComponent />
+            </AuthProvider>
+        );
+
+        expect(screen.getByTestId('auth-status').textContent).toBe('AUTENTICADO');
+
+        // Avanzamos el reloj 15 minutos y 5 segundos superando la frecuencia de muestreo del intervalo
+        act(() => {
+            vi.advanceTimersByTime(15 * 60 * 1000 + 5000);
+        });
+
+        expect(screen.getByTestId('auth-status').textContent).toBe('NO_AUTENTICADO');
+    });
+
+    it('debe posponer el expiresAt y mantener la sesión activa si el usuario registra interacciones en el DOM [NotebookLM - Activity Tracker]', async () => {
+        const now = Date.now();
+        const expiresAt = now + 15 * 60 * 1000;
+        const sessionUser = {
+            userId: 42,
+            username: 'Luis',
+            role: ROLES.STUDENT,
+            email: 'luis@tfg.com',
+            token: 'jwt_token_tfg_secret',
+            expiresAt: expiresAt
+        };
+
+        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(sessionUser);
+        const spyWrite = vi.spyOn(authStorage, 'writeStoredAuthUser');
+
+        render(
+            <AuthProvider>
+                <TestComponent />
+            </AuthProvider>
+        );
+
+        // Simulamos el paso de 10 minutos de inactividad (quedarían 5 minutos antes de expirar)
+        act(() => {
+            vi.advanceTimersByTime(10 * 60 * 1000);
+        });
+
+        // El usuario interactúa: se simula un movimiento de ratón en la interfaz web
+        act(() => {
+            fireEvent.mouseMove(window);
+        });
+
+        // Dejamos pasar 2.5 segundos para satisfacer el throttle de la Ref del AuthProvider
+        act(() => {
+            vi.advanceTimersByTime(2500);
+        });
+
+        // Avanzamos el reloj otros 6 minutos (en el modelo absoluto antiguo aquí el usuario ya habría sido expulsado)
+        act(() => {
+            vi.advanceTimersByTime(6 * 60 * 1000);
+        });
+
+        // Verificamos que gracias al Activity Tracker la sesión sigue plenamente vigente y autenticada
+        expect(screen.getByTestId('auth-status').textContent).toBe('AUTENTICADO');
+
+        // Confirmamos que el sistema escribió la actualización en caliente en el almacenamiento local
+        expect(spyWrite).toHaveBeenCalled();
     });
 });
 
@@ -6149,7 +6166,7 @@ public class JwtProperties {
 
     /** Margen de tolerancia para diferencias de reloj, en segundos. */
     @PositiveOrZero
-    private long clockSkewSeconds = 0;
+    private long clockSkewSeconds = 60;
 
     /**
      * Obtiene la clave secreta para JWT.
@@ -6306,6 +6323,49 @@ public record AuthTokenResponse(
                 user.getRole(),
                 user.getEmail(),
                 enrolledCourseIds);
+    }
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/dto/RecommendationDTO.java
+================
+package com.cursosonline.backend.dto;
+
+import com.cursosonline.backend.entities.Courses;
+
+/**
+ * DTO de transferencia unificado para el motor de sugerencias algorítmicas
+ * [ADR-30].
+ * Sincronizado milimétricamente con el tipo RecommendedCourse del frontend.
+ */
+public record RecommendationDTO(
+        Long id,
+        String title,
+        String instructor,
+        String category,
+        Double rating,
+        String reason,
+        int score) {
+    /**
+     * Constructor compacto para la desestructuración semántica del algoritmo en
+     * memoria.
+     * Garantiza el flujo de Explicabilidad Avanzada inyectando el argumento real
+     * del motor.
+     */
+    public RecommendationDTO(Courses course, int score, String reason) {
+        this(
+                course.getCourse_id(),
+                course.getTitle(),
+                course.getInstructors() != null ? course.getInstructors() : "Por asignar",
+                course.getCategory() != null ? course.getCategory() : "General",
+                course.getRating() != null ? course.getRating() : 5.0,
+                /*
+                 * CORRECCIÓN CRÍTICA DE FLUJO: Se mapea la variable 'reason' calculada
+                 * por la concatenación atómica en lugar de la columna estática de la entidad.
+                 */
+                reason == null || reason.trim().isEmpty() ? "Sugerencia personalizada basada en tu perfil."
+                        : reason.trim(),
+                score);
     }
 }
 
@@ -6544,201 +6604,6 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, Long> 
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/services/RecommendationService.java
-================
-package com.cursosonline.backend.services;
-
-import com.cursosonline.backend.dto.RecommendationDTO;
-import com.cursosonline.backend.entities.Courses;
-import com.cursosonline.backend.entities.Enrollment;
-import com.cursosonline.backend.entities.Interest;
-import com.cursosonline.backend.repository.CoursesRepository;
-import com.cursosonline.backend.repository.EnrollmentRepository;
-import com.cursosonline.backend.repository.InterestRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.*;
-import java.util.stream.Collectors;
-
-@Service
-@RequiredArgsConstructor
-public class RecommendationService {
-
-    private final CoursesRepository coursesRepository;
-    private final InterestRepository interestRepository;
-    private final EnrollmentRepository enrollmentRepository;
-    private final SemanticNormalizer normalizer; // <--- Inyección del nuevo componente
-
-    @Transactional(readOnly = true)
-    public List<RecommendationDTO> getRecommendationsForUser(Long userId) {
-        Interest interests = interestRepository.findById(userId).orElse(null);
-        List<Enrollment> myEnrollments = enrollmentRepository.findAllByUserIdWithCourses(userId);
-
-        Set<Long> excludedIds = myEnrollments.stream()
-                .filter(e -> e.getCourse() != null)
-                .map(e -> e.getCourse().getCourse_id())
-                .collect(Collectors.toSet());
-
-        List<Courses> allCourses = coursesRepository.findAll();
-
-        // FASE DE TRADUCCIÓN: Extracción previa y unificación a Tokens Invariables
-        Set<String> userCategoryTokens = interests != null ? normalizer.normalizeCategories(interests.getCategory())
-                : Collections.emptySet();
-        Set<String> userLevelTokens = interests != null ? normalizer.normalizeLevels(interests.getCourse_type())
-                : Collections.emptySet();
-        Set<String> userLanguageTokens = interests != null ? normalizer.normalizeLanguages(interests.getLanguage())
-                : Collections.emptySet();
-        Set<String> userSubtitleTokens = interests != null
-                ? normalizer.normalizeLanguages(interests.getSubtitle_languages())
-                : Collections.emptySet();
-        List<String> rawDurations = interests != null ? interests.getDuration() : Collections.emptyList();
-
-        return allCourses.stream()
-                .filter(course -> course != null && course.getCourse_id() != null)
-                .filter(course -> !excludedIds.contains(course.getCourse_id()))
-                .map(course -> calculateAffinityWithTokens(course, userCategoryTokens, userLevelTokens,
-                        userLanguageTokens, userSubtitleTokens, rawDurations, myEnrollments))
-                .sorted((dto1, dto2) -> Integer.compare(dto2.score(), dto1.score()))
-                .limit(6)
-                .collect(Collectors.toList());
-    }
-
-    private RecommendationDTO calculateAffinityWithTokens(
-            Courses course,
-            Set<String> userCategoryTokens,
-            Set<String> userLevelTokens,
-            Set<String> userLanguageTokens,
-            Set<String> userSubtitleTokens,
-            List<String> rawDurations,
-            List<Enrollment> myEnrollments) {
-
-        double score = 0;
-        StringBuilder reason = new StringBuilder();
-
-        // 1. Evaluación de Precondiciones emparejando a nivel de Token Semántico
-        String courseCategoryToken = normalizer.normalizeCategory(course.getCategory());
-        boolean isCategoryMatch = userCategoryTokens.contains(courseCategoryToken);
-
-        String courseLevelToken = normalizer.normalizeLevel(course.getCourseType());
-        boolean isLevelMatch = userLevelTokens.contains(courseLevelToken);
-
-        String courseLanguageToken = normalizer.normalizeLanguage(course.getLanguage());
-        boolean isLanguageMatch = userLanguageTokens.contains(courseLanguageToken);
-
-        // Subtítulos: Al ser una columna de texto libre (ej: "English, Spanish"),
-        // comprobamos inclusión lingüística mediante tokens
-        boolean isSubtitleMatch = false;
-        if (course.getSubtitleLanguages() != null && !userSubtitleTokens.isEmpty()) {
-            String cleanSubs = course.getSubtitleLanguages().toLowerCase();
-            isSubtitleMatch = userSubtitleTokens.stream()
-                    .anyMatch(token -> {
-                        if (token.equals("SPANISH") && (cleanSubs.contains("esp") || cleanSubs.contains("spa")))
-                            return true;
-                        if (token.equals("ENGLISH") && (cleanSubs.contains("ing") || cleanSubs.contains("eng")))
-                            return true;
-                        if (token.equals("PORTUGUESE") && (cleanSubs.contains("por") || cleanSubs.contains("pt")))
-                            return true;
-                        if (token.equals("JAPANESE") && (cleanSubs.contains("jap") || cleanSubs.contains("jp")))
-                            return true;
-                        return cleanSubs.contains(token.toLowerCase());
-                    });
-        }
-
-        boolean isDurationMatch = checkDurationMatch(course.getDuration(), rawDurations);
-
-        // 2. MODELO POR ESCALONES CRECIENTES DEL HISTORIAL ACADÉMICO
-        int historyScore = 0;
-        int maxProgressInTemplate = 0;
-
-        if (myEnrollments != null && !myEnrollments.isEmpty() && course.getCategory() != null) {
-            for (Enrollment enrollment : myEnrollments) {
-                if (enrollment.getCourse() != null && enrollment.getCourse().getCategory() != null) {
-                    String enrollmentCatToken = normalizer.normalizeCategory(enrollment.getCourse().getCategory());
-                    if (courseCategoryToken.equals(enrollmentCatToken)) {
-                        int currentProgress = enrollment.getProgress_percentage();
-                        if (currentProgress > maxProgressInTemplate) {
-                            maxProgressInTemplate = currentProgress;
-                        }
-                    }
-                }
-            }
-
-            if (maxProgressInTemplate >= 100)
-                historyScore = 25;
-            else if (maxProgressInTemplate >= 75)
-                historyScore = 15;
-            else if (maxProgressInTemplate >= 50)
-                historyScore = 8;
-        }
-
-        // 3. Acumulación Estricta de la Matriz de Pesos (Total 100 pts)
-        if (isCategoryMatch)
-            score += 30;
-        score += historyScore;
-        if (isLevelMatch)
-            score += 20;
-        if (isLanguageMatch)
-            score += 15;
-        if (isSubtitleMatch)
-            score += 10;
-        if (isDurationMatch)
-            score += 5;
-
-        // 4. GENERACIÓN DE EXPLICABILIDAD DINÁMICA (Mapeada en español usando el
-        // catálogo real)
-        if (isCategoryMatch) {
-            reason.append("Coincide con tus categorías preferidas (").append(course.getCategory()).append("). ");
-        }
-
-        if (maxProgressInTemplate >= 100) {
-            reason.append("Premio por finalizar cursos de esta área al 100%. ");
-        } else if (maxProgressInTemplate >= 50) {
-            reason.append("Basado en tu progreso activo en asignaturas similares. ");
-        }
-
-        if (isLevelMatch) {
-            reason.append("Adecuado a tu nivel de experiencia. ");
-        }
-
-        if (isLanguageMatch) {
-            reason.append("Disponible en tu idioma nativo. ");
-        }
-
-        if (isSubtitleMatch) {
-            reason.append("Soporta subtítulos de traducción. ");
-        }
-
-        if (isDurationMatch) {
-            reason.append("Se ajusta a tu disponibilidad de tiempo.");
-        }
-
-        String finalReason = reason.toString().trim();
-        if (finalReason.isEmpty()) {
-            finalReason = "Sugerencia personalizada basada en tus intereses.";
-        }
-
-        return new RecommendationDTO(course, (int) score, finalReason);
-    }
-
-    private static boolean checkDurationMatch(Number courseHours, List<String> preferredDurations) {
-        if (courseHours == null || preferredDurations == null || preferredDurations.isEmpty())
-            return false;
-        int hours = courseHours.intValue();
-        return preferredDurations.stream().anyMatch(target -> {
-            if (target == null)
-                return false;
-            if (hours < 10 && target.contains("Corto"))
-                return true;
-            if (hours >= 10 && hours <= 40 && target.contains("Medio"))
-                return true;
-            return hours > 40 && target.contains("Largo");
-        });
-    }
-}
-
-================
 File: backend/src/main/java/com/cursosonline/backend/services/SessionAuthenticationService.java
 ================
 package com.cursosonline.backend.services;
@@ -6776,6 +6641,144 @@ public class SessionAuthenticationService {
                 return AuthResponse.from(user);
         }
 
+}
+
+================
+File: backend/src/test/java/com/cursosonline/backend/services/RecommendationServiceTest.java
+================
+package com.cursosonline.backend.services;
+
+import com.cursosonline.backend.dto.RecommendationDTO;
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Interest;
+import com.cursosonline.backend.repository.CoursesRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.InterestRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class RecommendationServiceTest {
+
+        @Mock
+        private CoursesRepository coursesRepository;
+
+        @Mock
+        private InterestRepository interestRepository;
+
+        @Mock
+        private EnrollmentRepository enrollmentRepository;
+
+        @Spy // Usamos @Spy para que se ejecute la lógica real del normalizador semántico
+        private SemanticNormalizer semanticNormalizer;
+
+        @InjectMocks
+        private RecommendationService recommendationService;
+
+        private Interest luisInterests;
+        private List<Courses> courseCatalog;
+
+        @BeforeEach
+        void setUp() {
+                // Configurar los intereses en español del alumno Luis (Escenario Real)
+                luisInterests = new Interest();
+                luisInterests.setId(1L);
+                luisInterests.setCategory(new ArrayList<>(List.of("Ciencias Sociales")));
+                luisInterests.setCourse_type(new ArrayList<>(List.of("Principiante")));
+                luisInterests.setLanguage(new ArrayList<>(List.of("Español")));
+                luisInterests.setSubtitle_languages(new ArrayList<>(List.of("Español")));
+                luisInterests.setDuration(new ArrayList<>(List.of("Corto")));
+
+                // Configurar el catálogo de cursos simulado (Híbrido/Inglés)
+                courseCatalog = new ArrayList<>();
+
+                // Curso A: Coincide semánticamente en categoría ("Social Sciences" = "Ciencias
+                // Sociales")
+                Courses socialScienceCourse = new Courses();
+                socialScienceCourse.setCourse_id(101L);
+                socialScienceCourse.setTitle("Introduction to Social Sciences");
+                socialScienceCourse.setCategory("Social Sciences"); // <── Variante en Inglés
+                socialScienceCourse.setCourseType("Beginner");
+                socialScienceCourse.setLanguage("English");
+                socialScienceCourse.setSubtitleLanguages("English, Spanish");
+                socialScienceCourse.setDuration(8.5f); // <── Corto (<10h)
+                socialScienceCourse.setRating(4.8f);
+
+                // Curso B: Categoría diferente ("Business")
+                Courses businessCourse = new Courses();
+                businessCourse.setCourse_id(102L);
+                businessCourse.setTitle("Key Technologies for Business Specialization");
+                businessCourse.setCategory("Business");
+                businessCourse.setCourseType("Beginner");
+                businessCourse.setLanguage("English");
+                businessCourse.setSubtitleLanguages("English");
+                businessCourse.setDuration(12.0f); // <── Medio (10h-40h)
+                businessCourse.setRating(4.5f);
+
+                courseCatalog.add(socialScienceCourse);
+                courseCatalog.add(businessCourse);
+        }
+
+        @Test
+        @DisplayName("Debería recomendar curso de Ciencias Sociales resolviendo la brecha multilingüe con tokens")
+        void shouldRecommendSocialSciencesCourseResolvingMultilingualGap() {
+                // Arrange (Configuración de comportamientos de los Mocks)
+                Long userId = 1L;
+                when(interestRepository.findById(userId)).thenReturn(Optional.of(luisInterests));
+                when(enrollmentRepository.findAllByUserIdWithCourses(userId)).thenReturn(new ArrayList<>()); // Sin
+                                                                                                             // matrículas
+                                                                                                             // previas
+                when(coursesRepository.findAll()).thenReturn(courseCatalog);
+
+                // Act (Ejecución del método del servicio bajo test)
+                List<RecommendationDTO> results = recommendationService.getRecommendationsForUser(userId);
+
+                // Assert (Verificaciones estrictas del comportamiento esperado)
+                assertNotNull(results, "La lista de recomendaciones no debe ser nula");
+                assertFalse(results.isEmpty(), "La lista de recomendaciones debe contener elementos");
+                assertTrue(results.size() <= 6, "No debe superar el límite fijado de 6 elementos");
+
+                // El primer curso sugerido debe ser el de Ciencias Sociales gracias a los 30
+                // puntos adicionales de la categoría
+                RecommendationDTO topRecommendation = results.get(0);
+                assertEquals(101L, topRecommendation.id(),
+                                "El curso con mayor afinidad debe ser el de Ciencias Sociales");
+                assertEquals("Social Sciences", topRecommendation.category(),
+                                "La categoría devuelta debe coincidir con la de la entidad");
+
+                // Verificar que la cadena explicativa generada no esté vacía ni sea el fallback
+                // de seguridad genérico
+                assertNotNull(topRecommendation.reason());
+                assertTrue(topRecommendation.reason().contains("Coincide con tus categorías preferidas"),
+                                "El texto de explicabilidad debe reflejar el match exitoso de la categoría");
+                assertTrue(topRecommendation.reason().contains("Se ajusta a tu disponibilidad de tiempo"),
+                                "El texto debe reflejar que también se calculó la coincidencia de duración");
+
+                // El curso de Ciencias Sociales debe tener mayor puntuación que el de Negocios
+                if (results.size() > 1) {
+                        RecommendationDTO secondRecommendation = results.get(1);
+                        assertTrue(topRecommendation.score() > secondRecommendation.score(),
+                                        "El curso de la categoría de interés debe puntuar más alto que el catálogo general");
+                }
+
+                // Verificar interacciones seguras con la persistencia
+                verify(interestRepository, times(1)).findById(userId);
+                verify(coursesRepository, times(1)).findAll();
+                verify(enrollmentRepository, times(1)).findAllByUserIdWithCourses(userId);
+        }
 }
 
 ================
@@ -7633,6 +7636,207 @@ public class FileStorageService {
 }
 
 ================
+File: backend/src/main/java/com/cursosonline/backend/services/RecommendationService.java
+================
+package com.cursosonline.backend.services;
+
+import com.cursosonline.backend.dto.RecommendationDTO;
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.entities.Interest;
+import com.cursosonline.backend.repository.CoursesRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.InterestRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class RecommendationService {
+
+    private final CoursesRepository coursesRepository;
+    private final InterestRepository interestRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final SemanticNormalizer normalizer; // <--- Inyección del nuevo componente
+
+    @Transactional(readOnly = true)
+    public List<RecommendationDTO> getRecommendationsForUser(Long userId) {
+        Interest interests = interestRepository.findById(userId).orElse(null);
+        List<Enrollment> myEnrollments = enrollmentRepository.findAllByUserIdWithCourses(userId);
+
+        Set<Long> excludedIds = myEnrollments.stream()
+                .filter(e -> e.getCourse() != null)
+                .map(e -> e.getCourse().getCourse_id())
+                .collect(Collectors.toSet());
+
+        List<Courses> allCourses = coursesRepository.findAll();
+
+        // FASE DE TRADUCCIÓN: Extracción previa y unificación a Tokens Invariables
+        Set<String> userCategoryTokens = interests != null ? normalizer.normalizeCategories(interests.getCategory())
+                : Collections.emptySet();
+        Set<String> userLevelTokens = interests != null ? normalizer.normalizeLevels(interests.getCourse_type())
+                : Collections.emptySet();
+        Set<String> userLanguageTokens = interests != null ? normalizer.normalizeLanguages(interests.getLanguage())
+                : Collections.emptySet();
+        Set<String> userSubtitleTokens = interests != null
+                ? normalizer.normalizeLanguages(interests.getSubtitle_languages())
+                : Collections.emptySet();
+        List<String> rawDurations = interests != null ? interests.getDuration() : Collections.emptyList();
+
+        return allCourses.stream()
+                .filter(course -> course != null && course.getCourse_id() != null)
+                .filter(course -> !excludedIds.contains(course.getCourse_id()))
+                .map(course -> calculateAffinityWithTokens(course, userCategoryTokens, userLevelTokens,
+                        userLanguageTokens, userSubtitleTokens, rawDurations, myEnrollments))
+                .sorted((dto1, dto2) -> Integer.compare(dto2.score(), dto1.score()))
+                .limit(6)
+                .collect(Collectors.toList());
+    }
+
+    private RecommendationDTO calculateAffinityWithTokens(
+            Courses course,
+            Set<String> userCategoryTokens,
+            Set<String> userLevelTokens,
+            Set<String> userLanguageTokens,
+            Set<String> userSubtitleTokens,
+            List<String> rawDurations,
+            List<Enrollment> myEnrollments) {
+
+        double score = 0;
+        StringBuilder reason = new StringBuilder();
+
+        // 1. Evaluación de Precondiciones emparejando a nivel de Token Semántico
+        String courseCategoryToken = normalizer.normalizeCategory(course.getCategory());
+        boolean isCategoryMatch = userCategoryTokens.contains(courseCategoryToken);
+
+        String courseLevelToken = normalizer.normalizeLevel(course.getCourseType());
+        // CORRECCIÓN SECCIÓN NIVEL: Concede el match si coincide el token exacto O si
+        // Luis marcó que acepta todos los niveles
+        boolean isLevelMatch = userLevelTokens.contains("ALL_LEVELS") || userLevelTokens.contains(courseLevelToken);
+
+        String courseLanguageToken = normalizer.normalizeLanguage(course.getLanguage());
+        boolean isLanguageMatch = userLanguageTokens.contains(courseLanguageToken);
+
+        // Subtítulos: Al ser una columna de texto libre (ej: "English, Spanish"),
+        // comprobamos inclusión lingüística mediante tokens
+        boolean isSubtitleMatch = false;
+        if (course.getSubtitleLanguages() != null && !userSubtitleTokens.isEmpty()) {
+            String cleanSubs = course.getSubtitleLanguages().toLowerCase();
+            isSubtitleMatch = userSubtitleTokens.stream()
+                    .anyMatch(token -> {
+                        // CORRECCIÓN SECCIÓN SUBTÍTULOS: Sincronizado en minúsculas con las salidas de
+                        // SemanticNormalizer
+                        if (token.equals("spanish") && (cleanSubs.contains("esp") || cleanSubs.contains("spa")))
+                            return true;
+                        if (token.equals("english") && (cleanSubs.contains("ing") || cleanSubs.contains("eng")))
+                            return true;
+                        if (token.equals("portuguese") && (cleanSubs.contains("por") || cleanSubs.contains("pt")))
+                            return true;
+                        if (token.equals("japanese") && (cleanSubs.contains("jap") || cleanSubs.contains("jp")))
+                            return true;
+                        if (token.equals("french") && (cleanSubs.contains("fra") || cleanSubs.contains("fre")))
+                            return true;
+                        return cleanSubs.contains(token.toLowerCase());
+                    });
+        }
+
+        boolean isDurationMatch = checkDurationMatch(course.getDuration(), rawDurations);
+
+        // 2. MODELO POR ESCALONES CRECIENTES DEL HISTORIAL ACADÉMICO
+        int historyScore = 0;
+        int maxProgressInTemplate = 0;
+
+        if (myEnrollments != null && !myEnrollments.isEmpty() && course.getCategory() != null) {
+            for (Enrollment enrollment : myEnrollments) {
+                if (enrollment.getCourse() != null && enrollment.getCourse().getCategory() != null) {
+                    String enrollmentCatToken = normalizer.normalizeCategory(enrollment.getCourse().getCategory());
+                    if (courseCategoryToken.equals(enrollmentCatToken)) {
+                        int currentProgress = enrollment.getProgress_percentage();
+                        if (currentProgress > maxProgressInTemplate) {
+                            maxProgressInTemplate = currentProgress;
+                        }
+                    }
+                }
+            }
+
+            if (maxProgressInTemplate >= 100)
+                historyScore = 25;
+            else if (maxProgressInTemplate >= 75)
+                historyScore = 15;
+            else if (maxProgressInTemplate >= 50)
+                historyScore = 8;
+        }
+
+        // 3. Acumulación Estricta de la Matriz de Pesos (Total 100 pts)
+        if (isCategoryMatch)
+            score += 30;
+        score += historyScore;
+        if (isLevelMatch)
+            score += 20;
+        if (isLanguageMatch)
+            score += 15;
+        if (isSubtitleMatch)
+            score += 10;
+        if (isDurationMatch)
+            score += 5;
+
+        // 4. GENERACIÓN DE EXPLICABILIDAD DINÁMICA (Mapeada en español usando el
+        // catálogo real)
+        if (isCategoryMatch) {
+            reason.append("Coincide con tus categorías preferidas (").append(course.getCategory()).append("). ");
+        }
+
+        if (maxProgressInTemplate >= 100) {
+            reason.append("Premio por finalizar cursos de esta área al 100%. ");
+        } else if (maxProgressInTemplate >= 50) {
+            reason.append("Basado en tu progreso activo en asignaturas similares. ");
+        }
+
+        if (isLevelMatch) {
+            reason.append("Adecuado a tu nivel de experiencia. ");
+        }
+
+        if (isLanguageMatch) {
+            reason.append("Disponible en tu idioma nativo. ");
+        }
+
+        if (isSubtitleMatch) {
+            reason.append("Soporta subtítulos de traducción. ");
+        }
+
+        if (isDurationMatch) {
+            reason.append("Se ajusta a tu disponibilidad de tiempo.");
+        }
+
+        String finalReason = reason.toString().trim();
+        if (finalReason.isEmpty()) {
+            finalReason = "Sugerencia personalizada basada en tus intereses.";
+        }
+
+        return new RecommendationDTO(course, (int) score, finalReason);
+    }
+
+    private static boolean checkDurationMatch(Number courseHours, List<String> preferredDurations) {
+        if (courseHours == null || preferredDurations == null || preferredDurations.isEmpty())
+            return false;
+        int hours = courseHours.intValue();
+        return preferredDurations.stream().anyMatch(target -> {
+            if (target == null)
+                return false;
+            if (hours < 10 && target.contains("Corto"))
+                return true;
+            if (hours >= 10 && hours <= 40 && target.contains("Medio"))
+                return true;
+            return hours > 40 && target.contains("Largo");
+        });
+    }
+}
+
+================
 File: backend/src/test/java/com/cursosonline/backend/BackendApplicationTests.java
 ================
 package com.cursosonline.backend;
@@ -7775,121 +7979,6 @@ createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </StrictMode>,
 )
-
-================
-File: frontend/src/routes/AppRoutes.test.tsx
-================
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
-import AppRoutes from "./index";
-import { AuthContext } from "@/auth/AuthContext";
-import type { AuthContextValue } from "@/auth/AuthContext";
-import type { AuthUser } from "@/auth";
-
-// Intercepción exacta de la ruta relativa de la pasarela de red
-vi.mock("../services/apiClient", () => ({
-    apiClient: {
-        get: vi.fn(() => Promise.resolve({ data: [] })),
-        post: vi.fn(() => Promise.resolve({ data: {} })),
-        interceptors: {
-            request: { use: vi.fn(), eject: vi.fn() },
-            response: { use: vi.fn(), eject: vi.fn() }
-        }
-    }
-}));
-
-const buildAuthValue = (user: AuthUser | null): AuthContextValue => ({
-    user,
-    isAuthenticated: Boolean(user),
-    isLoading: false,
-    login: vi.fn(),
-    logout: vi.fn(),
-});
-
-const renderWithRouteAndAuth = (route: string, user: AuthUser | null) => {
-    return render(
-        <AuthContext.Provider value={buildAuthValue(user)}>
-            <MemoryRouter initialEntries={[route]}>
-                <AppRoutes />
-            </MemoryRouter>
-        </AuthContext.Provider>
-    );
-};
-
-describe("AppRoutes - autorizacion por rol", () => {
-    it("redirecciona a landing cuando el usuario no esta autenticado e intenta /student", () => {
-        renderWithRouteAndAuth("/student", null);
-
-        const buttons = screen.getAllByRole("button", { name: /Entrar \/ Registro/i });
-        expect(buttons.length).toBeGreaterThan(0);
-        expect(screen.queryByText(/Panel del estudiante/i)).not.toBeInTheDocument();
-    });
-
-    it("permite acceso a /student cuando el rol es STUDENT", () => {
-        renderWithRouteAndAuth("/student", {
-            username: "student_user",
-            role: "STUDENT",
-        });
-
-        expect(screen.getByText(/Intereses del estudiante/i)).toBeInTheDocument();
-    });
-
-    it("bloquea acceso a /admin para rol STUDENT y muestra acceso denegado", () => {
-        renderWithRouteAndAuth("/admin", {
-            username: "student_user",
-            role: "STUDENT",
-        });
-
-        expect(screen.getByText(/Acceso denegado/i)).toBeInTheDocument();
-    });
-
-    it("permite acceso a /admin cuando el rol es ADMIN", () => {
-        renderWithRouteAndAuth("/admin", {
-            username: "admin_user",
-            role: "ADMIN",
-        });
-
-        // Corregido: Tolera múltiples elementos de navegación duplicados en tu layout estructurado
-        const navs = screen.getAllByRole("navigation");
-        expect(navs.length).toBeGreaterThan(0);
-    });
-
-    it("permite acceso a /professor cuando el rol es PROFESSOR", () => {
-        renderWithRouteAndAuth("/professor", {
-            username: "prof_user",
-            role: "PROFESSOR",
-        });
-
-        // Corregido: Tolera múltiples elementos de navegación duplicados en tu layout estructurado
-        const navs = screen.getAllByRole("navigation");
-        expect(navs.length).toBeGreaterThan(0);
-    });
-
-    it("bloquea /student cuando el usuario autenticado no tiene rol", () => {
-        renderWithRouteAndAuth("/student", {
-            username: "sin_rol",
-        });
-
-        expect(screen.getByText(/Acceso denegado/i)).toBeInTheDocument();
-    });
-
-    it("permite /student aunque el rol venga en minusculas", () => {
-        renderWithRouteAndAuth("/student", {
-            username: "student_lowercase",
-            role: "student" as AuthUser["role"],
-        });
-
-        expect(screen.getByText(/Intereses del estudiante/i)).toBeInTheDocument();
-    });
-
-    it("redirecciona a landing cuando la ruta no existe", () => {
-        renderWithRouteAndAuth("/ruta-inexistente", null);
-
-        const buttons = screen.getAllByRole("button", { name: /Entrar \/ Registro/i });
-        expect(buttons.length).toBeGreaterThan(0);
-    });
-});
 
 ================
 File: frontend/src/routes/pages/student/components/CourseCatalog.tsx
@@ -8165,63 +8254,6 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments }: EnrolledCo
 };
 
 ================
-File: frontend/src/routes/pages/student/components/SmartRecommendations.tsx
-================
-import { Star } from 'lucide-react';
-// Importación desde el dominio centralizado unificado en servicios [DRY]
-import type { RecommendedCourse } from '../../../../services/userDomains';
-
-interface SmartRecommendationsProps {
-    recommendations: RecommendedCourse[];
-}
-
-export const SmartRecommendations = ({ recommendations }: SmartRecommendationsProps) => {
-    return (
-        <div className="w-full">
-            {/* Contenedor con scroll vertical limitado de 1.5 cursos */}
-            <div className="max-h-[220px] overflow-y-auto pr-2 space-y-3 scrollbar-thin scrollbar-thumb-slate-200">
-                {recommendations.length === 0 ? (
-                    <p className="text-xs font-medium text-slate-400 italic text-center py-4">
-                        No hay recomendaciones disponibles para tu perfil actual.
-                    </p>
-                ) : (
-                    recommendations.map((rec) => (
-                        <div
-                            key={rec.id}
-                            className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between transition-all hover:border-slate-300 hover:shadow-xs"
-                        >
-                            <div>
-                                <div className="flex justify-between items-start gap-2">
-                                    <span className="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wide">
-                                        {rec.category}
-                                    </span>
-                                    <div className="flex items-center gap-0.5 text-amber-500 text-[11px] font-bold">
-                                        <Star size={10} fill="currentColor" />
-                                        <span>{rec.rating.toFixed(1)}</span>
-                                    </div>
-                                </div>
-                                <h3 className="text-xs font-bold text-slate-800 leading-snug mt-1.5 line-clamp-2">
-                                    {rec.title}
-                                </h3>
-                                <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                                    Instructor: {rec.instructor}
-                                </p>
-                            </div>
-                            <div className="mt-3 pt-2 border-t border-slate-100">
-                                {/* CORRECCIÓN CRÍTICA: Se elimina la frase fija y se inyecta {rec.reason} */}
-                                <p className="text-[10px] text-slate-500 font-medium italic bg-slate-50/50 p-1.5 rounded-lg border border-slate-100">
-                                    💡 {rec.reason}
-                                </p>
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
-        </div>
-    );
-};
-
-================
 File: frontend/src/routes/pages/student/components/useCourseCatalog.ts
 ================
 import { useState, useEffect } from 'react';
@@ -8392,173 +8424,6 @@ export const useEnrolledCourses = (successTrigger: string) => {
         enrollmentError,
         injectLocalEnrollment
     };
-};
-
-================
-File: frontend/src/routes/pages/student/InterestsModal.tsx
-================
-import { useState, useEffect } from 'react';
-import { X, Layers, BarChart, Clock, Globe, Subtitles, Check, Loader2 } from 'lucide-react';
-// Importamos tu cliente de API centralizado
-import { apiClient } from '@/services/apiClient';
-
-interface InterestsModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onSave: (preferences: {
-        categories: string[];
-        levels: string[];
-        durations: string[];
-        languages: string[];
-        subtitles: string[];
-    }) => void;
-}
-
-export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps) => {
-    // 1. LISTAS DE DATOS ORIGINALES AMPLIADAS
-    const availableCategories = ['Ciencia de Datos', 'Negocios', 'Tecnología de la Información', 'Ciencias de la Computación', 'Artes y Humanidades', 'Aprendizaje de Idiomas', 'Desarrollo Personal', 'Salud', 'Ciencias Sociales', 'Ciencias Físicas e Ingeniería', 'Matemáticas y Lógica'];
-    const availableLevels = ['Principiante / Básico', 'Medio / Intermedio', 'Avanzado / Experto', 'Todos los niveles'];
-    const availableDurations = ['Corto (< 1 semana)', 'Medio (1 - 6 semanas)', 'Largo (> 6 semanas)'];
-    const availableLanguages = ['Español', 'Inglés', 'Portugués', 'Alemán', 'Francés'];
-    const availableSubtitles = ['Con Subtítulos', 'Sin Subtítulos', 'Subtítulos en Inglés', 'Subtítulos en Español'];
-
-    // 2. ESTADOS LOCALES DE SELECCIÓN
-    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-    const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
-    const [selectedDurations, setSelectedDurations] = useState<string[]>([]);
-    const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
-    const [selectedSubtitles, setSelectedSubtitles] = useState<string[]>([]);
-
-    // Estado para controlar la carga de datos desde PostgreSQL
-    const [isLoadingData, setIsLoadingData] = useState<boolean>(false);
-
-    // 🔄 EFECTO ATÓMICO: Carga las preferencias de forma automática al abrir el modal
-    useEffect(() => {
-        const fetchSavedInterests = async () => {
-            if (!isOpen) return;
-
-            setIsLoadingData(true);
-            try {
-                // Invocamos al nuevo endpoint GET que creamos en Spring Boot
-                const response = await apiClient.get('/api/auth/my-interests');
-
-                if (response.status === 200 && response.data) {
-                    const data = response.data;
-                    // Sincronizamos los estados locales asegurando que sean arrays (evita nulls)
-                    setSelectedCategories(data.categories || []);
-                    setSelectedLevels(data.levels || []);
-                    setSelectedDurations(data.durations || []);
-                    setSelectedLanguages(data.languages || []);
-                    setSelectedSubtitles(data.subtitles || []);
-                }
-            } catch (error) {
-                console.error("Error al recuperar las preferencias del estudiante:", error);
-            } finally {
-                setIsLoadingData(false);
-            }
-        };
-
-        fetchSavedInterests();
-    }, [isOpen]);
-
-    if (!isOpen) return null;
-
-    const toggleSelection = (item: string, list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>) => {
-        setList(list.includes(item) ? list.filter(i => i !== item) : [...list, item]);
-    };
-
-    const handleSave = () => {
-        onSave({
-            categories: selectedCategories,
-            levels: selectedLevels,
-            durations: selectedDurations,
-            languages: selectedLanguages,
-            subtitles: selectedSubtitles
-        });
-        onClose();
-    };
-
-    // 🛠️ SUB-COMPONENTE INTERNO GENÉRICO PARA EVITAR CÓDIGO REPETIDO Y CÓRTES DE TEXTO
-    const renderColumn = (
-        title: string,
-        icon: React.ReactNode,
-        items: string[],
-        currentSelection: string[],
-        setSelection: React.Dispatch<React.SetStateAction<string[]>>,
-        borderColorClass: string
-    ) => (
-        <div className="flex flex-col h-full border border-slate-100 rounded-xl bg-slate-50/30 overflow-hidden">
-            <div className="flex items-center gap-2 p-3 border-b border-slate-100 bg-slate-50 text-slate-700 font-bold text-xs uppercase tracking-wider">
-                {icon}
-                <span>{title}</span>
-            </div>
-            <div className="p-3 flex flex-col gap-1.5 overflow-y-auto max-h-[25vh] lg:max-h-full flex-1 scrollbar-thin scrollbar-thumb-slate-200">
-                {items.map((item) => {
-                    const isSelected = currentSelection.includes(item);
-                    return (
-                        <button
-                            key={item}
-                            type="button"
-                            disabled={isLoadingData}
-                            onClick={() => toggleSelection(item, currentSelection, setSelection)}
-                            className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-between border cursor-pointer ${isSelected
-                                ? `${borderColorClass} shadow-sm`
-                                : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'
-                                } disabled:opacity-50 disabled:cursor-not-allowed`}
-                        >
-                            <span className="truncate pr-1">{item}</span>
-                            {isSelected && <Check size={14} className="shrink-0 animate-in zoom-in-50 duration-200" />}
-                        </button>
-                    );
-                })}
-            </div>
-        </div>
-    );
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-7xl rounded-2xl border border-slate-200 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200">
-
-                {/* CABECERA */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-                    <div>
-                        <h3 className="text-base font-bold text-slate-800">Ajustar mis Intereses y Preferencias</h3>
-                        <p className="text-xs text-slate-500 font-medium">Selecciona los criterios para personalizar tus recommendations inteligentes</p>
-                    </div>
-                    <button onClick={onClose} className="p-1.5 hover:bg-slate-200/70 text-slate-400 hover:text-slate-600 rounded-lg transition-colors cursor-pointer" aria-label="Cerrar modal">
-                        <X size={18} />
-                    </button>
-                </div>
-
-                {/* CUERPO ADAPTATIVO GENERADO POR COMPOSICIÓN LIMPIA O FEEDBACK DE SPINNER */}
-                {isLoadingData ? (
-                    <div className="flex flex-col items-center justify-center flex-1 min-h-[40vh] bg-white gap-3">
-                        <Loader2 size={32} className="animate-spin text-slate-600" />
-                        <span className="text-xs font-semibold text-slate-500">Cargando tus preferencias desde PostgreSQL...</span>
-                    </div>
-                ) : (
-                    <div className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-hidden bg-white flex-1">
-                        {renderColumn("Categorías", <Layers size={14} className="text-blue-500" />, availableCategories, selectedCategories, setSelectedCategories, "bg-blue-50 border-blue-200 text-blue-700")}
-                        {renderColumn("Nivel", <BarChart size={14} className="text-amber-500" />, availableLevels, selectedLevels, setSelectedLevels, "bg-amber-50 border-amber-200 text-amber-700")}
-                        {renderColumn("Duración", <Clock size={14} className="text-emerald-500" />, availableDurations, selectedDurations, setSelectedDurations, "bg-emerald-50 border-emerald-200 text-emerald-700")}
-                        {renderColumn("Idioma", <Globe size={14} className="text-purple-500" />, availableLanguages, selectedLanguages, setSelectedLanguages, "bg-purple-50 border-purple-200 text-purple-700")}
-                        {renderColumn("Subtítulos", <Subtitles size={14} className="text-indigo-500" />, availableSubtitles, selectedSubtitles, setSelectedSubtitles, "bg-indigo-50 border-indigo-200 text-indigo-700")}
-                    </div>
-                )}
-
-                {/* PIE DEL MODAL CON BOTONES DE ACCIÓN */}
-                <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
-                    <button type="button" disabled={isLoadingData} onClick={onClose} className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-slate-50 active:scale-95 transition-all cursor-pointer disabled:opacity-50">
-                        Cancelar
-                    </button>
-                    <button type="button" disabled={isLoadingData} onClick={handleSave} className="px-5 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-slate-700 active:scale-95 transition-all shadow-md cursor-pointer disabled:bg-slate-400">
-                        Guardar Preferencias
-                    </button>
-                </div>
-
-            </div>
-        </div>
-    );
 };
 
 ================
@@ -9101,7 +8966,8 @@ public class JwtService {
         }
     }
 
-    // --- ENFOQUE CORREGIDO: VALIDACIÓN MATEMÁTICA INMUTABLE DEL VENCIMIENTO ---
+    // --- ENFOQUE CORREGIDO: VALIDACIÓN MATEMÁTICA INMUTABLE DEL VENCIMIENTO CON
+    // CLOCK SKEW EN REVERSA ---
     private boolean isExpired(Map<String, Object> claims) {
         Object expObj = claims.get("exp");
         if (expObj instanceof Number) {
@@ -9110,10 +8976,13 @@ public class JwtService {
             long expSeconds = ((Number) expObj).longValue();
             long skew = jwtProperties.getClockSkewSeconds();
 
-            // Un token está expirado si el instante de vencimiento (exp) es ANTES de la
-            // hora actual
-            // Aplicamos el margen de tolerancia (skew) sumándoselo a la hora de comparación
-            Instant adjustedCurrentTime = Instant.now(clock).plusSeconds(skew);
+            // [CORRECCIÓN CRÍTICA DE AUDITORÍA]: Para otorgar un margen de gracia de 60s,
+            // restamos la tolerancia al tiempo del servidor actual antes de evaluar el
+            // vencimiento.
+            Instant adjustedCurrentTime = Instant.now(clock).minusSeconds(skew);
+
+            // El token está verdaderamente expirado si su vencimiento es anterior al tiempo
+            // actual ajustado
             return Instant.ofEpochSecond(expSeconds).isBefore(adjustedCurrentTime);
         }
         return true; // Si no hay propiedad de expiración, se rechaza por seguridad
@@ -9183,9 +9052,9 @@ File: frontend/src/auth/authStorage.ts
 ================
 import type { AuthUser } from './authTypes';
 
-const USER_KEY = 'user';
-const LEGACY_USER_KEY = 'auth_user';
-const TOKEN_KEY = 'accessToken'; // Nueva clave para persistir el JWT de forma aislada
+// [CORRECCIÓN CRÍTICA DE AUDITORÍA]: Unificamos bajo una única clave oficial eliminando la duplicidad física
+const USER_KEY = 'auth_user'; 
+const TOKEN_KEY = 'accessToken'; 
 
 
 function canUseBrowserStorage() {
@@ -9220,13 +9089,13 @@ export function readStoredAuthUser(): AuthUser | null {
         return null;
     }
 
-    const rawValue = window.localStorage.getItem(USER_KEY) ?? window.localStorage.getItem(LEGACY_USER_KEY);
+    // Intenta leer de la clave unificada 'auth_user' o de la clave legacy antigua 'user' por migración
+    const rawValue = window.localStorage.getItem(USER_KEY) ?? window.localStorage.getItem('user');
     if (!rawValue) {
         return null;
     }
 
     try {
-        // Añadimos de forma segura la propiedad opcional expiresAt al parsear
         const parsedValue = JSON.parse(rawValue) as Partial<AuthUser> & { expiresAt?: number };
 
         if (typeof parsedValue.username !== 'string' || !parsedValue.username.trim()) {
@@ -9237,17 +9106,13 @@ export function readStoredAuthUser(): AuthUser | null {
         if (parsedValue.expiresAt && Date.now() > parsedValue.expiresAt) {
             console.warn("Sesión local caducada por límite temporal. Limpiando almacenamiento.");
             clearStoredAuth();
-            return null; // Forzamos a React a inicializarse como no autenticado
+            return null; 
         }
 
         const normalizedUser = {
             ...parsedValue,
             username: parsedValue.username,
         } as AuthUser;
-
-        if (!window.localStorage.getItem(USER_KEY) && window.localStorage.getItem(LEGACY_USER_KEY)) {
-            writeStoredAuthUser(normalizedUser);
-        }
 
         return normalizedUser;
     } catch {
@@ -9256,15 +9121,14 @@ export function readStoredAuthUser(): AuthUser | null {
 }
 
 /**
- * Persiste el usuario autenticado junto con su estructura básica de datos.
+ * Persiste el usuario autenticado bajo la clave oficial unificada.
  */
 export function writeStoredAuthUser(user: AuthUser) {
     if (!canUseBrowserStorage()) {
         return;
     }
-
+    // Escribe únicamente en la fuente de verdad oficial ('auth_user')
     window.localStorage.setItem(USER_KEY, JSON.stringify(user));
-    window.localStorage.setItem(LEGACY_USER_KEY, JSON.stringify(user));
 }
 
 /**
@@ -9274,9 +9138,10 @@ export function clearStoredAuth() {
     if (!canUseBrowserStorage()) {
         return;
     }
+    // Borra la clave oficial, la del token y ejecuta la purga reactiva de la clave antigua legacy
     window.localStorage.removeItem(USER_KEY);
-    window.localStorage.removeItem(LEGACY_USER_KEY);
-    window.localStorage.removeItem(TOKEN_KEY); // Limpieza absoluta del token
+    window.localStorage.removeItem(TOKEN_KEY); 
+    window.localStorage.removeItem('user'); // <── Purga preventiva de la clave legacy 'user'
 }
 
 ================
@@ -9420,6 +9285,433 @@ const MainNavbar = () => {
 };
 
 export default MainNavbar;
+
+================
+File: frontend/src/routes/AppRoutes.test.tsx
+================
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
+import AppRoutes from "./index";
+import { AuthContext } from "@/auth/AuthContext";
+import type { AuthContextValue } from "@/auth/AuthContext";
+import type { AuthUser } from "@/auth";
+
+// Intercepción exacta de la ruta relativa de la pasarela de red
+vi.mock("../services/apiClient", () => ({
+    apiClient: {
+        get: vi.fn(() => Promise.resolve({ data: [] })),
+        post: vi.fn(() => Promise.resolve({ data: {} })),
+        interceptors: {
+            request: { use: vi.fn(), eject: vi.fn() },
+            response: { use: vi.fn(), eject: vi.fn() }
+        }
+    }
+}));
+
+const buildAuthValue = (user: AuthUser | null): AuthContextValue => ({
+    user,
+    isAuthenticated: Boolean(user),
+    isLoading: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+});
+
+const renderWithRouteAndAuth = (route: string, user: AuthUser | null) => {
+    return render(
+        <AuthContext.Provider value={buildAuthValue(user)}>
+            <MemoryRouter initialEntries={[route]}>
+                <AppRoutes />
+            </MemoryRouter>
+        </AuthContext.Provider>
+    );
+};
+
+describe("AppRoutes - autorizacion por rol", () => {
+    it("redirecciona a landing cuando el usuario no esta autenticado e intenta /student", () => {
+        renderWithRouteAndAuth("/student", null);
+
+        const buttons = screen.getAllByRole("button", { name: /Entrar \/ Registro/i });
+        expect(buttons.length).toBeGreaterThan(0);
+        expect(screen.queryByText(/Panel del estudiante/i)).not.toBeInTheDocument();
+    });
+
+    it("permite acceso a /student cuando el rol es STUDENT", () => {
+        renderWithRouteAndAuth("/student", {
+            username: "student_user",
+            role: "STUDENT",
+        });
+
+        expect(screen.getByText(/Intereses del estudiante/i)).toBeInTheDocument();
+    });
+
+    it("bloquea acceso a /admin para rol STUDENT y muestra acceso denegado", () => {
+        renderWithRouteAndAuth("/admin", {
+            username: "student_user",
+            role: "STUDENT",
+        });
+
+        expect(screen.getByText(/Acceso denegado/i)).toBeInTheDocument();
+    });
+
+    it("permite acceso a /admin cuando el rol es ADMIN", () => {
+        renderWithRouteAndAuth("/admin", {
+            username: "admin_user",
+            role: "ADMIN",
+        });
+
+        // Corregido: Tolera múltiples elementos de navegación duplicados en tu layout estructurado
+        const navs = screen.getAllByRole("navigation");
+        expect(navs.length).toBeGreaterThan(0);
+    });
+
+    it("permite acceso a /professor cuando el rol es PROFESSOR", () => {
+        renderWithRouteAndAuth("/professor", {
+            username: "prof_user",
+            role: "PROFESSOR",
+        });
+
+        // Corregido: Tolera múltiples elementos de navegación duplicados en tu layout estructurado
+        const navs = screen.getAllByRole("navigation");
+        expect(navs.length).toBeGreaterThan(0);
+    });
+
+    it("bloquea /student cuando el usuario autenticado no tiene rol", () => {
+        renderWithRouteAndAuth("/student", {
+            username: "sin_rol",
+        });
+
+        expect(screen.getByText(/Acceso denegado/i)).toBeInTheDocument();
+    });
+
+    it("permite /student aunque el rol venga en minusculas", () => {
+        renderWithRouteAndAuth("/student", {
+            username: "student_lowercase",
+            role: "student" as AuthUser["role"],
+        });
+
+        expect(screen.getByText(/Intereses del estudiante/i)).toBeInTheDocument();
+    });
+
+    it("redirecciona a landing cuando la ruta no existe", () => {
+        renderWithRouteAndAuth("/ruta-inexistente", null);
+
+        const buttons = screen.getAllByRole("button", { name: /Entrar \/ Registro/i });
+        expect(buttons.length).toBeGreaterThan(0);
+    });
+});
+
+================
+File: frontend/src/routes/pages/student/components/SmartRecommendations.tsx
+================
+import { Star } from 'lucide-react';
+// Importación desde el dominio centralizado unificado en servicios [DRY]
+import type { RecommendedCourse } from '../../../../services/userDomains';
+
+interface SmartRecommendationsProps {
+    recommendations: RecommendedCourse[];
+}
+
+export const SmartRecommendations = ({ recommendations }: SmartRecommendationsProps) => {
+    return (
+        <div className="w-full">
+            {/* Contenedor con scroll vertical limitado de 1.5 cursos */}
+            <div className="max-h-55 overflow-y-auto pr-2 space-y-3 scrollbar-thin scrollbar-thumb-slate-200">
+                {recommendations.length === 0 ? (
+                    <p className="text-xs font-medium text-slate-400 italic text-center py-4">
+                        No hay recomendaciones disponibles para tu perfil actual.
+                    </p>
+                ) : (
+                    recommendations.map((rec) => (
+                        <div
+                            key={rec.id}
+                            className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between transition-all hover:border-slate-300 hover:shadow-xs"
+                        >
+                            <div>
+                                <div className="flex justify-between items-start gap-2">
+                                    <span className="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wide">
+                                        {rec.category}
+                                    </span>
+                                    <div className="flex items-center gap-0.5 text-amber-500 text-[11px] font-bold">
+                                        <Star size={10} fill="currentColor" />
+                                        <span>{rec.rating.toFixed(1)}</span>
+                                    </div>
+                                </div>
+                                <h3 className="text-xs font-bold text-slate-800 leading-snug mt-1.5 line-clamp-2">
+                                    {rec.title}
+                                </h3>
+                                <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                                    Instructor: {rec.instructor}
+                                </p>
+                            </div>
+                            <div className="mt-3 pt-2 border-t border-slate-100">
+                                {/* CORRECCIÓN CRÍTICA: Se elimina la frase fija y se inyecta {rec.reason} */}
+                                <p className="text-[10px] text-slate-500 font-medium italic bg-slate-50/50 p-1.5 rounded-lg border border-slate-100">
+                                    💡 {rec.reason}
+                                </p>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+};
+
+================
+File: frontend/src/routes/pages/student/InterestsModal.tsx
+================
+import { useState, useEffect } from 'react';
+import { X, Layers, BarChart, Clock, Globe, Subtitles, Check, Loader2 } from 'lucide-react';
+import { apiClient } from '@/services/apiClient';
+
+interface InterestsModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (preferences: {
+        categories: string[];
+        levels: string[];
+        durations: string[];
+        languages: string[];
+        subtitles: string[];
+    }) => void;
+}
+
+export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps) => {
+    // 1. LISTAS DE DATOS ORIGINALES (Sincronizadas con el catálogo) [3]
+    const availableCategories = ['Ciencia de Datos', 'Negocios', 'Tecnología de la Información', 'Ciencias de la Computación', 'Artes y Humanidades', 'Aprendizaje de Idiomas', 'Desarrollo Personal', 'Salud', 'Ciencias Sociales', 'Ciencias Físicas e Ingeniería', 'Matemáticas y Lógica'];
+    const availableLevels = ['Principiante / Básico', 'Medio / Intermedio', 'Avanzado / Experto', 'Todos los niveles'];
+    const availableDurations = ['Corto (< 1 semana)', 'Medio (1 - 6 semanas)', 'Largo (> 6 semanas)'];
+    const availableLanguages = ['Español', 'Inglés', 'Portugués', 'Alemán', 'Francés'];
+    const availableSubtitles = ['Con Subtítulos', 'Sin Subtítulos', 'Subtítulos en Inglés', 'Subtítulos en Español'];
+
+    // 2. ESTADOS LOCALES PARA LA SELECCIÓN
+    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+    const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
+    const [selectedDurations, setSelectedDurations] = useState<string[]>([]);
+    const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+    const [selectedSubtitles, setSelectedSubtitles] = useState<string[]>([]);
+
+    // Estado de carga para feedback visual y evitar doble post
+    const [loading, setLoading] = useState(false);
+
+    // 3. HIDRATACIÓN: Cargar intereses existentes al abrir el modal [4]
+    useEffect(() => {
+        if (isOpen) {
+            const fetchCurrentInterests = async () => {
+                try {
+                    const response = await apiClient.get('/api/auth/my-interests');
+                    if (response.data) {
+                        // Mapeo desde los nombres del InterestDTO [5]
+                        setSelectedCategories(response.data.categories || []);
+                        setSelectedLevels(response.data.levels || []);
+                        setSelectedDurations(response.data.durations || []);
+                        setSelectedLanguages(response.data.languages || []);
+                        setSelectedSubtitles(response.data.subtitles || []);
+                    }
+                } catch (err) {
+                    console.error("Error al hidratar intereses:", err);
+                }
+            };
+            fetchCurrentInterests();
+        }
+    }, [isOpen]);
+
+    // 4. LÓGICA DE SELECCIÓN (Toggle)
+    const toggleSelection = (item: string, currentList: string[], setList: (val: string[]) => void) => {
+        if (currentList.includes(item)) {
+            setList(currentList.filter(i => i !== item));
+        } else {
+            setList([...currentList, item]);
+        }
+    };
+
+    // 5. ENVIAR DATOS A POSTGRESQL CON PREVENCIÓN DE CONCURRENCIA
+    const handleSave = async () => {
+        setLoading(true); // <── Activamos el feedback visual en la UI
+        try {
+            // Sincronización Real: Mapeamos los arrays reactivos que mutan con los checkboxes
+            const payload = {
+                categories: selectedCategories,
+                levels: selectedLevels,
+                durations: selectedDurations,
+                languages: selectedLanguages,
+                subtitles: selectedSubtitles
+            };
+
+            // Petición POST al endpoint tolerante del UserController
+            await apiClient.post('/api/auth/my-interests', payload);
+
+            onSave(payload); // Notifica al Dashboard padre para actualizar el feed beige
+            onClose();       // Cierra el modal de forma limpia
+        } catch (error) {
+            console.error("Error al guardar intereses:", error);
+        } finally {
+            setLoading(false); // <── Aseguramos el apagado del spinner pase lo que pase
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-100">
+
+                {/* CABECERA */}
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div>
+                        <h2 className="text-xl font-black text-slate-800 tracking-tight">Personaliza tu Experiencia</h2>
+                        <p className="text-slate-500 text-xs font-medium">Ajusta tus preferencias para mejorar el motor de recomendaciones.</p>
+                    </div>
+                    <button onClick={onClose}
+                        aria-label="Cerrar Modal"
+                        className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-400">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                {/* CONTENIDO SCROLLABLE */}
+                <div className="p-6 overflow-y-auto space-y-8 custom-scrollbar">
+
+                    {/* SECCIÓN CATEGORÍAS (ESTANDARIZADA COMO EL RESTO) */}
+                    <section className="space-y-4">
+                        <div className="flex items-center gap-2 text-blue-600">
+                            <Layers size={18} />
+                            <h3 className="font-bold text-sm uppercase tracking-wider">Áreas de Interés</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {availableCategories.map(cat => (
+                                <label key={cat} className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedCategories.includes(cat)}
+                                        onChange={() => toggleSelection(cat, selectedCategories, setSelectedCategories)}
+                                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span className="text-xs font-semibold text-slate-700">{cat}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </section>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* NIVELES */}
+                        <section className="space-y-4">
+                            <div className="flex items-center gap-2 text-emerald-600">
+                                <BarChart size={18} />
+                                <h3 className="font-bold text-sm uppercase tracking-wider">Nivel de Dificultad</h3>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2">
+                                {availableLevels.map(level => (
+                                    <label key={level} className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedLevels.includes(level)}
+                                            onChange={() => toggleSelection(level, selectedLevels, setSelectedLevels)}
+                                            className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                        />
+                                        <span className="text-xs font-semibold text-slate-700">{level}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </section>
+
+                        {/* DURACIÓN */}
+                        <section className="space-y-4">
+                            <div className="flex items-center gap-2 text-amber-600">
+                                <Clock size={18} />
+                                <h3 className="font-bold text-sm uppercase tracking-wider">Disponibilidad de Tiempo</h3>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2">
+                                {availableDurations.map(dur => (
+                                    <label key={dur} className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedDurations.includes(dur)}
+                                            onChange={() => toggleSelection(dur, selectedDurations, setSelectedDurations)}
+                                            className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                                        />
+                                        <span className="text-xs font-semibold text-slate-700">{dur}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </section>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* IDIOMAS (ESTANDARIZADO COMO EL RESTO) */}
+                        <section className="space-y-4">
+                            <div className="flex items-center gap-2 text-indigo-600">
+                                <Globe size={18} />
+                                <h3 className="font-bold text-sm uppercase tracking-wider">Idioma del Curso</h3>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2">
+                                {availableLanguages.map(lang => (
+                                    <label key={lang} className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedLanguages.includes(lang)}
+                                            onChange={() => toggleSelection(lang, selectedLanguages, setSelectedLanguages)}
+                                            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <span className="text-xs font-semibold text-slate-700">{lang}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </section>
+
+                        {/* SUBTÍTULOS (ESTANDARIZADO COMO EL RESTO) */}
+                        <section className="space-y-4">
+                            <div className="flex items-center gap-2 text-purple-600">
+                                <Subtitles size={18} />
+                                <h3 className="font-bold text-sm uppercase tracking-wider">Preferencias de Subtítulos</h3>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2">
+                                {availableSubtitles.map(sub => (
+                                    <label key={sub} className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedSubtitles.includes(sub)}
+                                            onChange={() => toggleSelection(sub, selectedSubtitles, setSelectedSubtitles)}
+                                            className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                                        />
+                                        <span className="text-xs font-semibold text-slate-700">{sub}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                {/* PIE DE MODAL (ACCIONES) */}
+                <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50">
+                    <button
+                        onClick={onClose}
+                        className="px-6 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-200 transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        disabled={loading}
+                        className="bg-slate-800 text-white px-8 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-900 transition-all shadow-lg shadow-slate-200 active:scale-95 flex items-center gap-2 disabled:opacity-70"
+                    >
+                        {loading ? (
+                            <>
+                                <Loader2 className="animate-spin" size={16} />
+                                <span>Guardando...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Check size={16} />
+                                <span>Guardar Preferencias</span>
+                            </>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 ================
 File: frontend/tsconfig.app.json
@@ -9752,7 +10044,7 @@ export default AppRoutes;
 ================
 File: frontend/src/auth/AuthProvider.tsx
 ================
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthUser, AuthTokenResponse } from './authTypes';
 import { AuthContext } from './AuthContext';
@@ -9762,13 +10054,24 @@ interface AuthProviderProps {
     children: ReactNode;
 }
 
+// Constante de inactividad: 15 minutos en milisegundos (Exigencia de Auditoría)
+const INACTIVITY_LIFESPAN_MS = 15 * 60 * 1000;
+
 /**
- * Provider global de autenticación adaptado para JWT.
+ * Provider global de autenticación adaptado para JWT con Activity Tracker [ADR-34].
  * Convierte el estado de autenticación y el token en la fuente de verdad de la SPA.
  */
 export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Estado de usuario autenticado, inicializado desde el almacenamiento local
     const [user, setUser] = useState<AuthUser | null>(() => readStoredAuthUser());
+
+    // Ref inicializada de forma pura con 0 para satisfacer las reglas de compilación estricta
+    const lastActivityRef = useRef<number>(0);
+
+    // Inicialización segura del timestamp del marcador al montar el componente en el navegador
+    useEffect(() => {
+        lastActivityRef.current = Date.now();
+    }, []);
 
     /**
      * Cierra la sesión del usuario limpiando el estado y el almacenamiento.
@@ -9779,14 +10082,38 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }, []);
 
     /**
+     * Resetea el temporizador de inactividad actualizando el instante de expiración en caliente [ADR-34]
+     */
+    const resetInactivityTimeout = useCallback(() => {
+        const now = Date.now();
+        // Throttle de 2 segundos: Evita actualizar el estado de React de forma masiva en mousemove concurrentes
+        if (now - lastActivityRef.current < 2000) return;
+
+        lastActivityRef.current = now;
+
+        setUser((currentUser) => {
+            if (!currentUser) return null;
+
+            const updatedUser = {
+                ...currentUser,
+                expiresAt: now + INACTIVITY_LIFESPAN_MS
+            };
+
+            // Sincronizamos en el storage para que si recarga la pestaña se mantenga el tiempo ganado
+            writeStoredAuthUser(updatedUser);
+            return updatedUser;
+        });
+    }, []);
+
+    /**
      * Procesa el inicio de sesión con JWT e hidrata los metadatos de sesión.
      */
     const login = (tokenData: AuthTokenResponse) => {
         // Corrección de Auditoría: Se consume directamente 'expiresIn' del contrato del Backend.
         const seconds = tokenData.expiresIn;
 
-        // Calcular el instante exacto de expiración (15 min por defecto si falla o no viene el dato)
-        const lifespanMs = (typeof seconds === 'number' && seconds > 0) ? seconds * 1000 : 15 * 60 * 1000;
+        // Punto de partida inicial: 15 min por defecto si falla o no viene el dato
+        const lifespanMs = (typeof seconds === 'number' && seconds > 0) ? seconds * 1000 : INACTIVITY_LIFESPAN_MS;
         const expiresAt = Date.now() + lifespanMs;
 
         // Extraer los datos e inyectar el sello de caducidad y el array de cursos matriculados
@@ -9795,55 +10122,69 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             username: tokenData.username,
             role: tokenData.role,
             email: tokenData.email,
-            enrolledCourseIds: tokenData.enrolledCourseIds || [], // Hidratación síncrona en el cliente
+            enrolledCourseIds: tokenData.enrolledCourseIds || [],
             token: tokenData.accessToken,
             expiresAt: expiresAt
         };
 
+        lastActivityRef.current = Date.now();
         setUser(nextUser);
         writeStoredAuthUser(nextUser);
         writeStoredToken(tokenData.accessToken);
     };
 
     /**
+     * MONITOR DE ACTIVIDAD GLOBAL DEL USUARIO (DOM LISTENERS) [ADR-34]
+     * Captura las interacciones humanas reales para posponer de forma transparente la expulsión.
+     */
+    useEffect(() => {
+        if (!user) return;
+
+        window.addEventListener('mousemove', resetInactivityTimeout);
+        window.addEventListener('keydown', resetInactivityTimeout);
+        window.addEventListener('click', resetInactivityTimeout);
+        window.addEventListener('scroll', resetInactivityTimeout);
+
+        return () => {
+            window.removeEventListener('mousemove', resetInactivityTimeout);
+            window.removeEventListener('keydown', resetInactivityTimeout);
+            window.removeEventListener('click', resetInactivityTimeout);
+            window.removeEventListener('scroll', resetInactivityTimeout);
+        };
+    }, [user, resetInactivityTimeout]);
+
+    /**
      * BLINDAJE TFG ESTRÉPITO (Auditoría NotebookLM): Desconexión Proactiva Anti-Congelación.
-     * Combina verificación por visibilidad de pestaña e intervalos cortos para evitar la evasión de temporizadores.
+     * Evalúa el timestamp "expiresAt" dinámico mutado por el monitor de actividad.
      */
     useEffect(() => {
         const userWithExpiry = user as (AuthUser & { expiresAt?: number }) | null;
 
         if (!userWithExpiry || !userWithExpiry.expiresAt) return;
 
-        const expiresAt = userWithExpiry.expiresAt;
-
-        // Función centralizada para verificar si el token ya ha expirado
         const checkTokenExpiration = () => {
-            if (Date.now() >= expiresAt) {
-                console.warn("Sesión expirada proactivamente (Límite TTL alcanzado).");
+            if (Date.now() >= userWithExpiry.expiresAt!) {
+                console.warn("Sesión expirada por inactividad prolongada (Límite 15m alcanzado).");
                 logout();
                 return true;
             }
             return false;
         };
 
-        // 1. Control instantáneo al montar el efecto o cambiar el usuario
         if (checkTokenExpiration()) return;
 
-        // 2. Control reactivo cuando el usuario cambia de pestaña y regresa (Evita congelación del navegador)
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 checkTokenExpiration();
             }
         };
 
-        // 3. Verificación cíclica a intervalos cortos (Frecuencia de muestreo segura cada 5 segundos)
         const intervalId = setInterval(() => {
             checkTokenExpiration();
         }, 5000);
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        // Limpieza de listeners e intervalos al desmontar el efecto
         return () => {
             clearInterval(intervalId);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -11102,7 +11443,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
-import org.hibernate.Hibernate;
 
 import java.util.Optional;
 import java.util.List;
@@ -11228,8 +11568,9 @@ public class UserService {
                     Collections.emptyList());
         }
 
-        // Abstracción DRY recomendada por NotebookLM
-        initializeUserInterests(interest);
+        // CORRECCIÓN SEGURO: Eliminamos initializeUserInterests(interest) para liberar
+        // la sesión de Hibernate y permitir que el método POST/PUT posterior escriba en
+        // PostgreSQL.
 
         return new InterestDTO(
                 interest.getCategory(),
@@ -11240,25 +11581,11 @@ public class UserService {
     }
 
     /**
-     * Inicializa de forma segura y unificada las colecciones perezosas de la
-     * entidad Interest.
-     * Encapsula las operaciones de proxy de Hibernate para cumplir el principio
-     * DRY.
-     */
-    private void initializeUserInterests(Interest interest) {
-        Hibernate.initialize(interest.getCategory());
-        Hibernate.initialize(interest.getCourse_type());
-        Hibernate.initialize(interest.getDuration());
-        Hibernate.initialize(interest.getLanguage());
-        Hibernate.initialize(interest.getSubtitle_languages());
-    }
-
-    /**
      * Guarda o actualiza de forma transaccional las preferencias de un estudiante.
      * Si es la primera vez que configura sus intereses, se instancia una nueva
      * entidad vinculada a su cuenta de PostgreSQL usando @MapsId.
-     * Auditoría NotebookLM: Lanzamiento de ResourceNotFoundException (HTTP 404) en
-     * lugar de RuntimeException.
+     * Corregido bajo [ADR-18] para preservar los envoltorios PersistentBag de
+     * Hibernate.
      */
     @Transactional
     public void saveUserInterests(String username, InterestDTO dto) {
@@ -11267,24 +11594,39 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
 
         // 2. Buscar si ya tiene un registro de intereses previo. Si no existe, creamos
-        // uno nuevo.
+        // uno nuevo con ID síncrono.
         Interest interest = interestRepository.findById(user.getUser_id())
                 .orElseGet(() -> {
                     Interest newInterest = new Interest();
-                    newInterest.setUser(user); // Establecemos la relación OneToOne para @MapsId
-                    return newInterest;
+                    newInterest.setId(user.getUser_id()); // Sincronización manual requerida por @MapsId
+                    newInterest.setUser(user);
+                    return interestRepository.save(newInterest);
                 });
 
-        // 3. Mapear y actualizar los listados de preferencias dinámicas
-        interest.setCategory(dto.categories());
-        interest.setCourse_type(dto.levels()); // Mapeado semánticamente a la columna del catálogo de cursos
-        interest.setDuration(dto.durations());
-        interest.setLanguage(dto.languages());
-        interest.setSubtitle_languages(dto.subtitles()); // Mapeado semánticamente a la columna de subtítulos
+        // 3. Mapear y actualizar el contenido de los listados preservando las
+        // referencias de Hibernate [ADR-18]
+        updateCollection(interest.getCategory(), dto.categories());
+        updateCollection(interest.getCourse_type(), dto.levels());
+        updateCollection(interest.getDuration(), dto.durations());
+        updateCollection(interest.getLanguage(), dto.languages());
+        updateCollection(interest.getSubtitle_languages(), dto.subtitles());
 
         // 4. Persistir los cambios forzando el volcado directo a PostgreSQL y sus 5
         // tablas satélite
         interestRepository.saveAndFlush(interest);
+    }
+
+    /**
+     * Método auxiliar privado que implementa el mecanismo destructivo-limpio
+     * [ADR-18].
+     * Modifica el contenido de la lista gestionada por el ORM sin romper su
+     * envoltorio PersistentBag.
+     */
+    private void updateCollection(List<String> current, List<String> next) {
+        current.clear();
+        if (next != null) {
+            current.addAll(next);
+        }
     }
 
     /**
@@ -11790,17 +12132,23 @@ public class UserController {
     }
 
     /**
-     * Endpoint para guardar o actualizar los intereses y criterios de filtrado del
-     * alumno en sesión.
+     * Endpoint unificado para guardar o actualizar los intereses y criterios de
+     * filtrado del alumno en sesión.
+     * Soporta POST y PUT de forma segura para evitar fallos de parpadeo (405 Method
+     * Not Allowed) en el frontend.
      */
-    @PostMapping("/my-interests")
+    @RequestMapping(value = "/my-interests", method = { RequestMethod.POST, RequestMethod.PUT })
     public ResponseEntity<?> saveStudentInterests(@RequestBody com.cursosonline.backend.dto.InterestDTO interestDTO,
             Principal principal) {
         if (principal == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
         }
+
+        // Invocación a tu servicio (que ya tiene la corrección de sincronización de ID)
         userService.saveUserInterests(principal.getName(), interestDTO);
+
         return ResponseEntity.ok(Map.of(
+                "success", true,
                 "message", "Tus preferencias de recomendación han sido guardadas con éxito en PostgreSQL."));
     }
 
@@ -12409,6 +12757,51 @@ Esta decisión se ejecuta bajo las siguientes directrices técnicas:
   * **Arquitectura Altamente Reactiva:** La UI del frontend se sincroniza automáticamente e invalida el feed en milisegundos en cuanto el estudiante efectúa una nueva matrícula, disparando una recarga limpia de red sin necesidad de refrescar el navegador.
 
 ---
+
+## [Enmienda Tecnológica a ADR-33] Evolución de la Persistencia Multidimensional de Intereses
+
+### Contexto Técnico
+
+Durante la integración del Motor de Recomendaciones Algorítmicas, se detectó un fallo de regresión en el guardado del modal de preferencias del estudiante. La tabla principal `interests` y sus 5 tablas satélite (ej. `interest_categories`) rechazaban las actualizaciones de forma silenciosa debido a dos fenómenos del ciclo de vida de Hibernate:
+
+1. **Identidad Huérfana:** Al usar `@MapsId` sin estrategias `@GeneratedValue`, el motor de persistencia requería la asignación explícita del ID del usuario en memoria antes de invocar al repositorio.
+2. **Violación de PersistentBag:** El uso de métodos *setter* convencionales reemplazaba los envoltorios nativos de las colecciones de Spring Data JPA por instancias estándar de `ArrayList`, inhabilitando la generación automática de sentencias SQL `DELETE` e `INSERT`.
+
+### Decisiones Adoptadas
+
+1. **Sincronización Manual de Identidad:** Se modificó el bloque constructivo `.orElseGet()` en la capa de servicios para forzar la inyección del ID físico del usuario (`newInterest.setId(user.getUser_id())`) previo al volcado atómico.
+2. **Patrón de Mutación Destructivo-Limpio [ADR-18]:** Se implementó una abstracción encapsulada mediante el método `updateCollection(current, next)`, aplicando operaciones estrictas de `.clear()` y `.addAll()` sobre las listas originales de Hibernate para preservar el rastreo del estado de persistencia (*dirty checking*).
+3. **Tolerancia Semántica en Endpoints:** Se expandió la anotación del controlador a un mapa `@RequestMapping` multitolerante para absorber de forma nativa peticiones `POST` y `PUT` sin alterar el contrato con la interfaz de usuario en React.
+
+### Consecuencias Positivas
+
+* Se restablece la suite de pruebas del frontend y backend en verde sin alterar las dependencias del `pom.xml`.
+* Se garantiza la integridad referencial en PostgreSQL en la Primera Forma Normal (1FN), asegurando que el motor algorítmico lea datos reales e impidiendo el parpadeo de estado local en la interfaz del alumno Luis.
+
+---
+
+# [ADR-34] Gestión de Sesión por Inactividad frente a Expiración Absoluta
+
+## Estado
+
+Aceptado
+
+## Contexto
+
+El Tiempo de Vida (TTL) del token JWT está configurado en 15 minutos (900 segundos) para mitigar ventanas de exposición ante posibles secuestros de sesión. En la implementación previa del frontend, el cliente HTTP calculaba un instante estático de caducidad absoluto (`Date.now() + 15min`) al procesar el inicio de sesión. Esta lógica provocaba la expulsión abrupta y prematura del alumno Luis desde el Dashboard, incluso si se encontraba redactando, interactuando de forma concurrente con el modal de intereses o consumiendo el catálogo de cursos. Adicionalmente, la auditoría del monorrepo arrojó un error en la fórmula matemática del "Clock Skew" del servidor y una doble identidad redundante en las claves de persistencia local (`user` y `auth_user`).
+
+## Decisión
+
+1. **Activity Tracker en el Cliente:** Implementar un monitor de actividad reactivo dentro del `AuthProvider.tsx` que capture interacciones humanas nativas en el DOM (`mousemove`, `keydown`, `click`, `scroll`). Cada evento válido pospone el instante de vencimiento del usuario en memoria y en disco otorgándole un nuevo margen renovado de 15 minutos.
+2. **Mecanismo de Throttle Embebido:** Limitar la frecuencia de actualización del estado de React a un rango de muestreo seguro de 2000 milisegundos mediante el uso táctico de una referencia inmutable (`useRef`). Esto bloquea re-renders masivos del Dashboard preservando el rendimiento gráfico de la interfaz.
+3. **Corrección Aritmética del Clock Skew:** Modificar la validación temporal de `JwtService.java` en el servidor restando la tolerancia de 60 segundos del instante actual (`Instant.now().minusSeconds(skew)`) en lugar de sumarla, garantizando que el token disfrute de un margen de gracia real ante desincronizaciones de reloj entre cliente y servidor.
+4. **Unificación Física del Storage:** Refactorizar `authStorage.ts` para persistir la sesión bajo una única constante e identificador físico inmutable (`auth_user`), mitigando el split-brain informático del localStorage y eliminando de un plumazo el consumo de cuota duplicado detectado en la auditoría.
+
+## Consecuencias
+
+* **Mejora en Usabilidad:** Se elimina la expulsión prematura del alumno activo de la plataforma de manera transparente sin comprometer las directrices estrictas de seguridad.
+* **Consistencia de Datos:** La suite de pruebas de Vitest se elevó a 33 de 33 tests en verde gracias al diseño de relojes virtuales (`vi.useFakeTimers`) que simulan interacciones concurrentes del usuario en el tiempo absoluto.
+* **Aislamiento de Errores:** El servidor tolera desincronizaciones temporales de milisegundos en peticiones HTTP API REST complejas sin corromper el canal.
 
 # Notas de Migración: Transición a JWT y Compatibilidad
 

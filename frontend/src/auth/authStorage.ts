@@ -1,8 +1,8 @@
 import type { AuthUser } from './authTypes';
 
-const USER_KEY = 'user';
-const LEGACY_USER_KEY = 'auth_user';
-const TOKEN_KEY = 'accessToken'; // Nueva clave para persistir el JWT de forma aislada
+// [CORRECCIÓN CRÍTICA DE AUDITORÍA]: Unificamos bajo una única clave oficial eliminando la duplicidad física
+const USER_KEY = 'auth_user'; 
+const TOKEN_KEY = 'accessToken'; 
 
 
 function canUseBrowserStorage() {
@@ -37,13 +37,13 @@ export function readStoredAuthUser(): AuthUser | null {
         return null;
     }
 
-    const rawValue = window.localStorage.getItem(USER_KEY) ?? window.localStorage.getItem(LEGACY_USER_KEY);
+    // Intenta leer de la clave unificada 'auth_user' o de la clave legacy antigua 'user' por migración
+    const rawValue = window.localStorage.getItem(USER_KEY) ?? window.localStorage.getItem('user');
     if (!rawValue) {
         return null;
     }
 
     try {
-        // Añadimos de forma segura la propiedad opcional expiresAt al parsear
         const parsedValue = JSON.parse(rawValue) as Partial<AuthUser> & { expiresAt?: number };
 
         if (typeof parsedValue.username !== 'string' || !parsedValue.username.trim()) {
@@ -54,17 +54,13 @@ export function readStoredAuthUser(): AuthUser | null {
         if (parsedValue.expiresAt && Date.now() > parsedValue.expiresAt) {
             console.warn("Sesión local caducada por límite temporal. Limpiando almacenamiento.");
             clearStoredAuth();
-            return null; // Forzamos a React a inicializarse como no autenticado
+            return null; 
         }
 
         const normalizedUser = {
             ...parsedValue,
             username: parsedValue.username,
         } as AuthUser;
-
-        if (!window.localStorage.getItem(USER_KEY) && window.localStorage.getItem(LEGACY_USER_KEY)) {
-            writeStoredAuthUser(normalizedUser);
-        }
 
         return normalizedUser;
     } catch {
@@ -73,15 +69,14 @@ export function readStoredAuthUser(): AuthUser | null {
 }
 
 /**
- * Persiste el usuario autenticado junto con su estructura básica de datos.
+ * Persiste el usuario autenticado bajo la clave oficial unificada.
  */
 export function writeStoredAuthUser(user: AuthUser) {
     if (!canUseBrowserStorage()) {
         return;
     }
-
+    // Escribe únicamente en la fuente de verdad oficial ('auth_user')
     window.localStorage.setItem(USER_KEY, JSON.stringify(user));
-    window.localStorage.setItem(LEGACY_USER_KEY, JSON.stringify(user));
 }
 
 /**
@@ -91,7 +86,9 @@ export function clearStoredAuth() {
     if (!canUseBrowserStorage()) {
         return;
     }
+    // Borra la clave oficial, la del token y ejecuta la purga reactiva de la clave antigua legacy
     window.localStorage.removeItem(USER_KEY);
-    window.localStorage.removeItem(LEGACY_USER_KEY);
-    window.localStorage.removeItem(TOKEN_KEY); // Limpieza absoluta del token
+    window.localStorage.removeItem(TOKEN_KEY); 
+    window.localStorage.removeItem('user'); // <── Purga preventiva de la clave legacy 'user'
 }
+

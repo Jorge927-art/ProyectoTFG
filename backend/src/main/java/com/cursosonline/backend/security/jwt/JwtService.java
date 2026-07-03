@@ -180,7 +180,8 @@ public class JwtService {
         }
     }
 
-    // --- ENFOQUE CORREGIDO: VALIDACIÓN MATEMÁTICA INMUTABLE DEL VENCIMIENTO ---
+    // --- ENFOQUE CORREGIDO: VALIDACIÓN MATEMÁTICA INMUTABLE DEL VENCIMIENTO CON
+    // CLOCK SKEW EN REVERSA ---
     private boolean isExpired(Map<String, Object> claims) {
         Object expObj = claims.get("exp");
         if (expObj instanceof Number) {
@@ -189,10 +190,13 @@ public class JwtService {
             long expSeconds = ((Number) expObj).longValue();
             long skew = jwtProperties.getClockSkewSeconds();
 
-            // Un token está expirado si el instante de vencimiento (exp) es ANTES de la
-            // hora actual
-            // Aplicamos el margen de tolerancia (skew) sumándoselo a la hora de comparación
-            Instant adjustedCurrentTime = Instant.now(clock).plusSeconds(skew);
+            // [CORRECCIÓN CRÍTICA DE AUDITORÍA]: Para otorgar un margen de gracia de 60s,
+            // restamos la tolerancia al tiempo del servidor actual antes de evaluar el
+            // vencimiento.
+            Instant adjustedCurrentTime = Instant.now(clock).minusSeconds(skew);
+
+            // El token está verdaderamente expirado si su vencimiento es anterior al tiempo
+            // actual ajustado
             return Instant.ofEpochSecond(expSeconds).isBefore(adjustedCurrentTime);
         }
         return true; // Si no hay propiedad de expiración, se rechaza por seguridad

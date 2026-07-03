@@ -39,7 +39,7 @@ public class JwtProperties {
 
     /** Margen de tolerancia para diferencias de reloj, en segundos. */
     @PositiveOrZero
-    private long clockSkewSeconds = 0;
+    private long clockSkewSeconds = 60;
 
     /**
      * Obtiene la clave secreta para JWT.

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthUser, AuthTokenResponse } from './authTypes';
 import { AuthContext } from './AuthContext';
@@ -8,13 +8,24 @@ interface AuthProviderProps {
     children: ReactNode;
 }
 
+// Constante de inactividad: 15 minutos en milisegundos (Exigencia de Auditoría)
+const INACTIVITY_LIFESPAN_MS = 15 * 60 * 1000;
+
 /**
- * Provider global de autenticación adaptado para JWT.
+ * Provider global de autenticación adaptado para JWT con Activity Tracker [ADR-34].
  * Convierte el estado de autenticación y el token en la fuente de verdad de la SPA.
  */
 export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Estado de usuario autenticado, inicializado desde el almacenamiento local
     const [user, setUser] = useState<AuthUser | null>(() => readStoredAuthUser());
+
+    // Ref inicializada de forma pura con 0 para satisfacer las reglas de compilación estricta
+    const lastActivityRef = useRef<number>(0);
+
+    // Inicialización segura del timestamp del marcador al montar el componente en el navegador
+    useEffect(() => {
+        lastActivityRef.current = Date.now();
+    }, []);
 
     /**
      * Cierra la sesión del usuario limpiando el estado y el almacenamiento.
@@ -25,14 +36,38 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }, []);
 
     /**
+     * Resetea el temporizador de inactividad actualizando el instante de expiración en caliente [ADR-34]
+     */
+    const resetInactivityTimeout = useCallback(() => {
+        const now = Date.now();
+        // Throttle de 2 segundos: Evita actualizar el estado de React de forma masiva en mousemove concurrentes
+        if (now - lastActivityRef.current < 2000) return;
+
+        lastActivityRef.current = now;
+
+        setUser((currentUser) => {
+            if (!currentUser) return null;
+
+            const updatedUser = {
+                ...currentUser,
+                expiresAt: now + INACTIVITY_LIFESPAN_MS
+            };
+
+            // Sincronizamos en el storage para que si recarga la pestaña se mantenga el tiempo ganado
+            writeStoredAuthUser(updatedUser);
+            return updatedUser;
+        });
+    }, []);
+
+    /**
      * Procesa el inicio de sesión con JWT e hidrata los metadatos de sesión.
      */
     const login = (tokenData: AuthTokenResponse) => {
         // Corrección de Auditoría: Se consume directamente 'expiresIn' del contrato del Backend.
         const seconds = tokenData.expiresIn;
 
-        // Calcular el instante exacto de expiración (15 min por defecto si falla o no viene el dato)
-        const lifespanMs = (typeof seconds === 'number' && seconds > 0) ? seconds * 1000 : 15 * 60 * 1000;
+        // Punto de partida inicial: 15 min por defecto si falla o no viene el dato
+        const lifespanMs = (typeof seconds === 'number' && seconds > 0) ? seconds * 1000 : INACTIVITY_LIFESPAN_MS;
         const expiresAt = Date.now() + lifespanMs;
 
         // Extraer los datos e inyectar el sello de caducidad y el array de cursos matriculados
@@ -41,55 +76,69 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             username: tokenData.username,
             role: tokenData.role,
             email: tokenData.email,
-            enrolledCourseIds: tokenData.enrolledCourseIds || [], // Hidratación síncrona en el cliente
+            enrolledCourseIds: tokenData.enrolledCourseIds || [],
             token: tokenData.accessToken,
             expiresAt: expiresAt
         };
 
+        lastActivityRef.current = Date.now();
         setUser(nextUser);
         writeStoredAuthUser(nextUser);
         writeStoredToken(tokenData.accessToken);
     };
 
     /**
+     * MONITOR DE ACTIVIDAD GLOBAL DEL USUARIO (DOM LISTENERS) [ADR-34]
+     * Captura las interacciones humanas reales para posponer de forma transparente la expulsión.
+     */
+    useEffect(() => {
+        if (!user) return;
+
+        window.addEventListener('mousemove', resetInactivityTimeout);
+        window.addEventListener('keydown', resetInactivityTimeout);
+        window.addEventListener('click', resetInactivityTimeout);
+        window.addEventListener('scroll', resetInactivityTimeout);
+
+        return () => {
+            window.removeEventListener('mousemove', resetInactivityTimeout);
+            window.removeEventListener('keydown', resetInactivityTimeout);
+            window.removeEventListener('click', resetInactivityTimeout);
+            window.removeEventListener('scroll', resetInactivityTimeout);
+        };
+    }, [user, resetInactivityTimeout]);
+
+    /**
      * BLINDAJE TFG ESTRÉPITO (Auditoría NotebookLM): Desconexión Proactiva Anti-Congelación.
-     * Combina verificación por visibilidad de pestaña e intervalos cortos para evitar la evasión de temporizadores.
+     * Evalúa el timestamp "expiresAt" dinámico mutado por el monitor de actividad.
      */
     useEffect(() => {
         const userWithExpiry = user as (AuthUser & { expiresAt?: number }) | null;
 
         if (!userWithExpiry || !userWithExpiry.expiresAt) return;
 
-        const expiresAt = userWithExpiry.expiresAt;
-
-        // Función centralizada para verificar si el token ya ha expirado
         const checkTokenExpiration = () => {
-            if (Date.now() >= expiresAt) {
-                console.warn("Sesión expirada proactivamente (Límite TTL alcanzado).");
+            if (Date.now() >= userWithExpiry.expiresAt!) {
+                console.warn("Sesión expirada por inactividad prolongada (Límite 15m alcanzado).");
                 logout();
                 return true;
             }
             return false;
         };
 
-        // 1. Control instantáneo al montar el efecto o cambiar el usuario
         if (checkTokenExpiration()) return;
 
-        // 2. Control reactivo cuando el usuario cambia de pestaña y regresa (Evita congelación del navegador)
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 checkTokenExpiration();
             }
         };
 
-        // 3. Verificación cíclica a intervalos cortos (Frecuencia de muestreo segura cada 5 segundos)
         const intervalId = setInterval(() => {
             checkTokenExpiration();
         }, 5000);
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        // Limpieza de listeners e intervalos al desmontar el efecto
         return () => {
             clearInterval(intervalId);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
