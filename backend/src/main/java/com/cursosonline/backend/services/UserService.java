@@ -22,6 +22,8 @@ import org.springframework.data.domain.PageRequest;
 
 import java.util.Optional;
 import java.util.List;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import lombok.RequiredArgsConstructor;
 
@@ -38,6 +40,7 @@ public class UserService {
     private final InterestRepository interestRepository;
     private final CoursesRepository coursesRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private Clock clock = Clock.systemUTC();
 
     /**
      * Busca un usuario por su nombre de usuario.
@@ -260,5 +263,61 @@ public class UserService {
 
         // 5. Volcar de forma transaccional directa a PostgreSQL
         return enrollmentRepository.saveAndFlush(enrollment);
+    }
+
+    /**
+     * 
+     * Método seguro para iniciar el cronómetro de un curso [ADR-34].
+     * Valida la identidad del alumno frente a la matrícula antes de guardar el
+     * sello de tiempo.
+     */
+    @Transactional
+    public void startCourseSecure(Long enrollmentId, String authenticatedUsername) {
+        // 1. Buscamos la matrícula cruzando el ID y el nombre de usuario autenticado.
+        // Si no coinciden, lanza error 404 de inmediato mitigando ataques de sondeo de
+        // IDs de otros alumnos.
+        Enrollment enrollment = enrollmentRepository
+                .findByEnrollmentidAndUserUsername(enrollmentId, authenticatedUsername)
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Matrícula no encontrada o acceso denegado", enrollmentId));
+
+        // 2. Si la matrícula es válida y no ha sido iniciada previamente, guardamos el
+        // sello de tiempo
+        if (enrollment.getStarted_at() == null) {
+            enrollment.setStarted_at(LocalDateTime.now(clock));
+            enrollment.setStatus("EN_CURSO");
+            enrollmentRepository.save(enrollment);
+        }
+    }
+
+    /**
+     * Calcula el progreso real basado en el tiempo transcurrido (24h/día) de forma
+     * determinista y libre de operaciones concurrentes en base de datos.
+     */
+    public int calculateCurrentProgress(Enrollment enrollment) {
+        if (enrollment.getStarted_at() == null)
+            return 0;
+
+        // Mapeo seguro .longValue() para evitar problemas de tipos primitivos con Float
+        long totalHours = enrollment.getCourse().getDuration().longValue();
+        if (totalHours <= 0)
+            return 0;
+
+        // Cálculo de horas transcurridas preciso usando el reloj inyectado
+        long hoursElapsed = java.time.Duration.between(
+                enrollment.getStarted_at(),
+                LocalDateTime.now(clock)).toHours();
+
+        double progress = (hoursElapsed * 100.0) / totalHours;
+
+        // Acotamiento inmutable estricto entre 0 y 100
+        return (int) Math.max(0, Math.min(100, Math.floor(progress)));
+    }
+
+    /**
+     * Permite inyectar un reloj alternativo desde la suite de pruebas unitarias.
+     */
+    public void setClock(Clock clock) {
+        this.clock = clock;
     }
 }

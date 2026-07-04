@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../../../../services/apiClient';
 import { useAuth } from '../../../../auth/useAuth';
 import { readStoredAuthUser } from '../../../../auth/authStorage';
-import type { EnrollmentInfo, DBModelCourse } from '../../../../services/courseTypes';
-
+import type { EnrollmentInfo} from '../../../../services/courseTypes';
 
 export const useEnrolledCourses = (successTrigger: string) => {
     const { user } = useAuth();
@@ -31,25 +30,42 @@ export const useEnrolledCourses = (successTrigger: string) => {
             });
 
             if (response.status === 200 && response.data) {
-                // 3. Mapeo adaptativo tolerante a la nomenclatura del ORM (course vs courses)
+                // Mapeo adaptativo estricto
                 const normalizedData = response.data.map((enrollment) => {
                     const courseData = (enrollment.course || enrollment.courses || enrollment) as Record<string, unknown>;
                     
+                    // [CORRECCIÓN CRÍTICA CRASH]: Forzar la extracción exacta de PostgreSQL (en minúsculas)
+                    const rawEnrollmentId = enrollment.enrollmentid ?? enrollment.enrollmentId;
+                    const safeCourseId = Number(courseData.course_id || courseData.id || 0);
+
+                    // Si llega a ser undefined por un fallo de payload, lanzamos un warning controlado para depurar
+                    if (!rawEnrollmentId) {
+                        console.warn(`[WARN TFG] Matrícula detectada sin ID físico de base de datos para el curso: ${courseData.title}`);
+                    }
+
                     return {
-                        enrollmentid: Number(enrollment.enrollmentid || Date.now()),
+                        // Mantenemos la integridad estricta del ID numérico real. Nunca un fallback falso.
+                        enrollmentid: rawEnrollmentId ? Number(rawEnrollmentId) : 0,
                         enrolled_at: String(enrollment.enrolled_at || new Date().toISOString()),
+                        
+                        // Sello de tiempo del cronómetro
+                        started_at: enrollment.started_at || enrollment.startedAt ? String(enrollment.started_at || enrollment.startedAt) : null,
+                        
                         status: String(enrollment.status || "EN_PROGRESO"),
                         progress_percentage: Number(enrollment.progress_percentage ?? enrollment.progress ?? 0),
                         course: {
-                            course_id: Number(courseData.course_id || courseData.id || 0),
+                            course_id: safeCourseId,
                             title: String(courseData.title || ""),
                             category: String(courseData.category || "General"),
-                            instructors: String(courseData.instructors || "Por asignar")
+                            instructors: String(courseData.instructors || "Por asignar"),
+                            duration: Number(courseData.duration || 0)
                         }
                     };
                 });
 
-                setEnrolledList(normalizedData);
+                // Filtrar cualquier fila corrupta que haya venido sin ID real para proteger el DOM virtual de React
+                const validEnrollments = normalizedData.filter(e => e.enrollmentid !== 0);
+                setEnrolledList(validEnrollments as EnrollmentInfo[]);
             }
         } catch (err) {
             console.error("Error crítico en la pasarela HTTP de matrículas:", err);
@@ -64,31 +80,21 @@ export const useEnrolledCourses = (successTrigger: string) => {
         fetchStudentEnrollments();
     }, [successTrigger, fetchStudentEnrollments]);
 
-    /**
+        /**
      * Inyecta de forma optimista la matrícula en caliente en el estado local
      */
-    const injectLocalEnrollment = (course: DBModelCourse) => {
-        setEnrolledList((prev) => {
-            const exists = prev.some(e => e.course.course_id === course.course_id);
-            if (exists) return prev;
-
-            return [
-                ...prev,
-                {
-                    enrollmentid: Date.now(),
-                    enrolled_at: new Date().toISOString(),
-                    status: "EN_PROGRESO",
-                    progress_percentage: 0,
-                    course: course
-                }
-            ];
-        });
+    const injectLocalEnrollment = () => {
+        // Al ser una inserción optimista local inmediata sin ID de DB asignado aún,
+        // forzamos el refresco limpio desde PostgreSQL para evitar IDs temporales que rompan las keys.
+        fetchStudentEnrollments();
     };
+
 
     return {
         enrolledList,
         loadingEnrollments,
         enrollmentError,
-        injectLocalEnrollment
+        injectLocalEnrollment,
+        fetchStudentEnrollments
     };
 };

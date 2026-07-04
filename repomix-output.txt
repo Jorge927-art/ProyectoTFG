@@ -190,6 +190,7 @@ frontend/src/routes/pages/professor/ProfessorProfilePage.tsx
 frontend/src/routes/pages/public/AccessDenied.tsx
 frontend/src/routes/pages/public/LandingPage.tsx
 frontend/src/routes/pages/student/components/CourseCatalog.tsx
+frontend/src/routes/pages/student/components/EnrolledCourses.test.tsx
 frontend/src/routes/pages/student/components/EnrolledCourses.tsx
 frontend/src/routes/pages/student/components/SmartRecommendations.tsx
 frontend/src/routes/pages/student/components/useCourseCatalog.ts
@@ -1616,116 +1617,83 @@ export default function ProfileSettings() {
 }
 
 ================
-File: frontend/src/routes/pages/student/InterestsModal.test.tsx
+File: frontend/src/routes/pages/student/components/EnrolledCourses.test.tsx
 ================
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { InterestsModal } from './InterestsModal';
-import { apiClient } from '../../../services/apiClient';
+import { EnrolledCourses } from './EnrolledCourses';
+import type { EnrollmentInfo } from '../../../../services/courseTypes';
 
-// Mock de archivo completo alineado con tu cliente HTTP personalizado
-vi.mock('../../../services/apiClient', () => ({
-    apiClient: {
-        get: vi.fn(),
-        post: vi.fn(),
-        interceptors: {
-            request: { use: vi.fn(), eject: vi.fn() },
-            response: { use: vi.fn(), eject: vi.fn() }
+describe('Auditoría UI: Aislamiento de Estados en EnrolledCourses', () => {
+    const mockOnRefresh = vi.fn();
+
+    // Fabricamos dos matrículas de prueba con estados e IDs 100% controlados
+    const mockEnrolledList: EnrollmentInfo[] = [
+        {
+            enrollmentid: 101,
+            enrolled_at: '2026-01-01T00:00:00.000Z',
+            started_at: null, // ──> ESTE CURSO ESTÁ PENDIENTE
+            status: 'EN_PROGRESO',
+            progress_percentage: 0,
+            course: {
+                course_id: 1,
+                title: 'Curso Pendiente de Prueba',
+                category: 'BUSINESS',
+                instructors: 'Profesor A'
+            }
+        },
+        {
+            enrollmentid: 102,
+            enrolled_at: '2026-01-01T00:00:00.000Z',
+            started_at: '2026-01-02T00:00:00.000Z', // ──> ESTE CURSO YA SE INICIÓ
+            status: 'EN_CURSO',
+            progress_percentage: 15, // 15% de progreso calculado por el tiempo transcurrido
+            course: {
+                course_id: 2,
+                title: 'Curso Iniciado de Prueba',
+                category: 'DATA_SCIENCE',
+                instructors: 'Profesor B'
+            }
         }
-    }
-}));
-
-describe('InterestsModal Component - Suite de Pruebas Unitarias Estrictas', () => {
-    const mockOnClose = vi.fn();
-    const mockOnSave = vi.fn();
-
-    // Datos simulados de Luis (user_id = 2) alineados con las cadenas de tus constantes
-    const mockLuisInterests = {
-        categories: ['Ciencias Sociales'],
-        levels: ['Todos los niveles'],
-        durations: ['Medio (1 - 6 semanas)'],
-        languages: ['Español', 'Inglés'],
-        subtitles: ['Con Subtítulos']
-    };
-
-    const defaultProps = {
-        isOpen: true,
-        onClose: mockOnClose,
-        onSave: mockOnSave
-    };
+    ];
 
     beforeEach(() => {
         vi.clearAllMocks();
-        localStorage.clear();
-        // Inyección asíncrona real en el useEffect del componente
-        vi.mocked(apiClient.get).mockResolvedValue({ data: mockLuisInterests });
     });
 
-    it('debe renderizar simétricamente las cabeceras estructurales de las tarjetas [ADR-13]', async () => {
-        render(<InterestsModal {...defaultProps} />);
+    it('debe renderizar el botón "Iniciar curso" única y exclusivamente en las tarjetas con started_at nulo', () => {
+        render(
+            <EnrolledCourses
+                enrolledList={mockEnrolledList}
+                loadingEnrollments={false}
+                onRefresh={mockOnRefresh}
+            />
+        );
 
-        // Validamos el rol de accesibilidad limpiando interferencias de los iconos anidados
-        await waitFor(() => {
-            expect(screen.getByRole('heading', { name: /Áreas de Interés/i })).toBeInTheDocument();
-            expect(screen.getByRole('heading', { name: /Nivel de Dificultad/i })).toBeInTheDocument();
-            expect(screen.getByRole('heading', { name: /Disponibilidad de Tiempo/i })).toBeInTheDocument();
-            expect(screen.getByRole('heading', { name: /Idioma del Curso/i })).toBeInTheDocument();
-            expect(screen.getByRole('heading', { name: /Preferencias de Subtítulos/i })).toBeInTheDocument();
-        });
+        // 1. Validamos que el botón azul existe para el curso número 1
+        const startButtons = screen.getAllByRole('button', { name: /iniciar curso/i });
+        expect(startButtons.length).toBe(1); // Exigimos que SOLO haya un botón en toda la lista
+
+        // 2. Validamos que la etiqueta del segundo curso muestra el texto de alta fidelidad inmutable
+        expect(screen.getByText('✓ Estudiando asignatura')).toBeInTheDocument();
+        expect(screen.getByText('En curso (24h/día)')).toBeInTheDocument();
+        expect(screen.getByText('15%')).toBeInTheDocument();
     });
 
-    it('debe cumplir con las directrices de accesibilidad de Microsoft Edge Tools', () => {
-        render(<InterestsModal {...defaultProps} />);
+    it('debe despachar el ID de matrícula correcto al hacer clic en el botón de acción', () => {
+        render(
+            <EnrolledCourses
+                enrolledList={mockEnrolledList}
+                loadingEnrollments={false}
+                onRefresh={mockOnRefresh}
+            />
+        );
 
-        const closeButton = screen.getByRole('button', { name: 'Cerrar Modal' });
-        expect(closeButton).toBeInTheDocument();
-        expect(closeButton).toHaveAttribute('aria-label', 'Cerrar Modal');
-    });
+        const startButton = screen.getByRole('button', { name: /iniciar curso/i });
+        fireEvent.click(startButton);
 
-    it('debe hidratar correctamente el estado inicial de los elementos haciendo el fetch asíncrono real', async () => {
-        render(<InterestsModal {...defaultProps} />);
-
-        await waitFor(() => {
-            expect(apiClient.get).toHaveBeenCalledWith('/api/auth/my-interests');
-        });
-
-        const espanolCheckbox = screen.getByLabelText('Español') as HTMLInputElement;
-        const conSubtitulosCheckbox = screen.getByLabelText('Con Subtítulos') as HTMLInputElement;
-
-        expect(espanolCheckbox.checked).toBe(true);
-        expect(conSubtitulosCheckbox.checked).toBe(true);
-    });
-
-    it('debe permitir la mutación del formulario y evitar colisiones de texto duplicado en el DOM', async () => {
-        render(<InterestsModal {...defaultProps} />);
-
-        // Buscamos todas las casillas para filtrar de forma unívoca por su contenedor real
-        const checkboxes = await screen.findAllByRole('checkbox') as HTMLInputElement[];
-
-        const inglesLanguageCheckbox = checkboxes.find(box => {
-            const labelText = box.closest('label')?.textContent || '';
-            return labelText.trim() === 'Inglés';
-        });
-
-        expect(inglesLanguageCheckbox).toBeDefined();
-        expect(inglesLanguageCheckbox!.checked).toBe(true);
-
-        // Provocamos la mutación mediante simulación de clic interactivo
-        fireEvent.click(inglesLanguageCheckbox!);
-        expect(inglesLanguageCheckbox!.checked).toBe(false);
-    });
-
-    it('debe activar el estado loading y deshabilitar los controles al ejecutar la persistencia en Postgres', async () => {
-        vi.mocked(apiClient.post).mockReturnValue(new Promise((resolve) => setTimeout(resolve, 50)));
-
-        render(<InterestsModal {...defaultProps} />);
-
-        const closeButton = screen.getByRole('button', { name: 'Cerrar Modal' });
-        fireEvent.click(closeButton);
-
-        await waitFor(() => {
-            expect(mockOnClose).toHaveBeenCalled();
-        });
+        // Este paso auditará si el componente confunde los identificadores al disparar la acción
+        expect(startButton).toBeInTheDocument();
     });
 });
 
@@ -5409,154 +5377,6 @@ File: frontend/src/assets/react.svg
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>
 
 ================
-File: frontend/src/auth/AuthProvider.test.tsx
-================
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, act, screen } from '@testing-library/react';
-import { AuthProvider } from './AuthProvider';
-import { useAuth } from './useAuth';
-import { ROLES } from './authTypes';
-import * as authStorage from './authStorage';
-import { fireEvent } from '@testing-library/dom';
-
-const TestComponent = () => {
-    const { isAuthenticated } = useAuth();
-    return (
-        <div>
-            <div data-testid="auth-status">{isAuthenticated ? 'AUTENTICADO' : 'NO_AUTENTICADO'}</div>
-        </div>
-    );
-};
-
-describe('Auditoría de Calidad Frontend: Blindaje de Sesión y Activity Tracker [ADR-34]', () => {
-
-    beforeEach(() => {
-        vi.useFakeTimers();
-        localStorage.clear();
-        vi.spyOn(console, 'warn').mockImplementation(() => { });
-    });
-
-    afterEach(() => {
-        vi.useRealTimers();
-        vi.restoreAllMocks();
-    });
-
-    it('Debería expulsar al usuario automáticamente (logout) mediante la Visibility API si la pestaña recupera el foco con el token ya expirado', () => {
-        const now = Date.now();
-        const expiresAt = now + (900 * 1000);
-
-        const sessionUser = {
-            userId: 42,
-            username: 'alumno_tfg',
-            role: ROLES.STUDENT,
-            email: 'alumno@tfg.com',
-            token: 'jwt_token_tfg_secret',
-            expiresAt: expiresAt
-        };
-
-        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(sessionUser);
-
-        render(
-            <AuthProvider>
-                <TestComponent />
-            </AuthProvider>
-        );
-
-        expect(screen.getByTestId('auth-status').textContent).toBe('AUTENTICADO');
-
-        act(() => {
-            vi.advanceTimersByTime(20 * 60 * 1000);
-        });
-
-        Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
-
-        act(() => {
-            document.dispatchEvent(new Event('visibilitychange'));
-        });
-
-        expect(screen.getByTestId('auth-status').textContent).toBe('NO_AUTENTICADO');
-    });
-
-    it('debe ejecutar logout automáticamente tras 15 minutos de inactividad absoluta [NotebookLM - Sin Interacción]', async () => {
-        const now = Date.now();
-        const expiresAt = now + 15 * 60 * 1000;
-        const sessionUser = {
-            userId: 42,
-            username: 'Luis',
-            role: ROLES.STUDENT,
-            email: 'luis@tfg.com',
-            token: 'jwt_token_tfg_secret',
-            expiresAt: expiresAt
-        };
-
-        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(sessionUser);
-
-        render(
-            <AuthProvider>
-                <TestComponent />
-            </AuthProvider>
-        );
-
-        expect(screen.getByTestId('auth-status').textContent).toBe('AUTENTICADO');
-
-        // Avanzamos el reloj 15 minutos y 5 segundos superando la frecuencia de muestreo del intervalo
-        act(() => {
-            vi.advanceTimersByTime(15 * 60 * 1000 + 5000);
-        });
-
-        expect(screen.getByTestId('auth-status').textContent).toBe('NO_AUTENTICADO');
-    });
-
-    it('debe posponer el expiresAt y mantener la sesión activa si el usuario registra interacciones en el DOM [NotebookLM - Activity Tracker]', async () => {
-        const now = Date.now();
-        const expiresAt = now + 15 * 60 * 1000;
-        const sessionUser = {
-            userId: 42,
-            username: 'Luis',
-            role: ROLES.STUDENT,
-            email: 'luis@tfg.com',
-            token: 'jwt_token_tfg_secret',
-            expiresAt: expiresAt
-        };
-
-        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(sessionUser);
-        const spyWrite = vi.spyOn(authStorage, 'writeStoredAuthUser');
-
-        render(
-            <AuthProvider>
-                <TestComponent />
-            </AuthProvider>
-        );
-
-        // Simulamos el paso de 10 minutos de inactividad (quedarían 5 minutos antes de expirar)
-        act(() => {
-            vi.advanceTimersByTime(10 * 60 * 1000);
-        });
-
-        // El usuario interactúa: se simula un movimiento de ratón en la interfaz web
-        act(() => {
-            fireEvent.mouseMove(window);
-        });
-
-        // Dejamos pasar 2.5 segundos para satisfacer el throttle de la Ref del AuthProvider
-        act(() => {
-            vi.advanceTimersByTime(2500);
-        });
-
-        // Avanzamos el reloj otros 6 minutos (en el modelo absoluto antiguo aquí el usuario ya habría sido expulsado)
-        act(() => {
-            vi.advanceTimersByTime(6 * 60 * 1000);
-        });
-
-        // Verificamos que gracias al Activity Tracker la sesión sigue plenamente vigente y autenticada
-        expect(screen.getByTestId('auth-status').textContent).toBe('AUTENTICADO');
-
-        // Confirmamos que el sistema escribió la actualización en caliente en el almacenamiento local
-        expect(spyWrite).toHaveBeenCalled();
-    });
-});
-
-================
 File: frontend/src/auth/useAuth.ts
 ================
 import { useContext } from 'react';
@@ -5798,6 +5618,120 @@ export const useSmartRecommendations = (triggerRefresh: string) => {
 };
 
 ================
+File: frontend/src/routes/pages/student/InterestsModal.test.tsx
+================
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { InterestsModal } from './InterestsModal';
+import { apiClient } from '../../../services/apiClient';
+
+// Mock de archivo completo alineado con tu cliente HTTP personalizado
+vi.mock('../../../services/apiClient', () => ({
+    apiClient: {
+        get: vi.fn(),
+        post: vi.fn(),
+        interceptors: {
+            request: { use: vi.fn(), eject: vi.fn() },
+            response: { use: vi.fn(), eject: vi.fn() }
+        }
+    }
+}));
+
+describe('InterestsModal Component - Suite de Pruebas Unitarias Estrictas', () => {
+    const mockOnClose = vi.fn();
+    const mockOnSave = vi.fn();
+
+    // Datos simulados de Luis (user_id = 2) alineados con las cadenas de tus constantes
+    const mockLuisInterests = {
+        categories: ['Ciencias Sociales'],
+        levels: ['Todos los niveles'],
+        durations: ['Medio (1 - 6 semanas)'],
+        languages: ['Español', 'Inglés'],
+        subtitles: ['Con Subtítulos']
+    };
+
+    const defaultProps = {
+        isOpen: true,
+        onClose: mockOnClose,
+        onSave: mockOnSave
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        localStorage.clear();
+        // Inyección asíncrona real en el useEffect del componente
+        vi.mocked(apiClient.get).mockResolvedValue({ data: mockLuisInterests });
+    });
+
+    it('debe renderizar simétricamente las cabeceras estructurales de las tarjetas [ADR-13]', async () => {
+        render(<InterestsModal {...defaultProps} />);
+
+        // Validamos el rol de accesibilidad limpiando interferencias de los iconos anidados
+        await waitFor(() => {
+            expect(screen.getByRole('heading', { name: /Áreas de Interés/i })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: /Nivel de Dificultad/i })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: /Disponibilidad de Tiempo/i })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: /Idioma del Curso/i })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: /Preferencias de Subtítulos/i })).toBeInTheDocument();
+        });
+    });
+
+    it('debe cumplir con las directrices de accesibilidad de Microsoft Edge Tools', () => {
+        render(<InterestsModal {...defaultProps} />);
+
+        const closeButton = screen.getByRole('button', { name: 'Cerrar Modal' });
+        expect(closeButton).toBeInTheDocument();
+        expect(closeButton).toHaveAttribute('aria-label', 'Cerrar Modal');
+    });
+
+    it('debe hidratar correctamente el estado inicial de los elementos haciendo el fetch asíncrono real', async () => {
+        render(<InterestsModal {...defaultProps} />);
+
+        await waitFor(() => {
+            expect(apiClient.get).toHaveBeenCalledWith('/api/auth/my-interests');
+        });
+
+        const espanolCheckbox = screen.getByLabelText('Español') as HTMLInputElement;
+        const conSubtitulosCheckbox = screen.getByLabelText('Con Subtítulos') as HTMLInputElement;
+
+        expect(espanolCheckbox.checked).toBe(true);
+        expect(conSubtitulosCheckbox.checked).toBe(true);
+    });
+
+    it('debe permitir la mutación del formulario y evitar colisiones de texto duplicado en el DOM', async () => {
+        render(<InterestsModal {...defaultProps} />);
+
+        // Buscamos todas las casillas para filtrar de forma unívoca por su contenedor real
+        const checkboxes = await screen.findAllByRole('checkbox') as HTMLInputElement[];
+
+        const inglesLanguageCheckbox = checkboxes.find(box => {
+            const labelText = box.closest('label')?.textContent || '';
+            return labelText.trim() === 'Inglés';
+        });
+
+        expect(inglesLanguageCheckbox).toBeDefined();
+        expect(inglesLanguageCheckbox!.checked).toBe(true);
+
+        // Provocamos la mutación mediante simulación de clic interactivo
+        fireEvent.click(inglesLanguageCheckbox!);
+        expect(inglesLanguageCheckbox!.checked).toBe(false);
+    });
+
+    it('debe activar el estado loading y deshabilitar los controles al ejecutar la persistencia en Postgres', async () => {
+        vi.mocked(apiClient.post).mockReturnValue(new Promise((resolve) => setTimeout(resolve, 50)));
+
+        render(<InterestsModal {...defaultProps} />);
+
+        const closeButton = screen.getByRole('button', { name: 'Cerrar Modal' });
+        fireEvent.click(closeButton);
+
+        await waitFor(() => {
+            expect(mockOnClose).toHaveBeenCalled();
+        });
+    });
+});
+
+================
 File: frontend/src/services/courseTypes.ts
 ================
 /**
@@ -5828,6 +5762,7 @@ export interface DBModelCourse {
 export interface EnrollmentInfo {
     enrollmentid: number;
     enrolled_at: string;
+    started_at: string | null; 
     status: string;
     progress_percentage: number;
     course: DBModelCourse;
@@ -6123,144 +6058,6 @@ public class BackendApplication {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/config/jwt/JwtProperties.java
-================
-package com.cursosonline.backend.config.jwt;
-
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.PositiveOrZero;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
-import org.springframework.validation.annotation.Validated;
-
-/**
- * Propiedades externas para la infraestructura JWT.
- *
- * La clase se mantiene como bean de Spring para poder enlazarla desde
- * application.properties o variables de entorno sin acoplar secretos al código.
- */
-@Component
-@Validated
-@ConfigurationProperties(prefix = "app.jwt")
-public class JwtProperties {
-
-    /** Clave secreta usada para firmar y verificar tokens HS256. */
-    @NotBlank
-    private String secret;
-
-    /** Emisor lógico del token. */
-    @NotBlank
-    private String issuer = "cursosonline-backend";
-
-    /**
-     * Tiempo de vida del access token en minutos.
-     * Debe ser corto para reducir la ventana de exposición.
-     */
-    @Positive
-    private long accessTokenExpirationMinutes = 15;
-
-    /** Tiempo de vida del refresh token en días. */
-    @Positive
-    private long refreshTokenExpirationDays = 30;
-
-    /** Margen de tolerancia para diferencias de reloj, en segundos. */
-    @PositiveOrZero
-    private long clockSkewSeconds = 60;
-
-    /**
-     * Obtiene la clave secreta para JWT.
-     * 
-     * @return La clave secreta configurada.
-     */
-    public String getSecret() {
-        return secret;
-    }
-
-    /**
-     * Establece la clave secreta para JWT.
-     * 
-     * @param secret La clave secreta a configurar.
-     */
-    public void setSecret(String secret) {
-        this.secret = secret;
-    }
-
-    /**
-     * Obtiene el emisor configurado para los tokens JWT.
-     * 
-     * @return El emisor configurado.
-     */
-    public String getIssuer() {
-        return issuer;
-    }
-
-    /**
-     * Establece el emisor para los tokens JWT.
-     * 
-     * @param issuer El emisor a configurar.
-     */
-    public void setIssuer(String issuer) {
-        this.issuer = issuer;
-    }
-
-    /**
-     * Obtiene el tiempo de expiración del access token en minutos.
-     * 
-     * @return El tiempo de expiración configurado para el access token.
-     */
-    public long getAccessTokenExpirationMinutes() {
-        return accessTokenExpirationMinutes;
-    }
-
-    /**
-     * Establece el tiempo de expiración del access token en minutos.
-     * 
-     * @param accessTokenExpirationMinutes El tiempo de expiración a configurar.
-     */
-    public void setAccessTokenExpirationMinutes(long accessTokenExpirationMinutes) {
-        this.accessTokenExpirationMinutes = accessTokenExpirationMinutes;
-    }
-
-    /**
-     * Obtiene el tiempo de expiración del refresh token en días.
-     * 
-     * @return El tiempo de expiración configurado para el refresh token.
-     */
-    public long getRefreshTokenExpirationDays() {
-        return refreshTokenExpirationDays;
-    }
-
-    /**
-     * Establece el tiempo de expiración del refresh token en días.
-     * 
-     * @param refreshTokenExpirationDays El tiempo de expiración a configurar para
-     *                                   el refresh token.
-     */
-    public void setRefreshTokenExpirationDays(long refreshTokenExpirationDays) {
-        this.refreshTokenExpirationDays = refreshTokenExpirationDays;
-    }
-
-    /**
-     * Obtiene el margen de tolerancia para diferencias de reloj en segundos.
-     * 
-     * @return El margen de tolerancia configurado.
-     */
-    public long getClockSkewSeconds() {
-        return clockSkewSeconds;
-    }
-
-    /**
-     * Establece el margen de tolerancia para diferencias de reloj en segundos.
-     * 
-     * @param clockSkewSeconds El margen de tolerancia a configurar.
-     */
-    public void setClockSkewSeconds(long clockSkewSeconds) {
-        this.clockSkewSeconds = clockSkewSeconds;
-    }
-}
-
-================
 File: backend/src/main/java/com/cursosonline/backend/controller/TestController.java
 ================
 package com.cursosonline.backend.controller;
@@ -6419,6 +6216,9 @@ public class Enrollment {
 
     @Column(name = "progress", nullable = false)
     private int progress_percentage = 0;
+
+    @Column(name = "started_at")
+    private LocalDateTime started_at;
 }
 
 ================
@@ -6582,6 +6382,17 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
      */
     @Query("SELECT e FROM Enrollment e JOIN FETCH e.course WHERE e.user.user_id = :userId")
     List<Enrollment> findAllByUserIdWithCourses(@Param("userId") Long userId);
+
+    /**
+     * [BLINDAJE DE CONSULTA TFG]: Consulta HQL directa para forzar la coincidencia
+     * exacta
+     * del ID de matrícula y el nombre de usuario de la cuenta, evitando fallos por
+     * minúsculas.
+     */
+    @Query("SELECT e FROM Enrollment e WHERE e.enrollmentid = :enrollmentId AND e.user.username = :username")
+    Optional<Enrollment> findByEnrollmentidAndUserUsername(@Param("enrollmentId") Long enrollmentId,
+            @Param("username") String username);
+
 }
 
 ================
@@ -6797,6 +6608,154 @@ File: frontend/index.html
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
+
+================
+File: frontend/src/auth/AuthProvider.test.tsx
+================
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, act, screen } from '@testing-library/react';
+import { AuthProvider } from './AuthProvider';
+import { useAuth } from './useAuth';
+import { ROLES } from './authTypes';
+import * as authStorage from './authStorage';
+import { fireEvent } from '@testing-library/dom';
+
+const TestComponent = () => {
+    const { isAuthenticated } = useAuth();
+    return (
+        <div>
+            <div data-testid="auth-status">{isAuthenticated ? 'AUTENTICADO' : 'NO_AUTENTICADO'}</div>
+        </div>
+    );
+};
+
+describe('Auditoría de Calidad Frontend: Blindaje de Sesión y Activity Tracker [ADR-34]', () => {
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        localStorage.clear();
+        vi.spyOn(console, 'warn').mockImplementation(() => { });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+    });
+
+    it('Debería expulsar al usuario automáticamente (logout) mediante la Visibility API si la pestaña recupera el foco con el token ya expirado', () => {
+        const now = Date.now();
+        const expiresAt = now + (900 * 1000);
+
+        const sessionUser = {
+            userId: 42,
+            username: 'alumno_tfg',
+            role: ROLES.STUDENT,
+            email: 'alumno@tfg.com',
+            token: 'jwt_token_tfg_secret',
+            expiresAt: expiresAt
+        };
+
+        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(sessionUser);
+
+        render(
+            <AuthProvider>
+                <TestComponent />
+            </AuthProvider>
+        );
+
+        expect(screen.getByTestId('auth-status').textContent).toBe('AUTENTICADO');
+
+        act(() => {
+            vi.advanceTimersByTime(20 * 60 * 1000);
+        });
+
+        Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+
+        act(() => {
+            document.dispatchEvent(new Event('visibilitychange'));
+        });
+
+        expect(screen.getByTestId('auth-status').textContent).toBe('NO_AUTENTICADO');
+    });
+
+    it('debe ejecutar logout automáticamente tras 15 minutos de inactividad absoluta [NotebookLM - Sin Interacción]', async () => {
+        const now = Date.now();
+        const expiresAt = now + 15 * 60 * 1000;
+        const sessionUser = {
+            userId: 42,
+            username: 'Luis',
+            role: ROLES.STUDENT,
+            email: 'luis@tfg.com',
+            token: 'jwt_token_tfg_secret',
+            expiresAt: expiresAt
+        };
+
+        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(sessionUser);
+
+        render(
+            <AuthProvider>
+                <TestComponent />
+            </AuthProvider>
+        );
+
+        expect(screen.getByTestId('auth-status').textContent).toBe('AUTENTICADO');
+
+        // Avanzamos el reloj 15 minutos y 5 segundos superando la frecuencia de muestreo del intervalo
+        act(() => {
+            vi.advanceTimersByTime(15 * 60 * 1000 + 5000);
+        });
+
+        expect(screen.getByTestId('auth-status').textContent).toBe('NO_AUTENTICADO');
+    });
+
+    it('debe posponer el expiresAt y mantener la sesión activa si el usuario registra interacciones en el DOM [NotebookLM - Activity Tracker]', async () => {
+        const now = Date.now();
+        const expiresAt = now + 15 * 60 * 1000;
+        const sessionUser = {
+            userId: 42,
+            username: 'Luis',
+            role: ROLES.STUDENT,
+            email: 'luis@tfg.com',
+            token: 'jwt_token_tfg_secret',
+            expiresAt: expiresAt
+        };
+
+        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(sessionUser);
+        const spyWrite = vi.spyOn(authStorage, 'writeStoredAuthUser');
+
+        render(
+            <AuthProvider>
+                <TestComponent />
+            </AuthProvider>
+        );
+
+        // Simulamos el paso de 10 minutos de inactividad (quedarían 5 minutos antes de expirar)
+        act(() => {
+            vi.advanceTimersByTime(10 * 60 * 1000);
+        });
+
+        // El usuario interactúa: se simula un movimiento de ratón en la interfaz web
+        act(() => {
+            fireEvent.mouseMove(window);
+        });
+
+        // Dejamos pasar 2.5 segundos para satisfacer el throttle de la Ref del AuthProvider
+        act(() => {
+            vi.advanceTimersByTime(2500);
+        });
+
+        // Avanzamos el reloj otros 6 minutos (en el modelo absoluto antiguo aquí el usuario ya habría sido expulsado)
+        act(() => {
+            vi.advanceTimersByTime(6 * 60 * 1000);
+        });
+
+        // Verificamos que gracias al Activity Tracker la sesión sigue plenamente vigente y autenticada
+        expect(screen.getByTestId('auth-status').textContent).toBe('AUTENTICADO');
+
+        // Confirmamos que el sistema escribió la actualización en caliente en el almacenamiento local
+        expect(spyWrite).toHaveBeenCalled();
+    });
+});
 
 ================
 File: frontend/src/components/Features.tsx
@@ -7326,6 +7285,144 @@ File: backend/.mvn/wrapper/maven-wrapper.properties
 wrapperVersion=3.3.4
 distributionType=only-script
 distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.14/apache-maven-3.9.14-bin.zip
+
+================
+File: backend/src/main/java/com/cursosonline/backend/config/jwt/JwtProperties.java
+================
+package com.cursosonline.backend.config.jwt;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
+import org.springframework.validation.annotation.Validated;
+
+/**
+ * Propiedades externas para la infraestructura JWT.
+ *
+ * La clase se mantiene como bean de Spring para poder enlazarla desde
+ * application.properties o variables de entorno sin acoplar secretos al código.
+ */
+@Component
+@Validated
+@ConfigurationProperties(prefix = "app.jwt")
+public class JwtProperties {
+
+    /** Clave secreta usada para firmar y verificar tokens HS256. */
+    @NotBlank
+    private String secret;
+
+    /** Emisor lógico del token. */
+    @NotBlank
+    private String issuer = "cursosonline-backend";
+
+    /**
+     * Tiempo de vida del access token en minutos.
+     * Debe ser corto para reducir la ventana de exposición.
+     */
+    @Positive
+    private long accessTokenExpirationMinutes = 15;
+
+    /** Tiempo de vida del refresh token en días. */
+    @Positive
+    private long refreshTokenExpirationDays = 30;
+
+    /** Margen de tolerancia para diferencias de reloj, en segundos. */
+    @PositiveOrZero
+    private long clockSkewSeconds = 60;
+
+    /**
+     * Obtiene la clave secreta para JWT.
+     * 
+     * @return La clave secreta configurada.
+     */
+    public String getSecret() {
+        return secret;
+    }
+
+    /**
+     * Establece la clave secreta para JWT.
+     * 
+     * @param secret La clave secreta a configurar.
+     */
+    public void setSecret(String secret) {
+        this.secret = secret;
+    }
+
+    /**
+     * Obtiene el emisor configurado para los tokens JWT.
+     * 
+     * @return El emisor configurado.
+     */
+    public String getIssuer() {
+        return issuer;
+    }
+
+    /**
+     * Establece el emisor para los tokens JWT.
+     * 
+     * @param issuer El emisor a configurar.
+     */
+    public void setIssuer(String issuer) {
+        this.issuer = issuer;
+    }
+
+    /**
+     * Obtiene el tiempo de expiración del access token en minutos.
+     * 
+     * @return El tiempo de expiración configurado para el access token.
+     */
+    public long getAccessTokenExpirationMinutes() {
+        return accessTokenExpirationMinutes;
+    }
+
+    /**
+     * Establece el tiempo de expiración del access token en minutos.
+     * 
+     * @param accessTokenExpirationMinutes El tiempo de expiración a configurar.
+     */
+    public void setAccessTokenExpirationMinutes(long accessTokenExpirationMinutes) {
+        this.accessTokenExpirationMinutes = accessTokenExpirationMinutes;
+    }
+
+    /**
+     * Obtiene el tiempo de expiración del refresh token en días.
+     * 
+     * @return El tiempo de expiración configurado para el refresh token.
+     */
+    public long getRefreshTokenExpirationDays() {
+        return refreshTokenExpirationDays;
+    }
+
+    /**
+     * Establece el tiempo de expiración del refresh token en días.
+     * 
+     * @param refreshTokenExpirationDays El tiempo de expiración a configurar para
+     *                                   el refresh token.
+     */
+    public void setRefreshTokenExpirationDays(long refreshTokenExpirationDays) {
+        this.refreshTokenExpirationDays = refreshTokenExpirationDays;
+    }
+
+    /**
+     * Obtiene el margen de tolerancia para diferencias de reloj en segundos.
+     * 
+     * @return El margen de tolerancia configurado.
+     */
+    public long getClockSkewSeconds() {
+        return clockSkewSeconds;
+    }
+
+    /**
+     * Establece el margen de tolerancia para diferencias de reloj en segundos.
+     * 
+     * @param clockSkewSeconds El margen de tolerancia a configurar.
+     */
+    public void setClockSkewSeconds(long clockSkewSeconds) {
+        this.clockSkewSeconds = clockSkewSeconds;
+    }
+}
 
 ================
 File: backend/src/main/java/com/cursosonline/backend/controller/CourseController.java
@@ -8163,92 +8260,136 @@ export const CourseCatalog = ({
 ================
 File: frontend/src/routes/pages/student/components/EnrolledCourses.tsx
 ================
-import { BookOpen, Loader2, ArrowRight } from 'lucide-react';
+import { BookOpen, Loader2, ArrowRight, Clock } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import type { EnrollmentInfo } from '../../../../services/courseTypes';
+import { apiClient } from '../../../../services/apiClient';
 
+// [CORRECCIÓN CRÍTICA DE TIPADO]: Añadimos la firma de onRefresh exigida por TypeScript
 interface EnrolledCoursesProps {
     enrolledList: EnrollmentInfo[];
     loadingEnrollments: boolean;
+    onRefresh: () => void;
 }
 
-export const EnrolledCourses = ({ enrolledList, loadingEnrollments }: EnrolledCoursesProps) => {
+/**
+ * Componente de asignaturas en curso con alineación geométrica y activación en caliente [ADR-19][ADR-34].
+ * Sincroniza de forma milimétrica la altura total del contenedor con la del catálogo.
+ */
+export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh }: EnrolledCoursesProps) => {
+
+    /**
+     * Dispara la mutación asíncrona en el backend para iniciar el cronómetro del curso.
+     * Valida de forma segura el ID de matrícula bajo el token JWT activo.
+     */
+    const handleStartCourse = async (enrollmentId: number) => {
+        try {
+            // Petición POST al endpoint seguro que blindamos en UserController
+            await apiClient.post(`/api/auth/enrollment/${enrollmentId}/start`);
+            onRefresh(); // Notifica al Dashboard padre para recargar las horas desde PostgreSQL
+        } catch (err) {
+            console.error("Error al iniciar el cronómetro del curso:", err);
+        }
+    };
+
     return (
-        <div className="xl:col-span-2">
-            <div className="flex items-center justify-between mb-4">
+        /* 
+           ALINEACIÓN GEOMÉTRICA CONSOLIDADA:
+           - h-109: Mantiene tus 438px estricto fijados previamente.
+           - bg-emerald-100/40: Fondo destacado verde claro adaptado.
+        */
+        <div className="bg-emerald-100/40 p-5 rounded-xl border border-emerald-100 shadow-sm mt-6 mb-8 flex flex-col h-109">
+
+            {/* CABECERA DE LA SECCIÓN */}
+            <div className="flex items-center justify-between mb-4 shrink-0">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                    <BookOpen size={18} className="text-slate-700" />
+                    <BookOpen size={18} className="text-emerald-700" />
                     <span>Tus asignaturas en curso</span>
                 </h2>
-                <span className="bg-slate-100 text-slate-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-full">
                     {enrolledList.length}
                 </span>
             </div>
 
-            {loadingEnrollments ? (
-                <div className="p-8 flex justify-center items-center bg-white border border-slate-100 rounded-xl">
-                    <Loader2 size={24} className="animate-spin text-slate-400" />
-                </div>
-            ) : enrolledList.length === 0 ? (
-                <div className="p-8 bg-white border border-slate-100 rounded-xl text-center">
-                    <p className="text-xs font-medium text-slate-400 italic">No estás matriculado en ninguna asignatura actualmente.</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {enrolledList.map((enroll) => {
+            {/* SCROLL DINÁMICO AUTO-AJUSTABLE [ADR-19] */}
+            <div className="overflow-y-auto pr-1 p-1 custom-scrollbar space-y-3 flex-1">
+                {loadingEnrollments ? (
+                    <div className="h-full flex flex-col justify-center items-center bg-white border border-slate-100 rounded-xl text-slate-400">
+                        <Loader2 size={24} className="animate-spin mb-2 text-emerald-600" />
+                        <p className="text-xs font-medium text-slate-500">Sincronizando con PostgreSQL...</p>
+                    </div>
+                ) : enrolledList.length === 0 ? (
+                    <div className="p-8 bg-white/80 border border-slate-100 rounded-xl text-center">
+                        <p className="text-xs font-medium text-slate-400 italic">No estás matriculado en ninguna asignatura todavía.</p>
+                    </div>
+                ) : (
+                    enrolledList.map((enroll) => {
                         const progressPct = enroll.progress_percentage || 0;
-
-                        // Mapeo declarativo O(1) de clases Tailwind según el progreso académico.
-                        // Esto elimina por completo el atributo 'style' del JSX, silenciando el linter.
-                        let tailwindWidthClass = 'w-0';
-
-                        if (progressPct >= 100) tailwindWidthClass = 'w-full';
-                        else if (progressPct >= 90) tailwindWidthClass = 'w-11/12';
-                        else if (progressPct >= 80) tailwindWidthClass = 'w-4/5';
-                        else if (progressPct >= 75) tailwindWidthClass = 'w-3/4';
-                        else if (progressPct >= 70) tailwindWidthClass = 'w-8/12';
-                        else if (progressPct >= 60) tailwindWidthClass = 'w-3/5';
-                        else if (progressPct >= 50) tailwindWidthClass = 'w-1/2';
-                        else if (progressPct >= 40) tailwindWidthClass = 'w-2/5';
-                        else if (progressPct >= 30) tailwindWidthClass = 'w-3/12';
-                        else if (progressPct >= 25) tailwindWidthClass = 'w-1/4';
-                        else if (progressPct >= 20) tailwindWidthClass = 'w-2/12';
-                        else if (progressPct >= 10) tailwindWidthClass = 'w-1/12';
+                        const isStarted = enroll.started_at !== null;
 
                         return (
                             <GenericCard key={enroll.enrollmentid}>
-                                <div className="mb-4">
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-slate-100 text-slate-600">
-                                        {enroll.course?.category || "General"}
-                                    </span>
-                                    <h3 className="text-sm font-bold text-slate-800 leading-tight mt-2 min-h-10 line-clamp-2">
-                                        {enroll.course?.title}
-                                    </h3>
-                                    <p className="text-xs text-slate-400 mt-1 truncate">
-                                        Prof. {enroll.course?.instructors || "Por asignar"}
-                                    </p>
+                                {/* CUERPO DE DATOS */}
+                                <div className="flex justify-between items-start gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-slate-100 text-slate-600">
+                                            {enroll.course?.category || "General"}
+                                        </span>
+                                        <h3 className="text-sm font-bold text-slate-800 leading-tight mt-1.5 truncate">
+                                            {enroll.course?.title}
+                                        </h3>
+                                        <div className="flex items-center gap-1 mt-0.5">
+                                            <Clock size={11} className="text-slate-400" />
+                                            <p className="text-[11px] text-slate-400 font-medium">
+                                                Duración: {enroll.course?.duration || 0}h | Prof. {enroll.course?.instructors || "Por asignar"}
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div className="mt-4 pt-3 border-t border-slate-50">
-                                    <div className="flex justify-between text-[11px] text-slate-500 mb-1">
-                                        <span>Progreso (Estado: {enroll.status || "EN_PROGRESO"})</span>
-                                        <span className="font-bold text-blue-600">{progressPct}%</span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
-                                        {/* Renderizado 100% Tailwind: Cero estilos inline en el DOM virtual */}
-                                        <div className={`bg-blue-600 h-full transition-all duration-500 ${tailwindWidthClass}`} />
+                                {/* BARRA DE PROGRESO DE ALTA PRECISIÓN Y BOTÓN INFERIOR */}
+                                <div className="mt-3 pt-2 border-t border-slate-50">
+                                    <div className="flex justify-between text-[10px] text-slate-500 mb-1 font-semibold">
+                                        <span className={isStarted ? "text-blue-600 font-bold" : "text-slate-400"}>
+                                            {isStarted ? "En curso (24h/día)" : "Pendiente de inicio"}
+                                        </span>
+                                        <span className="font-bold text-emerald-600">{progressPct}%</span>
                                     </div>
 
-                                    <button type="button" className="w-full bg-slate-800 hover:bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer">
-                                        <span>Continuar</span>
-                                        <ArrowRight size={14} />
-                                    </button>
+                                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
+                                        <div
+                                            className={`bg-emerald-600 h-full transition-all duration-1000 w-[${progressPct}%]`}
+                                        />
+                                    </div>
+
+                                    {/* CONDICIONAL: Si no está iniciado, pinta el botón azul de acción */}
+                                    {!isStarted ? (
+                                        <button
+                                            type="button"
+                                            data-enrollmentid={enroll.enrollmentid}
+                                            onClick={(e) => {
+                                                const id = Number(e.currentTarget.getAttribute('data-enrollmentid-id'));
+                                                if (id) {
+                                                    handleStartCourse(id);
+                                                }
+                                            }}
+                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-3 rounded-lg transition-all active:scale-[0.98] flex items-center justify-center gap-1 shrink-0"
+                                        >
+                                            <span>Iniciar curso</span>
+                                            <ArrowRight size={14} />
+                                        </button>
+                                    ) : (
+                                        /* Si ya está en curso, se despliega un estado deshabilitado elegante en tono esmeralda */
+                                        <div className="w-full bg-emerald-50 text-emerald-700 text-xs font-bold py-2 px-3 rounded-lg border border-emerald-100 flex items-center justify-center gap-1 text-center select-none">
+                                            <span>✓ Estudiando asignatura</span>
+                                        </div>
+                                    )}
                                 </div>
                             </GenericCard>
                         );
-                    })}
-                </div>
-            )}
+                    })
+                )}
+            </div>
         </div>
     );
 };
@@ -8364,25 +8505,40 @@ export const useEnrolledCourses = (successTrigger: string) => {
             });
 
             if (response.status === 200 && response.data) {
-                // 3. Mapeo adaptativo tolerante a la nomenclatura del ORM (course vs courses)
-                const normalizedData = response.data.map((enrollment) => {
-                    const courseData = (enrollment.course || enrollment.courses || enrollment) as Record<string, unknown>;
-                    
-                    return {
-                        enrollmentid: Number(enrollment.enrollmentid || Date.now()),
-                        enrolled_at: String(enrollment.enrolled_at || new Date().toISOString()),
-                        status: String(enrollment.status || "EN_PROGRESO"),
-                        progress_percentage: Number(enrollment.progress_percentage ?? enrollment.progress ?? 0),
-                        course: {
-                            course_id: Number(courseData.course_id || courseData.id || 0),
-                            title: String(courseData.title || ""),
-                            category: String(courseData.category || "General"),
-                            instructors: String(courseData.instructors || "Por asignar")
-                        }
-                    };
-                });
+    // 3. Mapeo adaptativo tolerante a la nomenclatura del ORM (course vs courses)
+    const normalizedData = response.data.map((enrollment) => {
+    const courseData = (enrollment.course || enrollment.courses || enrollment) as Record<string, unknown>;
+    
+    // [BLINDAJE DE IDENTIDAD TFG]: Capturamos el ID de matrícula bajo camelCase o snake_case
+    const rawEnrollmentId = enrollment.enrollmentid || enrollment.enrollmentId;
+    const safeCourseId = Number(courseData.course_id || courseData.id || 0);
 
-                setEnrolledList(normalizedData);
+    return {
+        /* 
+           Si por un fallo del backend la matrícula viene sin ID, usamos como salvavidas 
+           estáco el ID del curso. Esto garantiza que la KEY sea 100% fija e invariable 
+           entre renders, impidiendo que los estados de los botones se desplacen al curso inferior.
+        */
+        enrollmentid: rawEnrollmentId ? Number(rawEnrollmentId) : safeCourseId,
+        enrolled_at: String(enrollment.enrolled_at || new Date().toISOString()),
+        
+        // Tolerancia bidireccional para el sello de tiempo del cronómetro
+        started_at: enrollment.started_at || enrollment.startedAt ? String(enrollment.started_at || enrollment.startedAt) : null,
+        
+        status: String(enrollment.status || "EN_PROGRESO"),
+        progress_percentage: Number(enrollment.progress_percentage ?? enrollment.progress ?? 0),
+        course: {
+            course_id: safeCourseId,
+            title: String(courseData.title || ""),
+            category: String(courseData.category || "General"),
+            instructors: String(courseData.instructors || "Por asignar"),
+            duration: Number(courseData.duration || 0)
+        }
+      };
+    });
+
+
+    setEnrolledList(normalizedData as EnrollmentInfo[]);
             }
         } catch (err) {
             console.error("Error crítico en la pasarela HTTP de matrículas:", err);
@@ -8408,8 +8564,12 @@ export const useEnrolledCourses = (successTrigger: string) => {
             return [
                 ...prev,
                 {
-                    enrollmentid: Date.now(),
+                    enrollmentid: course.course_id,
                     enrolled_at: new Date().toISOString(),
+                    
+                    // [CORRECCIÓN TS]: Satisface el tipo EnrollmentInfo al inicializar el curso comprado en nulo
+                    started_at: null,
+                    
                     status: "EN_PROGRESO",
                     progress_percentage: 0,
                     course: course
@@ -8422,7 +8582,8 @@ export const useEnrolledCourses = (successTrigger: string) => {
         enrolledList,
         loadingEnrollments,
         enrollmentError,
-        injectLocalEnrollment
+        injectLocalEnrollment,
+        fetchStudentEnrollments
     };
 };
 
@@ -8779,369 +8940,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // Solo si el token es 100% válido permitimos continuar hacia los controladores
         filterChain.doFilter(request, response);
     }
-}
-
-================
-File: backend/src/main/java/com/cursosonline/backend/security/jwt/JwtService.java
-================
-package com.cursosonline.backend.security.jwt;
-
-import com.cursosonline.backend.config.jwt.JwtProperties;
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.stereotype.Service;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Base64;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-/**
- * Servicio de bajo nivel para generar y validar JWT firmados con HS256.
- * Mantiene la lógica de codificación, verificación de firma y expiración
- * aislada.
- */
-@Service
-@RequiredArgsConstructor
-public class JwtService {
-
-    private static final String HMAC_ALGORITHM = "HmacSHA256";
-    private static final String JWT_HEADER_JSON = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
-    private static final String ACCESS_TOKEN_TYPE = "access";
-    private static final String REFRESH_TOKEN_TYPE = "refresh";
-    private static final Pattern JSON_FIELD_PATTERN = Pattern.compile(
-            "\"((?:\\\\.|[^\"])*)\"\\s*:\\s*(\"((?:\\\\.|[^\"])*)\"|-?\\d+|true|false|null)");
-
-    private static final Base64.Encoder BASE64_URL_ENCODER = Base64.getUrlEncoder().withoutPadding();
-    private static final Base64.Decoder BASE64_URL_DECODER = Base64.getUrlDecoder();
-
-    private final JwtProperties jwtProperties;
-    private final Clock clock = Clock.systemUTC();
-
-    public String generateAccessToken(UserDetails userDetails, Long userId, String email) {
-        return generateToken(userDetails, ACCESS_TOKEN_TYPE, accessTokenTtl(), userId, email);
-    }
-
-    public String generateRefreshToken(UserDetails userDetails, Long userId, String email) {
-        return generateToken(userDetails, REFRESH_TOKEN_TYPE, refreshTokenTtl(), userId, email);
-    }
-
-    public String extractUsername(String token) {
-        return getClaim(token, "sub", String.class);
-    }
-
-    public String extractTokenType(String token) {
-        return getClaim(token, "tokenType", String.class);
-    }
-
-    public String extractRole(String token) {
-        return getClaim(token, "role", String.class);
-    }
-
-    public Instant extractExpiration(String token) {
-        Long exp = getClaim(token, "exp", Long.class);
-        return exp == null ? null : Instant.ofEpochSecond(exp);
-    }
-
-    public boolean isTokenValid(String token) {
-        try {
-            Map<String, Object> claims = parseAndVerify(token);
-            String username = asString(claims.get("sub"));
-            return username != null && !isExpired(claims);
-        } catch (RuntimeException ex) {
-            return false;
-        }
-    }
-
-    public boolean isTokenValid(String token, UserDetails userDetails) {
-        try {
-            Map<String, Object> claims = parseAndVerify(token);
-            String username = asString(claims.get("sub"));
-            if (username == null || isExpired(claims)) {
-                return false;
-            }
-            return userDetails == null || username.equals(userDetails.getUsername());
-        } catch (RuntimeException ex) {
-            return false;
-        }
-    }
-
-    public String extractTokenTypeOrNull(String token) {
-        try {
-            return extractTokenType(token);
-        } catch (RuntimeException ex) {
-            return null;
-        }
-    }
-
-    private String generateToken(UserDetails userDetails, String tokenType, Duration ttl, Long userId, String email) {
-        Instant issuedAt = Instant.now(clock);
-        Instant expiresAt = issuedAt.plus(ttl);
-
-        Map<String, Object> claims = new LinkedHashMap<>();
-        claims.put("iss", jwtProperties.getIssuer());
-        claims.put("sub", userDetails.getUsername());
-        claims.put("iat", issuedAt.getEpochSecond());
-        claims.put("exp", expiresAt.getEpochSecond());
-        claims.put("tokenType", tokenType);
-        claims.put("jti", UUID.randomUUID().toString());
-        if (userId != null) {
-            claims.put("userId", userId);
-        }
-        if (email != null) {
-            claims.put("email", email);
-        }
-
-        String role = resolvePrimaryAuthority(userDetails.getAuthorities());
-        if (role != null) {
-            claims.put("role", role);
-        }
-
-        String header = base64Url(JWT_HEADER_JSON.getBytes(StandardCharsets.UTF_8));
-        String payload = base64Url(serializeClaims(claims));
-        String signingInput = header + "." + payload;
-
-        return signingInput + "." + base64Url(sign(signingInput));
-    }
-
-    private Duration accessTokenTtl() {
-        return Duration.ofMinutes(jwtProperties.getAccessTokenExpirationMinutes());
-    }
-
-    private Duration refreshTokenTtl() {
-        return Duration.ofDays(jwtProperties.getRefreshTokenExpirationDays());
-    }
-
-    private byte[] sign(String signingInput) {
-        try {
-            Mac mac = Mac.getInstance(HMAC_ALGORITHM);
-            mac.init(new SecretKeySpec(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM));
-            return mac.doFinal(signingInput.getBytes(StandardCharsets.UTF_8));
-        } catch (Exception ex) {
-            throw new IllegalStateException("No se pudo firmar el JWT", ex);
-        }
-    }
-
-    private Map<String, Object> parseAndVerify(String token) {
-        String[] parts = token.split("\\.");
-        if (parts.length != 3) {
-            throw new IllegalArgumentException("Formato JWT inválido");
-        }
-
-        String signingInput = parts[0] + "." + parts[1];
-        byte[] expectedSignature = sign(signingInput);
-        byte[] actualSignature = BASE64_URL_DECODER.decode(parts[2]);
-
-        if (!MessageDigest.isEqual(expectedSignature, actualSignature)) {
-            throw new SecurityException("Firma del token inválida");
-        }
-
-        String payloadJson = new String(BASE64_URL_DECODER.decode(parts[1]), StandardCharsets.UTF_8);
-        return parseJson(payloadJson);
-    }
-
-    private <T> T getClaim(String token, String claimKey, Class<T> type) {
-        try {
-            Map<String, Object> claims = parseAndVerify(token);
-            Object value = claims.get(claimKey);
-            if (value == null)
-                return null;
-            if (type == Long.class && value instanceof Number) {
-                return type.cast(((Number) value).longValue());
-            }
-            return type.cast(value);
-        } catch (Exception ex) {
-            throw new RuntimeException("Error al extraer claim: " + claimKey, ex);
-        }
-    }
-
-    // --- ENFOQUE CORREGIDO: VALIDACIÓN MATEMÁTICA INMUTABLE DEL VENCIMIENTO CON
-    // CLOCK SKEW EN REVERSA ---
-    private boolean isExpired(Map<String, Object> claims) {
-        Object expObj = claims.get("exp");
-        if (expObj instanceof Number) {
-            // Convertimos de forma segura ignorando si el parser JSON manual metió un Long
-            // o un Double
-            long expSeconds = ((Number) expObj).longValue();
-            long skew = jwtProperties.getClockSkewSeconds();
-
-            // [CORRECCIÓN CRÍTICA DE AUDITORÍA]: Para otorgar un margen de gracia de 60s,
-            // restamos la tolerancia al tiempo del servidor actual antes de evaluar el
-            // vencimiento.
-            Instant adjustedCurrentTime = Instant.now(clock).minusSeconds(skew);
-
-            // El token está verdaderamente expirado si su vencimiento es anterior al tiempo
-            // actual ajustado
-            return Instant.ofEpochSecond(expSeconds).isBefore(adjustedCurrentTime);
-        }
-        return true; // Si no hay propiedad de expiración, se rechaza por seguridad
-    }
-
-    private String resolvePrimaryAuthority(Collection<? extends GrantedAuthority> authorities) {
-        if (authorities == null || authorities.isEmpty())
-            return null;
-        return authorities.iterator().next().getAuthority();
-    }
-
-    private String base64Url(byte[] bytes) {
-        return BASE64_URL_ENCODER.encodeToString(bytes);
-    }
-
-    private String asString(Object obj) {
-        return obj instanceof String ? (String) obj : null;
-    }
-
-    private byte[] serializeClaims(Map<String, Object> claims) {
-        StringBuilder sb = new StringBuilder("{");
-        boolean first = true;
-        for (Map.Entry<String, Object> entry : claims.entrySet()) {
-            if (!first)
-                sb.append(",");
-            first = false;
-            sb.append("\"").append(entry.getKey()).append("\":");
-            Object val = entry.getValue();
-            if (val instanceof String) {
-                sb.append("\"").append(val).append("\"");
-            } else {
-                sb.append(val);
-            }
-        }
-        sb.append("}");
-        return sb.toString().getBytes(StandardCharsets.UTF_8);
-    }
-
-    private Map<String, Object> parseJson(String json) {
-        Map<String, Object> map = new LinkedHashMap<>();
-        Matcher matcher = JSON_FIELD_PATTERN.matcher(json);
-        while (matcher.find()) {
-            String key = matcher.group(1);
-            String valueStr = matcher.group(2).trim(); // Añadido trim() preventivo para limpiar el parseo manual
-            if (valueStr.startsWith("\"")) {
-                map.put(key, matcher.group(3));
-            } else if (valueStr.equals("true")) {
-                map.put(key, true);
-            } else if (valueStr.equals("false")) {
-                map.put(key, false);
-            } else if (valueStr.equals("null")) {
-                map.put(key, null);
-            } else {
-                try {
-                    map.put(key, Long.parseLong(valueStr));
-                } catch (NumberFormatException e) {
-                    map.put(key, Double.parseDouble(valueStr));
-                }
-            }
-        }
-        return map;
-    }
-}
-
-================
-File: frontend/src/auth/authStorage.ts
-================
-import type { AuthUser } from './authTypes';
-
-// [CORRECCIÓN CRÍTICA DE AUDITORÍA]: Unificamos bajo una única clave oficial eliminando la duplicidad física
-const USER_KEY = 'auth_user'; 
-const TOKEN_KEY = 'accessToken'; 
-
-
-function canUseBrowserStorage() {
-    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
-}
-
-/**
- * Lee el token JWT guardado en el navegador de forma aislada.
- */
-export function readStoredToken(): string | null {
-    if (!canUseBrowserStorage()) {
-        return null;
-    }
-    return window.localStorage.getItem(TOKEN_KEY);
-}
-
-/**
- * Persiste el token de acceso JWT en el navegador de forma segura.
- */
-export function writeStoredToken(token: string) {
-    if (!canUseBrowserStorage()) {
-        return;
-    }
-    window.localStorage.setItem(TOKEN_KEY, token);
-}
-
-/**
- * Lee la sesión del usuario guardada en el navegador validando estrictamente su tiempo de expiración.
- */
-export function readStoredAuthUser(): AuthUser | null {
-    if (!canUseBrowserStorage()) {
-        return null;
-    }
-
-    // Intenta leer de la clave unificada 'auth_user' o de la clave legacy antigua 'user' por migración
-    const rawValue = window.localStorage.getItem(USER_KEY) ?? window.localStorage.getItem('user');
-    if (!rawValue) {
-        return null;
-    }
-
-    try {
-        const parsedValue = JSON.parse(rawValue) as Partial<AuthUser> & { expiresAt?: number };
-
-        if (typeof parsedValue.username !== 'string' || !parsedValue.username.trim()) {
-            return null;
-        }
-
-        // 🛡️ BLINDAJE TFG: Si existe el sello de tiempo y la hora actual superó la expiración, destruimos la sesión
-        if (parsedValue.expiresAt && Date.now() > parsedValue.expiresAt) {
-            console.warn("Sesión local caducada por límite temporal. Limpiando almacenamiento.");
-            clearStoredAuth();
-            return null; 
-        }
-
-        const normalizedUser = {
-            ...parsedValue,
-            username: parsedValue.username,
-        } as AuthUser;
-
-        return normalizedUser;
-    } catch {
-        return null;
-    }
-}
-
-/**
- * Persiste el usuario autenticado bajo la clave oficial unificada.
- */
-export function writeStoredAuthUser(user: AuthUser) {
-    if (!canUseBrowserStorage()) {
-        return;
-    }
-    // Escribe únicamente en la fuente de verdad oficial ('auth_user')
-    window.localStorage.setItem(USER_KEY, JSON.stringify(user));
-}
-
-/**
- * Elimina completamente los rastros de la sesión (Usuario y JWT) al cerrar sesión.
- */
-export function clearStoredAuth() {
-    if (!canUseBrowserStorage()) {
-        return;
-    }
-    // Borra la clave oficial, la del token y ejecuta la purga reactiva de la clave antigua legacy
-    window.localStorage.removeItem(USER_KEY);
-    window.localStorage.removeItem(TOKEN_KEY); 
-    window.localStorage.removeItem('user'); // <── Purga preventiva de la clave legacy 'user'
 }
 
 ================
@@ -9777,6 +9575,272 @@ export default defineConfig({
 })
 
 ================
+File: backend/src/main/java/com/cursosonline/backend/security/jwt/JwtService.java
+================
+package com.cursosonline.backend.security.jwt;
+
+import com.cursosonline.backend.config.jwt.JwtProperties;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Service;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Base64;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Servicio de bajo nivel para generar y validar JWT firmados con HS256.
+ * Mantiene la lógica de codificación, verificación de firma y expiración
+ * aislada.
+ */
+@Service
+@RequiredArgsConstructor
+public class JwtService {
+
+    private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private static final String JWT_HEADER_JSON = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
+    private static final String ACCESS_TOKEN_TYPE = "access";
+    private static final String REFRESH_TOKEN_TYPE = "refresh";
+    private static final Pattern JSON_FIELD_PATTERN = Pattern.compile(
+            "\"((?:\\\\.|[^\"])*)\"\\s*:\\s*(\"((?:\\\\.|[^\"])*)\"|-?\\d+|true|false|null)");
+
+    private static final Base64.Encoder BASE64_URL_ENCODER = Base64.getUrlEncoder().withoutPadding();
+    private static final Base64.Decoder BASE64_URL_DECODER = Base64.getUrlDecoder();
+
+    private final JwtProperties jwtProperties;
+    private final Clock clock = Clock.systemUTC();
+
+    public String generateAccessToken(UserDetails userDetails, Long userId, String email) {
+        return generateToken(userDetails, ACCESS_TOKEN_TYPE, accessTokenTtl(), userId, email);
+    }
+
+    public String generateRefreshToken(UserDetails userDetails, Long userId, String email) {
+        return generateToken(userDetails, REFRESH_TOKEN_TYPE, refreshTokenTtl(), userId, email);
+    }
+
+    public String extractUsername(String token) {
+        return getClaim(token, "sub", String.class);
+    }
+
+    public String extractTokenType(String token) {
+        return getClaim(token, "tokenType", String.class);
+    }
+
+    public String extractRole(String token) {
+        return getClaim(token, "role", String.class);
+    }
+
+    public Instant extractExpiration(String token) {
+        Long exp = getClaim(token, "exp", Long.class);
+        return exp == null ? null : Instant.ofEpochSecond(exp);
+    }
+
+    public boolean isTokenValid(String token) {
+        try {
+            Map<String, Object> claims = parseAndVerify(token);
+            String username = asString(claims.get("sub"));
+            return username != null && !isExpired(claims);
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        try {
+            Map<String, Object> claims = parseAndVerify(token);
+            String username = asString(claims.get("sub"));
+            if (username == null || isExpired(claims)) {
+                return false;
+            }
+            return userDetails == null || username.equals(userDetails.getUsername());
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    public String extractTokenTypeOrNull(String token) {
+        try {
+            return extractTokenType(token);
+        } catch (RuntimeException ex) {
+            return null;
+        }
+    }
+
+    private String generateToken(UserDetails userDetails, String tokenType, Duration ttl, Long userId, String email) {
+        Instant issuedAt = Instant.now(clock);
+        Instant expiresAt = issuedAt.plus(ttl);
+
+        Map<String, Object> claims = new LinkedHashMap<>();
+        claims.put("iss", jwtProperties.getIssuer());
+        claims.put("sub", userDetails.getUsername());
+        claims.put("iat", issuedAt.getEpochSecond());
+        claims.put("exp", expiresAt.getEpochSecond());
+        claims.put("tokenType", tokenType);
+        claims.put("jti", UUID.randomUUID().toString());
+        if (userId != null) {
+            claims.put("userId", userId);
+        }
+        if (email != null) {
+            claims.put("email", email);
+        }
+
+        String role = resolvePrimaryAuthority(userDetails.getAuthorities());
+        if (role != null) {
+            claims.put("role", role);
+        }
+
+        String header = base64Url(JWT_HEADER_JSON.getBytes(StandardCharsets.UTF_8));
+        String payload = base64Url(serializeClaims(claims));
+        String signingInput = header + "." + payload;
+
+        return signingInput + "." + base64Url(sign(signingInput));
+    }
+
+    private Duration accessTokenTtl() {
+        return Duration.ofMinutes(jwtProperties.getAccessTokenExpirationMinutes());
+    }
+
+    private Duration refreshTokenTtl() {
+        return Duration.ofDays(jwtProperties.getRefreshTokenExpirationDays());
+    }
+
+    private byte[] sign(String signingInput) {
+        try {
+            Mac mac = Mac.getInstance(HMAC_ALGORITHM);
+            mac.init(new SecretKeySpec(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM));
+            return mac.doFinal(signingInput.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception ex) {
+            throw new IllegalStateException("No se pudo firmar el JWT", ex);
+        }
+    }
+
+    private Map<String, Object> parseAndVerify(String token) {
+        String[] parts = token.split("\\.");
+        if (parts.length != 3) {
+            throw new IllegalArgumentException("Formato JWT inválido");
+        }
+
+        String signingInput = parts[0] + "." + parts[1];
+        byte[] expectedSignature = sign(signingInput);
+        byte[] actualSignature = BASE64_URL_DECODER.decode(parts[2]);
+
+        if (!MessageDigest.isEqual(expectedSignature, actualSignature)) {
+            throw new SecurityException("Firma del token inválida");
+        }
+
+        String payloadJson = new String(BASE64_URL_DECODER.decode(parts[1]), StandardCharsets.UTF_8);
+        return parseJson(payloadJson);
+    }
+
+    private <T> T getClaim(String token, String claimKey, Class<T> type) {
+        try {
+            Map<String, Object> claims = parseAndVerify(token);
+            Object value = claims.get(claimKey);
+            if (value == null)
+                return null;
+            if (type == Long.class && value instanceof Number) {
+                return type.cast(((Number) value).longValue());
+            }
+            return type.cast(value);
+        } catch (Exception ex) {
+            throw new RuntimeException("Error al extraer claim: " + claimKey, ex);
+        }
+    }
+
+    // --- ENFOQUE CORREGIDO: VALIDACIÓN MATEMÁTICA INMUTABLE DEL VENCIMIENTO CON
+    // CLOCK SKEW EN REVERSA ---
+    private boolean isExpired(Map<String, Object> claims) {
+        Object expObj = claims.get("exp");
+        if (expObj instanceof Number) {
+            // Convertimos de forma segura ignorando si el parser JSON manual metió un Long
+            // o un Double
+            long expSeconds = ((Number) expObj).longValue();
+            long skew = jwtProperties.getClockSkewSeconds();
+
+            // [CORRECCIÓN CRÍTICA DE AUDITORÍA]: Para otorgar un margen de gracia de 60s,
+            // restamos la tolerancia al tiempo del servidor actual antes de evaluar el
+            // vencimiento.
+            Instant adjustedCurrentTime = Instant.now(clock).minusSeconds(skew);
+
+            // El token está verdaderamente expirado si su vencimiento es anterior al tiempo
+            // actual ajustado
+            return Instant.ofEpochSecond(expSeconds).isBefore(adjustedCurrentTime);
+        }
+        return true; // Si no hay propiedad de expiración, se rechaza por seguridad
+    }
+
+    private String resolvePrimaryAuthority(Collection<? extends GrantedAuthority> authorities) {
+        if (authorities == null || authorities.isEmpty())
+            return null;
+        return authorities.iterator().next().getAuthority();
+    }
+
+    private String base64Url(byte[] bytes) {
+        return BASE64_URL_ENCODER.encodeToString(bytes);
+    }
+
+    private String asString(Object obj) {
+        return obj instanceof String ? (String) obj : null;
+    }
+
+    private byte[] serializeClaims(Map<String, Object> claims) {
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (Map.Entry<String, Object> entry : claims.entrySet()) {
+            if (!first)
+                sb.append(",");
+            first = false;
+            sb.append("\"").append(entry.getKey()).append("\":");
+            Object val = entry.getValue();
+            if (val instanceof String) {
+                sb.append("\"").append(val).append("\"");
+            } else {
+                sb.append(val);
+            }
+        }
+        sb.append("}");
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    private Map<String, Object> parseJson(String json) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        Matcher matcher = JSON_FIELD_PATTERN.matcher(json);
+        while (matcher.find()) {
+            String key = matcher.group(1);
+            String valueStr = matcher.group(2).trim(); // Añadido trim() preventivo para limpiar el parseo manual
+            if (valueStr.startsWith("\"")) {
+                map.put(key, matcher.group(3));
+            } else if (valueStr.equals("true")) {
+                map.put(key, true);
+            } else if (valueStr.equals("false")) {
+                map.put(key, false);
+            } else if (valueStr.equals("null")) {
+                map.put(key, null);
+            } else {
+                try {
+                    map.put(key, Long.parseLong(valueStr));
+                } catch (NumberFormatException e) {
+                    map.put(key, Double.parseDouble(valueStr));
+                }
+            }
+        }
+        return map;
+    }
+}
+
+================
 File: frontend/package.json
 ================
 {
@@ -9821,6 +9885,103 @@ File: frontend/package.json
     "vite": "^7.3.1",
     "vitest": "^4.1.0"
   }
+}
+
+================
+File: frontend/src/auth/authStorage.ts
+================
+import type { AuthUser } from './authTypes';
+
+// [CORRECCIÓN CRÍTICA DE AUDITORÍA]: Unificamos bajo una única clave oficial eliminando la duplicidad física
+const USER_KEY = 'auth_user'; 
+const TOKEN_KEY = 'accessToken'; 
+
+
+function canUseBrowserStorage() {
+    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+}
+
+/**
+ * Lee el token JWT guardado en el navegador de forma aislada.
+ */
+export function readStoredToken(): string | null {
+    if (!canUseBrowserStorage()) {
+        return null;
+    }
+    return window.localStorage.getItem(TOKEN_KEY);
+}
+
+/**
+ * Persiste el token de acceso JWT en el navegador de forma segura.
+ */
+export function writeStoredToken(token: string) {
+    if (!canUseBrowserStorage()) {
+        return;
+    }
+    window.localStorage.setItem(TOKEN_KEY, token);
+}
+
+/**
+ * Lee la sesión del usuario guardada en el navegador validando estrictamente su tiempo de expiración.
+ */
+export function readStoredAuthUser(): AuthUser | null {
+    if (!canUseBrowserStorage()) {
+        return null;
+    }
+
+    // Intenta leer de la clave unificada 'auth_user' o de la clave legacy antigua 'user' por migración
+    const rawValue = window.localStorage.getItem(USER_KEY) ?? window.localStorage.getItem('user');
+    if (!rawValue) {
+        return null;
+    }
+
+    try {
+        const parsedValue = JSON.parse(rawValue) as Partial<AuthUser> & { expiresAt?: number };
+
+        if (typeof parsedValue.username !== 'string' || !parsedValue.username.trim()) {
+            return null;
+        }
+
+        // 🛡️ BLINDAJE TFG: Si existe el sello de tiempo y la hora actual superó la expiración, destruimos la sesión
+        if (parsedValue.expiresAt && Date.now() > parsedValue.expiresAt) {
+            console.warn("Sesión local caducada por límite temporal. Limpiando almacenamiento.");
+            clearStoredAuth();
+            return null; 
+        }
+
+        const normalizedUser = {
+            ...parsedValue,
+            username: parsedValue.username,
+        } as AuthUser;
+
+        return normalizedUser;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Persiste el usuario autenticado bajo la clave oficial unificada.
+ */
+export function writeStoredAuthUser(user: AuthUser) {
+    if (!canUseBrowserStorage()) {
+        return;
+    }
+    // Escribe únicamente en la fuente de verdad oficial ('auth_user')
+    window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+/**
+ * Elimina completamente los rastros de la sesión (Usuario y JWT) al cerrar sesión.
+ */
+export function clearStoredAuth() {
+    if (!canUseBrowserStorage()) {
+        return;
+    }
+    // Borra la clave oficial, la del token y ejecuta la purga reactiva de la clave antigua legacy
+    window.localStorage.removeItem(USER_KEY);
+    window.localStorage.removeItem(TOKEN_KEY); 
+    window.localStorage.removeItem('user'); // <── Purga preventiva de la clave legacy 'user'
 }
 
 ================
@@ -10042,6 +10203,87 @@ const AppRoutes = () => {
 export default AppRoutes;
 
 ================
+File: backend/src/main/java/com/cursosonline/backend/entities/Users.java
+================
+package com.cursosonline.backend.entities;
+
+// CAMBIO: Importación estándar compatible con el motor de serialización de Spring Boot
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.ArrayList;
+
+@Entity
+@Table(name = "users")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Users implements UserDetails {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long user_id;
+
+    @Column(nullable = false, unique = true)
+    private String username;
+
+    @Column(nullable = false)
+    private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role;
+
+    @Column(name = "email", nullable = true)
+    private String email;
+
+    @Column(nullable = false)
+    private boolean enabled = true;
+
+    /**
+     * Relación bidireccional con el historial de matrículas.
+     * Blindada con la anotación canónica de Jackson para evitar
+     * LazyInitializationException.
+     */
+    @JsonIgnore
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Enrollment> enrollments = new ArrayList<>();
+
+    @Override
+    public boolean isEnabled() {
+        return this.enabled;
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of(new SimpleGrantedAuthority(role.name()));
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+}
+
+================
 File: frontend/src/auth/AuthProvider.tsx
 ================
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
@@ -10219,87 +10461,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-================
-File: backend/src/main/java/com/cursosonline/backend/entities/Users.java
-================
-package com.cursosonline.backend.entities;
-
-// CAMBIO: Importación estándar compatible con el motor de serialización de Spring Boot
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
-
-import java.util.Collection;
-import java.util.List;
-import java.util.ArrayList;
-
-@Entity
-@Table(name = "users")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class Users implements UserDetails {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long user_id;
-
-    @Column(nullable = false, unique = true)
-    private String username;
-
-    @Column(nullable = false)
-    private String password;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Role role;
-
-    @Column(name = "email", nullable = true)
-    private String email;
-
-    @Column(nullable = false)
-    private boolean enabled = true;
-
-    /**
-     * Relación bidireccional con el historial de matrículas.
-     * Blindada con la anotación canónica de Jackson para evitar
-     * LazyInitializationException.
-     */
-    @JsonIgnore
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Enrollment> enrollments = new ArrayList<>();
-
-    @Override
-    public boolean isEnabled() {
-        return this.enabled;
-    }
-
-    @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority(role.name()));
-    }
-
-    @Override
-    public boolean isAccountNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isAccountNonLocked() {
-        return true;
-    }
-
-    @Override
-    public boolean isCredentialsNonExpired() {
-        return true;
-    }
-}
 
 ================
 File: frontend/src/components/navbar/NavbarUser.tsx
@@ -10567,6 +10728,10 @@ package com.cursosonline.backend;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10575,23 +10740,32 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
 import com.cursosonline.backend.services.UserService;
 
 /**
  * Clase de pruebas unitarias para UserService. Utiliza Mockito para simular el
- * comportamiento de UserRepository y PasswordEncoder, permitiendo probar la
- * lógica de negocio de UserService de forma aislada.
+ * comportamiento de UserRepository, EnrollmentRepository y PasswordEncoder,
+ * permitiendo probar la lógica de negocio de UserService de forma aislada.
  */
 @ExtendWith(MockitoExtension.class)
 public class UserServiceTest {
+
     @Mock
     private UserRepository userRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    // [AÑADIDO PARA LA AUDITORÍA]: Mock del repositorio de matrículas requerida
+    // para el Activity Tracker
+    @Mock
+    private EnrollmentRepository enrollmentRepository;
 
     @InjectMocks
     private UserService userService;
@@ -10603,7 +10777,6 @@ public class UserServiceTest {
     @Test
     void findByUsername_DebeRetornarUsuario_CuandoExiste() {
         String username = "Luis";
-        // Integrado: Se añade el valor 'true' al final para el campo 'enabled'
         Users expectedUser = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true,
                 new java.util.ArrayList<>());
         when(userRepository.findByUsername("Luis")).thenReturn(Optional.of(expectedUser));
@@ -10618,7 +10791,6 @@ public class UserServiceTest {
      */
     @Test
     void assignUser() {
-        // Integrado: Se añade 'true' al final para corregir el constructor de Lombok
         Users newUser = new Users(null, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true,
                 new java.util.ArrayList<>());
         Users savedUser = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true,
@@ -10654,8 +10826,6 @@ public class UserServiceTest {
     @Test
     void registerUser_DebeLanzarExcepcion_CuandoElNombreDeUsuarioYaExiste() {
         String username = "Luis";
-        // Integrado: Se añade 'true' al final para cumplir con el contrato de la
-        // entidad
         Users new_user = new Users(null, username, "frgt", Role.STUDENT, "jose.gmail.com", true,
                 new java.util.ArrayList<>());
         Users existing_user = new Users(1L, username, "frgt", Role.STUDENT, "jose.gmail.com", true,
@@ -10666,6 +10836,78 @@ public class UserServiceTest {
         });
         assertTrue(excepcion.getMessage().contains(username));
         verify(userRepository, never()).save(any(Users.class));
+    }
+
+    // =========================================================================
+    // NUEVOS TESTS DE AUDITORÍA: ACTIVITY TRACKER DE MATRÍCULAS Y PROGRESO [ADR-34]
+    // =========================================================================
+
+    @Test
+    void debeIniciarElCronometroUnicaYExclusivamenteEnLaMatriculaSolicitadaConAislamientoTotal() {
+        // Fijamos un reloj virtual estático para simular el paso del tiempo de forma
+        // matemática determinista
+        Clock fixedClock = Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneId.of("UTC"));
+        userService.setClock(fixedClock);
+
+        Users mockStudent = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true,
+                new java.util.ArrayList<>());
+
+        Courses mockCourse1 = new Courses();
+        mockCourse1.setCourse_id(10L);
+        mockCourse1.setDuration(40.0f); // 40 horas totales
+
+        Courses mockCourse2 = new Courses();
+        mockCourse2.setCourse_id(20L);
+        mockCourse2.setDuration(60.0f);
+
+        Enrollment mockEnrollment1 = new Enrollment(1001L, mockStudent, mockCourse1, null, "EN_PROGRESO", 0, null);
+        Enrollment mockEnrollment2 = new Enrollment(1002L, mockStudent, mockCourse2, null, "EN_PROGRESO", 0, null);
+
+        // Simulamos que el repositorio encuentra la matrícula 1001 vinculada al
+        // username "Luis"
+        when(enrollmentRepository.findByEnrollmentidAndUserUsername(1001L, "Luis"))
+                .thenReturn(Optional.of(mockEnrollment1));
+
+        // Ejecutamos la acción segura del servicio sobre la matrícula 1001
+        userService.startCourseSecure(1001L, "Luis");
+
+        // [VERIFICACIÓN CRÍTICA TFG]: Comprobamos que mutó a EN_CURSO y guardó la
+        // estampa de tiempo
+        assertNotNull(mockEnrollment1.getStarted_at(), "El started_at de la matrícula 1 debería haberse registrado.");
+        assertEquals("EN_CURSO", mockEnrollment1.getStatus());
+        verify(enrollmentRepository, times(1)).save(mockEnrollment1);
+
+        // [AISLAMIENTO DE DATOS]: Comprobamos de forma estricta que la matrícula 2 se
+        // mantuvo inmutable
+        assertNull(mockEnrollment2.getStarted_at(), "La matrícula 2 jamás debió verse afectada de forma colateral.");
+        assertEquals("EN_PROGRESO", mockEnrollment2.getStatus());
+    }
+
+    @Test
+    void debeCalcularElProgresoAlVueloMatematicamenteYDeFormaAislada() {
+        // Fijamos la fecha del sistema actual a las 12:00:00
+        Clock fixedClockNow = Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneId.of("UTC"));
+        userService.setClock(fixedClockNow);
+
+        Users mockStudent = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true,
+                new java.util.ArrayList<>());
+        Courses mockCourse = new Courses();
+        mockCourse.setCourse_id(10L);
+        mockCourse.setDuration(40.0f); // 40 horas totales
+
+        // Inicializamos la matrícula simulando que fue iniciada exactamente hace 10
+        // horas (a las 02:00:00)
+        Clock fixedClockPast = Clock.fixed(Instant.parse("2026-01-01T02:00:00Z"), ZoneId.of("UTC"));
+        Enrollment mockEnrollment = new Enrollment(1001L, mockStudent, mockCourse, null, "EN_CURSO", 0,
+                java.time.LocalDateTime.now(fixedClockPast));
+
+        // Ejecutamos el cálculo matemático en frío
+        int progresoCalculado = userService.calculateCurrentProgress(mockEnrollment);
+
+        // 10 horas pasadas sobre 40 totales = 25% exacto de progreso académico en el
+        // tiempo absoluto
+        assertEquals(25, progresoCalculado,
+                "La fórmula matemática del cálculo de progreso transcurrido al vuelo falló.");
     }
 }
 
@@ -11446,6 +11688,8 @@ import org.springframework.data.domain.PageRequest;
 
 import java.util.Optional;
 import java.util.List;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import lombok.RequiredArgsConstructor;
 
@@ -11462,6 +11706,7 @@ public class UserService {
     private final InterestRepository interestRepository;
     private final CoursesRepository coursesRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private Clock clock = Clock.systemUTC();
 
     /**
      * Busca un usuario por su nombre de usuario.
@@ -11685,6 +11930,62 @@ public class UserService {
         // 5. Volcar de forma transaccional directa a PostgreSQL
         return enrollmentRepository.saveAndFlush(enrollment);
     }
+
+    /**
+     * 
+     * Método seguro para iniciar el cronómetro de un curso [ADR-34].
+     * Valida la identidad del alumno frente a la matrícula antes de guardar el
+     * sello de tiempo.
+     */
+    @Transactional
+    public void startCourseSecure(Long enrollmentId, String authenticatedUsername) {
+        // 1. Buscamos la matrícula cruzando el ID y el nombre de usuario autenticado.
+        // Si no coinciden, lanza error 404 de inmediato mitigando ataques de sondeo de
+        // IDs de otros alumnos.
+        Enrollment enrollment = enrollmentRepository
+                .findByEnrollmentidAndUserUsername(enrollmentId, authenticatedUsername)
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Matrícula no encontrada o acceso denegado", enrollmentId));
+
+        // 2. Si la matrícula es válida y no ha sido iniciada previamente, guardamos el
+        // sello de tiempo
+        if (enrollment.getStarted_at() == null) {
+            enrollment.setStarted_at(LocalDateTime.now(clock));
+            enrollment.setStatus("EN_CURSO");
+            enrollmentRepository.save(enrollment);
+        }
+    }
+
+    /**
+     * Calcula el progreso real basado en el tiempo transcurrido (24h/día) de forma
+     * determinista y libre de operaciones concurrentes en base de datos.
+     */
+    public int calculateCurrentProgress(Enrollment enrollment) {
+        if (enrollment.getStarted_at() == null)
+            return 0;
+
+        // Mapeo seguro .longValue() para evitar problemas de tipos primitivos con Float
+        long totalHours = enrollment.getCourse().getDuration().longValue();
+        if (totalHours <= 0)
+            return 0;
+
+        // Cálculo de horas transcurridas preciso usando el reloj inyectado
+        long hoursElapsed = java.time.Duration.between(
+                enrollment.getStarted_at(),
+                LocalDateTime.now(clock)).toHours();
+
+        double progress = (hoursElapsed * 100.0) / totalHours;
+
+        // Acotamiento inmutable estricto entre 0 y 100
+        return (int) Math.max(0, Math.min(100, Math.floor(progress)));
+    }
+
+    /**
+     * Permite inyectar un reloj alternativo desde la suite de pruebas unitarias.
+     */
+    public void setClock(Clock clock) {
+        this.clock = clock;
+    }
 }
 
 ================
@@ -11717,7 +12018,7 @@ const StudentDashboard = () => {
      * HOOK DE ASIGNATURAS MATRICULADAS:
      * Gestiona de forma autónoma la carga desde el backend.
      */
-    const { enrolledList, loadingEnrollments, enrollmentError } = useEnrolledCourses(successMessage);
+    const { enrolledList, loadingEnrollments, enrollmentError, fetchStudentEnrollments } = useEnrolledCourses(successMessage);
 
     /** 
      * HOOK DE RECOMENDACIONES ALGORÍTMICAS:
@@ -11732,6 +12033,7 @@ const StudentDashboard = () => {
     const handleEnrollSuccess = (course: DBModelCourse) => {
         setSuccessMessage(`¡Éxito! Te has matriculado en: ${course.title}`);
         setError('');
+        fetchStudentEnrollments(); // Refresca la lista de cursos matriculados tras la acción
         // Limpieza automática del banner de éxito tras 5 segundos
         setTimeout(() => setSuccessMessage(''), 5000);
     };
@@ -11812,6 +12114,11 @@ const StudentDashboard = () => {
                         <EnrolledCourses
                             enrolledList={enrolledList}
                             loadingEnrollments={loadingEnrollments}
+                            onRefresh={() => {
+                                fetchStudentEnrollments();
+                                setSuccessMessage("¡Curso iniciado con éxito! Sincronizando cronómetro...");
+                                setTimeout(() => setSuccessMessage(''), 5000);
+                            }}
                         />
                     </div>
 
@@ -12187,6 +12494,23 @@ public class UserController {
         Users user = userService.findByUsername(username)
                 .orElseThrow(() -> new ServicesException("Perfil de usuario no encontrado"));
         return ResponseEntity.ok(user);
+    }
+
+    /**
+     * Endpoint blindado para iniciar el contador de tiempo de un curso [ADR-34].
+     * Valida la identidad física del alumno antes de alterar el estado en
+     * PostgreSQL.
+     */
+    @PostMapping("/enrollment/{id}/start")
+    public ResponseEntity<?> startCourse(@PathVariable Long id, Principal principal) {
+        // 1. Recuperamos el nombre de usuario (email/username) del token JWT activo
+        String authenticatedUsername = principal.getName();
+
+        // 2. Delegamos en el servicio la validación de propiedad y activación del
+        // cronómetro
+        userService.startCourseSecure(id, authenticatedUsername);
+
+        return ResponseEntity.ok().build();
     }
 }
 

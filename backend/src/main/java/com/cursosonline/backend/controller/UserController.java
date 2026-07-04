@@ -189,4 +189,21 @@ public class UserController {
                 .orElseThrow(() -> new ServicesException("Perfil de usuario no encontrado"));
         return ResponseEntity.ok(user);
     }
+
+    /**
+     * Endpoint blindado para iniciar el contador de tiempo de un curso [ADR-34].
+     * Valida la identidad física del alumno antes de alterar el estado en
+     * PostgreSQL.
+     */
+    @PostMapping("/enrollment/{id}/start")
+    public ResponseEntity<?> startCourse(@PathVariable Long id, Principal principal) {
+        // 1. Recuperamos el nombre de usuario (email/username) del token JWT activo
+        String authenticatedUsername = principal.getName();
+
+        // 2. Delegamos en el servicio la validación de propiedad y activación del
+        // cronómetro
+        userService.startCourseSecure(id, authenticatedUsername);
+
+        return ResponseEntity.ok().build();
+    }
 }

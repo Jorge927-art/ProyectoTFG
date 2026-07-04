@@ -25,7 +25,7 @@ const StudentDashboard = () => {
      * HOOK DE ASIGNATURAS MATRICULADAS:
      * Gestiona de forma autónoma la carga desde el backend.
      */
-    const { enrolledList, loadingEnrollments, enrollmentError } = useEnrolledCourses(successMessage);
+    const { enrolledList, loadingEnrollments, enrollmentError, fetchStudentEnrollments } = useEnrolledCourses(successMessage);
 
     /** 
      * HOOK DE RECOMENDACIONES ALGORÍTMICAS:
@@ -40,6 +40,7 @@ const StudentDashboard = () => {
     const handleEnrollSuccess = (course: DBModelCourse) => {
         setSuccessMessage(`¡Éxito! Te has matriculado en: ${course.title}`);
         setError('');
+        fetchStudentEnrollments(); // Refresca la lista de cursos matriculados tras la acción
         // Limpieza automática del banner de éxito tras 5 segundos
         setTimeout(() => setSuccessMessage(''), 5000);
     };
@@ -120,6 +121,11 @@ const StudentDashboard = () => {
                         <EnrolledCourses
                             enrolledList={enrolledList}
                             loadingEnrollments={loadingEnrollments}
+                            onRefresh={() => {
+                                fetchStudentEnrollments();
+                                setSuccessMessage("¡Curso iniciado con éxito! Sincronizando cronómetro...");
+                                setTimeout(() => setSuccessMessage(''), 5000);
+                            }}
                         />
                     </div>
 

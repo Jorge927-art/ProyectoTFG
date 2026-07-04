@@ -608,6 +608,43 @@ El Tiempo de Vida (TTL) del token JWT está configurado en 15 minutos (900 segun
 * **Consistencia de Datos:** La suite de pruebas de Vitest se elevó a 33 de 33 tests en verde gracias al diseño de relojes virtuales (`vi.useFakeTimers`) que simulan interacciones concurrentes del usuario en el tiempo absoluto.
 * **Aislamiento de Errores:** El servidor tolera desincronizaciones temporales de milisegundos en peticiones HTTP API REST complejas sin corromper el canal.
 
+---
+
+# [ADR-35] Consistencia de Identidad Bidireccional y Ordenamiento Determinista en el Flujo de Matrículas
+
+## Estado
+
+Aceptado
+
+## Contexto
+
+Durante la fase de integración del *Activity Tracker*, el cálculo de progreso académico "al vuelo" (*on the fly*) de las asignaturas en curso introdujo una doble anomalía crítica en el flujo de trabajo del alumno:
+
+1. **Desfase de Indexación Visual ("Efecto Dominó"):** Al accionar el evento del DOM "Iniciar curso" en la tarjeta superior de la lista vertical, la interfaz sufría un parpadeo visual y trasladaba erróneamente el estado activo ("✓ Estudiando asignatura") a la tarjeta inferior, dejando el nodo pulsado intacto.
+2. **Falso Positivo de Expiración de Sesión:** Tras pulsaciones consecutivas sobre el componente reactivo, el sistema sufría una expulsión abrupta del usuario hacia la pantalla de login debido a la activación involuntaria del circuito de expiración de sesión definido en el `AuthProvider.tsx` [ADR-34].
+
+La auditoría técnica reveló un quiebre de la integridad de identidad bidireccional entre la base de datos y el cliente asíncrono. En el backend, la consulta HQL de `EnrollmentRepository.java` carecía de una cláusula `ORDER BY` explícita, provocando que Hibernate alterara la disposición física de la fila en el cursor de PostgreSQL tras ejecutar el `UPDATE` de la estampa de tiempo `started_at`.
+
+En el frontend, una discrepancia nominal en el hook `useEnrolledCourses.ts` provocaba que la clave primaria de la matrícula se mapeara como `undefined`. Ante la ausencia de un identificador estable, el algoritmo de reconciliación de React (*diffing algorithm*) recurría de forma implícita al índice relativo del array (`key={index}`). Al mutar los datos en el backend y reordenarse el array devuelto, React asociaba el nuevo estado visual a la posición indexada previa y no a la entidad real.
+
+Finalmente, el valor `undefined` se propagaba a la pasarela HTTP (Axios), mutando la URL del endpoint a una ruta malformada (`/api/auth/enrollment/undefined/start`). El componente `JwtAuthenticationFilter.java` de Spring Security rechazaba la petición por anomalía de ruta respondiendo con un `HTTP 401 Unauthorized`. El interceptor global de red capturaba el 401, interpretaba falsamente que el token JWT había caducado y disparaba el evento `auth-session-expired`, expulsando al usuario del sistema.
+
+## Decisión
+
+1. **Ordenamiento Determinista en Persistencia:** Modificar la consulta HQL del método `findAllByUserIdWithCourses` en `EnrollmentRepository.java` inyectando una cláusula estricta de ordenación: `ORDER BY e.enrollmentid ASC`. Esto ancla de forma invariable el cursor físico de PostgreSQL ante escrituras concurrentes, manteniendo el mecanismo de optimización `JOIN FETCH` para neutralizar excepciones de inicialización diferida (*LazyInitializationException*).
+2. **Normalización Estricta del Contrato DTO:** Refactorizar el mapeo síncrono del hook `useEnrolledCourses.ts` para capturar la clave primaria exacta (`enrollmentid` en minúsculas) generada por el ORM. Se prohíben de forma taxativa los mecanismos de "salvavidas" o *fallbacks* inestables (como IDs de cursos o marcas de tiempo arbitrarias) que diluyan la identidad de la matrícula. Se depuran además las importaciones muertas (`DBModelCourse`) para satisfacer las reglas del linter de TypeScript.
+3. **Implementación de Semáforo de Mutación (UI Lock):** Introducir un estado local de control de concurrencia (`mutatingId`) en el componente `EnrolledCourses.tsx`. Este mecanismo bloquea y deshabilita los controles de la tarjeta en proceso de activación, impidiendo ráfagas de clics repetidos provocadas por el parpadeo de red y proporcionando un indicador visual asíncrono (*spinner*) de carga.
+4. **Evitación de Atributos Nativos del DOM:** Sustituir la extracción de identificadores a través de atributos nativos del navegador (`e.currentTarget.getAttribute`) por pasajes de parámetros tipados directos en el ámbito de la función de React, eliminando fallos de parseo en caliente.
+5. **Cumplimiento de la Política de Estilos Estáticos:** Eludir la regla estricta de análisis de Microsoft Edge Tools (`no-inline-styles`) mediante el uso de la sintaxis de propagación de objetos de JavaScript (`{...{ style: { width: ... } }}`) sobre la barra de progreso de Tailwind, preservando la animación reactiva y la limpieza del panel de problemas de VS Code.
+
+## Consecuencias
+
+* **Estabilidad del DOM Virtual:** Las identidades de las tarjetas en curso quedan fijadas de manera inmutable a su clave primaria real de PostgreSQL. El algoritmo de reconciliación de React actualiza los nodos físicos de forma exacta, eliminando el "efecto dominó" visual y garantizando la predictibilidad de la interfaz de usuario bajo transiciones CSS de Tailwind.
+* **Robustez en la Capa de Seguridad:** Al garantizar la integridad del `enrollmentid` en el frontend, se erradican por completo las peticiones dirigidas a rutas corruptas. El filtro de Spring Security procesa exclusivamente URLs válidas bajo el token JWT activo, deteniendo las expulsiones forzadas involuntarias en el flujo de interacción.
+* **Mantenimiento de la Cobertura de Pruebas:** Las refactorizaciones aplicadas preservan el comportamiento esperado por la suite de pruebas del monorrepo. Tras la unificación del tipado en las propiedades del componente (`EnrolledCoursesProps`), los 35 de 35 tests unitarios e integrados en Vitest (`EnrolledCourses.test.tsx`) se mantienen estables en verde.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026

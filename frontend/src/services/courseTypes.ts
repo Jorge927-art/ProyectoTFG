@@ -26,6 +26,7 @@ export interface DBModelCourse {
 export interface EnrollmentInfo {
     enrollmentid: number;
     enrolled_at: string;
+    started_at: string | null; 
     status: string;
     progress_percentage: number;
     course: DBModelCourse;

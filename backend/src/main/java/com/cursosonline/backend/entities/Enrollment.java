@@ -45,4 +45,7 @@ public class Enrollment {
 
     @Column(name = "progress", nullable = false)
     private int progress_percentage = 0;
+
+    @Column(name = "started_at")
+    private LocalDateTime started_at;
 }

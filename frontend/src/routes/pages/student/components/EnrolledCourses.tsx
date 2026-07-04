@@ -1,89 +1,147 @@
-import { BookOpen, Loader2, ArrowRight } from 'lucide-react';
+import { useState } from 'react';
+import { BookOpen, Loader2, ArrowRight, Clock } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import type { EnrollmentInfo } from '../../../../services/courseTypes';
+import { apiClient } from '../../../../services/apiClient';
 
+// [CORRECCIÓN CRÍTICA DE TIPADO]: Añadimos la firma de onRefresh exigida por TypeScript
 interface EnrolledCoursesProps {
     enrolledList: EnrollmentInfo[];
     loadingEnrollments: boolean;
+    onRefresh: () => void;
 }
 
-export const EnrolledCourses = ({ enrolledList, loadingEnrollments }: EnrolledCoursesProps) => {
+/**
+ * Componente de asignaturas en curso con alineación geométrica y activación en caliente [ADR-19][ADR-34].
+ * Sincroniza de forma milimétrica la altura total del contenedor con la del catálogo.
+ */
+export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh }: EnrolledCoursesProps) => {
+    // Estado local para evitar clics concurrentes que corrompan el DOM virtual durante la red
+    const [mutatingId, setMutatingId] = useState<number | null>(null);
+
+    /**
+     * Dispara la mutación asíncrona en el backend para iniciar el cronómetro del curso.
+     * Valida de forma segura el ID de matrícula bajo el token JWT activo.
+     */
+    const handleStartCourse = async (enrollmentId: number) => {
+        if (!enrollmentId || mutatingId !== null) return;
+
+        setMutatingId(enrollmentId); // Bloquea la tarjeta actual
+        try {
+            // Petición POST al endpoint seguro que blindamos en UserController
+            await apiClient.post(`/api/auth/enrollment/${enrollmentId}/start`);
+            onRefresh(); // Notifica al Dashboard padre para recargar las horas desde PostgreSQL
+        } catch (err) {
+            console.error("Error al iniciar el cronómetro del curso:", err);
+        } finally {
+            setMutatingId(null); // Libera el bloqueo global
+        }
+    };
+
     return (
-        <div className="xl:col-span-2">
-            <div className="flex items-center justify-between mb-4">
+        /* 
+           ALINEACIÓN GEOMÉTRICA CONSOLIDADA:
+           - h-109: Mantiene tus 438px estricto fijados previamente.
+           - bg-emerald-100/40: Fondo destacado verde claro adaptado.
+        */
+        <div className="bg-emerald-100/40 p-5 rounded-xl border border-emerald-100 shadow-sm mt-6 mb-8 flex flex-col h-109">
+
+            {/* CABECERA DE LA SECCIÓN */}
+            <div className="flex items-center justify-between mb-4 shrink-0">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                    <BookOpen size={18} className="text-slate-700" />
+                    <BookOpen size={18} className="text-emerald-700" />
                     <span>Tus asignaturas en curso</span>
                 </h2>
-                <span className="bg-slate-100 text-slate-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-full">
                     {enrolledList.length}
                 </span>
             </div>
 
-            {loadingEnrollments ? (
-                <div className="p-8 flex justify-center items-center bg-white border border-slate-100 rounded-xl">
-                    <Loader2 size={24} className="animate-spin text-slate-400" />
-                </div>
-            ) : enrolledList.length === 0 ? (
-                <div className="p-8 bg-white border border-slate-100 rounded-xl text-center">
-                    <p className="text-xs font-medium text-slate-400 italic">No estás matriculado en ninguna asignatura actualmente.</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {enrolledList.map((enroll) => {
+            {/* SCROLL DINÁMICO AUTO-AJUSTABLE [ADR-19] */}
+            <div className="overflow-y-auto pr-1 p-1 custom-scrollbar space-y-3 flex-1">
+                {loadingEnrollments ? (
+                    <div className="h-full flex flex-col justify-center items-center bg-white border border-slate-100 rounded-xl text-slate-400">
+                        <Loader2 size={24} className="animate-spin mb-2 text-emerald-600" />
+                        <p className="text-xs font-medium text-slate-500">Sincronizando con PostgreSQL...</p>
+                    </div>
+                ) : enrolledList.length === 0 ? (
+                    <div className="p-8 bg-white/80 border border-slate-100 rounded-xl text-center">
+                        <p className="text-xs font-medium text-slate-400 italic">No estás matriculado en ninguna asignatura todavía.</p>
+                    </div>
+                ) : (
+                    enrolledList.map((enroll) => {
                         const progressPct = enroll.progress_percentage || 0;
-
-                        // Mapeo declarativo O(1) de clases Tailwind según el progreso académico.
-                        // Esto elimina por completo el atributo 'style' del JSX, silenciando el linter.
-                        let tailwindWidthClass = 'w-0';
-
-                        if (progressPct >= 100) tailwindWidthClass = 'w-full';
-                        else if (progressPct >= 90) tailwindWidthClass = 'w-11/12';
-                        else if (progressPct >= 80) tailwindWidthClass = 'w-4/5';
-                        else if (progressPct >= 75) tailwindWidthClass = 'w-3/4';
-                        else if (progressPct >= 70) tailwindWidthClass = 'w-8/12';
-                        else if (progressPct >= 60) tailwindWidthClass = 'w-3/5';
-                        else if (progressPct >= 50) tailwindWidthClass = 'w-1/2';
-                        else if (progressPct >= 40) tailwindWidthClass = 'w-2/5';
-                        else if (progressPct >= 30) tailwindWidthClass = 'w-3/12';
-                        else if (progressPct >= 25) tailwindWidthClass = 'w-1/4';
-                        else if (progressPct >= 20) tailwindWidthClass = 'w-2/12';
-                        else if (progressPct >= 10) tailwindWidthClass = 'w-1/12';
+                        const isStarted = enroll.started_at !== null;
+                        const isThisMutating = mutatingId === enroll.enrollmentid;
 
                         return (
                             <GenericCard key={enroll.enrollmentid}>
-                                <div className="mb-4">
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-slate-100 text-slate-600">
-                                        {enroll.course?.category || "General"}
-                                    </span>
-                                    <h3 className="text-sm font-bold text-slate-800 leading-tight mt-2 min-h-10 line-clamp-2">
-                                        {enroll.course?.title}
-                                    </h3>
-                                    <p className="text-xs text-slate-400 mt-1 truncate">
-                                        Prof. {enroll.course?.instructors || "Por asignar"}
-                                    </p>
+                                {/* CUERPO DE DATOS */}
+                                <div className="flex justify-between items-start gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-slate-100 text-slate-600">
+                                            {enroll.course?.category || "General"}
+                                        </span>
+                                        <h3 className="text-sm font-bold text-slate-800 leading-tight mt-1.5 truncate">
+                                            {enroll.course?.title}
+                                        </h3>
+                                        <div className="flex items-center gap-1 mt-0.5">
+                                            <Clock size={11} className="text-slate-400" />
+                                            <p className="text-[11px] text-slate-400 font-medium">
+                                                Duración: {enroll.course?.duration || 0}h | Prof. {enroll.course?.instructors || "Por asignar"}
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div className="mt-4 pt-3 border-t border-slate-50">
-                                    <div className="flex justify-between text-[11px] text-slate-500 mb-1">
-                                        <span>Progreso (Estado: {enroll.status || "EN_PROGRESO"})</span>
-                                        <span className="font-bold text-blue-600">{progressPct}%</span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
-                                        {/* Renderizado 100% Tailwind: Cero estilos inline en el DOM virtual */}
-                                        <div className={`bg-blue-600 h-full transition-all duration-500 ${tailwindWidthClass}`} />
+                                {/* BARRA DE PROGRESO DE ALTA PRECISIÓN Y BOTÓN INFERIOR */}
+                                <div className="mt-3 pt-2 border-t border-slate-50">
+                                    <div className="flex justify-between text-[10px] text-slate-500 mb-1 font-semibold">
+                                        <span className={isStarted ? "text-blue-600 font-bold" : "text-slate-400"}>
+                                            {isStarted ? "En curso (24h/día)" : "Pendiente de inicio"}
+                                        </span>
+                                        <span className="font-bold text-emerald-600">{progressPct}%</span>
                                     </div>
 
-                                    <button type="button" className="w-full bg-slate-800 hover:bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer">
-                                        <span>Continuar</span>
-                                        <ArrowRight size={14} />
-                                    </button>
+                                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
+                                        <div
+                                            className="bg-emerald-600 h-full transition-all duration-1000"
+                                            {...{ style: { width: `${progressPct}%` } }}
+                                        />
+                                    </div>
+
+                                    {/* CONDICIONAL: Si no está iniciado, pinta el botón azul de acción */}
+                                    {!isStarted ? (
+                                        <button
+                                            type="button"
+                                            disabled={mutatingId !== null}
+                                            onClick={() => handleStartCourse(enroll.enrollmentid)}
+                                            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-bold py-2 px-3 rounded-lg transition-all active:scale-[0.98] flex items-center justify-center gap-1 shrink-0 cursor-pointer disabled:cursor-not-allowed"
+                                        >
+                                            {isThisMutating ? (
+                                                <>
+                                                    <Loader2 size={14} className="animate-spin" />
+                                                    <span>Iniciando...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span>Iniciar curso</span>
+                                                    <ArrowRight size={14} />
+                                                </>
+                                            )}
+                                        </button>
+                                    ) : (
+                                        /* Si ya está en curso, se despliega un estado deshabilitado elegante en tono esmeralda */
+                                        <div className="w-full bg-emerald-50 text-emerald-700 text-xs font-bold py-2 px-3 rounded-lg border border-emerald-100 flex items-center justify-center gap-1 text-center select-none">
+                                            <span>✓ Estudiando asignatura</span>
+                                        </div>
+                                    )}
                                 </div>
                             </GenericCard>
                         );
-                    })}
-                </div>
-            )}
+                    })
+                )}
+            </div>
         </div>
     );
 };
