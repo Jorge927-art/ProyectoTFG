@@ -645,6 +645,32 @@ Finalmente, el valor `undefined` se propagaba a la pasarela HTTP (Axios), mutand
 
 ---
 
+# [ADR-36] Módulo Genérico de Gestión de Documentos Académicos Seguros
+
+## Estado
+
+Aceptado
+
+## Contexto
+
+Para potenciar la interacción pedagógica en la plataforma, surgió la necesidad de implementar un módulo que permitiera enviar y recibir documentos de texto y académicos. La directriz original del [ADR-23] limitaba la carpeta de documentos de forma estricta a extensiones `.pdf` para neutralizar vectores de ataque por ejecución remota de código (RCE) y suplantación de tipos (*MIME-sniffing*).
+
+Permitir la incorporación de formatos de procesamiento de palabras como Microsoft Word (`.docx`) y texto plano (`.txt`) requería una reevaluación del perímetro de seguridad para evitar que la flexibilización de extensiones comprometiera la integridad del servidor. Asimismo, el diseño debía ser altamente escalable para posibilitar el uso de este canal por parte de estudiantes, profesores y administradores de forma transparente y unificada, aislando la lógica de red para evitar la proliferación de componentes sobredimensionados (*God Components*) [ADR-20].
+
+## Decisión
+
+1. **Ampliación Perimetral Dual:** Modificar `FileStorageService.java` para validar de forma síncrona y obligatoria que el archivo transmitido satisfaga simultáneamente la extensión de disco permitida (`pdf`, `docx`, `txt`) y su respectivo tipo MIME oficial (`application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/plain`). Cualquier payload que quiebre una de las dos condiciones es rechazado inmediatamente (HTTP 400).
+2. **Abstracción Genérica de Persistencia (Multi-Rol):** Descartar modelos acoplados a un único tipo de actor (ej. `StudentDocument`) y dar de alta la entidad `DocumentMetadata.java`. Esta tabla almacena los identificadores físicos generados mediante UUID, los nombres originales del archivo y se vincula mediante una relación `@ManyToOne` de carga diferida (*Lazy Fetch*) directamente a la clase base `Users`, habilitando la funcionalidad multi-rol de manera nativa.
+3. **Aislamiento en Servicios y Hooks de Presentación:** Encapsular la pasarela HTTP asíncrona dentro de `documentService.ts` bajo el cliente Axios unificado. La gestión de estados mutables locales, errores de red y sincronizaciones se delega al hook especializado `useDocuments.ts`, el cual sanitiza las excepciones de tipo `unknown` para satisfacer las directrices del linter TypeScript sin eludir el análisis estático.
+4. **Composición Gráfica con Restricción Geométrica:** Desarrollar el componente `DocumentManager.tsx` bajo criterios de composición pura [ADR-13]. La lista de archivos recibidos se confina a un scroll de altura máxima controlada (`max-h-[160px] custom-scrollbar`) según las reglas visuales globales [ADR-19]. Las restricciones de estilos en línea de los navegadores (*Microsoft Edge Tools*) se circunvalan inyectando propiedades mediante la propagación de objetos de JavaScript.
+
+## Consecuencias
+
+* **Seguridad y Escalabilidad:** El servidor acepta múltiples formatos de texto de forma segura sin peligro de ataques de sobreescritura de archivos (*Path Traversal*) gracias al enmascaramiento con UUID en disco. El modelo de datos es capaz de soportar flujos de profesores y administradores sin requerir refactorizaciones estructurales en PostgreSQL.
+* **Mantenimiento y Cobertura:** Se mantiene la política rigurosa de calidad de código del monorrepo. La capa de presentación frontend se validó mediante el desarrollo de `DocumentManager.test.tsx` en Vitest usando aislamiento con `vi.mocked()`. La capa de control backend se blindó mediante pruebas unitarias puras de aislamiento con Mockito en `DocumentControllerTest.java`. Ambas suites se ejecutan con éxito y se consolidan en verde.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026

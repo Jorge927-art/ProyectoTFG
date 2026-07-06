@@ -20,7 +20,17 @@ public class FileStorageService {
 
     // Extensiones permitidas por categorías
     private final List<String> ALLOWED_IMAGE_EXTENSIONS = Arrays.asList("jpg", "jpeg", "png", "webp");
-    private final List<String> ALLOWED_DOC_EXTENSIONS = Arrays.asList("pdf");
+
+    // [ADR-23 REFACTORIZADO]: Ampliación de lista blanca para incluir formatos de
+    // texto y procesamiento de palabras
+    private final List<String> ALLOWED_DOC_EXTENSIONS = Arrays.asList("pdf", "docx", "txt");
+
+    // Lista blanca estricta de tipos MIME válidos para mitigar ataques de ejecución
+    // remota (RCE) y MIME-sniffing
+    private final List<String> ALLOWED_DOC_MIME_TYPES = Arrays.asList(
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain");
 
     public FileStorageService(@Value("${spring.servlet.multipart.location}") String uploadDir) {
         this.rootLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
@@ -80,14 +90,16 @@ public class FileStorageService {
                 throw new IllegalArgumentException("El tipo de contenido no corresponde a una imagen válida.");
             }
         } else if ("documents".equalsIgnoreCase(subFolder)) {
-            // Validar extensión de documento
+            // [VALIDACIÓN PERIMETRAL DUAL]: Comprobar de forma síncrona que la extensión
+            // esté en la lista blanca
             if (!ALLOWED_DOC_EXTENSIONS.contains(extension)) {
                 throw new IllegalArgumentException(
-                        "Extensión de documento no permitida (" + extension + "). Solo se admite PDF.");
+                        "Extensión de documento no permitida (" + extension + "). Solo se admite PDF, DOCX o TXT.");
             }
-            // Validar Content-Type de documento
-            if (contentType == null || !contentType.equalsIgnoreCase("application/pdf")) {
-                throw new IllegalArgumentException("El tipo de contenido debe ser estrictamente un PDF.");
+            // [VALIDACIÓN PERIMETRAL DUAL]: Comprobar que el tipo MIME coincida
+            // estrictamente con el payload transmitido
+            if (contentType == null || !ALLOWED_DOC_MIME_TYPES.contains(contentType.toLowerCase())) {
+                throw new IllegalArgumentException("El tipo de contenido del documento no es válido o está corrupto.");
             }
         } else {
             throw new IllegalArgumentException("Carpeta de destino no configurada para validación de seguridad.");

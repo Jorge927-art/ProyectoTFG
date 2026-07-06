@@ -1617,87 +1617,6 @@ export default function ProfileSettings() {
 }
 
 ================
-File: frontend/src/routes/pages/student/components/EnrolledCourses.test.tsx
-================
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EnrolledCourses } from './EnrolledCourses';
-import type { EnrollmentInfo } from '../../../../services/courseTypes';
-
-describe('Auditoría UI: Aislamiento de Estados en EnrolledCourses', () => {
-    const mockOnRefresh = vi.fn();
-
-    // Fabricamos dos matrículas de prueba con estados e IDs 100% controlados
-    const mockEnrolledList: EnrollmentInfo[] = [
-        {
-            enrollmentid: 101,
-            enrolled_at: '2026-01-01T00:00:00.000Z',
-            started_at: null, // ──> ESTE CURSO ESTÁ PENDIENTE
-            status: 'EN_PROGRESO',
-            progress_percentage: 0,
-            course: {
-                course_id: 1,
-                title: 'Curso Pendiente de Prueba',
-                category: 'BUSINESS',
-                instructors: 'Profesor A'
-            }
-        },
-        {
-            enrollmentid: 102,
-            enrolled_at: '2026-01-01T00:00:00.000Z',
-            started_at: '2026-01-02T00:00:00.000Z', // ──> ESTE CURSO YA SE INICIÓ
-            status: 'EN_CURSO',
-            progress_percentage: 15, // 15% de progreso calculado por el tiempo transcurrido
-            course: {
-                course_id: 2,
-                title: 'Curso Iniciado de Prueba',
-                category: 'DATA_SCIENCE',
-                instructors: 'Profesor B'
-            }
-        }
-    ];
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    it('debe renderizar el botón "Iniciar curso" única y exclusivamente en las tarjetas con started_at nulo', () => {
-        render(
-            <EnrolledCourses
-                enrolledList={mockEnrolledList}
-                loadingEnrollments={false}
-                onRefresh={mockOnRefresh}
-            />
-        );
-
-        // 1. Validamos que el botón azul existe para el curso número 1
-        const startButtons = screen.getAllByRole('button', { name: /iniciar curso/i });
-        expect(startButtons.length).toBe(1); // Exigimos que SOLO haya un botón en toda la lista
-
-        // 2. Validamos que la etiqueta del segundo curso muestra el texto de alta fidelidad inmutable
-        expect(screen.getByText('✓ Estudiando asignatura')).toBeInTheDocument();
-        expect(screen.getByText('En curso (24h/día)')).toBeInTheDocument();
-        expect(screen.getByText('15%')).toBeInTheDocument();
-    });
-
-    it('debe despachar el ID de matrícula correcto al hacer clic en el botón de acción', () => {
-        render(
-            <EnrolledCourses
-                enrolledList={mockEnrolledList}
-                loadingEnrollments={false}
-                onRefresh={mockOnRefresh}
-            />
-        );
-
-        const startButton = screen.getByRole('button', { name: /iniciar curso/i });
-        fireEvent.click(startButton);
-
-        // Este paso auditará si el componente confunde los identificadores al disparar la acción
-        expect(startButton).toBeInTheDocument();
-    });
-});
-
-================
 File: backend/.env.example
 ================
 # ======================================================
@@ -5573,6 +5492,87 @@ const LandingPage = () => {
 export default LandingPage;
 
 ================
+File: frontend/src/routes/pages/student/components/EnrolledCourses.test.tsx
+================
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { EnrolledCourses } from './EnrolledCourses';
+import type { EnrollmentInfo } from '../../../../services/courseTypes';
+
+describe('Auditoría UI: Aislamiento de Estados en EnrolledCourses', () => {
+    const mockOnRefresh = vi.fn();
+
+    // Fabricamos dos matrículas de prueba con estados e IDs 100% controlados
+    const mockEnrolledList: EnrollmentInfo[] = [
+        {
+            enrollmentid: 101,
+            enrolled_at: '2026-01-01T00:00:00.000Z',
+            started_at: null, // ──> ESTE CURSO ESTÁ PENDIENTE
+            status: 'EN_PROGRESO',
+            progress_percentage: 0,
+            course: {
+                course_id: 1,
+                title: 'Curso Pendiente de Prueba',
+                category: 'BUSINESS',
+                instructors: 'Profesor A'
+            }
+        },
+        {
+            enrollmentid: 102,
+            enrolled_at: '2026-01-01T00:00:00.000Z',
+            started_at: '2026-01-02T00:00:00.000Z', // ──> ESTE CURSO YA SE INICIÓ
+            status: 'EN_CURSO',
+            progress_percentage: 15, // 15% de progreso calculado por el tiempo transcurrido
+            course: {
+                course_id: 2,
+                title: 'Curso Iniciado de Prueba',
+                category: 'DATA_SCIENCE',
+                instructors: 'Profesor B'
+            }
+        }
+    ];
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('debe renderizar el botón "Iniciar curso" única y exclusivamente en las tarjetas con started_at nulo', () => {
+        render(
+            <EnrolledCourses
+                enrolledList={mockEnrolledList}
+                loadingEnrollments={false}
+                onRefresh={mockOnRefresh}
+            />
+        );
+
+        // 1. Validamos que el botón azul existe para el curso número 1
+        const startButtons = screen.getAllByRole('button', { name: /iniciar curso/i });
+        expect(startButtons.length).toBe(1); // Exigimos que SOLO haya un botón en toda la lista
+
+        // 2. Validamos que la etiqueta del segundo curso muestra el texto de alta fidelidad inmutable
+        expect(screen.getByText('✓ Estudiando asignatura')).toBeInTheDocument();
+        expect(screen.getByText('En curso (24h/día)')).toBeInTheDocument();
+        expect(screen.getByText('15%')).toBeInTheDocument();
+    });
+
+    it('debe despachar el ID de matrícula correcto al hacer clic en el botón de acción', () => {
+        render(
+            <EnrolledCourses
+                enrolledList={mockEnrolledList}
+                loadingEnrollments={false}
+                onRefresh={mockOnRefresh}
+            />
+        );
+
+        const startButton = screen.getByRole('button', { name: /iniciar curso/i });
+        fireEvent.click(startButton);
+
+        // Este paso auditará si el componente confunde los identificadores al disparar la acción
+        expect(startButton).toBeInTheDocument();
+    });
+});
+
+================
 File: frontend/src/routes/pages/student/components/useSmartRecommendations.ts
 ================
 import { useState, useEffect } from 'react';
@@ -5730,43 +5730,6 @@ describe('InterestsModal Component - Suite de Pruebas Unitarias Estrictas', () =
         });
     });
 });
-
-================
-File: frontend/src/services/courseTypes.ts
-================
-/**
- * Modelo canónico unificado que representa la estructura completa de un Curso.
- * Sincronizado estrictamente con la entidad 'Courses' del Backend para toda la SPA.
- */
-export interface DBModelCourse {
-    course_id: number;
-    title: string;
-    url?: string;
-    shortIntro?: string;
-    category: string;
-    subCategory?: string;
-    courseType?: string;
-    language?: string;
-    subtitleLanguages?: string;
-    skills?: string;
-    instructors?: string;
-    rating?: number;
-    numOfViewers?: number;
-    duration?: number;
-    site?: string;
-}
-
-/**
- * Modelo estándar que representa el registro de una Matrícula académica.
- */
-export interface EnrollmentInfo {
-    enrollmentid: number;
-    enrolled_at: string;
-    started_at: string | null; 
-    status: string;
-    progress_percentage: number;
-    course: DBModelCourse;
-}
 
 ================
 File: frontend/src/services/profileService.ts
@@ -6167,61 +6130,6 @@ public record RecommendationDTO(
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/entities/Enrollment.java
-================
-package com.cursosonline.backend.entities;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty; // Importación obligatoria para el contrato JSON
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import java.time.LocalDateTime;
-
-@Entity
-@Table(name = "enrollment")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class Enrollment {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long enrollmentid;
-
-    @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    private Users user;
-
-    /**
-     * Relación con el curso.
-     * Se fuerza mediante @JsonProperty que la propiedad JSON sea "course" (en
-     * singular)
-     * para asegurar compatibilidad absoluta con la interfaz de TypeScript del
-     * Frontend,
-     * independientemente del tipo de clase 'Courses' en plural del compilador.
-     */
-    @JsonProperty("course")
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "course_id")
-    private Courses course;
-
-    @Column(nullable = false)
-    private LocalDateTime enrolled_at = LocalDateTime.now();
-
-    @Column(nullable = false)
-    private String status = "EN_PROGRESO";
-
-    @Column(name = "progress", nullable = false)
-    private int progress_percentage = 0;
-
-    @Column(name = "started_at")
-    private LocalDateTime started_at;
-}
-
-================
 File: backend/src/main/java/com/cursosonline/backend/entities/Role.java
 ================
 package com.cursosonline.backend.entities;
@@ -6352,47 +6260,6 @@ public class UserAlreadyExistsException extends ServicesException {
     public UserAlreadyExistsException(String username) {
         super("El usuario " + username + " ya existe en el sistema.");
     }
-}
-
-================
-File: backend/src/main/java/com/cursosonline/backend/repository/EnrollmentRepository.java
-================
-package com.cursosonline.backend.repository;
-
-import com.cursosonline.backend.entities.Enrollment;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import java.util.List;
-import java.util.Optional;
-
-public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
-
-    @Query("SELECT e.course.course_id FROM Enrollment e WHERE e.user.user_id = :userId")
-    List<Long> findEnrolledCourseIdsByUserId(@Param("userId") Long userId);
-
-    @Query("SELECT e FROM Enrollment e WHERE e.user.user_id = :userId AND e.course.course_id = :courseId")
-    Optional<Enrollment> findByUserIdAndCourseId(@Param("userId") Long userId, @Param("courseId") Long courseId);
-
-    /**
-     * Dictamen NotebookLM: Recupera las matrículas activas filtrando por ID
-     * numérico.
-     * El JOIN FETCH inicializa la relación 'course' mitigando la
-     * LazyInitializationException.
-     */
-    @Query("SELECT e FROM Enrollment e JOIN FETCH e.course WHERE e.user.user_id = :userId")
-    List<Enrollment> findAllByUserIdWithCourses(@Param("userId") Long userId);
-
-    /**
-     * [BLINDAJE DE CONSULTA TFG]: Consulta HQL directa para forzar la coincidencia
-     * exacta
-     * del ID de matrícula y el nombre de usuario de la cuenta, evitando fallos por
-     * minúsculas.
-     */
-    @Query("SELECT e FROM Enrollment e WHERE e.enrollmentid = :enrollmentId AND e.user.username = :username")
-    Optional<Enrollment> findByEnrollmentidAndUserUsername(@Param("enrollmentId") Long enrollmentId,
-            @Param("username") String username);
-
 }
 
 ================
@@ -7216,6 +7083,43 @@ apiClient.interceptors.response.use(
 );
 
 ================
+File: frontend/src/services/courseTypes.ts
+================
+/**
+ * Modelo canónico unificado que representa la estructura completa de un Curso.
+ * Sincronizado estrictamente con la entidad 'Courses' del Backend para toda la SPA.
+ */
+export interface DBModelCourse {
+    course_id: number;
+    title: string;
+    url?: string;
+    shortIntro?: string;
+    category: string;
+    subCategory?: string;
+    courseType?: string;
+    language?: string;
+    subtitleLanguages?: string;
+    skills?: string;
+    instructors?: string;
+    rating?: number;
+    numOfViewers?: number;
+    duration?: number;
+    site?: string;
+}
+
+/**
+ * Modelo estándar que representa el registro de una Matrícula académica.
+ */
+export interface EnrollmentInfo {
+    enrollmentid: number;
+    enrolled_at: string;
+    started_at: string | null; 
+    status: string;
+    progress_percentage: number;
+    course: DBModelCourse;
+}
+
+================
 File: frontend/tsconfig.json
 ================
 {
@@ -7509,6 +7413,61 @@ public class CourseController {
 }
 
 ================
+File: backend/src/main/java/com/cursosonline/backend/entities/Enrollment.java
+================
+package com.cursosonline.backend.entities;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty; // Importación obligatoria para el contrato JSON
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "enrollment")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Enrollment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long enrollmentid;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private Users user;
+
+    /**
+     * Relación con el curso.
+     * Se fuerza mediante @JsonProperty que la propiedad JSON sea "course" (en
+     * singular)
+     * para asegurar compatibilidad absoluta con la interfaz de TypeScript del
+     * Frontend,
+     * independientemente del tipo de clase 'Courses' en plural del compilador.
+     */
+    @JsonProperty("course")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "course_id")
+    private Courses course;
+
+    @Column(nullable = false)
+    private LocalDateTime enrolled_at = LocalDateTime.now();
+
+    @Column(nullable = false)
+    private String status = "EN_PROGRESO";
+
+    @Column(name = "progress", nullable = false)
+    private int progress_percentage = 0;
+
+    @Column(name = "started_at")
+    private LocalDateTime started_at;
+}
+
+================
 File: backend/src/main/java/com/cursosonline/backend/exception/GlobalExceptionHandler.java
 ================
 package com.cursosonline.backend.exception;
@@ -7622,6 +7581,49 @@ public class ResourceNotFoundException extends ServicesException {
     public ResourceNotFoundException(String message) {
         super(message);
     }
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/repository/EnrollmentRepository.java
+================
+package com.cursosonline.backend.repository;
+
+import com.cursosonline.backend.entities.Enrollment;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import java.util.List;
+import java.util.Optional;
+
+public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
+
+    @Query("SELECT e.course.course_id FROM Enrollment e WHERE e.user.user_id = :userId")
+    List<Long> findEnrolledCourseIdsByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT e FROM Enrollment e WHERE e.user.user_id = :userId AND e.course.course_id = :courseId")
+    Optional<Enrollment> findByUserIdAndCourseId(@Param("userId") Long userId, @Param("courseId") Long courseId);
+
+    /**
+     * Dictamen NotebookLM: Recupera las matrículas activas filtrando por ID
+     * numérico.
+     * El JOIN FETCH inicializa la relación 'course' mitigando la
+     * LazyInitializationException.
+     * [CORRECCIÓN EFECTO DOMINÓ]: Añadido ORDER BY estricto por enrollmentid
+     * para fijar el cursor de PostgreSQL tras los updates.
+     */
+    @Query("SELECT e FROM Enrollment e JOIN FETCH e.course WHERE e.user.user_id = :userId ORDER BY e.enrollmentid ASC")
+    List<Enrollment> findAllByUserIdWithCourses(@Param("userId") Long userId);
+
+    /**
+     * [BLINDAJE DE CONSULTA TFG]: Consulta HQL directa para forzar la coincidencia
+     * exacta
+     * del ID de matrícula y el nombre de usuario de la cuenta, evitando fallos por
+     * minúsculas.
+     */
+    @Query("SELECT e FROM Enrollment e WHERE e.enrollmentid = :enrollmentId AND e.user.username = :username")
+    Optional<Enrollment> findByEnrollmentidAndUserUsername(@Param("enrollmentId") Long enrollmentId,
+            @Param("username") String username);
+
 }
 
 ================
@@ -8258,143 +8260,6 @@ export const CourseCatalog = ({
 };
 
 ================
-File: frontend/src/routes/pages/student/components/EnrolledCourses.tsx
-================
-import { BookOpen, Loader2, ArrowRight, Clock } from 'lucide-react';
-import GenericCard from '../../../../components/ui/genericCard/GenericCard';
-import type { EnrollmentInfo } from '../../../../services/courseTypes';
-import { apiClient } from '../../../../services/apiClient';
-
-// [CORRECCIÓN CRÍTICA DE TIPADO]: Añadimos la firma de onRefresh exigida por TypeScript
-interface EnrolledCoursesProps {
-    enrolledList: EnrollmentInfo[];
-    loadingEnrollments: boolean;
-    onRefresh: () => void;
-}
-
-/**
- * Componente de asignaturas en curso con alineación geométrica y activación en caliente [ADR-19][ADR-34].
- * Sincroniza de forma milimétrica la altura total del contenedor con la del catálogo.
- */
-export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh }: EnrolledCoursesProps) => {
-
-    /**
-     * Dispara la mutación asíncrona en el backend para iniciar el cronómetro del curso.
-     * Valida de forma segura el ID de matrícula bajo el token JWT activo.
-     */
-    const handleStartCourse = async (enrollmentId: number) => {
-        try {
-            // Petición POST al endpoint seguro que blindamos en UserController
-            await apiClient.post(`/api/auth/enrollment/${enrollmentId}/start`);
-            onRefresh(); // Notifica al Dashboard padre para recargar las horas desde PostgreSQL
-        } catch (err) {
-            console.error("Error al iniciar el cronómetro del curso:", err);
-        }
-    };
-
-    return (
-        /* 
-           ALINEACIÓN GEOMÉTRICA CONSOLIDADA:
-           - h-109: Mantiene tus 438px estricto fijados previamente.
-           - bg-emerald-100/40: Fondo destacado verde claro adaptado.
-        */
-        <div className="bg-emerald-100/40 p-5 rounded-xl border border-emerald-100 shadow-sm mt-6 mb-8 flex flex-col h-109">
-
-            {/* CABECERA DE LA SECCIÓN */}
-            <div className="flex items-center justify-between mb-4 shrink-0">
-                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                    <BookOpen size={18} className="text-emerald-700" />
-                    <span>Tus asignaturas en curso</span>
-                </h2>
-                <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-full">
-                    {enrolledList.length}
-                </span>
-            </div>
-
-            {/* SCROLL DINÁMICO AUTO-AJUSTABLE [ADR-19] */}
-            <div className="overflow-y-auto pr-1 p-1 custom-scrollbar space-y-3 flex-1">
-                {loadingEnrollments ? (
-                    <div className="h-full flex flex-col justify-center items-center bg-white border border-slate-100 rounded-xl text-slate-400">
-                        <Loader2 size={24} className="animate-spin mb-2 text-emerald-600" />
-                        <p className="text-xs font-medium text-slate-500">Sincronizando con PostgreSQL...</p>
-                    </div>
-                ) : enrolledList.length === 0 ? (
-                    <div className="p-8 bg-white/80 border border-slate-100 rounded-xl text-center">
-                        <p className="text-xs font-medium text-slate-400 italic">No estás matriculado en ninguna asignatura todavía.</p>
-                    </div>
-                ) : (
-                    enrolledList.map((enroll) => {
-                        const progressPct = enroll.progress_percentage || 0;
-                        const isStarted = enroll.started_at !== null;
-
-                        return (
-                            <GenericCard key={enroll.enrollmentid}>
-                                {/* CUERPO DE DATOS */}
-                                <div className="flex justify-between items-start gap-4">
-                                    <div className="flex-1 min-w-0">
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-slate-100 text-slate-600">
-                                            {enroll.course?.category || "General"}
-                                        </span>
-                                        <h3 className="text-sm font-bold text-slate-800 leading-tight mt-1.5 truncate">
-                                            {enroll.course?.title}
-                                        </h3>
-                                        <div className="flex items-center gap-1 mt-0.5">
-                                            <Clock size={11} className="text-slate-400" />
-                                            <p className="text-[11px] text-slate-400 font-medium">
-                                                Duración: {enroll.course?.duration || 0}h | Prof. {enroll.course?.instructors || "Por asignar"}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* BARRA DE PROGRESO DE ALTA PRECISIÓN Y BOTÓN INFERIOR */}
-                                <div className="mt-3 pt-2 border-t border-slate-50">
-                                    <div className="flex justify-between text-[10px] text-slate-500 mb-1 font-semibold">
-                                        <span className={isStarted ? "text-blue-600 font-bold" : "text-slate-400"}>
-                                            {isStarted ? "En curso (24h/día)" : "Pendiente de inicio"}
-                                        </span>
-                                        <span className="font-bold text-emerald-600">{progressPct}%</span>
-                                    </div>
-
-                                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
-                                        <div
-                                            className={`bg-emerald-600 h-full transition-all duration-1000 w-[${progressPct}%]`}
-                                        />
-                                    </div>
-
-                                    {/* CONDICIONAL: Si no está iniciado, pinta el botón azul de acción */}
-                                    {!isStarted ? (
-                                        <button
-                                            type="button"
-                                            data-enrollmentid={enroll.enrollmentid}
-                                            onClick={(e) => {
-                                                const id = Number(e.currentTarget.getAttribute('data-enrollmentid-id'));
-                                                if (id) {
-                                                    handleStartCourse(id);
-                                                }
-                                            }}
-                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-3 rounded-lg transition-all active:scale-[0.98] flex items-center justify-center gap-1 shrink-0"
-                                        >
-                                            <span>Iniciar curso</span>
-                                            <ArrowRight size={14} />
-                                        </button>
-                                    ) : (
-                                        /* Si ya está en curso, se despliega un estado deshabilitado elegante en tono esmeralda */
-                                        <div className="w-full bg-emerald-50 text-emerald-700 text-xs font-bold py-2 px-3 rounded-lg border border-emerald-100 flex items-center justify-center gap-1 text-center select-none">
-                                            <span>✓ Estudiando asignatura</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </GenericCard>
-                        );
-                    })
-                )}
-            </div>
-        </div>
-    );
-};
-
-================
 File: frontend/src/routes/pages/student/components/useCourseCatalog.ts
 ================
 import { useState, useEffect } from 'react';
@@ -8466,124 +8331,6 @@ export const useCourseCatalog = (onEnrollSuccess: (course: DBModelCourse) => voi
         enrollingId,
         catalogError,
         handleEnrollCourse
-    };
-};
-
-================
-File: frontend/src/routes/pages/student/components/useEnrolledCourses.ts
-================
-import { useState, useEffect, useCallback } from 'react';
-import { apiClient } from '../../../../services/apiClient';
-import { useAuth } from '../../../../auth/useAuth';
-import { readStoredAuthUser } from '../../../../auth/authStorage';
-import type { EnrollmentInfo, DBModelCourse } from '../../../../services/courseTypes';
-
-
-export const useEnrolledCourses = (successTrigger: string) => {
-    const { user } = useAuth();
-    const [enrolledList, setEnrolledList] = useState<EnrollmentInfo[]>([]);
-    const [loadingEnrollments, setLoadingEnrollments] = useState<boolean>(false);
-    const [enrollmentError, setEnrollmentError] = useState<string>('');
-
-    /**
-     * Recupera las asignaturas activas del estudiante pasando el username como parámetro.
-     * Sincroniza el contrato de red con el endpoint especializado del Backend.
-     */
-    const fetchStudentEnrollments = useCallback(async () => {
-        setLoadingEnrollments(true);
-        setEnrollmentError('');
-        try {
-            const currentUsername = user?.username?.trim() ?? readStoredAuthUser()?.username?.trim();
-
-            if (!currentUsername) {
-                setEnrollmentError('No se pudo identificar al estudiante autenticado.');
-                return;
-            }
-
-            const response = await apiClient.get<Record<string, unknown>[]>('/api/auth/my-active-courses', {
-                params: { username: currentUsername }
-            });
-
-            if (response.status === 200 && response.data) {
-    // 3. Mapeo adaptativo tolerante a la nomenclatura del ORM (course vs courses)
-    const normalizedData = response.data.map((enrollment) => {
-    const courseData = (enrollment.course || enrollment.courses || enrollment) as Record<string, unknown>;
-    
-    // [BLINDAJE DE IDENTIDAD TFG]: Capturamos el ID de matrícula bajo camelCase o snake_case
-    const rawEnrollmentId = enrollment.enrollmentid || enrollment.enrollmentId;
-    const safeCourseId = Number(courseData.course_id || courseData.id || 0);
-
-    return {
-        /* 
-           Si por un fallo del backend la matrícula viene sin ID, usamos como salvavidas 
-           estáco el ID del curso. Esto garantiza que la KEY sea 100% fija e invariable 
-           entre renders, impidiendo que los estados de los botones se desplacen al curso inferior.
-        */
-        enrollmentid: rawEnrollmentId ? Number(rawEnrollmentId) : safeCourseId,
-        enrolled_at: String(enrollment.enrolled_at || new Date().toISOString()),
-        
-        // Tolerancia bidireccional para el sello de tiempo del cronómetro
-        started_at: enrollment.started_at || enrollment.startedAt ? String(enrollment.started_at || enrollment.startedAt) : null,
-        
-        status: String(enrollment.status || "EN_PROGRESO"),
-        progress_percentage: Number(enrollment.progress_percentage ?? enrollment.progress ?? 0),
-        course: {
-            course_id: safeCourseId,
-            title: String(courseData.title || ""),
-            category: String(courseData.category || "General"),
-            instructors: String(courseData.instructors || "Por asignar"),
-            duration: Number(courseData.duration || 0)
-        }
-      };
-    });
-
-
-    setEnrolledList(normalizedData as EnrollmentInfo[]);
-            }
-        } catch (err) {
-            console.error("Error crítico en la pasarela HTTP de matrículas:", err);
-            setEnrollmentError("No se pudieron sincronizar tus asignaturas activas desde PostgreSQL.");
-        } finally {
-            setLoadingEnrollments(false);
-        }
-    }, [user?.username]);
-
-    // Reactividad: Se ejecuta al montar el componente y cada vez que cambia el successTrigger
-    useEffect(() => {
-        fetchStudentEnrollments();
-    }, [successTrigger, fetchStudentEnrollments]);
-
-    /**
-     * Inyecta de forma optimista la matrícula en caliente en el estado local
-     */
-    const injectLocalEnrollment = (course: DBModelCourse) => {
-        setEnrolledList((prev) => {
-            const exists = prev.some(e => e.course.course_id === course.course_id);
-            if (exists) return prev;
-
-            return [
-                ...prev,
-                {
-                    enrollmentid: course.course_id,
-                    enrolled_at: new Date().toISOString(),
-                    
-                    // [CORRECCIÓN TS]: Satisface el tipo EnrollmentInfo al inicializar el curso comprado en nulo
-                    started_at: null,
-                    
-                    status: "EN_PROGRESO",
-                    progress_percentage: 0,
-                    course: course
-                }
-            ];
-        });
-    };
-
-    return {
-        enrolledList,
-        loadingEnrollments,
-        enrollmentError,
-        injectLocalEnrollment,
-        fetchStudentEnrollments
     };
 };
 
@@ -9200,6 +8947,157 @@ describe("AppRoutes - autorizacion por rol", () => {
 });
 
 ================
+File: frontend/src/routes/pages/student/components/EnrolledCourses.tsx
+================
+import { useState } from 'react';
+import { BookOpen, Loader2, ArrowRight, Clock } from 'lucide-react';
+import GenericCard from '../../../../components/ui/genericCard/GenericCard';
+import type { EnrollmentInfo } from '../../../../services/courseTypes';
+import { apiClient } from '../../../../services/apiClient';
+
+// [CORRECCIÓN CRÍTICA DE TIPADO]: Añadimos la firma de onRefresh exigida por TypeScript
+interface EnrolledCoursesProps {
+    enrolledList: EnrollmentInfo[];
+    loadingEnrollments: boolean;
+    onRefresh: () => void;
+}
+
+/**
+ * Componente de asignaturas en curso con alineación geométrica y activación en caliente [ADR-19][ADR-34].
+ * Sincroniza de forma milimétrica la altura total del contenedor con la del catálogo.
+ */
+export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh }: EnrolledCoursesProps) => {
+    // Estado local para evitar clics concurrentes que corrompan el DOM virtual durante la red
+    const [mutatingId, setMutatingId] = useState<number | null>(null);
+
+    /**
+     * Dispara la mutación asíncrona en el backend para iniciar el cronómetro del curso.
+     * Valida de forma segura el ID de matrícula bajo el token JWT activo.
+     */
+    const handleStartCourse = async (enrollmentId: number) => {
+        if (!enrollmentId || mutatingId !== null) return;
+
+        setMutatingId(enrollmentId); // Bloquea la tarjeta actual
+        try {
+            // Petición POST al endpoint seguro que blindamos en UserController
+            await apiClient.post(`/api/auth/enrollment/${enrollmentId}/start`);
+            onRefresh(); // Notifica al Dashboard padre para recargar las horas desde PostgreSQL
+        } catch (err) {
+            console.error("Error al iniciar el cronómetro del curso:", err);
+        } finally {
+            setMutatingId(null); // Libera el bloqueo global
+        }
+    };
+
+    return (
+        /* 
+           ALINEACIÓN GEOMÉTRICA CONSOLIDADA:
+           - h-109: Mantiene tus 438px estricto fijados previamente.
+           - bg-emerald-100/40: Fondo destacado verde claro adaptado.
+        */
+        <div className="bg-emerald-100/40 p-5 rounded-xl border border-emerald-100 shadow-sm mt-6 mb-8 flex flex-col h-109">
+
+            {/* CABECERA DE LA SECCIÓN */}
+            <div className="flex items-center justify-between mb-4 shrink-0">
+                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <BookOpen size={18} className="text-emerald-700" />
+                    <span>Tus asignaturas en curso</span>
+                </h2>
+                <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-full">
+                    {enrolledList.length}
+                </span>
+            </div>
+
+            {/* SCROLL DINÁMICO AUTO-AJUSTABLE [ADR-19] */}
+            <div className="overflow-y-auto pr-1 p-1 custom-scrollbar space-y-3 flex-1">
+                {loadingEnrollments ? (
+                    <div className="h-full flex flex-col justify-center items-center bg-white border border-slate-100 rounded-xl text-slate-400">
+                        <Loader2 size={24} className="animate-spin mb-2 text-emerald-600" />
+                        <p className="text-xs font-medium text-slate-500">Sincronizando con PostgreSQL...</p>
+                    </div>
+                ) : enrolledList.length === 0 ? (
+                    <div className="p-8 bg-white/80 border border-slate-100 rounded-xl text-center">
+                        <p className="text-xs font-medium text-slate-400 italic">No estás matriculado en ninguna asignatura todavía.</p>
+                    </div>
+                ) : (
+                    enrolledList.map((enroll) => {
+                        const progressPct = enroll.progress_percentage || 0;
+                        const isStarted = enroll.started_at !== null;
+                        const isThisMutating = mutatingId === enroll.enrollmentid;
+
+                        return (
+                            <GenericCard key={enroll.enrollmentid}>
+                                {/* CUERPO DE DATOS */}
+                                <div className="flex justify-between items-start gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-slate-100 text-slate-600">
+                                            {enroll.course?.category || "General"}
+                                        </span>
+                                        <h3 className="text-sm font-bold text-slate-800 leading-tight mt-1.5 truncate">
+                                            {enroll.course?.title}
+                                        </h3>
+                                        <div className="flex items-center gap-1 mt-0.5">
+                                            <Clock size={11} className="text-slate-400" />
+                                            <p className="text-[11px] text-slate-400 font-medium">
+                                                Duración: {enroll.course?.duration || 0}h | Prof. {enroll.course?.instructors || "Por asignar"}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* BARRA DE PROGRESO DE ALTA PRECISIÓN Y BOTÓN INFERIOR */}
+                                <div className="mt-3 pt-2 border-t border-slate-50">
+                                    <div className="flex justify-between text-[10px] text-slate-500 mb-1 font-semibold">
+                                        <span className={isStarted ? "text-blue-600 font-bold" : "text-slate-400"}>
+                                            {isStarted ? "En curso (24h/día)" : "Pendiente de inicio"}
+                                        </span>
+                                        <span className="font-bold text-emerald-600">{progressPct}%</span>
+                                    </div>
+
+                                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
+                                        <div
+                                            className="bg-emerald-600 h-full transition-all duration-1000"
+                                            {...{ style: { width: `${progressPct}%` } }}
+                                        />
+                                    </div>
+
+                                    {/* CONDICIONAL: Si no está iniciado, pinta el botón azul de acción */}
+                                    {!isStarted ? (
+                                        <button
+                                            type="button"
+                                            disabled={mutatingId !== null}
+                                            onClick={() => handleStartCourse(enroll.enrollmentid)}
+                                            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-bold py-2 px-3 rounded-lg transition-all active:scale-[0.98] flex items-center justify-center gap-1 shrink-0 cursor-pointer disabled:cursor-not-allowed"
+                                        >
+                                            {isThisMutating ? (
+                                                <>
+                                                    <Loader2 size={14} className="animate-spin" />
+                                                    <span>Iniciando...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span>Iniciar curso</span>
+                                                    <ArrowRight size={14} />
+                                                </>
+                                            )}
+                                        </button>
+                                    ) : (
+                                        /* Si ya está en curso, se despliega un estado deshabilitado elegante en tono esmeralda */
+                                        <div className="w-full bg-emerald-50 text-emerald-700 text-xs font-bold py-2 px-3 rounded-lg border border-emerald-100 flex items-center justify-center gap-1 text-center select-none">
+                                            <span>✓ Estudiando asignatura</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </GenericCard>
+                        );
+                    })
+                )}
+            </div>
+        </div>
+    );
+};
+
+================
 File: frontend/src/routes/pages/student/components/SmartRecommendations.tsx
 ================
 import { Star } from 'lucide-react';
@@ -9254,6 +9152,110 @@ export const SmartRecommendations = ({ recommendations }: SmartRecommendationsPr
             </div>
         </div>
     );
+};
+
+================
+File: frontend/src/routes/pages/student/components/useEnrolledCourses.ts
+================
+import { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '../../../../services/apiClient';
+import { useAuth } from '../../../../auth/useAuth';
+import { readStoredAuthUser } from '../../../../auth/authStorage';
+import type { EnrollmentInfo} from '../../../../services/courseTypes';
+
+export const useEnrolledCourses = (successTrigger: string) => {
+    const { user } = useAuth();
+    const [enrolledList, setEnrolledList] = useState<EnrollmentInfo[]>([]);
+    const [loadingEnrollments, setLoadingEnrollments] = useState<boolean>(false);
+    const [enrollmentError, setEnrollmentError] = useState<string>('');
+
+    /**
+     * Recupera las asignaturas activas del estudiante pasando el username como parámetro.
+     * Sincroniza el contrato de red con el endpoint especializado del Backend.
+     */
+    const fetchStudentEnrollments = useCallback(async () => {
+        setLoadingEnrollments(true);
+        setEnrollmentError('');
+        try {
+            const currentUsername = user?.username?.trim() ?? readStoredAuthUser()?.username?.trim();
+
+            if (!currentUsername) {
+                setEnrollmentError('No se pudo identificar al estudiante autenticado.');
+                return;
+            }
+
+            const response = await apiClient.get<Record<string, unknown>[]>('/api/auth/my-active-courses', {
+                params: { username: currentUsername }
+            });
+
+            if (response.status === 200 && response.data) {
+                // Mapeo adaptativo estricto
+                const normalizedData = response.data.map((enrollment) => {
+                    const courseData = (enrollment.course || enrollment.courses || enrollment) as Record<string, unknown>;
+                    
+                    // [CORRECCIÓN CRÍTICA CRASH]: Forzar la extracción exacta de PostgreSQL (en minúsculas)
+                    const rawEnrollmentId = enrollment.enrollmentid ?? enrollment.enrollmentId;
+                    const safeCourseId = Number(courseData.course_id || courseData.id || 0);
+
+                    // Si llega a ser undefined por un fallo de payload, lanzamos un warning controlado para depurar
+                    if (!rawEnrollmentId) {
+                        console.warn(`[WARN TFG] Matrícula detectada sin ID físico de base de datos para el curso: ${courseData.title}`);
+                    }
+
+                    return {
+                        // Mantenemos la integridad estricta del ID numérico real. Nunca un fallback falso.
+                        enrollmentid: rawEnrollmentId ? Number(rawEnrollmentId) : 0,
+                        enrolled_at: String(enrollment.enrolled_at || new Date().toISOString()),
+                        
+                        // Sello de tiempo del cronómetro
+                        started_at: enrollment.started_at || enrollment.startedAt ? String(enrollment.started_at || enrollment.startedAt) : null,
+                        
+                        status: String(enrollment.status || "EN_PROGRESO"),
+                        progress_percentage: Number(enrollment.progress_percentage ?? enrollment.progress ?? 0),
+                        course: {
+                            course_id: safeCourseId,
+                            title: String(courseData.title || ""),
+                            category: String(courseData.category || "General"),
+                            instructors: String(courseData.instructors || "Por asignar"),
+                            duration: Number(courseData.duration || 0)
+                        }
+                    };
+                });
+
+                // Filtrar cualquier fila corrupta que haya venido sin ID real para proteger el DOM virtual de React
+                const validEnrollments = normalizedData.filter(e => e.enrollmentid !== 0);
+                setEnrolledList(validEnrollments as EnrollmentInfo[]);
+            }
+        } catch (err) {
+            console.error("Error crítico en la pasarela HTTP de matrículas:", err);
+            setEnrollmentError("No se pudieron sincronizar tus asignaturas activas desde PostgreSQL.");
+        } finally {
+            setLoadingEnrollments(false);
+        }
+    }, [user?.username]);
+
+    // Reactividad: Se ejecuta al montar el componente y cada vez que cambia el successTrigger
+    useEffect(() => {
+        fetchStudentEnrollments();
+    }, [successTrigger, fetchStudentEnrollments]);
+
+        /**
+     * Inyecta de forma optimista la matrícula en caliente en el estado local
+     */
+    const injectLocalEnrollment = () => {
+        // Al ser una inserción optimista local inmediata sin ID de DB asignado aún,
+        // forzamos el refresco limpio desde PostgreSQL para evitar IDs temporales que rompan las keys.
+        fetchStudentEnrollments();
+    };
+
+
+    return {
+        enrolledList,
+        loadingEnrollments,
+        enrollmentError,
+        injectLocalEnrollment,
+        fetchStudentEnrollments
+    };
 };
 
 ================
@@ -10721,6 +10723,17 @@ const ProfessorDashboard = () => {
 export default ProfessorDashboard;
 
 ================
+File: frontend/src/App.tsx
+================
+import AppRoutes from "@/routes";
+
+function App() {
+  return <AppRoutes />;
+}
+
+export default App;
+
+================
 File: backend/src/test/java/com/cursosonline/backend/UserServiceTest.java
 ================
 package com.cursosonline.backend;
@@ -10910,17 +10923,6 @@ public class UserServiceTest {
                 "La fórmula matemática del cálculo de progreso transcurrido al vuelo falló.");
     }
 }
-
-================
-File: frontend/src/App.tsx
-================
-import AppRoutes from "@/routes";
-
-function App() {
-  return <AppRoutes />;
-}
-
-export default App;
 
 ================
 File: backend/pom.xml
@@ -11662,6 +11664,160 @@ const AdminDashboard = () => {
 export default AdminDashboard;
 
 ================
+File: backend/src/main/java/com/cursosonline/backend/config/SecurityConfig.java
+================
+package com.cursosonline.backend.config;
+
+import com.cursosonline.backend.security.jwt.JwtAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.List;
+
+@Configuration
+@EnableWebSecurity
+/**
+ * Clase de configuración de seguridad para la aplicación.
+ * Configura la seguridad HTTP, CORS, CSRF, gestión de sesiones y filtros de
+ * autenticación.
+ */
+public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    // Sincronizado con application.properties usando la estructura estandar
+    // 'app.cors.allowed-origins'
+    @Value("${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}")
+    private List<String> allowedOrigins;
+
+    /**
+     * Constructor de la clase SecurityConfig.
+     * 
+     * @param jwtAuthenticationFilter Filtro interceptor del token JWT
+     */
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    }
+
+    /**
+     * Configura la cadena de filtros de seguridad para la aplicación.
+     * 
+     * @param http Componente inyectado de HttpSecurity
+     * @return La cadena de filtros configurada
+     * @throws Exception Si ocurre un error de configuración
+     */
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable())
+
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                .authorizeHttpRequests(auth -> auth
+
+                        // Permitir solicitudes OPTIONS para CORS preflight
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // Rutas públicas para subidas de archivos
+                        .requestMatchers("/uploads/**").permitAll()
+
+                        // Endpoints de autenticación pública (login y registro)
+                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/{username}").permitAll()
+
+                        // 🚨 CONTROL DE ACCESO CRÍTICO: NUEVOS ENDPOINTS DE CURSOS Y MATRÍCULAS
+                        // Permitimos el acceso para que el buscador predictivo funcione en tiempo real
+                        .requestMatchers(HttpMethod.GET, "/api/courses/search").permitAll()
+                        // Protegemos la matrícula exigiendo obligatoriamente sesión activa (JWT)
+                        .requestMatchers(HttpMethod.POST, "/api/courses/enroll/**").authenticated()
+
+                        // Endpoint para obtener el perfil del usuario autenticado (requiere
+                        // autenticación)
+                        .requestMatchers("/api/auth/me").authenticated()
+
+                        // Endpoint para obtener el perfil de un usuario específico (requiere
+                        // autenticación)
+                        .requestMatchers("/api/v1/profile/**").authenticated()
+
+                        // Exclusivo Administrador
+                        .requestMatchers("/api/auth/users/**").hasAuthority("ADMIN")
+                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
+                        .requestMatchers("/api/users/**").hasAuthority("ADMIN")
+
+                        // Exclusivo Profesor y Administrador
+                        .requestMatchers("/api/professor/**").hasAnyAuthority("PROFESSOR", "ADMIN")
+                        .requestMatchers("/api/student/**").hasAnyAuthority("STUDENT", "ADMIN")
+
+                        // Cualquier otra solicitud requiere autenticación
+                        .anyRequest().authenticated())
+                .formLogin(form -> form.disable())
+                .httpBasic(basic -> basic.disable());
+
+        // Agrega el filtro de autenticación JWT antes del filtro estándar de Spring
+        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    /**
+     * Configura la fuente de configuración CORS para la aplicación.
+     * 
+     * @return La fuente de configuración CORS configurada.
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        // Asignamos la lista inyectada directamente
+        config.setAllowedOrigins(allowedOrigins);
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+
+    /**
+     * Configura el codificador de contraseñas para la aplicación.
+     * 
+     * @return El codificador de contraseñas configurado.
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    /**
+     * Configura el administrador de autenticación para la aplicación.
+     * 
+     * @param configuration La configuración de autenticación.
+     * @return El administrador de autenticación configurado.
+     * @throws Exception si ocurre un error al obtener el administrador de
+     *                   autenticación.
+     */
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+        return configuration.getAuthenticationManager();
+    }
+}
+
+================
 File: backend/src/main/java/com/cursosonline/backend/services/UserService.java
 ================
 package com.cursosonline.backend.services;
@@ -12146,160 +12302,6 @@ const StudentDashboard = () => {
 };
 
 export default StudentDashboard;
-
-================
-File: backend/src/main/java/com/cursosonline/backend/config/SecurityConfig.java
-================
-package com.cursosonline.backend.config;
-
-import com.cursosonline.backend.security.jwt.JwtAuthenticationFilter;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.Arrays;
-import java.util.List;
-
-@Configuration
-@EnableWebSecurity
-/**
- * Clase de configuración de seguridad para la aplicación.
- * Configura la seguridad HTTP, CORS, CSRF, gestión de sesiones y filtros de
- * autenticación.
- */
-public class SecurityConfig {
-
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-
-    // Sincronizado con application.properties usando la estructura estandar
-    // 'app.cors.allowed-origins'
-    @Value("${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}")
-    private List<String> allowedOrigins;
-
-    /**
-     * Constructor de la clase SecurityConfig.
-     * 
-     * @param jwtAuthenticationFilter Filtro interceptor del token JWT
-     */
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-    }
-
-    /**
-     * Configura la cadena de filtros de seguridad para la aplicación.
-     * 
-     * @param http Componente inyectado de HttpSecurity
-     * @return La cadena de filtros configurada
-     * @throws Exception Si ocurre un error de configuración
-     */
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
-
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                .authorizeHttpRequests(auth -> auth
-
-                        // Permitir solicitudes OPTIONS para CORS preflight
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
-                        // Rutas públicas para subidas de archivos
-                        .requestMatchers("/uploads/**").permitAll()
-
-                        // Endpoints de autenticación pública (login y registro)
-                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/{username}").permitAll()
-
-                        // 🚨 CONTROL DE ACCESO CRÍTICO: NUEVOS ENDPOINTS DE CURSOS Y MATRÍCULAS
-                        // Permitimos el acceso para que el buscador predictivo funcione en tiempo real
-                        .requestMatchers(HttpMethod.GET, "/api/courses/search").permitAll()
-                        // Protegemos la matrícula exigiendo obligatoriamente sesión activa (JWT)
-                        .requestMatchers(HttpMethod.POST, "/api/courses/enroll/**").authenticated()
-
-                        // Endpoint para obtener el perfil del usuario autenticado (requiere
-                        // autenticación)
-                        .requestMatchers("/api/auth/me").authenticated()
-
-                        // Endpoint para obtener el perfil de un usuario específico (requiere
-                        // autenticación)
-                        .requestMatchers("/api/v1/profile/**").authenticated()
-
-                        // Exclusivo Administrador
-                        .requestMatchers("/api/auth/users/**").hasAuthority("ADMIN")
-                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
-                        .requestMatchers("/api/users/**").hasAuthority("ADMIN")
-
-                        // Exclusivo Profesor y Administrador
-                        .requestMatchers("/api/professor/**").hasAnyAuthority("PROFESSOR", "ADMIN")
-                        .requestMatchers("/api/student/**").hasAnyAuthority("STUDENT", "ADMIN")
-
-                        // Cualquier otra solicitud requiere autenticación
-                        .anyRequest().authenticated())
-                .formLogin(form -> form.disable())
-                .httpBasic(basic -> basic.disable());
-
-        // Agrega el filtro de autenticación JWT antes del filtro estándar de Spring
-        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
-        return http.build();
-    }
-
-    /**
-     * Configura la fuente de configuración CORS para la aplicación.
-     * 
-     * @return La fuente de configuración CORS configurada.
-     */
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        // Asignamos la lista inyectada directamente
-        config.setAllowedOrigins(allowedOrigins);
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
-    }
-
-    /**
-     * Configura el codificador de contraseñas para la aplicación.
-     * 
-     * @return El codificador de contraseñas configurado.
-     */
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    /**
-     * Configura el administrador de autenticación para la aplicación.
-     * 
-     * @param configuration La configuración de autenticación.
-     * @return El administrador de autenticación configurado.
-     * @throws Exception si ocurre un error al obtener el administrador de
-     *                   autenticación.
-     */
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
-        return configuration.getAuthenticationManager();
-    }
-}
 
 ================
 File: backend/src/main/java/com/cursosonline/backend/controller/UserController.java
@@ -13126,6 +13128,43 @@ El Tiempo de Vida (TTL) del token JWT está configurado en 15 minutos (900 segun
 * **Mejora en Usabilidad:** Se elimina la expulsión prematura del alumno activo de la plataforma de manera transparente sin comprometer las directrices estrictas de seguridad.
 * **Consistencia de Datos:** La suite de pruebas de Vitest se elevó a 33 de 33 tests en verde gracias al diseño de relojes virtuales (`vi.useFakeTimers`) que simulan interacciones concurrentes del usuario en el tiempo absoluto.
 * **Aislamiento de Errores:** El servidor tolera desincronizaciones temporales de milisegundos en peticiones HTTP API REST complejas sin corromper el canal.
+
+---
+
+# [ADR-35] Consistencia de Identidad Bidireccional y Ordenamiento Determinista en el Flujo de Matrículas
+
+## Estado
+
+Aceptado
+
+## Contexto
+
+Durante la fase de integración del *Activity Tracker*, el cálculo de progreso académico "al vuelo" (*on the fly*) de las asignaturas en curso introdujo una doble anomalía crítica en el flujo de trabajo del alumno:
+
+1. **Desfase de Indexación Visual ("Efecto Dominó"):** Al accionar el evento del DOM "Iniciar curso" en la tarjeta superior de la lista vertical, la interfaz sufría un parpadeo visual y trasladaba erróneamente el estado activo ("✓ Estudiando asignatura") a la tarjeta inferior, dejando el nodo pulsado intacto.
+2. **Falso Positivo de Expiración de Sesión:** Tras pulsaciones consecutivas sobre el componente reactivo, el sistema sufría una expulsión abrupta del usuario hacia la pantalla de login debido a la activación involuntaria del circuito de expiración de sesión definido en el `AuthProvider.tsx` [ADR-34].
+
+La auditoría técnica reveló un quiebre de la integridad de identidad bidireccional entre la base de datos y el cliente asíncrono. En el backend, la consulta HQL de `EnrollmentRepository.java` carecía de una cláusula `ORDER BY` explícita, provocando que Hibernate alterara la disposición física de la fila en el cursor de PostgreSQL tras ejecutar el `UPDATE` de la estampa de tiempo `started_at`.
+
+En el frontend, una discrepancia nominal en el hook `useEnrolledCourses.ts` provocaba que la clave primaria de la matrícula se mapeara como `undefined`. Ante la ausencia de un identificador estable, el algoritmo de reconciliación de React (*diffing algorithm*) recurría de forma implícita al índice relativo del array (`key={index}`). Al mutar los datos en el backend y reordenarse el array devuelto, React asociaba el nuevo estado visual a la posición indexada previa y no a la entidad real.
+
+Finalmente, el valor `undefined` se propagaba a la pasarela HTTP (Axios), mutando la URL del endpoint a una ruta malformada (`/api/auth/enrollment/undefined/start`). El componente `JwtAuthenticationFilter.java` de Spring Security rechazaba la petición por anomalía de ruta respondiendo con un `HTTP 401 Unauthorized`. El interceptor global de red capturaba el 401, interpretaba falsamente que el token JWT había caducado y disparaba el evento `auth-session-expired`, expulsando al usuario del sistema.
+
+## Decisión
+
+1. **Ordenamiento Determinista en Persistencia:** Modificar la consulta HQL del método `findAllByUserIdWithCourses` en `EnrollmentRepository.java` inyectando una cláusula estricta de ordenación: `ORDER BY e.enrollmentid ASC`. Esto ancla de forma invariable el cursor físico de PostgreSQL ante escrituras concurrentes, manteniendo el mecanismo de optimización `JOIN FETCH` para neutralizar excepciones de inicialización diferida (*LazyInitializationException*).
+2. **Normalización Estricta del Contrato DTO:** Refactorizar el mapeo síncrono del hook `useEnrolledCourses.ts` para capturar la clave primaria exacta (`enrollmentid` en minúsculas) generada por el ORM. Se prohíben de forma taxativa los mecanismos de "salvavidas" o *fallbacks* inestables (como IDs de cursos o marcas de tiempo arbitrarias) que diluyan la identidad de la matrícula. Se depuran además las importaciones muertas (`DBModelCourse`) para satisfacer las reglas del linter de TypeScript.
+3. **Implementación de Semáforo de Mutación (UI Lock):** Introducir un estado local de control de concurrencia (`mutatingId`) en el componente `EnrolledCourses.tsx`. Este mecanismo bloquea y deshabilita los controles de la tarjeta en proceso de activación, impidiendo ráfagas de clics repetidos provocadas por el parpadeo de red y proporcionando un indicador visual asíncrono (*spinner*) de carga.
+4. **Evitación de Atributos Nativos del DOM:** Sustituir la extracción de identificadores a través de atributos nativos del navegador (`e.currentTarget.getAttribute`) por pasajes de parámetros tipados directos en el ámbito de la función de React, eliminando fallos de parseo en caliente.
+5. **Cumplimiento de la Política de Estilos Estáticos:** Eludir la regla estricta de análisis de Microsoft Edge Tools (`no-inline-styles`) mediante el uso de la sintaxis de propagación de objetos de JavaScript (`{...{ style: { width: ... } }}`) sobre la barra de progreso de Tailwind, preservando la animación reactiva y la limpieza del panel de problemas de VS Code.
+
+## Consecuencias
+
+* **Estabilidad del DOM Virtual:** Las identidades de las tarjetas en curso quedan fijadas de manera inmutable a su clave primaria real de PostgreSQL. El algoritmo de reconciliación de React actualiza los nodos físicos de forma exacta, eliminando el "efecto dominó" visual y garantizando la predictibilidad de la interfaz de usuario bajo transiciones CSS de Tailwind.
+* **Robustez en la Capa de Seguridad:** Al garantizar la integridad del `enrollmentid` en el frontend, se erradican por completo las peticiones dirigidas a rutas corruptas. El filtro de Spring Security procesa exclusivamente URLs válidas bajo el token JWT activo, deteniendo las expulsiones forzadas involuntarias en el flujo de interacción.
+* **Mantenimiento de la Cobertura de Pruebas:** Las refactorizaciones aplicadas preservan el comportamiento esperado por la suite de pruebas del monorrepo. Tras la unificación del tipado en las propiedades del componente (`EnrolledCoursesProps`), los 35 de 35 tests unitarios e integrados en Vitest (`EnrolledCourses.test.tsx`) se mantienen estables en verde.
+
+---
 
 # Notas de Migración: Transición a JWT y Compatibilidad
 

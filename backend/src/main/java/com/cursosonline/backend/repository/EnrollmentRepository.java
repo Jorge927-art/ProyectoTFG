@@ -16,10 +16,6 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     Optional<Enrollment> findByUserIdAndCourseId(@Param("userId") Long userId, @Param("courseId") Long courseId);
 
     /**
-     * Dictamen NotebookLM: Recupera las matrículas activas filtrando por ID
-     * numérico.
-     * El JOIN FETCH inicializa la relación 'course' mitigando la
-     * LazyInitializationException.
      * [CORRECCIÓN EFECTO DOMINÓ]: Añadido ORDER BY estricto por enrollmentid
      * para fijar el cursor de PostgreSQL tras los updates.
      */
@@ -27,10 +23,8 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     List<Enrollment> findAllByUserIdWithCourses(@Param("userId") Long userId);
 
     /**
-     * [BLINDAJE DE CONSULTA TFG]: Consulta HQL directa para forzar la coincidencia
-     * exacta
-     * del ID de matrícula y el nombre de usuario de la cuenta, evitando fallos por
-     * minúsculas.
+     * [CORRECCIÓN EFECTO DOMINÓ]: Añadido ORDER BY estricto por enrollmentid
+     * para fijar el cursor de PostgreSQL tras los updates.
      */
     @Query("SELECT e FROM Enrollment e WHERE e.enrollmentid = :enrollmentId AND e.user.username = :username")
     Optional<Enrollment> findByEnrollmentidAndUserUsername(@Param("enrollmentId") Long enrollmentId,

@@ -14,6 +14,7 @@ import { SmartRecommendations } from './components/SmartRecommendations';
 import { useEnrolledCourses } from './components/useEnrolledCourses';
 import { useSmartRecommendations } from './components/useSmartRecommendations';
 import type { DBModelCourse } from '../../../services/courseTypes';
+import { DocumentManager } from './components/DocumentManager';
 
 const StudentDashboard = () => {
     // --- ESTADOS DE UI Y FEEDBACK ---
@@ -117,7 +118,7 @@ const StudentDashboard = () => {
                 {/* Grid de Cursos Matriculados y Catálogo */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                     {/* Sección: Mis Cursos */}
-                    <div className="bg-white border rounded-2xl p-6 shadow-sm">
+                    <div className="bg-white border rounded-2xl p-6 shadow-sm space-y-6">
                         <EnrolledCourses
                             enrolledList={enrolledList}
                             loadingEnrollments={loadingEnrollments}
@@ -127,6 +128,8 @@ const StudentDashboard = () => {
                                 setTimeout(() => setSuccessMessage(''), 5000);
                             }}
                         />
+                        {/*INYECCIÓN DEL GESTOR DE DOCUMENTOS: Se integra de forma modular y reactiva con el hook useDocuments*/}
+                        <DocumentManager />
                     </div>
 
                     {/* Sección: Catálogo de Cursos Disponibles */}
