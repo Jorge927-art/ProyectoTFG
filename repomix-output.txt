@@ -60,7 +60,9 @@ backend/src/main/java/com/cursosonline/backend/config/CustomUserDetailsService.j
 backend/src/main/java/com/cursosonline/backend/config/jwt/JwtProperties.java
 backend/src/main/java/com/cursosonline/backend/config/SecurityConfig.java
 backend/src/main/java/com/cursosonline/backend/config/WebConfig.java
+backend/src/main/java/com/cursosonline/backend/controller/AcademicEvaluationController.java
 backend/src/main/java/com/cursosonline/backend/controller/CourseController.java
+backend/src/main/java/com/cursosonline/backend/controller/DocumentController.java
 backend/src/main/java/com/cursosonline/backend/controller/ProfileController.java
 backend/src/main/java/com/cursosonline/backend/controller/TestController.java
 backend/src/main/java/com/cursosonline/backend/controller/UserController.java
@@ -71,7 +73,9 @@ backend/src/main/java/com/cursosonline/backend/dto/LoginRequest.java
 backend/src/main/java/com/cursosonline/backend/dto/ProfileResponseDTO.java
 backend/src/main/java/com/cursosonline/backend/dto/ProfileUpdateDTO.java
 backend/src/main/java/com/cursosonline/backend/dto/RecommendationDTO.java
+backend/src/main/java/com/cursosonline/backend/entities/AcademicEvaluation.java
 backend/src/main/java/com/cursosonline/backend/entities/Courses.java
+backend/src/main/java/com/cursosonline/backend/entities/DocumentMetadata.java
 backend/src/main/java/com/cursosonline/backend/entities/Enrollment.java
 backend/src/main/java/com/cursosonline/backend/entities/Interest.java
 backend/src/main/java/com/cursosonline/backend/entities/Role.java
@@ -82,7 +86,9 @@ backend/src/main/java/com/cursosonline/backend/exception/GlobalExceptionHandler.
 backend/src/main/java/com/cursosonline/backend/exception/ResourceNotFoundException.java
 backend/src/main/java/com/cursosonline/backend/exception/ServicesException.java
 backend/src/main/java/com/cursosonline/backend/exception/UserAlreadyExistsException.java
+backend/src/main/java/com/cursosonline/backend/repository/AcademicEvaluationRepository.java
 backend/src/main/java/com/cursosonline/backend/repository/CoursesRepository.java
+backend/src/main/java/com/cursosonline/backend/repository/DocumentMetadataRepository.java
 backend/src/main/java/com/cursosonline/backend/repository/EnrollmentRepository.java
 backend/src/main/java/com/cursosonline/backend/repository/InterestRepository.java
 backend/src/main/java/com/cursosonline/backend/repository/UserProfileRepository.java
@@ -98,6 +104,8 @@ backend/src/main/resources/application-dev.properties
 backend/src/main/resources/application-prod.properties
 backend/src/main/resources/application.properties
 backend/src/test/java/com/cursosonline/backend/BackendApplicationTests.java
+backend/src/test/java/com/cursosonline/backend/controller/AcademicEvaluationControllerTest.java
+backend/src/test/java/com/cursosonline/backend/controller/DocumentControllerTest.java
 backend/src/test/java/com/cursosonline/backend/controller/UserControllerTest.java
 backend/src/test/java/com/cursosonline/backend/FileStorageServiceTest.java
 backend/src/test/java/com/cursosonline/backend/security/jwt/CorsIntegrationTest.java
@@ -190,10 +198,16 @@ frontend/src/routes/pages/professor/ProfessorProfilePage.tsx
 frontend/src/routes/pages/public/AccessDenied.tsx
 frontend/src/routes/pages/public/LandingPage.tsx
 frontend/src/routes/pages/student/components/CourseCatalog.tsx
+frontend/src/routes/pages/student/components/DocumentManager.test.tsx
+frontend/src/routes/pages/student/components/DocumentManager.tsx
 frontend/src/routes/pages/student/components/EnrolledCourses.test.tsx
 frontend/src/routes/pages/student/components/EnrolledCourses.tsx
+frontend/src/routes/pages/student/components/EvaluationPanel.test.tsx
+frontend/src/routes/pages/student/components/EvaluationPanel.tsx
 frontend/src/routes/pages/student/components/SmartRecommendations.tsx
+frontend/src/routes/pages/student/components/useActiveEvaluations.ts
 frontend/src/routes/pages/student/components/useCourseCatalog.ts
+frontend/src/routes/pages/student/components/useDocuments.ts
 frontend/src/routes/pages/student/components/useEnrolledCourses.ts
 frontend/src/routes/pages/student/components/useSmartRecommendations.ts
 frontend/src/routes/pages/student/InterestsModal.test.tsx
@@ -202,6 +216,8 @@ frontend/src/routes/pages/student/StudentDashboard.tsx
 frontend/src/routes/pages/student/StudentProfilePage.tsx
 frontend/src/services/apiClient.ts
 frontend/src/services/courseTypes.ts
+frontend/src/services/documentService.ts
+frontend/src/services/evaluationService.ts
 frontend/src/services/profileService.ts
 frontend/src/services/userDomains.ts
 frontend/src/setupTests.tsx
@@ -214,6 +230,412 @@ tfg-documentacion-tecnica.md
 ================================================================
 Files
 ================================================================
+
+================
+File: backend/src/main/java/com/cursosonline/backend/controller/AcademicEvaluationController.java
+================
+package com.cursosonline.backend.controller;
+
+import com.cursosonline.backend.entities.AcademicEvaluation;
+import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.repository.AcademicEvaluationRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.UserRepository;
+import com.cursosonline.backend.repository.CoursesRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/v1/evaluations")
+@Transactional
+public class AcademicEvaluationController {
+
+    private final EnrollmentRepository enrollmentRepository;
+    private final AcademicEvaluationRepository academicEvaluationRepository;
+    private final UserRepository userRepository;
+    private final CoursesRepository coursesRepository;
+
+    public AcademicEvaluationController(EnrollmentRepository enrollmentRepository,
+            AcademicEvaluationRepository academicEvaluationRepository,
+            UserRepository userRepository,
+            CoursesRepository coursesRepository) {
+        this.enrollmentRepository = enrollmentRepository;
+        this.academicEvaluationRepository = academicEvaluationRepository;
+        this.userRepository = userRepository;
+        this.coursesRepository = coursesRepository;
+    }
+
+    /**
+     * [ENDPOINT FILTRADO DOCENTE]: Obtiene las asignaturas y profesores que el
+     * alumno
+     * cursa activamente y que se encuentran pendientes de recibir calificación.
+     */
+    @GetMapping("/pending")
+    public ResponseEntity<?> getPendingEvaluations(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o sesión inválida."));
+            }
+
+            String username = authentication.getName();
+            List<Enrollment> pending = enrollmentRepository.findPendingEvaluationsByUsername(username);
+
+            return ResponseEntity.ok(pending);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error interno al recuperar asignaturas pendientes de evaluación",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
+    /**
+     * [ENDPOINT CARGA PUNTUACIONES]: Valida las precondiciones de seguridad y
+     * almacena el voto granular de estrellas y comentarios en PostgreSQL.
+     */
+    @PostMapping("/submit")
+    public ResponseEntity<?> submitEvaluation(
+            Authentication authentication,
+            @RequestBody Map<String, Object> payload) {
+
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o sesión inválida."));
+            }
+
+            // 1. Extracción y parseo seguro del payload entrante
+            Long courseId = Long.valueOf(payload.get("course_id").toString());
+            Integer courseScore = Integer.valueOf(payload.get("course_score").toString());
+            Integer instructorScore = Integer.valueOf(payload.get("instructor_score").toString());
+            String courseComment = payload.get("course_comment") != null ? payload.get("course_comment").toString()
+                    : null;
+            String instructorComment = payload.get("instructor_comment") != null
+                    ? payload.get("instructor_comment").toString()
+                    : null;
+
+            // Rango de estrellas aceptado (1 a 5)
+            if (courseScore < 1 || courseScore > 5 || instructorScore < 1 || instructorScore > 5) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Las puntuaciones deben estar confinadas entre 1 y 5 estrellas."));
+            }
+
+            String username = authentication.getName();
+
+            // 2. [BLINDAJE PERIMETRAL JWT]: Validar que el alumno esté legítimamente
+            // matriculado
+            boolean isEnrolled = enrollmentRepository.existsByUsernameAndCourseId(username, courseId);
+            if (!isEnrolled) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error",
+                                "Acceso denegado: No puedes evaluar una asignatura en la que no estás matriculado."));
+            }
+
+            // 3. [CONTROL ANTE DUPLICADOS]: Validar que no exista un voto previo
+            boolean alreadyEvaluated = academicEvaluationRepository.existsByUserUsernameAndCourseCourseId(username,
+                    courseId);
+            if (alreadyEvaluated) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Ya has emitido una calificación para esta asignatura."));
+            }
+
+            // 4. Recuperación de entidades y persistencia
+            Users currentUser = userRepository.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado en el sistema."));
+
+            Courses currentCourse = coursesRepository.findById(courseId)
+                    .orElseThrow(() -> new RuntimeException("Asignatura no encontrada en el catálogo."));
+
+            AcademicEvaluation evaluation = new AcademicEvaluation();
+            evaluation.setCourse_score(courseScore);
+            evaluation.setCourseComment(courseComment);
+            evaluation.setInstructor_score(instructorScore);
+            evaluation.setInstructorComment(instructorComment);
+            evaluation.setUser(currentUser);
+            evaluation.setCourse(currentCourse);
+
+            academicEvaluationRepository.save(evaluation);
+
+            return ResponseEntity.ok(Map.of("message", "Evaluación académica guardada y procesada correctamente."));
+
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Estructura de datos de evaluación corrupta o incompleta."));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error crítico al guardar la evaluación en el servidor",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/entities/AcademicEvaluation.java
+================
+package com.cursosonline.backend.entities;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "academic_evaluations", uniqueConstraints = {
+        // [BLINDAJE DE IDENTIDAD TFG]: Impide estrictamente que un alumno
+        // duplique evaluaciones para la misma asignatura matriculada.
+        @UniqueConstraint(columnNames = { "user_id", "course_id" })
+})
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class AcademicEvaluation {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long evaluationid;
+
+    // --- RATING DE ASIGNATURA ---
+    @Column(nullable = false)
+    private Integer course_score; // Puntuación numérica local (1-5 estrellas)
+
+    @Column(name = "course_comment", columnDefinition = "TEXT")
+    private String courseComment; // Retroalimentación textual opcional sobre el curso
+
+    // --- RATING DE DOCENTE / INSTRUCTOR ---
+    @Column(nullable = false)
+    private Integer instructor_score; // Puntuación numérica local (1-5 estrellas)
+
+    @Column(name = "instructor_comment", columnDefinition = "TEXT")
+    private String instructorComment; // Retroalimentación textual opcional sobre el profesor
+
+    // --- METADATOS ---
+    @Column(nullable = false)
+    private LocalDateTime evaluation_date = LocalDateTime.now();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private Users user; // El estudiante autenticado que emite el voto
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "course_id", nullable = false)
+    private Courses course; // El curso asociado (sirve como ancla y contiene el String de instructores)
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/repository/AcademicEvaluationRepository.java
+================
+package com.cursosonline.backend.repository;
+
+import com.cursosonline.backend.entities.AcademicEvaluation;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface AcademicEvaluationRepository extends JpaRepository<AcademicEvaluation, Long> {
+
+    /**
+     * [RATING DUAL - ASIGNATURA]: Calcula la media aritmética local (Comunidad)
+     * para un curso específico. Retorna null si aún no tiene votos.
+     */
+    @Query("SELECT AVG(ae.course_score) FROM AcademicEvaluation ae WHERE ae.course.course_id = :courseId")
+    Double getAverageCourseScore(@Param("courseId") Long courseId);
+
+    /**
+     * [RATING DUAL - DOCENTE]: Calcula la media aritmética local (Comunidad) de un
+     * profesor evaluando las coincidencias de texto del campo instructors de la
+     * tabla courses.
+     */
+    @Query("SELECT AVG(ae.instructor_score) FROM AcademicEvaluation ae WHERE ae.course.instructors = :instructorName")
+    Double getAverageInstructorScore(@Param("instructorName") String instructorName);
+
+    /**
+     * [BLINDAJE DE IDENTIDAD]: Verifica de forma atómica si un alumno ya emitió
+     * una calificación para un curso antes de permitir la inserción.
+     */
+    @Query("SELECT COUNT(ae) > 0 FROM AcademicEvaluation ae WHERE ae.user.username = :username AND ae.course.course_id = :courseId")
+    boolean existsByUserUsernameAndCourseCourseId(@Param("username") String username, @Param("courseId") Long courseId);
+}
+
+================
+File: backend/src/test/java/com/cursosonline/backend/controller/AcademicEvaluationControllerTest.java
+================
+package com.cursosonline.backend.controller;
+
+import com.cursosonline.backend.entities.AcademicEvaluation;
+import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.repository.AcademicEvaluationRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.UserRepository;
+import com.cursosonline.backend.repository.CoursesRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+
+@DisplayName("Suite de Pruebas Unitarias de Aislamiento: AcademicEvaluationController [TFG Backend]")
+public class AcademicEvaluationControllerTest {
+
+    @InjectMocks
+    private AcademicEvaluationController academicEvaluationController;
+
+    @Mock
+    private EnrollmentRepository enrollmentRepository;
+
+    @Mock
+    private AcademicEvaluationRepository academicEvaluationRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private CoursesRepository coursesRepository;
+
+    @Mock
+    private Authentication authentication;
+
+    private Users mockUser;
+    private Courses mockCourse;
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+
+        mockUser = new Users();
+        mockUser.setUser_id(1L);
+        mockUser.setUsername("luis_student");
+        mockUser.setEmail("luis@tfg.com");
+
+        mockCourse = new Courses();
+        mockCourse.setCourse_id(101L);
+        mockCourse.setTitle("Introduction to Data Science");
+        mockCourse.setInstructors("Prof. Andrew Ng");
+
+        // Simulación estándar del contexto de seguridad por Claims
+        Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+        Mockito.when(authentication.getName()).thenReturn("luis_student");
+    }
+
+    @Test
+    @DisplayName("Debe retornar HTTP 200 con la lista de asignaturas pendientes asociadas al alumno legítimo")
+    void debeRetornarAsignaturasPendientesConExito() {
+        Enrollment mockEnrollment = new Enrollment();
+        mockEnrollment.setEnrollmentid(50L);
+        mockEnrollment.setCourse(mockCourse);
+        mockEnrollment.setUser(mockUser);
+
+        Mockito.when(enrollmentRepository.findPendingEvaluationsByUsername("luis_student"))
+                .thenReturn(Arrays.asList(mockEnrollment));
+
+        ResponseEntity<?> response = academicEvaluationController.getPendingEvaluations(authentication);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertTrue(response.getBody() instanceof List);
+        List<?> bodyList = (List<?>) response.getBody();
+        assertEquals(1, bodyList.size());
+    }
+
+    @Test
+    @DisplayName("Debe procesar y persistir con éxito (HTTP 200) un formulario granular con estrellas y comentarios válidos")
+    void debeProcesarYGuardarEvaluacionLegitima() {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("course_id", 101L);
+        payload.put("course_score", 5);
+        payload.put("course_comment", "Excelente material didáctico.");
+        payload.put("instructor_score", 4);
+        payload.put("instructor_comment", "Buenas tutorías explicativas.");
+
+        // Simulamos precondiciones de seguridad: está matriculado y no ha votado antes
+        Mockito.when(enrollmentRepository.existsByUsernameAndCourseId("luis_student", 101L)).thenReturn(true);
+        Mockito.when(academicEvaluationRepository.existsByUserUsernameAndCourseCourseId("luis_student", 101L))
+                .thenReturn(false);
+
+        Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockUser));
+        Mockito.when(coursesRepository.findById(101L)).thenReturn(Optional.of(mockCourse));
+
+        ResponseEntity<?> response = academicEvaluationController.submitEvaluation(authentication, payload);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+        assertNotNull(bodyMap);
+        assertEquals("Evaluación académica guardada y procesada correctamente.", bodyMap.get("message"));
+
+        // Validamos que se invocó el método save del repositorio
+        Mockito.verify(academicEvaluationRepository, Mockito.times(1)).save(any(AcademicEvaluation.class));
+    }
+
+    @Test
+    @DisplayName("Debe denegar el acceso (HTTP 403 Forbidden) si el alumno intenta evaluar una asignatura sin matrícula legítima")
+    void debeDenegarEvaluacionSiNoEstaMatriculado() {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("course_id", 999L); // Curso pirata sin matrícula
+        payload.put("course_score", 5);
+        payload.put("instructor_score", 5);
+
+        // Simulamos que la matrícula no existe en PostgreSQL
+        Mockito.when(enrollmentRepository.existsByUsernameAndCourseId("luis_student", 999L)).thenReturn(false);
+
+        ResponseEntity<?> response = academicEvaluationController.submitEvaluation(authentication, payload);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+        assertNotNull(bodyMap);
+        assertEquals("Acceso denegado: No puedes evaluar una asignatura en la que no estás matriculado.",
+                bodyMap.get("error"));
+
+        // Verificamos protección perimetral estricta: nunca debe invocar el método save
+        Mockito.verify(academicEvaluationRepository, Mockito.never()).save(any(AcademicEvaluation.class));
+    }
+
+    @Test
+    @DisplayName("Debe denegar el registro (HTTP 400 Bad Request) si el alumno intenta duplicar una calificación ya emitida")
+    void debeRechazarEvaluacionSiYaExisteUnVotoPrevio() {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("course_id", 101L);
+        payload.put("course_score", 4);
+        payload.put("instructor_score", 4);
+
+        Mockito.when(enrollmentRepository.existsByUsernameAndCourseId("luis_student", 101L)).thenReturn(true);
+        // Simulamos que ya hay un registro persistido en la tabla
+        Mockito.when(academicEvaluationRepository.existsByUserUsernameAndCourseCourseId("luis_student", 101L))
+                .thenReturn(true);
+
+        ResponseEntity<?> response = academicEvaluationController.submitEvaluation(authentication, payload);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+        assertNotNull(bodyMap);
+        assertEquals("Ya has emitido una calificación para esta asignatura.", bodyMap.get("error"));
+
+        Mockito.verify(academicEvaluationRepository, Mockito.never()).save(any(AcademicEvaluation.class));
+    }
+}
 
 ================
 File: frontend/src/components/ui/authModal/AuthModal.test.tsx
@@ -1617,6 +2039,507 @@ export default function ProfileSettings() {
 }
 
 ================
+File: frontend/src/routes/pages/student/components/EvaluationPanel.test.tsx
+================
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { EvaluationPanel } from './EvaluationPanel';
+import { useActiveEvaluations } from './useActiveEvaluations';
+
+// 1. Mockear el hook para aislar el componente visual de las llamadas de Axios
+vi.mock('./useActiveEvaluations', () => ({
+    useActiveEvaluations: vi.fn()
+}));
+
+describe('EvaluationPanel Component [TFG Test Suite]', () => {
+    const mockSubmitEvaluation = vi.fn();
+    const mockSetEvaluationError = vi.fn();
+    const mockRefreshPending = vi.fn();
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+
+        // Configuración por defecto para un estado inicial limpio sin asignaturas
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: [],
+            loadingPending: false,
+            isSubmitting: false,
+            evaluationError: '',
+            setEvaluationError: mockSetEvaluationError,
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
+        } as ReturnType<typeof useActiveEvaluations>);
+    });
+
+    it('debe renderizar el estado vacío cuando no existen asignaturas pendientes de evaluar', () => {
+        render(<EvaluationPanel />);
+
+        expect(screen.getByText('Evaluación Académica de Docentes y Cursos')).toBeInTheDocument();
+        expect(screen.getByText('Has evaluado todas tus asignaturas vigentes. ¡Buen trabajo!')).toBeInTheDocument();
+    });
+
+    it('debe renderizar la lista de asignaturas y profesores activos pendientes de calificación', () => {
+        const mockPending = [
+            {
+                enrollmentid: 10,
+                enrolled_at: '2026-07-06T10:00:00.000Z',
+                status: 'EN_PROGRESO',
+                course: {
+                    course_id: 101,
+                    title: 'Introduction to Data Science',
+                    category: 'Data Science',
+                    instructors: 'Prof. Andrew Ng',
+                    duration: 40
+                }
+            }
+        ];
+
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: mockPending,
+            loadingPending: false,
+            isSubmitting: false,
+            evaluationError: '',
+            setEvaluationError: mockSetEvaluationError,
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
+        } as ReturnType<typeof useActiveEvaluations>);
+
+        render(<EvaluationPanel />);
+
+        expect(screen.getByText('Introduction to Data Science')).toBeInTheDocument();
+        expect(screen.getByText('Docente: Prof. Andrew Ng')).toBeInTheDocument();
+        expect(screen.getByText('1 pendientes')).toBeInTheDocument();
+    });
+
+    it('debe mostrar el spinner de carga asíncrona mientras sincroniza con PostgreSQL', () => {
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: [],
+            loadingPending: true,
+            isSubmitting: false,
+            evaluationError: '',
+            setEvaluationError: mockSetEvaluationError,
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
+        } as ReturnType<typeof useActiveEvaluations>);
+
+        render(<EvaluationPanel />);
+
+        expect(screen.getByText('Sincronizando asignaturas matriculadas...')).toBeInTheDocument();
+    });
+
+    it('debe desplegar el Alert Box controlado si el hook reporta un fallo de red o denegación', () => {
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: [],
+            loadingPending: false,
+            isSubmitting: false,
+            evaluationError: 'Acceso denegado: No puedes evaluar un curso sin matrícula activa.',
+            setEvaluationError: mockSetEvaluationError,
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
+        } as ReturnType<typeof useActiveEvaluations>);
+
+        render(<EvaluationPanel />);
+
+        expect(screen.getByText('Acceso denegado: No puedes evaluar un curso sin matrícula activa.')).toBeInTheDocument();
+    });
+
+    it('debe abrir el formulario de rating dual al pulsar el botón Evaluar', async () => {
+        const mockPending = [
+            {
+                enrollmentid: 10,
+                enrolled_at: '2026-07-06T10:00:00.000Z',
+                status: 'EN_PROGRESO',
+                course: {
+                    course_id: 101,
+                    title: 'Introduction to Data Science',
+                    category: 'Data Science',
+                    instructors: 'Prof. Andrew Ng',
+                    duration: 40
+                }
+            }
+        ];
+
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: mockPending,
+            loadingPending: false,
+            isSubmitting: false,
+            evaluationError: '',
+            setEvaluationError: mockSetEvaluationError,
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
+        } as ReturnType<typeof useActiveEvaluations>);
+
+        render(<EvaluationPanel />);
+
+        const evalButton = screen.getByRole('button', { name: /Evaluar/i });
+        fireEvent.click(evalButton);
+
+        // [CORRECCIÓN ACT WARNING]: Esperamos de forma asíncrona a que concluya la mutación del DOM virtual
+        await waitFor(() => {
+            expect(mockSetEvaluationError).toHaveBeenCalledWith('');
+        });
+    });
+});
+
+================
+File: frontend/src/routes/pages/student/components/EvaluationPanel.tsx
+================
+import { useState } from 'react';
+import { Star, MessageSquare, Award, UserCheck, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import GenericCard from '../../../../components/ui/genericCard/GenericCard';
+import { useActiveEvaluations } from './useActiveEvaluations';
+
+export const EvaluationPanel = () => {
+    const {
+        pendingList,
+        loadingPending,
+        isSubmitting,
+        evaluationError,
+        setEvaluationError,
+        submitEvaluation
+    } = useActiveEvaluations();
+
+    // --- ESTADOS INTERACTIVOS DEL FORMULARIO ---
+    const [selectedEnrollmentId, setSelectedEnrollmentId] = useState<number | null>(null);
+    const [courseScore, setCourseScore] = useState<number>(0);
+    const [courseComment, setCourseComment] = useState<string>('');
+    const [instructorScore, setInstructorScore] = useState<number>(0);
+    const [instructorComment, setInstructorComment] = useState<string>('');
+    const [successMessage, setSuccessMessage] = useState<string>('');
+
+    // Estados auxiliares para el efecto hover visual de las estrellas
+    const [hoverCourse, setHoverCourse] = useState<number>(0);
+    const [hoverInstructor, setHoverInstructor] = useState<number>(0);
+
+    const activeEnrollment = pendingList.find(e => e.enrollmentid === selectedEnrollmentId);
+
+    const resetForm = () => {
+        setSelectedEnrollmentId(null);
+        setCourseScore(0);
+        setCourseComment('');
+        setInstructorScore(0);
+        setInstructorComment('');
+        setHoverCourse(0);
+        setHoverInstructor(0);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!activeEnrollment) return;
+
+        if (courseScore === 0 || instructorScore === 0) {
+            setEvaluationError("Por favor, asigna una puntuación de estrellas tanto a la asignatura como al profesor.");
+            return;
+        }
+
+        const payload = {
+            course_id: activeEnrollment.course.course_id,
+            course_score: courseScore,
+            course_comment: courseComment.trim() || "",
+            instructor_score: instructorScore,
+            instructor_comment: instructorComment.trim() || ""
+        };
+
+        const success = await submitEvaluation(payload);
+        if (success) {
+            setSuccessMessage(`¡Evaluación enviada con éxito para: ${activeEnrollment.course.title}!`);
+            resetForm();
+            setTimeout(() => setSuccessMessage(''), 5000);
+        }
+    };
+
+    const starsArray = [1, 2, 3, 4, 5];
+
+    return (
+        /* ALINEACIÓN GEOMÉTRICA CONSOLIDADA: Mantiene simetría con h-109 */
+        <GenericCard className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-109">
+            {/* CABECERA DEL COMPONENTE */}
+            <div className="flex items-center justify-between mb-4 shrink-0">
+                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <Award size={18} className="text-amber-600" />
+                    <span>Evaluación Académica de Docentes y Cursos</span>
+                </h2>
+                <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full">
+                    {pendingList.length} pendientes
+                </span>
+            </div>
+
+            {/* ALERT BOXES DE FEEDBACK DE RED */}
+            {evaluationError && (
+                <div className="mb-3 p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg flex items-center gap-2 shrink-0">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <p className="truncate">{evaluationError}</p>
+                </div>
+            )}
+
+            {successMessage && (
+                <div className="mb-3 p-2.5 bg-green-50 border border-green-200 text-green-700 text-xs font-semibold rounded-lg flex items-center gap-2 shrink-0">
+                    <CheckCircle2 size={14} className="shrink-0" />
+                    <p className="truncate">{successMessage}</p>
+                </div>
+            )}
+            {/* CONTENEDOR DINÁMICO ASÍNCRONO */}
+            <div className="flex-1 flex flex-col min-h-0">
+                {loadingPending ? (
+                    <div className="h-full flex flex-col justify-center items-center bg-white border border-slate-100 rounded-xl text-slate-400 p-4">
+                        <Loader2 size={24} className="animate-spin mb-2 text-amber-600" />
+                        <p className="text-xs font-medium text-slate-500">Sincronizando asignaturas matriculadas...</p>
+                    </div>
+                ) : pendingList.length === 0 ? (
+                    <div className="p-6 bg-white/80 border border-slate-100 rounded-xl text-center flex flex-col justify-center h-full">
+                        <p className="text-xs font-medium text-slate-400 italic">Has evaluado todas tus asignaturas vigentes. ¡Buen trabajo!</p>
+                    </div>
+                ) : !selectedEnrollmentId ? (
+
+                    /* VISTA 1: LISTADO DE ASIGNATURAS POR EVALUAR [SCROLL CONTROLADO] */
+                    <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2">
+                        <p className="text-[11px] text-slate-400 font-medium mb-2">Selecciona una asignatura activa para calificar su contenido y a su docente:</p>
+                        {pendingList.map((enroll) => (
+                            <div
+                                key={enroll.enrollmentid}
+                                className="flex justify-between items-center p-3 bg-white border border-slate-100 hover:border-amber-300 hover:bg-amber-50/20 rounded-xl shadow-sm transition-all group"
+                            >
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="text-xs font-bold text-slate-700 truncate">{enroll.course.title}</h3>
+                                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">Docente: {enroll.course.instructors || "Por asignar"}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => { setEvaluationError(''); setSelectedEnrollmentId(enroll.enrollmentid); }}
+                                    className="ml-3 px-3 py-1.5 bg-slate-100 hover:bg-amber-600 hover:text-white text-slate-700 text-[11px] font-bold rounded-lg transition-all cursor-pointer shadow-xs"
+                                >
+                                    Evaluar
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+
+                    /* VISTA 2: FORMULARIO INTERACTIVO GRANULAR DE RATING DUAL */
+                    <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between min-h-0 bg-transparent overflow-y-auto custom-scrollbar">
+                        <div className="space-y-4">
+                            {/* Cabecera del Curso bajo Evaluación */}
+                            <div className="border-b pb-2">
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded uppercase">Cuestionario Activo</span>
+                                <h3 className="text-xs font-bold text-slate-800 truncate mt-1">{activeEnrollment?.course.title}</h3>
+                            </div>
+
+                            {/* DIMENSIÓN 1: EVALUACIÓN DE LA ASIGNATURA */}
+                            <div>
+                                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-1">
+                                    <MessageSquare size={13} className="text-blue-500" />
+                                    <span>1. Calidad del Contenido del Curso</span>
+                                </label>
+                                <div className="flex items-center gap-1 mb-2">
+                                    {starsArray.map((star: number) => (
+                                        <button
+                                            key={star}
+                                            type="button"
+                                            onClick={() => setCourseScore(star)}
+                                            onMouseEnter={() => setHoverCourse(star)}
+                                            onMouseLeave={() => setHoverCourse(0)}
+                                            className="text-slate-200 hover:scale-110 transition-transform cursor-pointer"
+                                            aria-label={`Calificar curso con ${star} estrellas`}
+                                            title={`Calificar curso con ${star} estrellas`}
+                                        >
+                                            <Star
+                                                size={18}
+                                                className={(hoverCourse || courseScore) >= star ? "fill-amber-400 text-amber-400" : "text-slate-300"}
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+                                <textarea
+                                    value={courseComment}
+                                    onChange={(e) => setCourseComment(e.target.value)}
+                                    placeholder="¿Qué opinas del material didáctico y las prácticas? (Opcional)"
+                                    className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:border-amber-500 focus:outline-hidden custom-scrollbar h-12 resize-none"
+                                    maxLength={300}
+                                />
+                            </div>
+
+                            {/* DIMENSIÓN 2: EVALUACIÓN DEL PROFESOR / INSTRUCTOR */}
+                            <div>
+                                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-1">
+                                    <UserCheck size={13} className="text-emerald-500" />
+                                    <span>2. Desempeño del Docente ({activeEnrollment?.course.instructors || "Profesor"})</span>
+                                </label>
+                                <div className="flex items-center gap-1 mb-2">
+                                    {starsArray.map((star: number) => (
+                                        <button
+                                            key={star}
+                                            type="button"
+                                            onClick={() => setInstructorScore(star)}
+                                            onMouseEnter={() => setHoverInstructor(star)}
+                                            onMouseLeave={() => setHoverInstructor(0)}
+                                            className="text-slate-200 hover:scale-110 transition-transform cursor-pointer"
+                                            aria-label={`Calificar docente con ${star} estrellas`}
+                                            title={`Calificar docente con ${star} estrellas`}
+                                        >
+                                            <Star
+                                                size={18}
+                                                className={(hoverInstructor || instructorScore) >= star ? "fill-amber-400 text-amber-400" : "text-slate-300"}
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+                                <textarea
+                                    value={instructorComment}
+                                    onChange={(e) => setInstructorComment(e.target.value)}
+                                    placeholder="¿Cómo valoras las explicaciones y tutorías del docente? (Opcional)"
+                                    className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:border-amber-500 focus:outline-hidden custom-scrollbar h-12 resize-none"
+                                    maxLength={300}
+                                />
+                            </div>
+                        </div>
+
+                        {/* ACCIONES DEL FORMULARIO */}
+                        <div className="flex gap-3 pt-3 border-t mt-4 shrink-0">
+                            <button
+                                type="button"
+                                onClick={resetForm}
+                                disabled={isSubmitting}
+                                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                            >
+                                Volver
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white text-xs font-bold py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed"
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <Loader2 size={14} className="animate-spin" />
+                                        <span>Procesando...</span>
+                                    </>
+                                ) : (
+                                    <span>Enviar Calificación</span>
+                                )}
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </div>
+        </GenericCard>
+    );
+};
+
+================
+File: frontend/src/routes/pages/student/components/useActiveEvaluations.ts
+================
+import { useState, useEffect, useCallback } from 'react';
+import { getPendingEvaluations, submitAcademicEvaluation, type PendingEvaluationDTO, type EvaluationInput } from '../../../../services/evaluationService';
+
+
+export const useActiveEvaluations = (successTrigger?: string) => {
+    const [pendingList, setPendingList] = useState<PendingEvaluationDTO[]>([]);
+    const [loadingPending, setLoadingPending] = useState<boolean>(false);
+    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+    const [evaluationError, setEvaluationError] = useState<string>('');
+
+    /**
+     * Sincroniza con PostgreSQL para extraer los cursos con profesores activos pendientes de evaluar.
+     */
+    const fetchPendingEvaluations = useCallback(async () => {
+        setLoadingPending(true);
+        setEvaluationError('');
+        try {
+            const data = await getPendingEvaluations();
+            setPendingList(data);
+        } catch (err: unknown) {
+            console.error("Error crítico al recuperar asignaturas pendientes de evaluación:", err);
+            setEvaluationError("No se pudieron sincronizar las asignaturas pendientes desde el servidor.");
+        } finally {
+            setLoadingPending(false);
+        }
+    }, []);
+
+    /**
+     * Transmite la evaluación dual de estrellas y comentarios al backend.
+     */
+    const submitEvaluation = async (inputData: EvaluationInput): Promise<boolean> => {
+        setIsSubmitting(true);
+        setEvaluationError('');
+        try {
+            await submitAcademicEvaluation(inputData);
+            await fetchPendingEvaluations(); // Refresca en caliente la lista local quitando el curso evaluado
+            return true;
+        } catch (err: unknown) {
+            console.error("Error al procesar el envío de la evaluación académica:", err);
+            // Captura estricta del mensaje de denegación perimetral o error de Spring Boot
+            const errorConResponse = err as { response?: { data?: { error?: string } } };
+            const backendError = errorConResponse.response?.data?.error || "Error crítico al guardar tu evaluación.";
+            setEvaluationError(backendError);
+            return false;
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    // Reactividad integrada para escuchar cambios o triggers externos del Dashboard
+    useEffect(() => {
+        fetchPendingEvaluations();
+    }, [successTrigger, fetchPendingEvaluations]);
+
+    return {
+        pendingList,
+        loadingPending,
+        isSubmitting,
+        evaluationError,
+        setEvaluationError,
+        refreshPending: fetchPendingEvaluations,
+        submitEvaluation
+    };
+};
+
+================
+File: frontend/src/services/evaluationService.ts
+================
+import { apiClient } from './apiClient';
+
+// Interfaz para mapear la estructura de la matrícula con el curso anidado
+export interface PendingEvaluationDTO {
+    enrollmentid: number;
+    enrolled_at: string;
+    status: string;
+    course: {
+        course_id: number;
+        title: string;
+        category: string;
+        instructors: string;
+        duration: number;
+    };
+}
+
+// Interfaz estricta para el payload estructurado del formulario granular
+export interface EvaluationInput {
+    course_id: number;
+    course_score: number;       // Estrellas de la asignatura (1-5)
+    course_comment: string;     // Comentario de la asignatura (Opcional)
+    instructor_score: number;   // Estrellas del profesor (1-5)
+    instructor_comment: string; // Comentario del profesor (Opcional)
+}
+
+/**
+ * [SERVICIO FILTRADO DOCENTE]: Recupera la lista de asignaturas y nombres de instructores 
+ * activos en las matrículas del estudiante autenticado que aún no han sido evaluados.
+ */
+export const getPendingEvaluations = async (): Promise<PendingEvaluationDTO[]> => {
+    const response = await apiClient.get<PendingEvaluationDTO[]>('/api/v1/evaluations/pending');
+    return response.data;
+};
+
+/**
+ * [SERVICIO CARGA PUNTUACIONES]: Transmite el payload granular con las estrellas y 
+ * valoraciones textuales de ambas dimensiones para su persistencia segura en PostgreSQL.
+ */
+export const submitAcademicEvaluation = async (data: EvaluationInput): Promise<{ message: string }> => {
+    const response = await apiClient.post<{ message: string }>('/api/v1/evaluations/submit', data);
+    return response.data;
+};
+
+================
 File: backend/.env.example
 ================
 # ======================================================
@@ -2442,6 +3365,123 @@ public class CustomUserDetailsService implements UserDetailsService {
 }
 
 ================
+File: backend/src/main/java/com/cursosonline/backend/controller/DocumentController.java
+================
+package com.cursosonline.backend.controller;
+
+import com.cursosonline.backend.entities.DocumentMetadata;
+import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.repository.DocumentMetadataRepository;
+import com.cursosonline.backend.repository.UserRepository;
+import com.cursosonline.backend.services.FileStorageService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/v1/documents")
+@Transactional
+public class DocumentController {
+
+    private final FileStorageService fileStorageService;
+    private final DocumentMetadataRepository documentMetadataRepository;
+    private final UserRepository userRepository;
+
+    public DocumentController(FileStorageService fileStorageService,
+            DocumentMetadataRepository documentMetadataRepository,
+            UserRepository userRepository) {
+        this.fileStorageService = fileStorageService;
+        this.documentMetadataRepository = documentMetadataRepository;
+        this.userRepository = userRepository;
+    }
+
+    /**
+     * [ENDPOINT DE CONSULTA MULTI-ROL]: Devuelve la lista ordenada de metadatos de
+     * documentos
+     * que pertenecen de forma exclusiva al usuario autenticado en la sesión.
+     */
+    @GetMapping
+    public ResponseEntity<?> getUserDocuments(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            String username = authentication.getName();
+            List<DocumentMetadata> documents = documentMetadataRepository
+                    .findAllByUserUsernameOrderByDocumentidDesc(username);
+
+            return ResponseEntity.ok(documents);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error interno al recuperar el listado de documentos",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
+    /**
+     * [ENDPOINT DE CARGA MULTI-ROL]: Recibe el archivo multipart, ejecuta la
+     * validación dual
+     * en el FileStorageService (.pdf, .docx, .txt) y persiste sus referencias en
+     * PostgreSQL.
+     */
+    @PostMapping("/upload")
+    public ResponseEntity<?> uploadDocument(
+            Authentication authentication,
+            @RequestParam("file") MultipartFile file) {
+
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            if (file == null || file.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "El archivo transmitido está vacío o es inválido."));
+            }
+
+            Users currentUser = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Usuario autenticado no encontrado en el sistema."));
+
+            // 1. Guardar archivo físico en el subdirectorio /documents bajo validación
+            // perimetral dual estricta
+            String relativePath = fileStorageService.storeFile(file, "documents");
+
+            // 2. Construir y persistir el registro de metadatos acoplado a la entidad
+            // genérica Users
+            DocumentMetadata metadata = new DocumentMetadata();
+            metadata.setFilename(relativePath);
+            metadata.setOriginalname(org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename()));
+            metadata.setUser(currentUser);
+
+            documentMetadataRepository.save(metadata);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Documento procesado y almacenado con éxito",
+                    "filename", relativePath,
+                    "originalname", metadata.getOriginalname()));
+
+        } catch (IllegalArgumentException e) {
+            // Captura de forma controlada excepciones por extensión incorrecta o violación
+            // de tipo MIME
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error crítico al procesar la subida del documento en el servidor",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+}
+
+================
 File: backend/src/main/java/com/cursosonline/backend/dto/AuthResponse.java
 ================
 package com.cursosonline.backend.dto;
@@ -2594,6 +3634,44 @@ public class Courses {
 }
 
 ================
+File: backend/src/main/java/com/cursosonline/backend/entities/DocumentMetadata.java
+================
+package com.cursosonline.backend.entities;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "document_metadata")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class DocumentMetadata {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long documentid;
+
+    @Column(nullable = false)
+    private String filename; // Nombre físico único generado con UUID en disco (ej: uuid_clase.pdf)
+
+    @Column(nullable = false)
+    private String originalname; // Nombre original subido por el usuario (ej: Tema1.pdf)
+
+    @Column(nullable = false)
+    private LocalDateTime upload_date = LocalDateTime.now();
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id") // Vinculado a la tabla Users (sirve para Alumnos, Profesores o Admins)
+    private Users user;
+}
+
+================
 File: backend/src/main/java/com/cursosonline/backend/entities/Interest.java
 ================
 package com.cursosonline.backend.entities;
@@ -2653,6 +3731,28 @@ public class Interest {
     @CollectionTable(name = "interest_subtitle_languages", joinColumns = @JoinColumn(name = "interest_id"))
     @Column(name = "subtitle_languages") // Sincronizado con la disponibilidad de subtítulos
     private List<String> subtitle_languages = new ArrayList<>();
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/repository/DocumentMetadataRepository.java
+================
+package com.cursosonline.backend.repository;
+
+import com.cursosonline.backend.entities.DocumentMetadata;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import java.util.List;
+
+public interface DocumentMetadataRepository extends JpaRepository<DocumentMetadata, Long> {
+
+    /**
+     * [BLINDAJE DE CONSULTA MULTI-ROL]: Recupera todos los documentos de un usuario
+     * ordenados de forma determinista por ID de documento descendente (los más
+     * recientes primero).
+     */
+    @Query("SELECT d FROM DocumentMetadata d WHERE d.user.username = :username ORDER BY d.documentid DESC")
+    List<DocumentMetadata> findAllByUserUsernameOrderByDocumentidDesc(@Param("username") String username);
 }
 
 ================
@@ -2846,6 +3946,160 @@ spring.datasource.password=${SPRING_DATASOURCE_PASSWORD}
 
 # En producción no se recomienda modificar esquema automáticamente.
 spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
+
+================
+File: backend/src/test/java/com/cursosonline/backend/controller/DocumentControllerTest.java
+================
+package com.cursosonline.backend.controller;
+
+import com.cursosonline.backend.entities.DocumentMetadata;
+import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.repository.DocumentMetadataRepository;
+import com.cursosonline.backend.repository.UserRepository;
+import com.cursosonline.backend.services.FileStorageService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.core.Authentication;
+
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+
+@DisplayName("Suite de Pruebas Unitarias de Aislamiento: DocumentController [TFG Backend]")
+public class DocumentControllerTest {
+
+    @InjectMocks
+    private DocumentController documentController;
+
+    @Mock
+    private FileStorageService fileStorageService;
+
+    @Mock
+    private DocumentMetadataRepository documentMetadataRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private Authentication authentication;
+
+    private Users mockUser;
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+
+        mockUser = new Users();
+        mockUser.setUser_id(1L);
+        mockUser.setUsername("luis_student");
+        mockUser.setEmail("luis@tfg.com");
+
+        // Simular que el usuario siempre está autenticado por defecto
+        Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+        Mockito.when(authentication.getName()).thenReturn("luis_student");
+    }
+
+    @Test
+    @DisplayName("Debe retornar lista vacía (HTTP 200) cuando el alumno no posee documentos persistidos en PostgreSQL")
+    void debeRetornarListaVaciaCuandoNoHayDocumentos() {
+        Mockito.when(documentMetadataRepository.findAllByUserUsernameOrderByDocumentidDesc("luis_student"))
+                .thenReturn(Collections.emptyList());
+
+        ResponseEntity<?> response = documentController.getUserDocuments(authentication);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertTrue(response.getBody() instanceof List);
+        List<?> bodyList = (List<?>) response.getBody();
+        assertTrue(bodyList.isEmpty());
+    }
+
+    @Test
+    @DisplayName("Debe retornar el listado ordenado de metadatos cuando existen registros asociados en la base de datos")
+    void debeRetornarMetadatosDeDocumentos() {
+        DocumentMetadata doc1 = new DocumentMetadata(1L, "documents/uuid1_t1.pdf", "Tema1.pdf", LocalDateTime.now(),
+                mockUser);
+        DocumentMetadata doc2 = new DocumentMetadata(2L, "documents/uuid2_e1.docx", "Ensayo.docx", LocalDateTime.now(),
+                mockUser);
+
+        Mockito.when(documentMetadataRepository.findAllByUserUsernameOrderByDocumentidDesc("luis_student"))
+                .thenReturn(Arrays.asList(doc1, doc2));
+
+        ResponseEntity<?> response = documentController.getUserDocuments(authentication);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        List<?> bodyList = (List<?>) response.getBody();
+        assertEquals(2, bodyList.size());
+
+        DocumentMetadata firstResult = (DocumentMetadata) bodyList.get(0);
+        assertEquals("Tema1.pdf", firstResult.getOriginalname());
+    }
+
+    @Test
+    @DisplayName("Debe procesar y persistir con éxito (HTTP 200) un archivo multipart válido (.pdf, .docx, .txt)")
+    void debeSubirDocumentoValidoConExito() {
+        MockMultipartFile validFile = new MockMultipartFile(
+                "file",
+                "MiPractica.pdf",
+                "application/pdf",
+                "Contenido binario simulado de prueba".getBytes());
+
+        Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockUser));
+        Mockito.when(fileStorageService.storeFile(any(), eq("documents"))).thenReturn("documents/uuid_mock.pdf");
+
+        ResponseEntity<?> response = documentController.uploadDocument(authentication, validFile);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+        assertNotNull(bodyMap);
+        assertEquals("Documento procesado y almacenado con éxito", bodyMap.get("message"));
+        assertEquals("MiPractica.pdf", bodyMap.get("originalname"));
+
+        Mockito.verify(documentMetadataRepository, Mockito.times(1)).save(any(DocumentMetadata.class));
+    }
+
+    @Test
+    @DisplayName("Debe retornar HTTP 400 Bad Request cuando el FileStorageService rechaza el archivo por validación perimetral dual")
+    void debeRechazarSubidaPorExtensionInvalida() {
+        MockMultipartFile invalidFile = new MockMultipartFile(
+                "file",
+                "Malware.exe",
+                "application/x-msdownload",
+                "Bytes maliciosos".getBytes());
+
+        Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockUser));
+
+        // Forzamos la excepción controlada de tu FileStorageService
+        Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
+                .thenThrow(new IllegalArgumentException(
+                        "Extensión de documento no permitida (.exe). Solo se admite PDF, DOCX o TXT."));
+
+        ResponseEntity<?> response = documentController.uploadDocument(authentication, invalidFile);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+        assertNotNull(bodyMap);
+        assertEquals("Extensión de documento no permitida (.exe). Solo se admite PDF, DOCX o TXT.",
+                bodyMap.get("error"));
+
+        // Verificamos protección perimetral: nunca debe llamar al repositorio
+        Mockito.verify(documentMetadataRepository, Mockito.never()).save(any(DocumentMetadata.class));
+    }
+}
 
 ================
 File: backend/src/test/java/com/cursosonline/backend/controller/UserControllerTest.java
@@ -5492,6 +6746,278 @@ const LandingPage = () => {
 export default LandingPage;
 
 ================
+File: frontend/src/routes/pages/student/components/DocumentManager.test.tsx
+================
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { DocumentManager } from './DocumentManager';
+import { useDocuments } from './useDocuments';
+
+// 1. Mockear el hook para aislar el componente visual de las llamadas reales de Axios
+vi.mock('./useDocuments', () => ({
+    useDocuments: vi.fn()
+}));
+
+describe('DocumentManager Component [TFG Test Suite]', () => {
+    // Definimos variables de mock que satisfacen estrictamente la interfaz del hook
+    const mockHandleUpload = vi.fn();
+    const mockSetDocumentError = vi.fn();
+    const mockRefreshDocuments = vi.fn();
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+
+        // Configuración por defecto para un estado inicial limpio
+        vi.mocked(useDocuments).mockReturnValue({
+            documentList: [],
+            loadingDocuments: false,
+            isUploading: false,
+            documentError: '',
+            setDocumentError: mockSetDocumentError,
+            refreshDocuments: mockRefreshDocuments,
+            handleUpload: mockHandleUpload
+        } as ReturnType<typeof useDocuments>);
+    });
+
+    it('debe renderizar el estado vacío cuando no existen documentos académicos', () => {
+        render(<DocumentManager />);
+
+        expect(screen.getByText('Gestión de Documentos Académicos')).toBeInTheDocument();
+        expect(screen.getByText('No has subido ni recibido ningún documento.')).toBeInTheDocument();
+    });
+
+    it('debe renderizar la lista de metadatos correctamente cuando existen registros en PostgreSQL', () => {
+        const mockDocuments = [
+            { documentid: 1, filename: 'doc1.pdf', originalname: 'Tarea_Algebra.pdf', upload_date: '2026-07-06T10:00:00.000Z' },
+            { documentid: 2, filename: 'doc2.docx', originalname: 'Ensayo_Final.docx', upload_date: '2026-07-05T10:00:00.000Z' }
+        ];
+
+        vi.mocked(useDocuments).mockReturnValue({
+            documentList: mockDocuments,
+            loadingDocuments: false,
+            isUploading: false,
+            documentError: '',
+            setDocumentError: mockSetDocumentError,
+            refreshDocuments: mockRefreshDocuments,
+            handleUpload: mockHandleUpload
+        } as ReturnType<typeof useDocuments>);
+
+        render(<DocumentManager />);
+
+        expect(screen.getByText('Tarea_Algebra.pdf')).toBeInTheDocument();
+        expect(screen.getByText('Ensayo_Final.docx')).toBeInTheDocument();
+        // Verifica el contador de la cabecera
+        expect(screen.getByText('2')).toBeInTheDocument();
+    });
+
+    it('debe mostrar el indicador de carga asíncrona mientras sincroniza con el backend', () => {
+        vi.mocked(useDocuments).mockReturnValue({
+            documentList: [],
+            loadingDocuments: true,
+            isUploading: false,
+            documentError: '',
+            setDocumentError: mockSetDocumentError,
+            refreshDocuments: mockRefreshDocuments,
+            handleUpload: mockHandleUpload
+        } as ReturnType<typeof useDocuments>);
+
+        render(<DocumentManager />);
+
+        expect(screen.getByText('Sincronizando metadatos con PostgreSQL...')).toBeInTheDocument();
+    });
+
+    it('debe desplegar el Alert Box controlado si el backend retorna un error de validación perimetral', () => {
+        vi.mocked(useDocuments).mockReturnValue({
+            documentList: [],
+            loadingDocuments: false,
+            isUploading: false,
+            documentError: 'Extensión de documento no permitida (.exe). Solo se admite PDF, DOCX o TXT.',
+            setDocumentError: mockSetDocumentError,
+            refreshDocuments: mockRefreshDocuments,
+            handleUpload: mockHandleUpload
+        } as ReturnType<typeof useDocuments>);
+
+        render(<DocumentManager />);
+
+        expect(screen.getByText('Extensión de documento no permitida (.exe). Solo se admite PDF, DOCX o TXT.')).toBeInTheDocument();
+    });
+
+    it('debe bloquear el input y mostrar el spinner de transmisión de payload durante la subida multipart', () => {
+        vi.mocked(useDocuments).mockReturnValue({
+            documentList: [],
+            loadingDocuments: false,
+            isUploading: true,
+            documentError: '',
+            setDocumentError: mockSetDocumentError,
+            refreshDocuments: mockRefreshDocuments,
+            handleUpload: mockHandleUpload
+        } as ReturnType<typeof useDocuments>);
+
+        render(<DocumentManager />);
+
+        expect(screen.getByText('Transmitiendo payload seguro...')).toBeInTheDocument();
+    });
+
+    it('debe interceptar y detener la subida en el cliente si el archivo supera el umbral de 5MB', async () => {
+        render(<DocumentManager />);
+
+        const fileInput = document.getElementById('doc-upload-input') as HTMLInputElement;
+        // Simular un archivo que excede los 5MB
+        const largeFile = new File(['a'.repeat(6 * 1024 * 1024)], 'Video_Pesado.mp4', { type: 'video/mp4' });
+
+        fireEvent.change(fileInput, { target: { files: [largeFile] } });
+
+        await waitFor(() => {
+            expect(mockSetDocumentError).toHaveBeenCalledWith(
+                "El archivo excede el límite de 5MB configurado por el sistema."
+            );
+            expect(mockHandleUpload).not.toHaveBeenCalled();
+        });
+    });
+});
+
+================
+File: frontend/src/routes/pages/student/components/DocumentManager.tsx
+================
+import React, { useRef } from 'react';
+import { Upload, FileText, Download, Loader2, AlertCircle, FileUp } from 'lucide-react';
+import GenericCard from '../../../../components/ui/genericCard/GenericCard';
+import { useDocuments } from './useDocuments';
+
+export const DocumentManager = () => {
+    const {
+        documentList,
+        loadingDocuments,
+        isUploading,
+        documentError,
+        setDocumentError,
+        handleUpload
+    } = useDocuments();
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+
+            // Validación previa en el cliente para ahorrar ancho de banda (Máx 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                setDocumentError("El archivo excede el límite de 5MB configurado por el sistema.");
+                return;
+            }
+
+            const success = await handleUpload(file);
+            if (success && fileInputRef.current) {
+                fileInputRef.current.value = ''; // Limpia el input tras la subida exitosa
+            }
+        }
+    };
+
+    const handleDownload = (filename: string) => {
+        // Concatenamos la ruta base de descargas apuntando al almacenamiento estático del backend
+        const fileUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/uploads/${filename}`;
+        window.open(fileUrl, '_blank', 'noopener,noreferrer');
+    };
+
+    return (
+        /* ALINEACIÓN GEOMÉTRICA CONSOLIDADA: Mantiene simetría con tus otras tarjetas */
+        <GenericCard className="flex flex-col h-109">
+            {/* CABECERA DEL COMPONENTE */}
+            <div className="flex items-center justify-between mb-4 shrink-0">
+                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <FileUp size={18} className="text-blue-600" />
+                    <span>Gestión de Documentos Académicos</span>
+                </h2>
+                <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">
+                    {documentList.length}
+                </span>
+            </div>
+
+            {/* ALERT BOX CONTROLADO DE ERRORES DEL BACKEND */}
+            {documentError && (
+                <div className="mb-3 p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg flex items-center gap-2 shrink-0">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <p className="truncate">{documentError}</p>
+                </div>
+            )}
+
+            {/* CONTENEDOR FLEX PRINCIPAL */}
+            <div className="flex-1 flex flex-col space-y-4 min-h-0">
+
+                {/* ZONA DE ARRASTRE Y SUBIDA MULTIPART */}
+                <div className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-4 text-center transition-all bg-white shrink-0 group">
+                    <input
+                        type="file"
+                        id="doc-upload-input"
+                        ref={fileInputRef}
+                        hidden
+                        onChange={onFileChange}
+                        accept=".pdf,.docx,.txt"
+                        disabled={isUploading}
+                    />
+                    <label
+                        htmlFor="doc-upload-input"
+                        className={`flex flex-col items-center gap-2 ${isUploading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                    >
+                        {isUploading ? (
+                            <Loader2 className="text-blue-500 animate-spin" size={24} />
+                        ) : (
+                            <Upload className="text-slate-400 group-hover:text-blue-500 transition-colors" size={24} />
+                        )}
+                        <span className="text-xs font-bold text-slate-600">
+                            {isUploading ? "Transmitiendo payload seguro..." : "Seleccionar archivo (.pdf, .docx, .txt)"}
+                        </span>
+                        <p className="text-[10px] text-slate-400 font-medium">Tamaño máximo admitido por petición: 5MB</p>
+                    </label>
+                </div>
+
+                {/* ZONA DE LISTADO CON SCROLL GEOMÉTRICO CONTROLADO [ADR-19] */}
+                <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2 min-h-[140px]">
+                    {loadingDocuments ? (
+                        <div className="h-full flex flex-col justify-center items-center bg-white border border-slate-100 rounded-xl text-slate-400 p-4">
+                            <Loader2 size={20} className="animate-spin mb-2 text-blue-600" />
+                            <p className="text-[11px] font-medium text-slate-500">Sincronizando metadatos con PostgreSQL...</p>
+                        </div>
+                    ) : documentList.length === 0 ? (
+                        <div className="p-6 bg-white/80 border border-slate-100 rounded-xl text-center flex flex-col justify-center h-full">
+                            <p className="text-xs font-medium text-slate-400 italic">No has subido ni recibido ningún documento.</p>
+                        </div>
+                    ) : (
+                        documentList.map((doc) => (
+                            <div
+                                key={doc.documentid}
+                                className="flex justify-between items-center p-2.5 bg-white border border-slate-100 hover:border-slate-200 rounded-lg shadow-sm transition-all"
+                            >
+                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                    <FileText size={16} className="text-slate-400 shrink-0" />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-xs font-bold text-slate-700 truncate" title={doc.originalname}>
+                                            {doc.originalname}
+                                        </p>
+                                        <p className="text-[10px] text-slate-400 font-medium">
+                                            Subido el: {new Date(doc.upload_date).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => handleDownload(doc.filename)}
+                                    className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors cursor-pointer ml-2 shrink-0"
+                                    title="Descargar documento"
+                                >
+                                    <Download size={14} />
+                                </button>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </GenericCard>
+    );
+};
+
+================
 File: frontend/src/routes/pages/student/components/EnrolledCourses.test.tsx
 ================
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -5571,6 +7097,75 @@ describe('Auditoría UI: Aislamiento de Estados en EnrolledCourses', () => {
         expect(startButton).toBeInTheDocument();
     });
 });
+
+================
+File: frontend/src/routes/pages/student/components/useDocuments.ts
+================
+import { useState, useEffect, useCallback } from 'react';
+import { getUserDocuments, uploadStudentDocument, type DocumentMetadata } from '../../../../services/documentService'; // Ajusta las rutas relativas según tu árbol
+
+export const useDocuments = (successTrigger?: string) => {
+    const [documentList, setDocumentList] = useState<DocumentMetadata[]>([]);
+    const [loadingDocuments, setLoadingDocuments] = useState<boolean>(false);
+    const [isUploading, setIsUploading] = useState<boolean>(false);
+    const [documentError, setDocumentError] = useState<string>('');
+
+    /**
+     * Recupera el listado de documentos del usuario autenticado sincronizando con PostgreSQL.
+     */
+    const fetchUserDocuments = useCallback(async () => {
+        setLoadingDocuments(true);
+        setDocumentError('');
+        try {
+            const data = await getUserDocuments();
+            setDocumentList(data);
+        } catch (err: unknown) {
+            console.error("Error crítico al sincronizar documentos con el servidor:", err);
+            setDocumentError("No se pudieron sincronizar tus documentos desde el servidor.");
+        } finally {
+            setLoadingDocuments(false);
+        }
+    }, []);
+
+    /**
+     * Sube un archivo físico al servidor y refresca el listado de forma síncrona.
+     */
+    const handleUpload = async (file: File): Promise<boolean> => {
+        if (!file) return false;
+        
+        setIsUploading(true);
+        setDocumentError('');
+        try {
+            await uploadStudentDocument(file);
+            await fetchUserDocuments(); // Refresca en caliente la lista sin recargar la página
+            return true;
+        } catch (err: unknown) {
+            console.error("Error al procesar la subida del documento:", err);
+            // Capturamos el mensaje de error exacto devuelto por la validación perimetral dual de Spring Boot
+            const errorConResponse = err as { response?: { data?: { error?: string } } };
+            const backendError = errorConResponse.response?.data?.error || "Error crítico al subir el archivo.";
+            setDocumentError(backendError);
+            return false;
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    // Reactividad: se ejecuta al montar y si cambia un trigger externo de éxito
+    useEffect(() => {
+        fetchUserDocuments();
+    }, [successTrigger, fetchUserDocuments]);
+
+    return {
+        documentList,
+        loadingDocuments,
+        isUploading,
+        documentError,
+        setDocumentError,
+        refreshDocuments: fetchUserDocuments,
+        handleUpload
+    };
+};
 
 ================
 File: frontend/src/routes/pages/student/components/useSmartRecommendations.ts
@@ -5730,6 +7325,55 @@ describe('InterestsModal Component - Suite de Pruebas Unitarias Estrictas', () =
         });
     });
 });
+
+================
+File: frontend/src/services/documentService.ts
+================
+import { apiClient } from './apiClient';
+
+// Interfaz estricta que mapea la entidad DocumentMetadata de PostgreSQL
+export interface DocumentMetadata {
+    documentid: number;
+    filename: string;
+    originalname: string;
+    upload_date: string;
+}
+
+// Interfaz para la respuesta exitosa del servidor tras almacenar el archivo
+export interface UploadDocumentResponse {
+    message: string;
+    filename: string;
+    originalname: string;
+}
+
+/**
+ * [SERVICIO MULTI-ROL]: Recupera el listado ordenado de metadatos de documentos
+ * asociados de forma exclusiva a la cuenta del usuario autenticado.
+ */
+export const getUserDocuments = async (): Promise<DocumentMetadata[]> => {
+    const response = await apiClient.get<DocumentMetadata[]>('/api/v1/documents');
+    return response.data;
+};
+
+/**
+ * [SERVICIO MULTI-ROL]: Envía un archivo físico (.pdf, .docx, .txt) encapsulado
+ * en un objeto Multipart/Form-Data para su validación perimetral dual en Spring Boot.
+ */
+export const uploadStudentDocument = async (file: File): Promise<UploadDocumentResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await apiClient.post<UploadDocumentResponse>(
+        '/api/v1/documents/upload',
+        formData,
+        {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        }
+    );
+    return response.data;
+};
 
 ================
 File: frontend/src/services/profileService.ts
@@ -7584,157 +9228,6 @@ public class ResourceNotFoundException extends ServicesException {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/repository/EnrollmentRepository.java
-================
-package com.cursosonline.backend.repository;
-
-import com.cursosonline.backend.entities.Enrollment;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import java.util.List;
-import java.util.Optional;
-
-public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
-
-    @Query("SELECT e.course.course_id FROM Enrollment e WHERE e.user.user_id = :userId")
-    List<Long> findEnrolledCourseIdsByUserId(@Param("userId") Long userId);
-
-    @Query("SELECT e FROM Enrollment e WHERE e.user.user_id = :userId AND e.course.course_id = :courseId")
-    Optional<Enrollment> findByUserIdAndCourseId(@Param("userId") Long userId, @Param("courseId") Long courseId);
-
-    /**
-     * Dictamen NotebookLM: Recupera las matrículas activas filtrando por ID
-     * numérico.
-     * El JOIN FETCH inicializa la relación 'course' mitigando la
-     * LazyInitializationException.
-     * [CORRECCIÓN EFECTO DOMINÓ]: Añadido ORDER BY estricto por enrollmentid
-     * para fijar el cursor de PostgreSQL tras los updates.
-     */
-    @Query("SELECT e FROM Enrollment e JOIN FETCH e.course WHERE e.user.user_id = :userId ORDER BY e.enrollmentid ASC")
-    List<Enrollment> findAllByUserIdWithCourses(@Param("userId") Long userId);
-
-    /**
-     * [BLINDAJE DE CONSULTA TFG]: Consulta HQL directa para forzar la coincidencia
-     * exacta
-     * del ID de matrícula y el nombre de usuario de la cuenta, evitando fallos por
-     * minúsculas.
-     */
-    @Query("SELECT e FROM Enrollment e WHERE e.enrollmentid = :enrollmentId AND e.user.username = :username")
-    Optional<Enrollment> findByEnrollmentidAndUserUsername(@Param("enrollmentId") Long enrollmentId,
-            @Param("username") String username);
-
-}
-
-================
-File: backend/src/main/java/com/cursosonline/backend/services/FileStorageService.java
-================
-package com.cursosonline.backend.services;
-
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-import jakarta.annotation.PostConstruct;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
-
-@Service
-public class FileStorageService {
-
-    private final Path rootLocation;
-
-    // Extensiones permitidas por categorías
-    private final List<String> ALLOWED_IMAGE_EXTENSIONS = Arrays.asList("jpg", "jpeg", "png", "webp");
-    private final List<String> ALLOWED_DOC_EXTENSIONS = Arrays.asList("pdf");
-
-    public FileStorageService(@Value("${spring.servlet.multipart.location}") String uploadDir) {
-        this.rootLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
-    }
-
-    @PostConstruct
-    public void init() {
-        try {
-            Files.createDirectories(this.rootLocation);
-            Files.createDirectories(this.rootLocation.resolve("avatars"));
-            Files.createDirectories(this.rootLocation.resolve("documents"));
-        } catch (IOException e) {
-            throw new RuntimeException("No se pudieron inicializar las carpetas de almacenamiento", e);
-        }
-    }
-
-    public String storeFile(MultipartFile file, String subFolder) {
-        String originalFileName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
-        try {
-            if (file.isEmpty()) {
-                throw new IllegalArgumentException("No se puede guardar un archivo vacío: " + originalFileName);
-            }
-            if (originalFileName.contains("..")) {
-                throw new IllegalArgumentException("Ruta no permitida fuera del directorio: " + originalFileName);
-            }
-
-            // AUDITORÍA NOTEBOOKLM: Validación estricta de extensiones y tipos de archivo
-            // por carpeta
-            validateFileType(file, originalFileName, subFolder);
-
-            String uniqueFileName = UUID.randomUUID().toString() + "_" + originalFileName;
-            Path targetLocation = this.rootLocation.resolve(subFolder).resolve(uniqueFileName);
-            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-
-            return subFolder + "/" + uniqueFileName;
-        } catch (IOException e) {
-            throw new RuntimeException("Error al almacenar el archivo " + originalFileName, e);
-        }
-    }
-
-    /**
-     * Valida de manera estricta que el archivo corresponda al formato permitido
-     * para su carpeta.
-     */
-    private void validateFileType(MultipartFile file, String filename, String subFolder) {
-        String extension = getFileExtension(filename).toLowerCase();
-        String contentType = file.getContentType();
-
-        if ("avatars".equalsIgnoreCase(subFolder)) {
-            // Validar extensión de imagen
-            if (!ALLOWED_IMAGE_EXTENSIONS.contains(extension)) {
-                throw new IllegalArgumentException(
-                        "Extensión de imagen no permitida (" + extension + "). Use JPG, JPEG, PNG o WEBP.");
-            }
-            // Validar Content-Type de imagen
-            if (contentType == null || !contentType.startsWith("image/")) {
-                throw new IllegalArgumentException("El tipo de contenido no corresponde a una imagen válida.");
-            }
-        } else if ("documents".equalsIgnoreCase(subFolder)) {
-            // Validar extensión de documento
-            if (!ALLOWED_DOC_EXTENSIONS.contains(extension)) {
-                throw new IllegalArgumentException(
-                        "Extensión de documento no permitida (" + extension + "). Solo se admite PDF.");
-            }
-            // Validar Content-Type de documento
-            if (contentType == null || !contentType.equalsIgnoreCase("application/pdf")) {
-                throw new IllegalArgumentException("El tipo de contenido debe ser estrictamente un PDF.");
-            }
-        } else {
-            throw new IllegalArgumentException("Carpeta de destino no configurada para validación de seguridad.");
-        }
-    }
-
-    private String getFileExtension(String filename) {
-        int lastIndexOf = filename.lastIndexOf(".");
-        if (lastIndexOf == -1) {
-            return ""; // Archivo sin extensión
-        }
-        return filename.substring(lastIndexOf + 1);
-    }
-}
-
-================
 File: backend/src/main/java/com/cursosonline/backend/services/RecommendationService.java
 ================
 package com.cursosonline.backend.services;
@@ -8556,6 +10049,66 @@ public interface CoursesRepository extends JpaRepository<Courses, Long> {
 }
 
 ================
+File: backend/src/main/java/com/cursosonline/backend/repository/EnrollmentRepository.java
+================
+package com.cursosonline.backend.repository;
+
+import com.cursosonline.backend.entities.Enrollment;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import java.util.List;
+import java.util.Optional;
+
+public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
+
+    @Query("SELECT e.course.course_id FROM Enrollment e WHERE e.user.user_id = :userId")
+    List<Long> findEnrolledCourseIdsByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT e FROM Enrollment e WHERE e.user.user_id = :userId AND e.course.course_id = :courseId")
+    Optional<Enrollment> findByUserIdAndCourseId(@Param("userId") Long userId, @Param("courseId") Long courseId);
+
+    /**
+     * [CORRECCIÓN EFECTO DOMINÓ]: Añadido ORDER BY estricto por enrollmentid
+     * para fijar el cursor de PostgreSQL tras los updates.
+     */
+    @Query("SELECT e FROM Enrollment e JOIN FETCH e.course WHERE e.user.user_id = :userId ORDER BY e.enrollmentid ASC")
+    List<Enrollment> findAllByUserIdWithCourses(@Param("userId") Long userId);
+
+    /**
+     * [CORRECCIÓN EFECTO DOMINÓ]: Añadido ORDER BY estricto por enrollmentid
+     * para fijar el cursor de PostgreSQL tras los updates.
+     */
+    @Query("SELECT e FROM Enrollment e WHERE e.enrollmentid = :enrollmentId AND e.user.username = :username")
+    Optional<Enrollment> findByEnrollmentidAndUserUsername(@Param("enrollmentId") Long enrollmentId,
+            @Param("username") String username);
+
+    // =========================================================================
+    // --- SISTEMA DE EVALUACIÓN ACADÉMICA DUAL ---
+    // =========================================================================
+
+    /**
+     * [CONTROL DE SEGURIDAD EXCLUSIVO]: Valida si un nombre de usuario cuenta con
+     * una matrícula legítima para un ID de curso específico antes de procesar el
+     * voto.
+     */
+    @Query("SELECT COUNT(e) > 0 FROM Enrollment e WHERE e.user.username = :username AND e.course.course_id = :courseId")
+    boolean existsByUsernameAndCourseId(@Param("username") String username, @Param("courseId") Long courseId);
+
+    /**
+     * [FILTRADO DOCENTE ACTIVO]: Recupera las matrículas del alumno inicializando
+     * 'course'
+     * y excluyendo por subconsulta los cursos que ya cuenten con una calificación
+     * previa de este usuario.
+     */
+    @Query("SELECT e FROM Enrollment e JOIN FETCH e.course c WHERE e.user.username = :username " +
+            "AND c.course_id NOT IN (SELECT ae.course.course_id FROM AcademicEvaluation ae WHERE ae.user.username = :username) "
+            +
+            "ORDER BY e.enrollmentid ASC")
+    List<Enrollment> findPendingEvaluationsByUsername(@Param("username") String username);
+}
+
+================
 File: backend/src/main/java/com/cursosonline/backend/repository/UserRepository.java
 ================
 package com.cursosonline.backend.repository;
@@ -8686,6 +10239,126 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Solo si el token es 100% válido permitimos continuar hacia los controladores
         filterChain.doFilter(request, response);
+    }
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/services/FileStorageService.java
+================
+package com.cursosonline.backend.services;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import jakarta.annotation.PostConstruct;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+public class FileStorageService {
+
+    private final Path rootLocation;
+
+    // Extensiones permitidas por categorías
+    private final List<String> ALLOWED_IMAGE_EXTENSIONS = Arrays.asList("jpg", "jpeg", "png", "webp");
+
+    // [ADR-23 REFACTORIZADO]: Ampliación de lista blanca para incluir formatos de
+    // texto y procesamiento de palabras
+    private final List<String> ALLOWED_DOC_EXTENSIONS = Arrays.asList("pdf", "docx", "txt");
+
+    // Lista blanca estricta de tipos MIME válidos para mitigar ataques de ejecución
+    // remota (RCE) y MIME-sniffing
+    private final List<String> ALLOWED_DOC_MIME_TYPES = Arrays.asList(
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain");
+
+    public FileStorageService(@Value("${spring.servlet.multipart.location}") String uploadDir) {
+        this.rootLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
+    }
+
+    @PostConstruct
+    public void init() {
+        try {
+            Files.createDirectories(this.rootLocation);
+            Files.createDirectories(this.rootLocation.resolve("avatars"));
+            Files.createDirectories(this.rootLocation.resolve("documents"));
+        } catch (IOException e) {
+            throw new RuntimeException("No se pudieron inicializar las carpetas de almacenamiento", e);
+        }
+    }
+
+    public String storeFile(MultipartFile file, String subFolder) {
+        String originalFileName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
+        try {
+            if (file.isEmpty()) {
+                throw new IllegalArgumentException("No se puede guardar un archivo vacío: " + originalFileName);
+            }
+            if (originalFileName.contains("..")) {
+                throw new IllegalArgumentException("Ruta no permitida fuera del directorio: " + originalFileName);
+            }
+
+            // AUDITORÍA NOTEBOOKLM: Validación estricta de extensiones y tipos de archivo
+            // por carpeta
+            validateFileType(file, originalFileName, subFolder);
+
+            String uniqueFileName = UUID.randomUUID().toString() + "_" + originalFileName;
+            Path targetLocation = this.rootLocation.resolve(subFolder).resolve(uniqueFileName);
+            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+
+            return subFolder + "/" + uniqueFileName;
+        } catch (IOException e) {
+            throw new RuntimeException("Error al almacenar el archivo " + originalFileName, e);
+        }
+    }
+
+    /**
+     * Valida de manera estricta que el archivo corresponda al formato permitido
+     * para su carpeta.
+     */
+    private void validateFileType(MultipartFile file, String filename, String subFolder) {
+        String extension = getFileExtension(filename).toLowerCase();
+        String contentType = file.getContentType();
+
+        if ("avatars".equalsIgnoreCase(subFolder)) {
+            // Validar extensión de imagen
+            if (!ALLOWED_IMAGE_EXTENSIONS.contains(extension)) {
+                throw new IllegalArgumentException(
+                        "Extensión de imagen no permitida (" + extension + "). Use JPG, JPEG, PNG o WEBP.");
+            }
+            // Validar Content-Type de imagen
+            if (contentType == null || !contentType.startsWith("image/")) {
+                throw new IllegalArgumentException("El tipo de contenido no corresponde a una imagen válida.");
+            }
+        } else if ("documents".equalsIgnoreCase(subFolder)) {
+            // [VALIDACIÓN PERIMETRAL DUAL]: Comprobar de forma síncrona que la extensión
+            // esté en la lista blanca
+            if (!ALLOWED_DOC_EXTENSIONS.contains(extension)) {
+                throw new IllegalArgumentException(
+                        "Extensión de documento no permitida (" + extension + "). Solo se admite PDF, DOCX o TXT.");
+            }
+            // [VALIDACIÓN PERIMETRAL DUAL]: Comprobar que el tipo MIME coincida
+            // estrictamente con el payload transmitido
+            if (contentType == null || !ALLOWED_DOC_MIME_TYPES.contains(contentType.toLowerCase())) {
+                throw new IllegalArgumentException("El tipo de contenido del documento no es válido o está corrupto.");
+            }
+        } else {
+            throw new IllegalArgumentException("Carpeta de destino no configurada para validación de seguridad.");
+        }
+    }
+
+    private String getFileExtension(String filename) {
+        int lastIndexOf = filename.lastIndexOf(".");
+        if (lastIndexOf == -1) {
+            return ""; // Archivo sin extensión
+        }
+        return filename.substring(lastIndexOf + 1);
     }
 }
 
@@ -12163,6 +13836,9 @@ import { SmartRecommendations } from './components/SmartRecommendations';
 import { useEnrolledCourses } from './components/useEnrolledCourses';
 import { useSmartRecommendations } from './components/useSmartRecommendations';
 import type { DBModelCourse } from '../../../services/courseTypes';
+import { DocumentManager } from './components/DocumentManager';
+import { EvaluationPanel } from './components/EvaluationPanel';
+
 
 const StudentDashboard = () => {
     // --- ESTADOS DE UI Y FEEDBACK ---
@@ -12263,10 +13939,11 @@ const StudentDashboard = () => {
                     )}
                 </div>
 
-                {/* Grid de Cursos Matriculados y Catálogo */}
+                {/* Grid Sincronizado de Cursos Matriculados y Catálogo */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                    {/* Sección: Mis Cursos */}
-                    <div className="bg-white border rounded-2xl p-6 shadow-sm">
+
+                    {/* COLUMNA 1 (IZQUIERDA): Mis Cursos y Gestor de Documentos */}
+                    <div className="bg-white border rounded-2xl p-6 shadow-sm space-y-6">
                         <EnrolledCourses
                             enrolledList={enrolledList}
                             loadingEnrollments={loadingEnrollments}
@@ -12276,19 +13953,27 @@ const StudentDashboard = () => {
                                 setTimeout(() => setSuccessMessage(''), 5000);
                             }}
                         />
+                        <DocumentManager />
                     </div>
 
-                    {/* Sección: Catálogo de Cursos Disponibles */}
-                    <div className="lg:col-span-2 bg-white border rounded-2xl p-6 shadow-sm">
-                        <h2 className="text-xl font-bold text-gray-900 mb-4">Catálogo de Cursos Disponibles</h2>
-                        <CourseCatalog
-                            enrolledList={enrolledList}
-                            onEnrollSuccess={handleEnrollSuccess}
-                            onSetGlobalError={setError}
-                            onSetGlobalSuccess={setSuccessMessage}
-                        />
+                    {/* COLUMNA 2 Y 3 (DERECHA): Bloque Vertical de Catálogo + Evaluación */}
+                    <div className="lg:col-span-2 space-y-6">
+                        {/* Tarjeta del Catálogo de Cursos Disponibles */}
+                        <div className="bg-white border rounded-2xl p-6 shadow-sm">
+                            <h2 className="text-xl font-bold text-gray-900 mb-4">Catálogo de Cursos Disponibles</h2>
+                            <CourseCatalog
+                                enrolledList={enrolledList}
+                                onEnrollSuccess={handleEnrollSuccess}
+                                onSetGlobalError={setError}
+                                onSetGlobalSuccess={setSuccessMessage}
+                            />
+                        </div>
+
+                        {/* Tarjeta de la Evaluación Académica Dual */}
+                        <EvaluationPanel />
                     </div>
-                </div>
+
+                </div> {/* Cierre correcto del div grid principal */}
 
                 {/* Modal de Configuración de Intereses */}
                 <InterestsModal
@@ -13163,6 +14848,62 @@ Finalmente, el valor `undefined` se propagaba a la pasarela HTTP (Axios), mutand
 * **Estabilidad del DOM Virtual:** Las identidades de las tarjetas en curso quedan fijadas de manera inmutable a su clave primaria real de PostgreSQL. El algoritmo de reconciliación de React actualiza los nodos físicos de forma exacta, eliminando el "efecto dominó" visual y garantizando la predictibilidad de la interfaz de usuario bajo transiciones CSS de Tailwind.
 * **Robustez en la Capa de Seguridad:** Al garantizar la integridad del `enrollmentid` en el frontend, se erradican por completo las peticiones dirigidas a rutas corruptas. El filtro de Spring Security procesa exclusivamente URLs válidas bajo el token JWT activo, deteniendo las expulsiones forzadas involuntarias en el flujo de interacción.
 * **Mantenimiento de la Cobertura de Pruebas:** Las refactorizaciones aplicadas preservan el comportamiento esperado por la suite de pruebas del monorrepo. Tras la unificación del tipado en las propiedades del componente (`EnrolledCoursesProps`), los 35 de 35 tests unitarios e integrados en Vitest (`EnrolledCourses.test.tsx`) se mantienen estables en verde.
+
+---
+
+# [ADR-36] Módulo Genérico de Gestión de Documentos Académicos Seguros
+
+## Estado
+
+Aceptado
+
+## Contexto
+
+Para potenciar la interacción pedagógica en la plataforma, surgió la necesidad de implementar un módulo que permitiera enviar y recibir documentos de texto y académicos. La directriz original del [ADR-23] limitaba la carpeta de documentos de forma estricta a extensiones `.pdf` para neutralizar vectores de ataque por ejecución remota de código (RCE) y suplantación de tipos (*MIME-sniffing*).
+
+Permitir la incorporación de formatos de procesamiento de palabras como Microsoft Word (`.docx`) y texto plano (`.txt`) requería una reevaluación del perímetro de seguridad para evitar que la flexibilización de extensiones comprometiera la integridad del servidor. Asimismo, el diseño debía ser altamente escalable para posibilitar el uso de este canal por parte de estudiantes, profesores y administradores de forma transparente y unificada, aislando la lógica de red para evitar la proliferación de componentes sobredimensionados (*God Components*) [ADR-20].
+
+## Decisión
+
+1. **Ampliación Perimetral Dual:** Modificar `FileStorageService.java` para validar de forma síncrona y obligatoria que el archivo transmitido satisfaga simultáneamente la extensión de disco permitida (`pdf`, `docx`, `txt`) y su respectivo tipo MIME oficial (`application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/plain`). Cualquier payload que quiebre una de las dos condiciones es rechazado inmediatamente (HTTP 400).
+2. **Abstracción Genérica de Persistencia (Multi-Rol):** Descartar modelos acoplados a un único tipo de actor (ej. `StudentDocument`) y dar de alta la entidad `DocumentMetadata.java`. Esta tabla almacena los identificadores físicos generados mediante UUID, los nombres originales del archivo y se vincula mediante una relación `@ManyToOne` de carga diferida (*Lazy Fetch*) directamente a la clase base `Users`, habilitando la funcionalidad multi-rol de manera nativa.
+3. **Aislamiento en Servicios y Hooks de Presentación:** Encapsular la pasarela HTTP asíncrona dentro de `documentService.ts` bajo el cliente Axios unificado. La gestión de estados mutables locales, errores de red y sincronizaciones se delega al hook especializado `useDocuments.ts`, el cual sanitiza las excepciones de tipo `unknown` para satisfacer las directrices del linter TypeScript sin eludir el análisis estático.
+4. **Composición Gráfica con Restricción Geométrica:** Desarrollar el componente `DocumentManager.tsx` bajo criterios de composición pura [ADR-13]. La lista de archivos recibidos se confina a un scroll de altura máxima controlada (`max-h-[160px] custom-scrollbar`) según las reglas visuales globales [ADR-19]. Las restricciones de estilos en línea de los navegadores (*Microsoft Edge Tools*) se circunvalan inyectando propiedades mediante la propagación de objetos de JavaScript.
+
+## Consecuencias
+
+* **Seguridad y Escalabilidad:** El servidor acepta múltiples formatos de texto de forma segura sin peligro de ataques de sobreescritura de archivos (*Path Traversal*) gracias al enmascaramiento con UUID en disco. El modelo de datos es capaz de soportar flujos de profesores y administradores sin requerir refactorizaciones estructurales en PostgreSQL.
+* **Mantenimiento y Cobertura:** Se mantiene la política rigurosa de calidad de código del monorrepo. La capa de presentación frontend se validó mediante el desarrollo de `DocumentManager.test.tsx` en Vitest usando aislamiento con `vi.mocked()`. La capa de control backend se blindó mediante pruebas unitarias puras de aislamiento con Mockito en `DocumentControllerTest.java`. Ambas suites se ejecutan con éxito y se consolidan en verde.
+
+---
+
+# [ADR-37] Sistema de Evaluación Académica y Arquitectura de Rating Dual
+
+## Estado
+
+Aceptado
+
+## Contexto
+
+Para potenciar los criterios de madurez pedagógica de la plataforma, se requería un módulo que permitiera a los estudiantes calificar tanto la calidad del material de la asignatura como el desempeño del profesorado. No obstante, el dataset original extraído de Coursera presentaba dos restricciones estructurales:
+
+1. Los instructores no poseían entidades relacionales propias en PostgreSQL, sino que se almacenaban como cadenas de texto indexadas (`TEXT`) dentro de la tabla de cursos.
+2. Los cursos poseían una puntuación estática original (`rating`). Alterar directamente dicha columna con las notas locales de la plataforma introduciría una alta volatilidad estadística en las medias aritméticas debido a la asimetría del tamaño muestral ($N$ inicial masivo del dataset frente a interacciones locales).
+
+Adicionalmente, bajo las políticas de seguridad perimetral por tokens distribuidos [ADR-27][ADR-35], era obligatorio restringir el formulario únicamente a aquellos docentes e itinerarios formativos en los que el alumno contara con una matrícula vigente y que no hubieran sido evaluados previamente, mitigando ráfagas de fraude o duplicación de votos.
+
+## Decisión
+
+1. **Arquitectura de Rating Dual:** Implementar un patrón de coexistencia analítica. La interfaz del frontend consumirá de manera diferenciada el "Rating del Catálogo" (proveniente de las columnas originales del dataset) y el "Rating de la Comunidad" (calculado dinámicamente en tiempo de ejecución mediante funciones de agregación `AVG` sobre los registros locales de la plataforma), preservando la pureza de la fuente original de datos.
+2. **Granularidad Disociada en Comentarios:** Diseñar la entidad `AcademicEvaluation.java` segregando las puntuaciones y los bloques de texto explicativos en campos independientes (`course_score`/`course_comment` e `instructor_score`/`instructor_comment`). Esto dota a la interfaz de la flexibilidad necesaria para que el alumno emita retroalimentaciones asimétricas de forma limpia.
+3. **Validación Perimetral por Subconsulta Cruzada:** Delegar el filtrado de exclusión a una subconsulta nativa en HQL dentro de `EnrollmentRepository.java`. El método descarta en el motor de PostgreSQL cualquier curso que ya posea una fila de evaluación acoplada al `username` extraído de los Claims del JWT, blindando el acceso en el endpoint `/pending` de forma stateless.
+4. **Accesibilidad e Integridad Sintáctica en la UI:** Refactorizar el renderizado iterativo del panel de estrellas inyectando de forma obligatoria propiedades descriptivas `aria-label` y `title` para satisfacer los inspectores automatizados de accesibilidad (*Microsoft Edge Tools / axe*). La estructura se mantiene desacoplada en el hook `useActiveEvaluations.ts` satisfaciendo la directriz anti-objetos mutantes del linter [ADR-20].
+
+## Consecuencias
+
+* **Consistencia Analítica:** Se habilita un sistema de puntuación docente y de asignaturas altamente descriptivo sin degradar el dataset preprocesado en Python. Las consultas agregadas computan el String del docente de forma unívoca, resolviendo la carencia de identificadores físicos de instructores en la base de datos.
+* **Validación de Reglas de Negocio:** El controlador bloquea de forma autónoma (HTTP 403 Forbidden / HTTP 400 Bad Request) cualquier intento de inyección de payloads corruptos o evaluaciones duplicadas, protegiendo las tablas relacionales.
+* **Robustez en la Suite de Integración:** La suite de pruebas de interfaz del cliente se eleva a un total consolidado de 46 tests en verde. La integración de bloques asíncronos `await waitFor` dentro de `EvaluationPanel.test.tsx` elimina con éxito las alertas de fugas de estado transitorias de React Testing Library, garantizando la predictibilidad de la plataforma ante futuras auditorías de código.
 
 ---
 

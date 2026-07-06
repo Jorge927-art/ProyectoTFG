@@ -15,6 +15,8 @@ import { useEnrolledCourses } from './components/useEnrolledCourses';
 import { useSmartRecommendations } from './components/useSmartRecommendations';
 import type { DBModelCourse } from '../../../services/courseTypes';
 import { DocumentManager } from './components/DocumentManager';
+import { EvaluationPanel } from './components/EvaluationPanel';
+
 
 const StudentDashboard = () => {
     // --- ESTADOS DE UI Y FEEDBACK ---
@@ -115,9 +117,10 @@ const StudentDashboard = () => {
                     )}
                 </div>
 
-                {/* Grid de Cursos Matriculados y Catálogo */}
+                {/* Grid Sincronizado de Cursos Matriculados y Catálogo */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                    {/* Sección: Mis Cursos */}
+
+                    {/* COLUMNA 1 (IZQUIERDA): Mis Cursos y Gestor de Documentos */}
                     <div className="bg-white border rounded-2xl p-6 shadow-sm space-y-6">
                         <EnrolledCourses
                             enrolledList={enrolledList}
@@ -128,21 +131,27 @@ const StudentDashboard = () => {
                                 setTimeout(() => setSuccessMessage(''), 5000);
                             }}
                         />
-                        {/*INYECCIÓN DEL GESTOR DE DOCUMENTOS: Se integra de forma modular y reactiva con el hook useDocuments*/}
                         <DocumentManager />
                     </div>
 
-                    {/* Sección: Catálogo de Cursos Disponibles */}
-                    <div className="lg:col-span-2 bg-white border rounded-2xl p-6 shadow-sm">
-                        <h2 className="text-xl font-bold text-gray-900 mb-4">Catálogo de Cursos Disponibles</h2>
-                        <CourseCatalog
-                            enrolledList={enrolledList}
-                            onEnrollSuccess={handleEnrollSuccess}
-                            onSetGlobalError={setError}
-                            onSetGlobalSuccess={setSuccessMessage}
-                        />
+                    {/* COLUMNA 2 Y 3 (DERECHA): Bloque Vertical de Catálogo + Evaluación */}
+                    <div className="lg:col-span-2 space-y-6">
+                        {/* Tarjeta del Catálogo de Cursos Disponibles */}
+                        <div className="bg-white border rounded-2xl p-6 shadow-sm">
+                            <h2 className="text-xl font-bold text-gray-900 mb-4">Catálogo de Cursos Disponibles</h2>
+                            <CourseCatalog
+                                enrolledList={enrolledList}
+                                onEnrollSuccess={handleEnrollSuccess}
+                                onSetGlobalError={setError}
+                                onSetGlobalSuccess={setSuccessMessage}
+                            />
+                        </div>
+
+                        {/* Tarjeta de la Evaluación Académica Dual */}
+                        <EvaluationPanel />
                     </div>
-                </div>
+
+                </div> {/* Cierre correcto del div grid principal */}
 
                 {/* Modal de Configuración de Intereses */}
                 <InterestsModal

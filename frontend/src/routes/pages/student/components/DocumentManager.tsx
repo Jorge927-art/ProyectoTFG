@@ -40,8 +40,7 @@ export const DocumentManager = () => {
 
     return (
         /* ALINEACIÓN GEOMÉTRICA CONSOLIDADA: Mantiene simetría con tus otras tarjetas */
-        <GenericCard className="bg-slate-50/50 p-5 rounded-xl border border-slate-100 shadow-sm mt-6 mb-8 flex flex-col h-109">
-
+        <GenericCard className="flex flex-col h-109">
             {/* CABECERA DEL COMPONENTE */}
             <div className="flex items-center justify-between mb-4 shrink-0">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
