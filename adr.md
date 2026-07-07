@@ -702,6 +702,35 @@ Adicionalmente, bajo las políticas de seguridad perimetral por tokens distribui
 
 ---
 
+# [ADR-38] Descarga Segura de Documentos Académicos y Control de Acceso Anti-IDOR
+
+## Estado
+
+Aceptado
+
+## Contexto
+
+Para consolidar las directrices de privacidad y control de acceso en el módulo de intercambio bidireccional y dirigido de archivos, se requería una solución técnica que garantizara que los documentos académicos almacenados en el servidor solo pudieran ser descargados por sus destinatarios legítimos o sus emisores originales. El diseño arquitectónico inicial presentaba tres vulnerabilidades críticas:
+
+1. La ruta estática `/uploads/**` estaba configurada como pública en la seguridad perimetral, permitiendo que cualquier usuario malintencionado que conociera el nombre físico del archivo pudiera saltarse los filtros de autenticación y descargarlo de forma directa.
+2. El uso de `window.open(fileUrl)` en el frontend exponía metadatos e identificadores sensibles en la barra de direcciones del navegador, facilitando vectores de ataque basados en la enumeración predecible de recursos.
+3. El sistema carecía de un mecanismo de validación de identidad en tiempo de ejecución, lo que exponía la plataforma a vulnerabilidades de Referencia Directa Insegura a Objetos (IDOR), donde un alumno autenticado válidamente con su token JWT podía consultar recursos privados pertenecientes a otros alumnos modificando los parámetros de la solicitud.
+
+## Decisión
+
+1. **Aislamiento Perimetral y Blindaje de Archivos:** Eliminar por completo la regla estática `.requestMatchers("/uploads/**").permitAll()` en `SecurityConfig.java`. El directorio de almacenamiento físico queda completamente aislado del tráfico de red externo, obligando a que cualquier solicitud de lectura sea interceptada y evaluada por el contexto de Spring Security.
+2. **Cortocircuito Defensivo Anti-IDOR (Backend):** Implementar el endpoint protegido `GET /api/v1/documents/download/{documentId}` en `DocumentController.java`. El método recupera el token JWT a través del objeto `Principal`, intercepta la entidad en la base de datos de PostgreSQL y evalúa mediante una condición excluyente si el `username` del usuario autenticado coincide obligatoriamente con el emisor (`sender_id`) o el receptor (`receiver_id`) del documento. Si la validación falla, el flujo se interrumpe de forma reactiva respondiendo con un estado HTTP 403 Forbidden.
+3. **Consumo por Flujo de Datos Binarios (Frontend):** Sustituir el uso de `window.open` en el cliente por un consumo asíncrono basado en `Blob`. La función `downloadDocumentSecure` inyecta de forma transparente el token JWT en las cabeceras de autorización mediante el cliente HTTP de Axios (`apiClient`) y procesa el flujo de bytes directamente en la memoria del navegador, forzando la descarga local con el nombre real del archivo (`originalname`).
+4. **Control de Concurrencia y Estado Visual en la UI:** Refactorizar el componente `DocumentManager.tsx` inyectando un estado de bloqueo local denominado `downloadingId`. Al activar el evento `onClick`, el componente inhabilita el botón correspondiente (`disabled`) para evitar solicitudes HTTP simultáneas o dobles clics accidentales del usuario. Simultáneamente, se muta el icono estático por un spinner animado (`Loader2`) preservando las dimensiones geométricas y las clases de Tailwind CSS sin alterar la maquetación.
+
+## Consecuencias
+
+* **Mitigación Completa de Vulnerabilidades IDOR:** Se erradica la posibilidad de fugas de información por manipulación de identificadores en la URL. El servidor valida la matriz de permisos de forma interna, garantizando la confidencialidad estricta del material académico.
+* **Flujos de Datos Transparentes:** Las credenciales de autorización y los tokens JWT viajan encapsulados de forma oculta en las cabeceras HTTP, evitando la exposición de firmas digitales en el historial del navegador o en los logs del servidor proxy.
+* **Integridad de la Suite de Pruebas:** Los tests de integración con `MockMvc` en `DocumentControllerTest.java` validan con éxito que los intentos de intrusión devuelvan un error 403. En el cliente, la refactorización mantiene en verde un consolidado absoluto de 46 tests en Vitest, garantizando que el comportamiento asíncrono y los bloqueos de interfaz se ejecutan de manera predecible y libre de regresiones.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026
