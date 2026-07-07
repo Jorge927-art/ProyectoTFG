@@ -98,3 +98,26 @@ export const getAdminsDirectory = async (): Promise<UserDirectoryDTO[]> => {
     const response = await apiClient.get<UserDirectoryDTO[]>('/api/v1/documents/directory/admins');
     return response.data;
 };
+
+/**
+ * [NUEVO SERVICIO ANTI-IDOR]: Solicita el archivo al backend como un flujo de bytes Blob,
+ * garantizando el transporte seguro bajo tokens JWT.
+ */
+export const downloadDocumentSecure = async (documentId: number, originalName: string): Promise<void> => {
+    const response = await apiClient.get(`/api/v1/documents/download/${documentId}`, {
+        responseType: 'blob'
+    });
+
+    const blob = new Blob([response.data], { type: response.headers['content-type'] });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', originalName);
+    document.body.appendChild(link);
+    link.click();
+    
+    link.parentNode?.removeChild(link);
+    window.URL.revokeObjectURL(url);
+};
+
+

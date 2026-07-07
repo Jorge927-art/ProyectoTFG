@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Upload, FileText, Download, Loader2, AlertCircle, FileUp, Inbox, Send, UserCheck } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import { useDocuments } from './useDocuments';
@@ -16,10 +16,12 @@ export const DocumentManager = () => {
         loadingDirectory,
         selectedReceiverId,
         setSelectedReceiverId,
-        handleUpload
+        handleUpload,
+        handleSecureDownload
     } = useDocuments();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
     const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
@@ -44,10 +46,20 @@ export const DocumentManager = () => {
         }
     };
 
-    const handleDownload = (filename: string) => {
-        const fileUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/uploads/${filename}`;
-        window.open(fileUrl, '_blank', 'noopener,noreferrer');
+    const handleDownload = async (documentId: number, originalName: string) => {
+        if (downloadingId !== null) return;
+        try {
+            setDownloadingId(documentId);
+            setDocumentError('');
+            await handleSecureDownload(documentId, originalName);
+        } catch (error) {
+            console.error("Error en la descarga segura:", error);
+            setDocumentError("No tienes autorización legítima para descargar este documento.");
+        } finally {
+            setDownloadingId(null);
+        }
     };
+
 
     return (
         /* ALINEACIÓN GEOMÉTRICA CONSOLIDADA: Mantiene simetría exacta con tus otras tarjetas en h-109 */
@@ -202,14 +214,18 @@ export const DocumentManager = () => {
                                         </p>
                                     </div>
                                 </div>
-
                                 <button
                                     type="button"
-                                    onClick={() => handleDownload(doc.filename)}
-                                    className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors cursor-pointer ml-2 shrink-0"
-                                    title="Descargar documento"
+                                    onClick={() => handleDownload(doc.documentid, doc.originalname)}
+                                    disabled={downloadingId !== null}
+                                    className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors cursor-pointer ml-2 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Descargar documento seguro"
                                 >
-                                    <Download size={14} />
+                                    {downloadingId === doc.documentid ? (
+                                        <Loader2 size={14} className="animate-spin text-blue-600" />
+                                    ) : (
+                                        <Download size={14} />
+                                    )}
                                 </button>
                             </div>
                         ))

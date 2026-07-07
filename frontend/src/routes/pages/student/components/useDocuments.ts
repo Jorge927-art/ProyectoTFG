@@ -6,6 +6,7 @@ import {
     getTeachersDirectory, 
     getClassmatesDirectory, 
     getAdminsDirectory, 
+    downloadDocumentSecure,
     type DocumentMetadata, 
     type UserDirectoryDTO 
 } from '../../../../services/documentService';
@@ -125,6 +126,9 @@ export const useDocuments = (successTrigger?: string) => {
         loadingDirectory,
         selectedReceiverId,
         setSelectedReceiverId,
-        handleUpload
+        handleUpload,
+        handleSecureDownload: downloadDocumentSecure
     };
+
 };
+

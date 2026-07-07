@@ -66,9 +66,6 @@ public class SecurityConfig {
                         // Permitir solicitudes OPTIONS para CORS preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // Rutas públicas para subidas de archivos
-                        .requestMatchers("/uploads/**").permitAll()
-
                         // Endpoints de autenticación pública (login y registro)
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/{username}").permitAll()
 

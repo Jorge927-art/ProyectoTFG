@@ -3,6 +3,8 @@ package com.cursosonline.backend.services;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -106,6 +108,12 @@ public class FileStorageService {
         }
     }
 
+    /**
+     * Obtiene la extensión del archivo a partir de su nombre.
+     * 
+     * @param filename
+     * @return
+     */
     private String getFileExtension(String filename) {
         int lastIndexOf = filename.lastIndexOf(".");
         if (lastIndexOf == -1) {
@@ -113,4 +121,28 @@ public class FileStorageService {
         }
         return filename.substring(lastIndexOf + 1);
     }
+
+    /**
+     * [NUEVO MÉTODO DE LECTURA SEGURO]: Carga un archivo desde el disco como un
+     * recurso
+     * para que pueda ser transmitido de forma autenticada por flujo de datos
+     * (Stream).
+     */
+    public Resource loadFileAsResource(String relativePath) {
+        try {
+            // Resuelve la ruta relativa (ej. "documents/uuid_archivo.pdf") contra el
+            // directorio raiz inmutable
+            Path filePath = this.rootLocation.resolve(relativePath).normalize();
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if (resource.exists() || resource.isReadable()) {
+                return resource;
+            } else {
+                return null;
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Error crítico de infraestructura al leer el recurso: " + relativePath, e);
+        }
+    }
+
 }

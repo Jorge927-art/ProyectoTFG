@@ -238,4 +238,59 @@ public class DocumentController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
+
+    /**
+     * [NUEVO ENDPOINT ANTI-IDOR]: Descarga segura de archivos con stream binario.
+     * Recupera el recurso del disco solo si el usuario autenticado es emisor o
+     * receptor.
+     */
+    @GetMapping("/download/{documentId}")
+    public ResponseEntity<?> downloadDocumentSecure(
+            Authentication authentication,
+            @PathVariable("documentId") Long documentId) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            String currentUsername = authentication.getName();
+
+            // 1. AUDITORÍA CRÍTICA EN BD: Recuperar metadatos para cruzar la propiedad
+            DocumentMetadata doc = documentMetadataRepository.findById(documentId)
+                    .orElseThrow(() -> new RuntimeException("El documento solicitado no existe en el sistema."));
+
+            // 2. CORTOCUITO DEFENSIVO ANTI-IDOR: Comprobar que pertenece al contrato
+            // dirigido
+            boolean isSender = doc.getSender().getUsername().equals(currentUsername);
+            boolean isReceiver = doc.getReceiver().getUsername().equals(currentUsername);
+
+            if (!isSender && !isReceiver) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error",
+                                "Acceso denegado: No tienes permisos legítimos para descargar este archivo."));
+            }
+
+            // 3. Conversión asíncrona a Stream Binario cargando el recurso de disco
+            org.springframework.core.io.Resource resource = fileStorageService.loadFileAsResource(doc.getFilename());
+
+            if (resource == null || !resource.exists()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "El archivo físico no se encuentra en el servidor."));
+            }
+
+            // 4. Inyección perimetral de cabeceras seguras Content-Disposition
+            return ResponseEntity.ok()
+                    .contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + doc.getOriginalname() + "\"")
+                    .body(resource);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error crítico al procesar la descarga segura por stream",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
 }

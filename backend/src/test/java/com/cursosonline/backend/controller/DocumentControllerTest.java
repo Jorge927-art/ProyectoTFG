@@ -19,6 +19,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -30,10 +36,14 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 
 @DisplayName("Suite de Pruebas Unitarias de Aislamiento: DocumentController [TFG Backend]")
 public class DocumentControllerTest {
+
+        private MockMvc mockMvc;
 
         @InjectMocks
         private DocumentController documentController;
@@ -79,6 +89,9 @@ public class DocumentControllerTest {
                 // Simular que el usuario siempre está autenticado por defecto
                 Mockito.when(authentication.isAuthenticated()).thenReturn(true);
                 Mockito.when(authentication.getName()).thenReturn("luis_student");
+                this.mockMvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
+                                .standaloneSetup(documentController)
+                                .build();
         }
 
         @Test
@@ -196,4 +209,78 @@ public class DocumentControllerTest {
                 Mockito.verify(userRepository, Mockito.never()).findById(anyLong());
                 Mockito.verify(documentMetadataRepository, Mockito.never()).save(any(DocumentMetadata.class));
         }
+
+        @Test
+        @WithMockUser(username = "luis_student")
+        void debe_permitir_la_descarga_si_el_usuario_es_el_receptor_legitimo_antiIDOR() throws Exception {
+                // Configuración de metadatos del documento contrato emisor-receptor
+                Long documentId = 1L;
+                DocumentMetadata mockDoc = new DocumentMetadata();
+
+                Users sender = new Users();
+                sender.setUsername("profesor_juan");
+
+                Users receiver = new Users();
+                receiver.setUsername("luis_student"); // Coincide con el usuario autenticado
+
+                mockDoc.setSender(sender);
+                mockDoc.setReceiver(receiver);
+                mockDoc.setFilename("documents/uuid_tarea.pdf");
+                mockDoc.setOriginalname("Tarea1.pdf");
+
+                // Mockear las respuestas de la capa de servicios e infraestructura
+                Resource mockResource = mock(Resource.class);
+                when(mockResource.exists()).thenReturn(true);
+                when(mockResource.isReadable()).thenReturn(true);
+
+                when(documentMetadataRepository.findById(documentId)).thenReturn(java.util.Optional.of(mockDoc));
+                when(fileStorageService.loadFileAsResource("documents/uuid_tarea.pdf")).thenReturn(mockResource);
+
+                // Ejecutar petición HTTP simulada
+                // Ejecutar petición HTTP simulada inyectando la autenticación manual del setUp
+                mockMvc.perform(get("/api/v1/documents/download/{documentId}", documentId)
+                                .principal(authentication))
+                                .andExpect(status().isOk())
+                                .andExpect(status().isOk())
+                                .andExpect(content().contentType(MediaType.APPLICATION_OCTET_STREAM))
+                                .andExpect(header().string("Content-Disposition",
+                                                "attachment; filename=\"Tarea1.pdf\""));
+        }
+
+        @Test
+        @WithMockUser(username = "atacante_student")
+        void debe_bloquear_la_descarga_y_devolver_403_si_un_tercero_intenta_un_ataque_IDOR() throws Exception {
+                // Configuración de un documento privado entre Luis y Juan
+                Long documentId = 2L;
+                DocumentMetadata privateDoc = new DocumentMetadata();
+
+                Users sender = new Users();
+                sender.setUsername("profesor_juan");
+
+                Users receiver = new Users();
+                receiver.setUsername("luis_student");
+
+                privateDoc.setSender(sender);
+                privateDoc.setReceiver(receiver); // El atacante NO es emisor ni receptor
+
+                // Mockear el repositorio para que devuelva el documento privado
+                when(documentMetadataRepository.findById(documentId)).thenReturn(java.util.Optional.of(privateDoc));
+
+                // Ejecutar petición: el interceptor perimetral del controlador debe activar el
+                // cortocircuito
+                // Configurar el mock de autenticación para que devuelva el nombre del atacante
+                when(authentication.getName()).thenReturn("atacante_student");
+
+                // Ejecutar petición inyectando el principal de autenticación
+                mockMvc.perform(get("/api/v1/documents/download/{documentId}", documentId)
+                                .principal(authentication))
+                                .andExpect(status().isForbidden())
+                                .andExpect(jsonPath("$.error").value(
+                                                "Acceso denegado: No tienes permisos legítimos para descargar este archivo."));
+
+                // Verificación estricta: El servicio de lectura de disco JAMÁS debe ser
+                // invocado ante un IDOR
+                verify(fileStorageService, never()).loadFileAsResource(anyString());
+        }
+
 }
