@@ -175,8 +175,7 @@ public class UserController {
                         () -> new ServicesException("Usuario no encontrado para el nombre: " + normalizedUsername));
 
         // 3. Consulta indexada por clave primaria sobre la relación JOIN FETCH
-        List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(user.getUser_id());
-
+        List<Enrollment> enrollments = userService.getStudentActiveCoursesWithCalculatedProgress(user.getUser_id());
         return ResponseEntity.ok(enrollments);
     }
 

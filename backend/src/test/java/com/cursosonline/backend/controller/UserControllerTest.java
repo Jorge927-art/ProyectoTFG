@@ -68,6 +68,7 @@ class UserControllerTest {
 
     @Test
     void myActiveCoursesDebeDevolverLaMatrículaConElCurso() throws Exception {
+        // 1. ESCENARIO REAL CON LOS DATOS ORIGINALES DE LUIS
         Users user = new Users(1L, "Luis", "encoded", Role.STUDENT, "luis@example.com", true,
                 new java.util.ArrayList<>());
         Courses course = new Courses();
@@ -83,9 +84,16 @@ class UserControllerTest {
         enrollment.setStatus("EN_PROGRESO");
         enrollment.setProgress_percentage(25);
 
+        // 2. CONFIGURACIÓN EN CADENA RIGUROSA (EMULA LOS PASOS REALES DEL CONTROLADOR
+        // DE PRODUCCIÓN)
+        // Paso A: El controlador busca el usuario por su nombre exacto
         when(userService.findByUsername("Luis")).thenReturn(Optional.of(user));
-        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(List.of(enrollment));
+        // Paso B: El controlador invoca el servicio que calcula el progreso usando el
+        // ID exacto de Luis
+        when(userService.getStudentActiveCoursesWithCalculatedProgress(user.getUser_id()))
+                .thenReturn(List.of(enrollment));
 
+        // 3. EJECUCIÓN Y VALIDACIÓN IMPLACABLE DEL CONTRATO HTTP
         mockMvc.perform(get("/api/auth/my-active-courses")
                 .param("username", "Luis"))
                 .andExpect(status().isOk())
@@ -94,4 +102,5 @@ class UserControllerTest {
                 .andExpect(jsonPath("$[0].course.course_id").value(101))
                 .andExpect(jsonPath("$[0].course.title").value("Introduction to Data Science Specialization"));
     }
+
 }

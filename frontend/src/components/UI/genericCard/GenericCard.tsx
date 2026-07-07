@@ -8,7 +8,7 @@ interface GenericCardProps {
 
 const GenericCard = ({ children, className = '' }: GenericCardProps) => {
     return (
-        <article className={`bg-white rounded-xl p-5 border border-slate-100 shadow-sm flex flex-col transition-all hover:shadow-md ${className}`}>
+        <article className={`bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col transition-all hover:shadow-md ${className}`}>
             {children}
         </article>
     );

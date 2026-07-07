@@ -117,10 +117,13 @@ const StudentDashboard = () => {
                     )}
                 </div>
 
-                {/* Grid Sincronizado de Cursos Matriculados y Catálogo */}
+                {/* 
+                   GRID SINCRONIZADO ORIGINAL RESTAURADO AL 100% [ADR-19]:
+                   - Recuperamos tus bordes exteriores exactos y tu alineación superior perfecta.
+                */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
 
-                    {/* COLUMNA 1 (IZQUIERDA): Mis Cursos y Gestor de Documentos */}
+                    {/* COLUMNA 1 (IZQUIERDA): Tu contenedor máster intacto que funciona a la perfección */}
                     <div className="bg-white border rounded-2xl p-6 shadow-sm space-y-6">
                         <EnrolledCourses
                             enrolledList={enrolledList}
@@ -134,7 +137,7 @@ const StudentDashboard = () => {
                         <DocumentManager />
                     </div>
 
-                    {/* COLUMNA 2 Y 3 (DERECHA): Bloque Vertical de Catálogo + Evaluación */}
+                    {/* COLUMNA 2 Y 3 (DERECHA): Catálogo arriba y Evaluación abajo */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Tarjeta del Catálogo de Cursos Disponibles */}
                         <div className="bg-white border rounded-2xl p-6 shadow-sm">
@@ -148,7 +151,9 @@ const StudentDashboard = () => {
                         </div>
 
                         {/* Tarjeta de la Evaluación Académica Dual */}
-                        <EvaluationPanel />
+                        <div className="bg-white border rounded-2xl p-6 shadow-sm">
+                            <EvaluationPanel />
+                        </div>
                     </div>
 
                 </div> {/* Cierre correcto del div grid principal */}

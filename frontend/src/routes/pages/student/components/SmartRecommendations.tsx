@@ -1,5 +1,5 @@
-import { Star } from 'lucide-react';
-// Importación desde el dominio centralizado unificado en servicios [DRY]
+import { Star, Sparkles } from 'lucide-react';
+import GenericCard from '../../../../components/ui/genericCard/GenericCard'; // Ajustado a la ruta de tu árbol
 import type { RecommendedCourse } from '../../../../services/userDomains';
 
 interface SmartRecommendationsProps {
@@ -8,11 +8,23 @@ interface SmartRecommendationsProps {
 
 export const SmartRecommendations = ({ recommendations }: SmartRecommendationsProps) => {
     return (
-        <div className="w-full">
+        /* 
+           [ADR-13 PURIFICACIÓN UI]: Sustituimos el div simple por GenericCard.
+           Encapsula el título con su icono y dota al módulo de recomendaciones 
+           de la misma sombra, borde y consistencia geométrica que el catálogo.
+        */
+        <GenericCard className="w-full bg-linear-to-r from-amber-50/30 to-orange-50/30">
+
+            {/* CABECERA CENTRALIZADA DEL MÓDULO */}
+            <div className="flex items-center gap-2 mb-4 shrink-0">
+                <Sparkles className="h-5 w-5 text-amber-600" />
+                <h2 className="text-sm font-black text-gray-900">Recomendaciones personalizadas para ti</h2>
+            </div>
+
             {/* Contenedor con scroll vertical limitado de 1.5 cursos */}
-            <div className="max-h-55 overflow-y-auto pr-2 space-y-3 scrollbar-thin scrollbar-thumb-slate-200">
+            <div className="max-h-55 overflow-y-auto pr-2 space-y-3 custom-scrollbar flex-1 min-h-0">
                 {recommendations.length === 0 ? (
-                    <p className="text-xs font-medium text-slate-400 italic text-center py-4">
+                    <p className="text-xs font-medium text-slate-400 italic text-center py-4 bg-white rounded-xl border border-slate-100">
                         No hay recomendaciones disponibles para tu perfil actual.
                     </p>
                 ) : (
@@ -48,6 +60,6 @@ export const SmartRecommendations = ({ recommendations }: SmartRecommendationsPr
                     ))
                 )}
             </div>
-        </div>
+        </GenericCard>
     );
 };

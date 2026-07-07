@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Star, MessageSquare, Award, UserCheck, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Star, MessageSquare, UserCheck, Loader2, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import { useActiveEvaluations } from './useActiveEvaluations';
 
@@ -65,20 +65,24 @@ export const EvaluationPanel = () => {
     const starsArray = [1, 2, 3, 4, 5];
 
     return (
-        /* ALINEACIÓN GEOMÉTRICA CONSOLIDADA: Mantiene simetría con h-109 */
-        <GenericCard className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-109">
+        /* 
+           ALINEACIÓN GEOMÉTRICA UNIFICADA COMPOSICIÓN PURA [ADR-13]:
+           - h-[580px]: Sella la altura máster calculada por NotebookLM para nivelar la columna derecha.
+           - flex flex-col: Mantiene el flujo de caja jerárquico.
+        */
+        <GenericCard className="h-auto max-h-96 flex flex-col">
             {/* CABECERA DEL COMPONENTE */}
-            <div className="flex items-center justify-between mb-4 shrink-0">
-                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                    <Award size={18} className="text-amber-600" />
+            <div className="flex items-center gap-2 mb-6 shrink-0">
+                <Star className="text-amber-500" size={20} />
+                <h2 className="text-base font-black text-slate-800">
                     <span>Evaluación Académica de Docentes y Cursos</span>
                 </h2>
-                <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full">
+                <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full shrink-0">
                     {pendingList.length} pendientes
                 </span>
             </div>
 
-            {/* ALERT BOXES DE FEEDBACK DE RED */}
+            {/* ALERT BOXES DE FEEDBACK DE RED (Si existen) */}
             {evaluationError && (
                 <div className="mb-3 p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg flex items-center gap-2 shrink-0">
                     <AlertCircle size={14} className="shrink-0" />
@@ -92,8 +96,9 @@ export const EvaluationPanel = () => {
                     <p className="truncate">{successMessage}</p>
                 </div>
             )}
-            {/* CONTENEDOR DINÁMICO ASÍNCRONO */}
-            <div className="flex-1 flex flex-col min-h-0">
+
+            {/* CONTENEDOR DINÁMICO ASÍNCRONO CON CONTROL DE SCROLL GLOBAL */}
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 {loadingPending ? (
                     <div className="h-full flex flex-col justify-center items-center bg-white border border-slate-100 rounded-xl text-slate-400 p-4">
                         <Loader2 size={24} className="animate-spin mb-2 text-amber-600" />
@@ -105,8 +110,10 @@ export const EvaluationPanel = () => {
                     </div>
                 ) : !selectedEnrollmentId ? (
 
-                    /* VISTA 1: LISTADO DE ASIGNATURAS POR EVALUAR [SCROLL CONTROLADO] */
-                    <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2">
+                    /* VISTA 1: LISTADO DE ASIGNATURAS POR EVALUAR [SCROLL DE TAMAÑO FIJO INTEGRADO]
+                       - flex-1 overflow-y-auto: Toma el espacio exacto libre dentro de los 580px y levanta el scroll.
+                    */
+                    <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2 h-full">
                         <p className="text-[11px] text-slate-400 font-medium mb-2">Selecciona una asignatura activa para calificar su contenido y a su docente:</p>
                         {pendingList.map((enroll) => (
                             <div
@@ -120,7 +127,7 @@ export const EvaluationPanel = () => {
                                 <button
                                     type="button"
                                     onClick={() => { setEvaluationError(''); setSelectedEnrollmentId(enroll.enrollmentid); }}
-                                    className="ml-3 px-3 py-1.5 bg-slate-100 hover:bg-amber-600 hover:text-white text-slate-700 text-[11px] font-bold rounded-lg transition-all cursor-pointer shadow-xs"
+                                    className="ml-3 px-3 py-1.5 bg-slate-100 hover:bg-amber-600 hover:text-white text-slate-700 text-[11px] font-bold rounded-lg transition-all cursor-pointer shadow-xs shrink-0"
                                 >
                                     Evaluar
                                 </button>
@@ -128,7 +135,6 @@ export const EvaluationPanel = () => {
                         ))}
                     </div>
                 ) : (
-
                     /* VISTA 2: FORMULARIO INTERACTIVO GRANULAR DE RATING DUAL */
                     <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between min-h-0 bg-transparent overflow-y-auto custom-scrollbar">
                         <div className="space-y-4">
@@ -187,8 +193,8 @@ export const EvaluationPanel = () => {
                                             onMouseEnter={() => setHoverInstructor(star)}
                                             onMouseLeave={() => setHoverInstructor(0)}
                                             className="text-slate-200 hover:scale-110 transition-transform cursor-pointer"
-                                            aria-label={`Calificar docente con ${star} estrellas`}
-                                            title={`Calificar docente con ${star} estrellas`}
+                                            aria-label={`Calificar profesor con ${star} estrellas`}
+                                            title={`Calificar profesor con ${star} estrellas`}
                                         >
                                             <Star
                                                 size={18}
@@ -200,35 +206,44 @@ export const EvaluationPanel = () => {
                                 <textarea
                                     value={instructorComment}
                                     onChange={(e) => setInstructorComment(e.target.value)}
-                                    placeholder="¿Cómo valoras las explicaciones y tutorías del docente? (Opcional)"
+                                    placeholder="¿Qué tal las explicaciones, tutorías y feedback del docente? (Opcional)"
                                     className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:border-amber-500 focus:outline-hidden custom-scrollbar h-12 resize-none"
                                     maxLength={300}
                                 />
                             </div>
                         </div>
 
-                        {/* ACCIONES DEL FORMULARIO */}
-                        <div className="flex gap-3 pt-3 border-t mt-4 shrink-0">
+                        {/* ACCIONES DEL FORMULARIO CONTRAPESADAS */}
+                        <div className="flex gap-2 mt-4 pt-3 border-t border-slate-100 shrink-0">
                             <button
                                 type="button"
-                                onClick={resetForm}
                                 disabled={isSubmitting}
-                                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                                onClick={() => {
+                                    setSelectedEnrollmentId(null);
+                                    setCourseScore(0);
+                                    setInstructorScore(0);
+                                    setCourseComment('');
+                                    setInstructorComment('');
+                                }}
+                                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 disabled:bg-slate-50 text-slate-700 disabled:text-slate-400 text-xs font-bold rounded-lg transition-all active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed text-center"
                             >
-                                Volver
+                                Volver al listado
                             </button>
                             <button
                                 type="submit"
-                                disabled={isSubmitting}
-                                className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white text-xs font-bold py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed"
+                                disabled={isSubmitting || courseScore === 0 || instructorScore === 0}
+                                className="flex-1 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-200 text-white disabled:text-slate-400 text-xs font-bold rounded-lg transition-all active:scale-[0.98] flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed"
                             >
                                 {isSubmitting ? (
                                     <>
-                                        <Loader2 size={14} className="animate-spin" />
+                                        <Loader2 size={13} className="animate-spin" />
                                         <span>Procesando...</span>
                                     </>
                                 ) : (
-                                    <span>Enviar Calificación</span>
+                                    <>
+                                        <span>Enviar evaluación</span>
+                                        <ArrowRight size={13} />
+                                    </>
                                 )}
                             </button>
                         </div>
@@ -238,3 +253,5 @@ export const EvaluationPanel = () => {
         </GenericCard>
     );
 };
+
+export default EvaluationPanel;

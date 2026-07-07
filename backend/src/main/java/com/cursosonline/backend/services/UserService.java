@@ -320,4 +320,26 @@ public class UserService {
     public void setClock(Clock clock) {
         this.clock = clock;
     }
+
+    /**
+     * Recupera de forma transaccional las asignaturas activas del estudiante
+     * y calcula de forma dinámica su progreso al vuelo antes de enviarlas al
+     * frontend.
+     */
+    @Transactional(readOnly = true)
+    public List<Enrollment> getStudentActiveCoursesWithCalculatedProgress(Long userId) {
+        // 1. Recuperamos la lista directa desde la relación JOIN FETCH del repositorio
+        List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(userId);
+
+        // 2. Recorremos cada matrícula para inyectar proactivamente el progreso
+        // dinámico transcurrido
+        for (Enrollment enrollment : enrollments) {
+            int currentProgress = calculateCurrentProgress(enrollment);
+            enrollment.setProgress_percentage(currentProgress);
+        }
+
+        // 3. Devolvemos la lista perfectamente calculada y sincronizada
+        return enrollments;
+    }
+
 }
