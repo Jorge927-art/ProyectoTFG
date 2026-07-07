@@ -9,10 +9,16 @@ import java.util.List;
 public interface DocumentMetadataRepository extends JpaRepository<DocumentMetadata, Long> {
 
     /**
-     * [BLINDAJE DE CONSULTA MULTI-ROL]: Recupera todos los documentos de un usuario
-     * ordenados de forma determinista por ID de documento descendente (los más
-     * recientes primero).
+     * Recupera la bandeja de entrada del usuario (Documentos Recibidos) ordenados
+     * por ID descendente.
      */
-    @Query("SELECT d FROM DocumentMetadata d WHERE d.user.username = :username ORDER BY d.documentid DESC")
-    List<DocumentMetadata> findAllByUserUsernameOrderByDocumentidDesc(@Param("username") String username);
+    @Query("SELECT d FROM DocumentMetadata d WHERE d.receiver.username = :username ORDER BY d.documentid DESC")
+    List<DocumentMetadata> findReceivedDocumentsByUsername(@Param("username") String username);
+
+    /**
+     * Recupera la bandeja de salida del usuario (Documentos Enviados) ordenados por
+     * ID descendente.
+     */
+    @Query("SELECT d FROM DocumentMetadata d WHERE d.sender.username = :username ORDER BY d.documentid DESC")
+    List<DocumentMetadata> findSentDocumentsByUsername(@Param("username") String username);
 }

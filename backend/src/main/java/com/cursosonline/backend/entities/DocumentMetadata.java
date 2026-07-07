@@ -19,16 +19,33 @@ public class DocumentMetadata {
     private Long documentid;
 
     @Column(nullable = false)
-    private String filename; // Nombre físico único generado con UUID en disco (ej: uuid_clase.pdf)
+    private String filename; // Nombre físico único generado con UUID en disco
 
     @Column(nullable = false)
-    private String originalname; // Nombre original subido por el usuario (ej: Tema1.pdf)
+    private String originalname; // Nombre original subido por el usuario
 
     @Column(nullable = false)
     private LocalDateTime upload_date = LocalDateTime.now();
 
+    // --- NUEVOS CAMPOS PARA INTERCAMBIO BIDIRECCIONAL ---
+
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id") // Vinculado a la tabla Users (sirve para Alumnos, Profesores o Admins)
-    private Users user;
+    @JoinColumn(name = "sender_id", nullable = false) // Quién envía el archivo
+    private Users sender;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "receiver_id", nullable = false) // Quién recibe el archivo
+    private Users receiver;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "course_id") // Contexto opcional de la asignatura
+    private Courses course;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private FolderType folder_type; // SENT o RECEIVED para mapear las pestañas frontend
+
 }
