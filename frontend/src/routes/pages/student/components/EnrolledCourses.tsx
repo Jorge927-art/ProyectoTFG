@@ -97,6 +97,30 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh }:
                                     </div>
                                 </div>
 
+                                {/* VENTANA INFORMATIVA DE CALIFICACIONES (Contrato anticipado con el módulo docente) */}
+                                <div className="mt-3 p-2.5 bg-slate-50 rounded-xl border border-slate-100/80">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-[9px] font-black text-slate-900 uppercase tracking-widest">
+                                            Calificaciones Académicas
+                                        </span>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        {enroll.grades && enroll.grades.length > 0 ? (
+                                            enroll.grades.map((grade, idx) => (
+                                                <div key={idx} className="flex justify-between items-center text-[11px] bg-white p-1.5 rounded-lg border border-slate-100 shadow-sm">
+                                                    <span className="font-bold text-slate-600 truncate pr-2">{grade.title}</span>
+                                                    <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded-md font-black text-[10px] shrink-0">
+                                                        {grade.score}
+                                                    </span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-[10px] text-slate-400 font-medium italic pl-0.5">
+                                                Aún no hay calificaciones publicadas por el docente.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
                                 {/* BARRA DE PROGRESO DE ALTA PRECISIÓN Y BOTÓN INFERIOR */}
                                 <div className="mt-3 pt-2 border-t border-slate-100">
                                     <div className="flex justify-between text-[10px] text-slate-500 mb-1 font-semibold">
@@ -144,7 +168,7 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh }:
                         );
                     })
                 )}
-            </div>
-        </GenericCard>
+            </div >
+        </GenericCard >
     );
 };

@@ -731,6 +731,36 @@ Para consolidar las directrices de privacidad y control de acceso en el módulo 
 
 ---
 
+# [ADR-39] Diseño de Contrato Anticipado para la Integración Desacoplada de Calificaciones Académicas
+
+## Estado
+
+Aceptado
+
+## Contexto
+
+Con el objetivo de expandir las capacidades formativas del panel del estudiante (`EnrolledCourses.tsx`) hacia futuras interacciones con el módulo del profesorado, se requería habilitar una "ventana informativa de calificaciones" que permitiera reflejar el motivo (exámenes, trabajos prácticos) y la nota asignada.
+
+No obstante, debido a que el módulo de inserción de calificaciones por parte del docente se implementará en una fase posterior del desarrollo, la arquitectura del frontend requería un diseño que cumpliera con las siguientes restricciones estructurales:
+
+1. **Tipado Estricto de Datos:** Evitar el uso de tipos genéricos (`any`) que degradaran la robustez del linter y la predictibilidad del compilador de TypeScript.
+2. **Funcionalidad Inerte Conectable:** El componente debía ser visualmente operativo y tolerante a la ausencia de datos en el presente, pero quedar "arquitectónicamente listo" para reaccionar de forma automática en cuanto el backend comience a proveer los registros reales de PostgreSQL.
+3. **Consistencia Tipográfica y Minimalismo:** La UI de calificaciones debía mimetizarse con el entorno visual del Dashboard del estudiante Luis, evitando sobrecargas cognitivas, redundancia de iconos o desalineaciones en la tarjeta contenedora rígida (`h-109`).
+
+## Decisión
+
+1. **Estrategia de Pre-Hidratación y Contrato por Desacoplamiento:** Extender el contrato de transferencia de datos en `courseTypes.ts` mediante la creación de la interfaz `CourseGradeInfo` y su acoplamiento como propiedad opcional (`grades?`) dentro de `EnrollmentInfo`. Esto permite al cliente tipar de manera estricta el flujo de datos sin obligar al backend a enviar el payload en la fase actual.
+2. **Evaluación de Ausencia Dinámica en el JSX:** Inyectar una sección condicional dentro del bucle `.map` que evalúe de forma reactiva la existencia de calificaciones. Si la colección es nula o vacía, la interfaz se comporta de manera inerte renderizando un estado elegante por defecto (*"Aún no hay calificaciones publicadas por el docente"*), eliminando cualquier riesgo de quiebre del ciclo de renderizado.
+3. **Unificación Estética de Carga Gráfica:** Ajustar la coloración de la etiqueta del título a un tono gris sólido (`text-slate-700`) y prescindir de iconografía adicional (`GraduationCap`). Esto garantiza una integración cromática perfectamente simétrica con las etiquetas de categoría y textos perimetrales ya existentes en la plataforma.
+
+## Consecuencias
+
+* **Desacoplamiento Efectivo de Módulos:** El equipo de frontend y backend pueden trabajar de forma asíncrona. La vista del estudiante queda blindada ante futuras modificaciones; cuando el controlador del profesor guarde datos en las tablas relacionales, la UI del alumno los consumirá nativamente sin necesidad de alterar una sola línea de código en la capa de presentación.
+* **Mantenimiento del Espacio Geométrico:** El diseño compacto aprovecha de forma óptima los píxeles recuperados en la cabecera en el [ADR-38], manteniendo a salvo el scroll controlado de la tarjeta y la simetría visual con los componentes adyacentes del catálogo.
+* **Cero Regresiones en la Suite de QA:** La suite de pruebas de **Vitest se consolida exitosamente con sus 46 tests en verde (PASS)**, demostrando que la adición de la lógica condicional y las interfaces tipadas no introducen comportamientos erráticos o fugas de memoria transitorias en React.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026

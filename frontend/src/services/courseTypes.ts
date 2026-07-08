@@ -30,4 +30,11 @@ export interface EnrollmentInfo {
     status: string;
     progress_percentage: number;
     course: DBModelCourse;
+    grades?: CourseGradeInfo[];
 }
+
+export interface CourseGradeInfo {
+    title: string; // Ej: "Examen Parcial", "Trabajo Fin de Curso"
+    score: string; // Ej: "8.5", "10"
+}
+
