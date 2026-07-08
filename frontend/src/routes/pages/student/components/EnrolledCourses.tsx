@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'; // Añadido useEffect para capturar la estampa de tiempo
+import { useState } from 'react'; // Añadido useEffect para capturar la estampa de tiempo
 import { BookOpen, Loader2, ArrowRight, Clock } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import type { EnrollmentInfo } from '../../../../services/courseTypes';
@@ -18,18 +18,6 @@ interface EnrolledCoursesProps {
 export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh }: EnrolledCoursesProps) => {
     // Estado local para evitar clics concurrentes que corrompan el DOM virtual durante la red
     const [mutatingId, setMutatingId] = useState<number | null>(null);
-    // Estado local para registrar la última sincronización con el servidor
-    const [syncTime, setSyncTime] = useState<string>('');
-
-    /**
-     * Sincronización reactiva: captura la hora del sistema exacta 
-     * cada vez que se refresca la lista de asignaturas desde el backend.
-     */
-    useEffect(() => {
-        const now = new Date();
-        const formattedTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        setSyncTime(formattedTime);
-    }, [enrolledList]);
 
     /**
      * Dispara la mutación asíncrona en el backend para iniciar el cronómetro del curso.
@@ -58,25 +46,17 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh }:
         */
         <GenericCard className="bg-emerald-100/40 mt-6 mb-8 h-109 flex flex-col p-5">
 
-            {/* CABECERA DE LA SECCIÓN (Refactorizada con indicador de sincronización asíncrona) */}
-            <div className="flex flex-col gap-1 mb-4 shrink-0">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                        <BookOpen size={18} className="text-emerald-700" />
-                        <span>Tus asignaturas en curso</span>
-                    </h2>
-                    <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-full shrink-0">
-                        {enrolledList.length}
-                    </span>
-                </div>
-                {/* ETIQUETA VISUAL DE ÚLTIMA SINCRONIZACIÓN [RECOMENDACIÓN NOTEBOOKLM] */}
-                {syncTime && (
-                    <div className="flex items-center gap-1 text-[10px] text-emerald-800 font-medium opacity-80 self-start mt-0.5">
-                        <Clock size={11} />
-                        <span>Sincronizado con PostgreSQL a las {syncTime}h</span>
-                    </div>
-                )}
+            {/* CABECERA DE LA SECCIÓN (Alineación horizontal compacta: Título + Contador) */}
+            <div className="flex items-center gap-2 mb-4 shrink-0">
+                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <BookOpen size={18} className="text-emerald-700" />
+                    <span>Tus asignaturas</span>
+                </h2>
+                <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-full shrink-0">
+                    {enrolledList.length}
+                </span>
             </div>
+
             {/* SCROLL DINÁMICO AUTO-AJUSTABLE [ADR-19] */}
             <div className="overflow-y-auto pr-1 p-1 custom-scrollbar space-y-3 flex-1">
                 {loadingEnrollments ? (
@@ -93,6 +73,8 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh }:
                         const progressPct = enroll.progress_percentage || 0;
                         const isStarted = enroll.started_at !== null;
                         const isThisMutating = mutatingId === enroll.enrollmentid;
+                        const durationInDays = Math.ceil((enroll.course?.duration || 0) / 24);
+
 
                         return (
                             /* Tarjetas internas adaptadas con border-slate-200 según Auditoría UI y Composición Pura */
@@ -109,7 +91,7 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh }:
                                         <div className="flex items-center gap-1 mt-0.5">
                                             <Clock size={11} className="text-slate-400" />
                                             <p className="text-[11px] text-slate-400 font-medium">
-                                                Duración: {enroll.course?.duration || 0}h | Prof. {enroll.course?.instructors || "Por asignar"}
+                                                Duración: {durationInDays} días | Prof. {enroll.course?.instructors || "Por asignar"}
                                             </p>
                                         </div>
                                     </div>

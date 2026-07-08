@@ -5971,192 +5971,6 @@ describe('Auditoría UI: Aislamiento de Estados en EnrolledCourses', () => {
 });
 
 ================
-File: frontend/src/routes/pages/student/components/EvaluationPanel.test.tsx
-================
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { EvaluationPanel } from './EvaluationPanel';
-import { useActiveEvaluations } from './useActiveEvaluations';
-
-// 1. Mockear el hook para aislar el componente visual de las llamadas de Axios
-vi.mock('./useActiveEvaluations', () => ({
-    useActiveEvaluations: vi.fn()
-}));
-
-describe('EvaluationPanel Component [TFG Test Suite]', () => {
-    const mockSubmitEvaluation = vi.fn();
-    const mockSetEvaluationError = vi.fn();
-    const mockRefreshPending = vi.fn();
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-
-        // Configuración por defecto para un estado inicial limpio sin asignaturas
-        vi.mocked(useActiveEvaluations).mockReturnValue({
-            pendingList: [],
-            loadingPending: false,
-            isSubmitting: false,
-            evaluationError: '',
-            setEvaluationError: mockSetEvaluationError,
-            refreshPending: mockRefreshPending,
-            submitEvaluation: mockSubmitEvaluation
-        } as ReturnType<typeof useActiveEvaluations>);
-    });
-
-    it('debe renderizar el estado vacío cuando no existen asignaturas pendientes de evaluar', () => {
-        render(<EvaluationPanel />);
-
-        expect(screen.getByText('Evaluación Académica de Docentes y Cursos')).toBeInTheDocument();
-        expect(screen.getByText('Has evaluado todas tus asignaturas vigentes. ¡Buen trabajo!')).toBeInTheDocument();
-    });
-
-    it('debe renderizar la lista de asignaturas y profesores activos pendientes de calificación', () => {
-        const mockPending = [
-            {
-                enrollmentid: 10,
-                enrolled_at: '2026-07-06T10:00:00.000Z',
-                status: 'EN_PROGRESO',
-                course: {
-                    course_id: 101,
-                    title: 'Introduction to Data Science',
-                    category: 'Data Science',
-                    instructors: 'Prof. Andrew Ng',
-                    duration: 40
-                }
-            }
-        ];
-
-        vi.mocked(useActiveEvaluations).mockReturnValue({
-            pendingList: mockPending,
-            loadingPending: false,
-            isSubmitting: false,
-            evaluationError: '',
-            setEvaluationError: mockSetEvaluationError,
-            refreshPending: mockRefreshPending,
-            submitEvaluation: mockSubmitEvaluation
-        } as ReturnType<typeof useActiveEvaluations>);
-
-        render(<EvaluationPanel />);
-
-        expect(screen.getByText('Introduction to Data Science')).toBeInTheDocument();
-        expect(screen.getByText('Docente: Prof. Andrew Ng')).toBeInTheDocument();
-        expect(screen.getByText('1 pendientes')).toBeInTheDocument();
-    });
-
-    it('debe mostrar el spinner de carga asíncrona mientras sincroniza con PostgreSQL', () => {
-        vi.mocked(useActiveEvaluations).mockReturnValue({
-            pendingList: [],
-            loadingPending: true,
-            isSubmitting: false,
-            evaluationError: '',
-            setEvaluationError: mockSetEvaluationError,
-            refreshPending: mockRefreshPending,
-            submitEvaluation: mockSubmitEvaluation
-        } as ReturnType<typeof useActiveEvaluations>);
-
-        render(<EvaluationPanel />);
-
-        expect(screen.getByText('Sincronizando asignaturas matriculadas...')).toBeInTheDocument();
-    });
-
-    it('debe desplegar el Alert Box controlado si el hook reporta un fallo de red o denegación', () => {
-        vi.mocked(useActiveEvaluations).mockReturnValue({
-            pendingList: [],
-            loadingPending: false,
-            isSubmitting: false,
-            evaluationError: 'Acceso denegado: No puedes evaluar un curso sin matrícula activa.',
-            setEvaluationError: mockSetEvaluationError,
-            refreshPending: mockRefreshPending,
-            submitEvaluation: mockSubmitEvaluation
-        } as ReturnType<typeof useActiveEvaluations>);
-
-        render(<EvaluationPanel />);
-
-        expect(screen.getByText('Acceso denegado: No puedes evaluar un curso sin matrícula activa.')).toBeInTheDocument();
-    });
-
-    it('debe abrir el formulario de rating dual al pulsar el botón Evaluar', async () => {
-        const mockPending = [
-            {
-                enrollmentid: 10,
-                enrolled_at: '2026-07-06T10:00:00.000Z',
-                status: 'EN_PROGRESO',
-                course: {
-                    course_id: 101,
-                    title: 'Introduction to Data Science',
-                    category: 'Data Science',
-                    instructors: 'Prof. Andrew Ng',
-                    duration: 40
-                }
-            }
-        ];
-
-        vi.mocked(useActiveEvaluations).mockReturnValue({
-            pendingList: mockPending,
-            loadingPending: false,
-            isSubmitting: false,
-            evaluationError: '',
-            setEvaluationError: mockSetEvaluationError,
-            refreshPending: mockRefreshPending,
-            submitEvaluation: mockSubmitEvaluation
-        } as ReturnType<typeof useActiveEvaluations>);
-
-        render(<EvaluationPanel />);
-
-        const evalButton = screen.getByRole('button', { name: /Evaluar/i });
-        fireEvent.click(evalButton);
-
-        // [CORRECCIÓN ACT WARNING]: Esperamos de forma asíncrona a que concluya la mutación del DOM virtual
-        await waitFor(() => {
-            expect(mockSetEvaluationError).toHaveBeenCalledWith('');
-        });
-    });
-});
-
-================
-File: frontend/src/routes/pages/student/components/useActiveEvaluations.ts
-================
-import { useState, useEffect, useCallback } from 'react';
-import { getPendingEvaluations, submitAcademicEvaluation, type PendingEvaluationDTO, type EvaluationInput } from '../../../../services/evaluationService';
-
-export const useActiveEvaluations = () => {
-  const [pendingList, setPendingList] = useState<PendingEvaluationDTO[]>([]);
-  const [loadingPending, setLoadingPending] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [evaluationError, setEvaluationError] = useState('');
-
-  const fetchPending = useCallback(async () => {
-    setLoadingPending(true);
-    try {
-      const data = await getPendingEvaluations();
-      setPendingList(data);
-    } catch  {
-      setEvaluationError('Error al cargar evaluaciones pendientes.');
-    } finally {
-      setLoadingPending(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchPending(); }, [fetchPending]);
-
-  const submitEvaluation = async (data: EvaluationInput) => {
-    setIsSubmitting(true);
-    setEvaluationError('');
-    try {
-      await submitAcademicEvaluation(data);
-      // Tras el éxito, eliminamos el curso de la lista local para feedback inmediato [ADR-35]
-      setPendingList(prev => prev.filter(item => item.course.course_id !== data.course_id));
-    } catch  {
-      setEvaluationError('No se pudo procesar la evaluación. Inténtalo de nuevo.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return { pendingList, loadingPending, isSubmitting, evaluationError, submitEvaluation, refreshPending: fetchPending };
-};
-
-================
 File: frontend/src/routes/pages/student/components/useSmartRecommendations.ts
 ================
 import { useState, useEffect } from 'react';
@@ -6693,247 +6507,26 @@ distributionType=only-script
 distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.14/apache-maven-3.9.14-bin.zip
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/controller/DocumentController.java
+File: backend/src/main/java/com/cursosonline/backend/config/WebConfig.java
 ================
-package com.cursosonline.backend.controller;
+package com.cursosonline.backend.config;
 
-import com.cursosonline.backend.dto.UserDirectoryDTO;
-import com.cursosonline.backend.entities.DocumentMetadata;
-import com.cursosonline.backend.entities.FolderType;
-import com.cursosonline.backend.entities.Users;
-import com.cursosonline.backend.entities.Role;
-import com.cursosonline.backend.repository.DocumentMetadataRepository;
-import com.cursosonline.backend.repository.EnrollmentRepository;
-import com.cursosonline.backend.repository.UserRepository;
-import com.cursosonline.backend.services.FileStorageService;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-import java.util.List;
-import java.util.Map;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-@RestController
-@RequestMapping("/api/v1/documents")
-@Transactional
-public class DocumentController {
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
 
-    private final FileStorageService fileStorageService;
-    private final DocumentMetadataRepository documentMetadataRepository;
-    private final UserRepository userRepository;
-    private final EnrollmentRepository enrollmentRepository;
+    @Value("${spring.servlet.multipart.location}")
+    private String uploadDir;
 
-    // CONSTRUCTOR ACTUALIZADO: Inyectamos el repositorio de matrículas necesario
-    // para el directorio académico
-    public DocumentController(FileStorageService fileStorageService,
-            DocumentMetadataRepository documentMetadataRepository,
-            UserRepository userRepository,
-            EnrollmentRepository enrollmentRepository) {
-        this.fileStorageService = fileStorageService;
-        this.documentMetadataRepository = documentMetadataRepository;
-        this.userRepository = userRepository;
-        this.enrollmentRepository = enrollmentRepository;
-    }
-
-    /**
-     * [ENDPOINT DE CONSULTA MODIFICADO]: Devuelve por defecto los documentos
-     * RECIBIDOS
-     * del usuario autenticado para alimentar la pestaña principal.
-     */
-    @GetMapping
-    public ResponseEntity<?> getUserDocuments(Authentication authentication) {
-        try {
-            if (authentication == null || !authentication.isAuthenticated()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "No autenticado o token JWT inválido."));
-            }
-
-            String username = authentication.getName();
-            List<DocumentMetadata> documents = documentMetadataRepository.findReceivedDocumentsByUsername(username);
-
-            return ResponseEntity.ok(documents);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                    "error", "Error interno al recuperar el listado de documentos",
-                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
-        }
-    }
-
-    /**
-     * [NUEVO ENDPOINT]: Devuelve de forma aislada los documentos ENVIADOS por el
-     * usuario.
-     */
-    @GetMapping("/sent")
-    public ResponseEntity<?> getSentDocuments(Authentication authentication) {
-        try {
-            if (authentication == null || !authentication.isAuthenticated()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "No autenticado o token JWT inválido."));
-            }
-
-            String username = authentication.getName();
-            List<DocumentMetadata> documents = documentMetadataRepository.findSentDocumentsByUsername(username);
-
-            return ResponseEntity.ok(documents);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                    "error", "Error al recuperar los documentos enviados",
-                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
-        }
-    }
-
-    /**
-     * [ENDPOINT DE CARGA DIRIGIDO]: Recibe el archivo y el ID del destinatario
-     * obligatorio,
-     * persistiendo las copias para las bandejas correspondientes.
-     */
-    @PostMapping("/upload")
-    public ResponseEntity<?> uploadDocument(
-            Authentication authentication,
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("receiverId") Long receiverId) {
-
-        try {
-            if (authentication == null || !authentication.isAuthenticated()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "No autenticado o token JWT inválido."));
-            }
-
-            if (file == null || file.isEmpty()) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "El archivo transmitido está vacío o es inválido."));
-            }
-
-            Users currentUser = userRepository.findByUsername(authentication.getName())
-                    .orElseThrow(() -> new RuntimeException("Usuario emisor no encontrado."));
-
-            // 1. REGLA DE NEGOCIO PRIMARIA: Validación perimetral inmediata (Evita llamadas
-            // a BD innecesarias)
-            if (currentUser.getUser_id().equals(receiverId)) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "No puedes enviarte un documento a ti mismo."));
-            }
-
-            // 2. CONTROL DE INFRAESTRUCTURA: Verificamos si el tercero existe
-            Users receiverUser = userRepository.findById(receiverId)
-                    .orElseThrow(() -> new RuntimeException("El usuario destinatario no existe."));
-
-            // 3. Guardar archivo físico en disco
-            String relativePath = fileStorageService.storeFile(file, "documents");
-            String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
-
-            // 4. Registro para la bandeja de ENVIADOS (Emisor)
-            DocumentMetadata sentMetadata = new DocumentMetadata();
-            sentMetadata.setFilename(relativePath);
-            sentMetadata.setOriginalname(cleanOriginalName);
-            sentMetadata.setSender(currentUser);
-            sentMetadata.setReceiver(receiverUser);
-            sentMetadata.setFolder_type(FolderType.SENT);
-            documentMetadataRepository.save(sentMetadata);
-
-            // 5. Registro para la bandeja de RECIBIDOS (Receptor)
-            DocumentMetadata receivedMetadata = new DocumentMetadata();
-            receivedMetadata.setFilename(relativePath);
-            receivedMetadata.setOriginalname(cleanOriginalName);
-            receivedMetadata.setSender(currentUser);
-            receivedMetadata.setReceiver(receiverUser);
-            receivedMetadata.setFolder_type(FolderType.RECEIVED);
-            documentMetadataRepository.save(receivedMetadata);
-
-            return ResponseEntity.ok(Map.of(
-                    "message", "Documento enviado con éxito al destinatario",
-                    "filename", relativePath,
-                    "originalname", cleanOriginalName));
-
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                    "error", "Error crítico al procesar el intercambio del documento",
-                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
-        }
-    }
-
-    /**
-     * [DIRECTORIO DINÁMICO]: Recupera los profesores de los cursos en los que el
-     * alumno está matriculado.
-     */
-    @GetMapping("/directory/teachers")
-    public ResponseEntity<?> getMyTeachers(Authentication authentication) {
-        try {
-            if (authentication == null || !authentication.isAuthenticated()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "No autenticado."));
-            }
-
-            Users currentUser = userRepository.findByUsername(authentication.getName())
-                    .orElseThrow(() -> new RuntimeException("Usuario emisor no encontrado."));
-
-            // 1. Obtener todas las matrículas del alumno con sus respectivos cursos
-            List<com.cursosonline.backend.entities.Enrollment> enrollments = enrollmentRepository
-                    .findAllByUserIdWithCourses(currentUser.getUser_id());
-
-            // 2. Traer todos los usuarios con rol PROFESOR del sistema para cruzarlos en
-            // memoria
-            List<Users> allProfessors = userRepository.findByRole(Role.PROFESSOR);
-
-            // 3. Filtrar los profesores cuyos nombres aparezcan en la cadena "instructors"
-            // de los cursos matriculados
-            List<UserDirectoryDTO> myTeachers = allProfessors.stream()
-                    .filter(prof -> enrollments.stream().anyMatch(e -> e.getCourse().getInstructors() != null &&
-                            e.getCourse().getInstructors().contains(prof.getUsername())))
-                    .map(p -> new UserDirectoryDTO(p.getUser_id(), p.getUsername(), p.getEmail(), p.getRole().name()))
-                    .toList();
-
-            return ResponseEntity.ok(myTeachers);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    /**
-     * [DIRECTORIO DINÁMICO]: Recupera los compañeros de clase que comparten
-     * asignaturas con el alumno.
-     */
-    @GetMapping("/directory/classmates")
-    public ResponseEntity<?> getMyClassmates(Authentication authentication) {
-        try {
-            if (authentication == null || !authentication.isAuthenticated()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "No autenticado."));
-            }
-
-            List<UserDirectoryDTO> classmates = userRepository.findClassmatesByUsername(authentication.getName())
-                    .stream()
-                    .map(c -> new UserDirectoryDTO(c.getUser_id(), c.getUsername(), c.getEmail(), c.getRole().name()))
-                    .toList();
-
-            return ResponseEntity.ok(classmates);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    /**
-     * [DIRECTORIO DINÁMICO]: Recupera las cuentas de administración de la
-     * plataforma.
-     */
-    @GetMapping("/directory/admins")
-    public ResponseEntity<?> getPlatformAdmins(Authentication authentication) {
-        try {
-            if (authentication == null || !authentication.isAuthenticated()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "No autenticado."));
-            }
-
-            List<UserDirectoryDTO> admins = userRepository.findByRole(Role.ADMIN).stream()
-                    .map(a -> new UserDirectoryDTO(a.getUser_id(), a.getUsername(), a.getEmail(), a.getRole().name()))
-                    .toList();
-
-            return ResponseEntity.ok(admins);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
-        }
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // Mapea la URL '/uploads/**' a la carpeta física real del disco
+        registry.addResourceHandler("/uploads/**")
+                .addResourceLocations("file:" + uploadDir + "/");
     }
 }
 
@@ -7355,209 +6948,6 @@ class BackendApplicationTests {
 		assertNotNull(jwtService, "El motor criptográfico JwtService no está disponible en el contexto.");
 		assertNotNull(userService, "La capa de servicios centrales de negocio falló al inicializarse.");
 	}
-}
-
-================
-File: backend/src/test/java/com/cursosonline/backend/controller/DocumentControllerTest.java
-================
-package com.cursosonline.backend.controller;
-
-import com.cursosonline.backend.entities.DocumentMetadata;
-import com.cursosonline.backend.entities.FolderType;
-import com.cursosonline.backend.entities.Users;
-import com.cursosonline.backend.entities.Role;
-import com.cursosonline.backend.repository.DocumentMetadataRepository;
-import com.cursosonline.backend.repository.EnrollmentRepository;
-import com.cursosonline.backend.repository.UserRepository;
-import com.cursosonline.backend.services.FileStorageService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.security.core.Authentication;
-
-import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.anyLong;
-
-@DisplayName("Suite de Pruebas Unitarias de Aislamiento: DocumentController [TFG Backend]")
-public class DocumentControllerTest {
-
-        @InjectMocks
-        private DocumentController documentController;
-
-        @Mock
-        private FileStorageService fileStorageService;
-
-        @Mock
-        private DocumentMetadataRepository documentMetadataRepository;
-
-        @Mock
-        private UserRepository userRepository;
-
-        // NUEVO MOCK: Añadimos el repositorio de matrículas para que Mockito lo inyecte
-        // automáticamente en el controlador
-        @Mock
-        private EnrollmentRepository enrollmentRepository;
-
-        @Mock
-        private Authentication authentication;
-
-        private Users mockSender;
-        private Users mockReceiver;
-
-        @BeforeEach
-        void setUp() {
-                MockitoAnnotations.openMocks(this);
-
-                // Configuración del Emisor (Estudiante Luis)
-                mockSender = new Users();
-                mockSender.setUser_id(1L);
-                mockSender.setUsername("luis_student");
-                mockSender.setEmail("luis@tfg.com");
-                mockSender.setRole(Role.STUDENT);
-
-                // Configuración del Receptor (Profesor u otro Alumno)
-                mockReceiver = new Users();
-                mockReceiver.setUser_id(2L);
-                mockReceiver.setUsername("profesor_juan");
-                mockReceiver.setEmail("juan@tfg.com");
-                mockReceiver.setRole(Role.PROFESSOR);
-
-                // Simular que el usuario siempre está autenticado por defecto
-                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
-                Mockito.when(authentication.getName()).thenReturn("luis_student");
-        }
-
-        @Test
-        @DisplayName("Debe retornar lista vacía (HTTP 200) cuando el alumno no posee documentos recibidos en PostgreSQL")
-        void debeRetornarListaVaciaCuandoNoHayDocumentos() {
-                Mockito.when(documentMetadataRepository.findReceivedDocumentsByUsername("luis_student"))
-                                .thenReturn(Collections.emptyList());
-
-                ResponseEntity<?> response = documentController.getUserDocuments(authentication);
-
-                assertEquals(HttpStatus.OK, response.getStatusCode());
-                assertTrue(response.getBody() instanceof List);
-                List<?> bodyList = (List<?>) response.getBody();
-                assertTrue(bodyList.isEmpty());
-        }
-
-        @Test
-        @DisplayName("Debe retornar el listado ordenado de metadatos cuando existen registros recibidos en la base de datos")
-        void debeRetornarMetadatosDeDocumentos() {
-                DocumentMetadata doc1 = new DocumentMetadata(1L, "documents/uuid1_t1.pdf", "Tema1.pdf",
-                                LocalDateTime.now(),
-                                mockSender, mockReceiver, null, FolderType.RECEIVED);
-                DocumentMetadata doc2 = new DocumentMetadata(2L, "documents/uuid2_e1.docx", "Ensayo.docx",
-                                LocalDateTime.now(),
-                                mockSender, mockReceiver, null, FolderType.RECEIVED);
-
-                Mockito.when(documentMetadataRepository.findReceivedDocumentsByUsername("luis_student"))
-                                .thenReturn(Arrays.asList(doc1, doc2));
-
-                ResponseEntity<?> response = documentController.getUserDocuments(authentication);
-
-                assertEquals(HttpStatus.OK, response.getStatusCode());
-                List<?> bodyList = (List<?>) response.getBody();
-                assertEquals(2, bodyList.size());
-
-                DocumentMetadata firstResult = (DocumentMetadata) bodyList.get(0);
-                assertEquals("Tema1.pdf", firstResult.getOriginalname());
-        }
-
-        @Test
-        @DisplayName("Debe procesar y persistir con éxito (HTTP 200) un archivo multipart válido duplicando para emisor (SENT) y receptor (RECEIVED)")
-        void debeSubirDocumentoValidoConExito() {
-                MockMultipartFile validFile = new MockMultipartFile(
-                                "file",
-                                "MiPractica.pdf",
-                                "application/pdf",
-                                "Contenido binario simulado de prueba".getBytes());
-
-                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
-                Mockito.when(userRepository.findById(2L)).thenReturn(Optional.of(mockReceiver));
-                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
-                                .thenReturn("documents/uuid_mock.pdf");
-
-                ResponseEntity<?> response = documentController.uploadDocument(authentication, validFile, 2L);
-
-                assertEquals(HttpStatus.OK, response.getStatusCode());
-                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
-                assertNotNull(bodyMap);
-                assertEquals("Documento enviado con éxito al destinatario", bodyMap.get("message"));
-                assertEquals("MiPractica.pdf", bodyMap.get("originalname"));
-
-                // Verificación rigurosa: Se deben invocar exactamente dos inserciones en la
-                // base de datos (SENT y RECEIVED)
-                Mockito.verify(documentMetadataRepository, Mockito.times(2)).save(any(DocumentMetadata.class));
-        }
-
-        @Test
-        @DisplayName("Debe retornar HTTP 400 Bad Request cuando el FileStorageService rechaza el archivo por validación perimetral dual")
-        void debeRechazarSubidaPorExtensionInvalida() {
-                MockMultipartFile invalidFile = new MockMultipartFile(
-                                "file",
-                                "Malware.exe",
-                                "application/x-msdownload",
-                                "Bytes maliciosos".getBytes());
-
-                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
-                Mockito.when(userRepository.findById(2L)).thenReturn(Optional.of(mockReceiver));
-
-                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
-                                .thenThrow(new IllegalArgumentException(
-                                                "Extensión de documento no permitida (.exe). Solo se admite PDF, DOCX o TXT."));
-
-                ResponseEntity<?> response = documentController.uploadDocument(authentication, invalidFile, 2L);
-
-                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
-                assertNotNull(bodyMap);
-                assertEquals("Extensión de documento no permitida (.exe). Solo se admite PDF, DOCX o TXT.",
-                                bodyMap.get("error"));
-
-                Mockito.verify(documentMetadataRepository, Mockito.never()).save(any(DocumentMetadata.class));
-        }
-
-        @Test
-        @DisplayName("Debe retornar HTTP 400 Bad Request cuando la regla perimetral frena el autoenvío sin consultar repositorios")
-        void debeRechazarAutoEnvio() {
-                MockMultipartFile validFile = new MockMultipartFile(
-                                "file",
-                                "MiPractica.pdf",
-                                "application/pdf",
-                                "Contenido binario simulado de prueba".getBytes());
-
-                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
-
-                // Ejecutamos pasando receiverId = 1L (idéntico al del emisor mockSender)
-                ResponseEntity<?> response = documentController.uploadDocument(authentication, validFile, 1L);
-
-                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
-                assertNotNull(bodyMap);
-                assertEquals("No puedes enviarte un documento a ti mismo.", bodyMap.get("error"));
-
-                // Verificamos rigurosamente que NO se haya interactuado con la infraestructura
-                // debido al cortocircuito defensivo
-                Mockito.verify(userRepository, Mockito.never()).findById(anyLong());
-                Mockito.verify(documentMetadataRepository, Mockito.never()).save(any(DocumentMetadata.class));
-        }
 }
 
 ================
@@ -8538,309 +7928,180 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
 });
 
 ================
-File: frontend/src/routes/pages/student/components/EvaluationPanel.tsx
+File: frontend/src/routes/pages/student/components/EvaluationPanel.test.tsx
 ================
-import { useState } from 'react';
-import { Star, MessageSquare, UserCheck, Loader2, AlertCircle, CheckCircle2, Send } from 'lucide-react';
-import GenericCard from '../../../../components/ui/genericCard/GenericCard';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { EvaluationPanel } from './EvaluationPanel';
 import { useActiveEvaluations } from './useActiveEvaluations';
-import type { EvaluationInput } from '../../../../services/evaluationService';
 
-/**
- * Componente de Evaluación Académica [ADR-37].
- * Permite calificar de forma asimétrica la asignatura y al profesorado.
- * Implementa un contenedor de scroll controlado para mantener la simetría visual [ADR-19].
- */
-export const EvaluationPanel = () => {
-    const {
-        pendingList,
-        loadingPending,
-        isSubmitting,
-        evaluationError,
-        submitEvaluation
-    } = useActiveEvaluations();
+// 1. Mockear el hook para aislar el componente visual de las llamadas de Axios
+vi.mock('./useActiveEvaluations', () => ({
+    useActiveEvaluations: vi.fn()
+}));
 
-    // Estado local para gestionar el formulario activo de cada tarjeta
-    const [formStates, setFormStates] = useState<Record<number, Partial<EvaluationInput>>>({});
+describe('EvaluationPanel Component [TFG Test Suite]', () => {
+    const mockSubmitEvaluation = vi.fn();
+    const mockRefreshPending = vi.fn();
 
-    const handleRatingChange = (enrollmentId: number, field: keyof EvaluationInput, value: number | string) => {
-        setFormStates(prev => ({
-            ...prev,
-            [enrollmentId]: { ...prev[enrollmentId], [field]: value }
-        }));
-    };
+    beforeEach(() => {
+        vi.clearAllMocks();
 
-    const handleSend = async (enrollmentId: number, courseId: number) => {
-        const state = formStates[enrollmentId];
-        if (!state?.course_score || !state?.instructor_score) return;
-
-        await submitEvaluation({
-            course_id: courseId,
-            course_score: state.course_score,
-            course_comment: state.course_comment || '',
-            instructor_score: state.instructor_score,
-            instructor_comment: state.instructor_comment || ''
+        // CONTRATO INTEGRAL: Se añade refreshPending para satisfacer la interfaz del hook real
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: [],
+            loadingPending: false,
+            isSubmitting: false,
+            evaluationError: '',
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
         });
-    };
+    });
 
-    return (
-        /* ALINEACIÓN GEOMÉTRICA: h-92 para nivelar con Asignaturas + Documentos */
-        <GenericCard className="h-90 flex flex-col shadow-sm border-slate-200">
-            <div className="flex items-center gap-2 mb-6">
-                <div className="bg-amber-50 p-2 rounded-lg">
-                    <Star className="text-amber-500 fill-amber-500" size={20} />
-                </div>
-                <div>
-                    <h2 className="text-base font-black text-slate-800 leading-tight">
-                        Evaluación académica
-                    </h2>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                        Docentes y asignaturas activas
-                    </p>
-                </div>
-            </div>
+    it('debe renderizar el estado vacío cuando no existen asignaturas pendientes de evaluar', () => {
+        render(<EvaluationPanel />);
 
-            {/* CONTENEDOR DE SCROLL [ADR-19][ADR-36] */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
-                {loadingPending ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                        <Loader2 className="animate-spin mb-2" size={24} />
-                        <p className="text-xs font-bold">Consultando red académica...</p>
-                    </div>
-                ) : pendingList.length === 0 ? (
-                    <div className="bg-slate-50 border-2 border-dashed border-slate-100 rounded-2xl p-8 text-center">
-                        <CheckCircle2 className="mx-auto text-emerald-400 mb-2" size={32} />
-                        <p className="text-slate-500 text-xs font-bold">¡Todo al día! No tienes evaluaciones pendientes.</p>
-                    </div>
-                ) : (
-                    pendingList.map((item) => {
-                        const state = formStates[item.enrollmentid] || {};
-                        const canSubmit = state.course_score && state.instructor_score && !isSubmitting;
+        expect(screen.getByText('Evaluación académica')).toBeInTheDocument();
+        expect(screen.getByText('¡Todo al día! No tienes evaluaciones pendientes.')).toBeInTheDocument();
+    });
 
-                        return (
-                            <div key={item.enrollmentid} className="p-4 bg-white border border-slate-100 rounded-xl shadow-xs space-y-4 transition-all hover:border-blue-100">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <h3 className="text-[11px] font-black text-slate-800 uppercase leading-tight">
-                                            {item.course.title}
-                                        </h3>
-                                        <div className="flex items-center gap-1.5 mt-1">
-                                            <UserCheck size={12} className="text-blue-500" />
-                                            <span className="text-[10px] text-slate-500 font-bold italic">
-                                                Prof: {item.course.instructors}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
+    it('debe renderizar la lista de asignaturas y profesores activos pendientes de calificación', () => {
+        const mockPending = [
+            {
+                enrollmentid: 10,
+                enrolled_at: '2026-07-06T10:00:00.000Z',
+                status: 'EN_PROGRESO',
+                course: {
+                    course_id: 101,
+                    title: 'Introduction to Data Science',
+                    category: 'Data Science',
+                    instructors: 'Prof. Andrew Ng',
+                    duration: 40
+                }
+            }
+        ];
 
-                                {/* Rating Asimétrico [ADR-37] */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Calidad del curso</label>
-                                        <div className="flex gap-1">
-                                            {[1 - 5].map(star => (
-                                                <button
-                                                    key={star}
-                                                    type="button"
-                                                    title={`Calificar curso con ${star} estrellas`}
-                                                    onClick={() => handleRatingChange(item.enrollmentid, 'course_score', star)}
-                                                    className={`transition-transform active:scale-125 ${(state.course_score || 0) >= star ? 'text-amber-400' : 'text-slate-200'}`}
-                                                >
-                                                    <Star size={16} fill={(state.course_score || 0) >= star ? "currentColor" : "none"} />
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: mockPending,
+            loadingPending: false,
+            isSubmitting: false,
+            evaluationError: '',
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
+        });
 
-                                    <div className="space-y-2">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Desempeño docente</label>
-                                        <div className="flex gap-1">
-                                            {[1 - 5].map(star => (
-                                                <button
-                                                    key={star}
-                                                    title={`Calificar profesor con ${star} estrellas`}
-                                                    onClick={() => handleRatingChange(item.enrollmentid, 'instructor_score', star)}
-                                                    className={`transition-transform active:scale-125 ${(state.instructor_score || 0) >= star ? 'text-blue-400' : 'text-slate-200'}`}
-                                                >
-                                                    <Star size={16} fill="currentColor" />
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
+        render(<EvaluationPanel />);
 
-                                {/* Comentarios granulares */}
-                                <div className="relative">
-                                    <MessageSquare size={12} className="absolute left-3 top-3 text-slate-300" />
-                                    <textarea
-                                        placeholder="Escribe un comentario opcional..."
-                                        className="w-full bg-slate-50 border-none rounded-lg p-2 pl-8 text-[10px] font-medium focus:ring-1 focus:ring-blue-200 outline-none resize-none"
-                                        rows={2}
-                                        onChange={(e) => handleRatingChange(item.enrollmentid, 'course_comment', e.target.value)}
-                                    />
-                                </div>
+        expect(screen.getByText('Introduction to Data Science')).toBeInTheDocument();
+        expect(screen.getByText('Prof: Prof. Andrew Ng')).toBeInTheDocument();
+    });
 
-                                <button
-                                    disabled={!canSubmit}
-                                    onClick={() => handleSend(item.enrollmentid, item.course.course_id)}
-                                    className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-black transition-all ${canSubmit
-                                        ? 'bg-slate-800 text-white hover:bg-black'
-                                        : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-                                        }`}
-                                >
-                                    {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                                    ENVIAR EVALUACIÓN
-                                </button>
-                            </div>
-                        );
-                    })
-                )}
-            </div>
+    it('debe mostrar el spinner de carga asíncrona mientras sincroniza con PostgreSQL', () => {
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: [],
+            loadingPending: true,
+            isSubmitting: false,
+            evaluationError: '',
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
+        });
 
-            {evaluationError && (
-                <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-xl flex items-center gap-2 text-[10px] font-bold animate-pulse">
-                    <AlertCircle size={14} />
-                    {evaluationError}
-                </div>
-            )}
-        </GenericCard>
-    );
-};
+        render(<EvaluationPanel />);
 
-export default EvaluationPanel;
+        expect(screen.getByText('Consultando red académica...')).toBeInTheDocument();
+    });
+
+    it('debe desplegar el Alert Box controlado si el hook reporta un fallo de red o denegación', () => {
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: [],
+            loadingPending: false,
+            isSubmitting: false,
+            evaluationError: 'Acceso denegado: No puedes evaluar un curso sin matrícula activa.',
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
+        });
+
+        render(<EvaluationPanel />);
+
+        expect(screen.getByText('Acceso denegado: No puedes evaluar un curso sin matrícula activa.')).toBeInTheDocument();
+    });
+
+    it('debe validar la existencia de las estrellas de rating dual e interceptar la acción de envío', async () => {
+        const mockPending = [
+            {
+                enrollmentid: 10,
+                enrolled_at: '2026-07-06T10:00:00.000Z',
+                status: 'EN_PROGRESO',
+                course: {
+                    course_id: 101,
+                    title: 'Introduction to Data Science',
+                    category: 'Data Science',
+                    instructors: 'Prof. Andrew Ng',
+                    duration: 40
+                }
+            }
+        ];
+
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: mockPending,
+            loadingPending: false,
+            isSubmitting: false,
+            evaluationError: '',
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
+        });
+
+        render(<EvaluationPanel />);
+
+        expect(screen.getByText('Calidad del curso')).toBeInTheDocument();
+        expect(screen.getByText('Desempeño docente')).toBeInTheDocument();
+
+        const submitButton = screen.getByRole('button', { name: /ENVIAR EVALUACIÓN/i });
+        expect(submitButton).toBeDisabled();
+    });
+});
 
 ================
-File: frontend/src/routes/pages/student/components/useDocuments.ts
+File: frontend/src/routes/pages/student/components/useActiveEvaluations.ts
 ================
 import { useState, useEffect, useCallback } from 'react';
-import { 
-    getUserDocuments, 
-    getSentDocuments, 
-    uploadStudentDocument, 
-    getTeachersDirectory, 
-    getClassmatesDirectory, 
-    getAdminsDirectory, 
-    type DocumentMetadata, 
-    type UserDirectoryDTO 
-} from '../../../../services/documentService';
+import { getPendingEvaluations, submitAcademicEvaluation, type PendingEvaluationDTO, type EvaluationInput } from '../../../../services/evaluationService';
 
-export const useDocuments = (successTrigger?: string) => {
-    // Listas independientes para evitar el "efecto fantasma" visual [ADR-19]
-    const [receivedList, setReceivedList] = useState<DocumentMetadata[]>([]);
-    const [sentList, setSentList] = useState<DocumentMetadata[]>([]);
-    const [activeTab, setActiveTab] = useState<'RECEIVED' | 'SENT'>('RECEIVED');
-    
-    // Estados de carga e interfaz
-    const [loadingDocuments, setLoadingDocuments] = useState<boolean>(false);
-    const [isUploading, setIsUploading] = useState<boolean>(false);
-    const [documentError, setDocumentError] = useState<string>('');
+export const useActiveEvaluations = () => {
+  const [pendingList, setPendingList] = useState<PendingEvaluationDTO[]>([]);
+  const [loadingPending, setLoadingPending] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [evaluationError, setEvaluationError] = useState('');
 
-    // Estados del directorio dinámico dirigido
-    const [directory, setDirectory] = useState<UserDirectoryDTO[]>([]);
-    const [loadingDirectory, setLoadingDirectory] = useState<boolean>(false);
-    const [selectedReceiverId, setSelectedReceiverId] = useState<number | ''>('');
+  const fetchPending = useCallback(async () => {
+    setLoadingPending(true);
+    try {
+      const data = await getPendingEvaluations();
+      setPendingList(data);
+    } catch  {
+      setEvaluationError('Error al cargar evaluaciones pendientes.');
+    } finally {
+      setLoadingPending(false);
+    }
+  }, []);
 
-    /**
-     * Sincroniza la lista de documentos de la pestaña que se encuentre activa.
-     */
-    const fetchTabDocuments = useCallback(async () => {
-        setLoadingDocuments(true);
-        setDocumentError('');
-        try {
-            if (activeTab === 'RECEIVED') {
-                const data = await getUserDocuments();
-                setReceivedList(data);
-            } else {
-                const data = await getSentDocuments();
-                setSentList(data);
-            }
-        } catch (err: unknown) {
-            console.error("Error al sincronizar documentos con el servidor:", err);
-            setDocumentError("No se pudieron sincronizar tus documentos desde el servidor.");
-        } finally {
-            setLoadingDocuments(false);
-        }
-    }, [activeTab]);
+  useEffect(() => { fetchPending(); }, [fetchPending]);
 
-    /**
-     * Agrupa y descarga de forma paralela los tres subgrupos del directorio académico legítimo.
-     */
-    const fetchDirectory = useCallback(async () => {
-        setLoadingDirectory(true);
-        try {
-            const [teachers, classmates, admins] = await Promise.all([
-                getTeachersDirectory(),
-                getClassmatesDirectory(),
-                getAdminsDirectory()
-            ]);
-            // Consolidamos en una única lista limpia para el selector
-            setDirectory([...teachers, ...classmates, ...admins]);
-        } catch (err: unknown) {
-            console.error("Error al recuperar el directorio de contactos:", err);
-            setDocumentError("Error al cargar la lista de destinatarios válidos.");
-        } finally {
-            setLoadingDirectory(false);
-        }
-    }, []);
-    /**
-     * Sube un archivo físico vinculándolo al destinatario seleccionado.
-     */
-    const handleUpload = async (file: File): Promise<boolean> => {
-        if (!file) return false;
-        
-        // Validación perimetral en cliente: Obligatorio haber seleccionado un destino
-        if (!selectedReceiverId) {
-            setDocumentError("Por favor, selecciona un destinatario obligatorio para el documento.");
-            return false;
-        }
-        
-        setIsUploading(true);
-        setDocumentError('');
-        try {
-            await uploadStudentDocument(file, Number(selectedReceiverId));
-            
-            // Limpiamos el selector de destinatario tras el éxito
-            setSelectedReceiverId('');
-            
-            // Refrescamos la lista de la pestaña activa en caliente
-            await fetchTabDocuments(); 
-            return true;
-        } catch (err: unknown) {
-            console.error("Error al procesar la subida del documento:", err);
-            const errorConResponse = err as { response?: { data?: { error?: string } } };
-            const backendError = errorConResponse.response?.data?.error || "Error crítico al subir el archivo.";
-            setDocumentError(backendError);
-            return false;
-        } finally {
-            setIsUploading(false);
-        }
-    };
+  const submitEvaluation = async (data: EvaluationInput) => {
+    setIsSubmitting(true);
+    setEvaluationError('');
+    try {
+      await submitAcademicEvaluation(data);
+      // Tras el éxito, eliminamos el curso de la lista local para feedback inmediato [ADR-35]
+      setPendingList(prev => prev.filter(item => item.course.course_id !== data.course_id));
+    } catch  {
+      setEvaluationError('No se pudo procesar la evaluación. Inténtalo de nuevo.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-    // Efecto 1: Reacciona al cambio de pestaña o trigger externo para sincronizar documentos
-    useEffect(() => {
-        fetchTabDocuments();
-    }, [successTrigger, fetchTabDocuments, activeTab]);
-
-    // Efecto 2: Carga el directorio dinámico legítimo una sola vez al montar el componente
-    useEffect(() => {
-        fetchDirectory();
-    }, [fetchDirectory]);
-
-    return {
-        // Retornamos la lista adecuada según la pestaña activa para simplificar el componente visual
-        documentList: activeTab === 'RECEIVED' ? receivedList : sentList,
-        activeTab,
-        setActiveTab,
-        loadingDocuments,
-        isUploading,
-        documentError,
-        setDocumentError,
-        directory,
-        loadingDirectory,
-        selectedReceiverId,
-        setSelectedReceiverId,
-        handleUpload
-    };
+  return { pendingList, loadingPending, isSubmitting, evaluationError, submitEvaluation, refreshPending: fetchPending };
 };
 
 ================
@@ -8946,110 +8207,6 @@ export interface EnrollmentInfo {
     progress_percentage: number;
     course: DBModelCourse;
 }
-
-================
-File: frontend/src/services/documentService.ts
-================
-import { apiClient } from './apiClient';
-
-// Interfaz para el mapeo simplificado del emisor/receptor dentro del documento
-export interface UserDocumentMinDTO {
-    user_id: number;
-    username: string;
-    email: string;
-    role: string;
-}
-
-// Interfaz estricta que mapea la entidad DocumentMetadata de PostgreSQL [ADR-36]
-export interface DocumentMetadata {
-    documentid: number;
-    filename: string;
-    originalname: string;
-    upload_date: string;
-    sender: UserDocumentMinDTO;
-    receiver: UserDocumentMinDTO;
-    folder_type: 'SENT' | 'RECEIVED';
-}
-
-// Interfaz que mapea las respuestas de los tres directorios dinámicos de la API
-export interface UserDirectoryDTO {
-    userId: number;
-    username: string;
-    email: string;
-    role: string;
-}
-
-export interface UploadDocumentResponse {
-    message: string;
-    filename: string;
-    originalname: string;
-}
-
-/**
- * [SERVICIO MULTI-ROL]: Recupera los documentos RECIBIDOS (Bandeja de Entrada)
- * asociados a la cuenta del usuario autenticado.
- */
-export const getUserDocuments = async (): Promise<DocumentMetadata[]> => {
-    const response = await apiClient.get<DocumentMetadata[]>('/api/v1/documents');
-    return response.data;
-};
-
-/**
- * [NUEVO SERVICIO]: Recupera los documentos ENVIADOS (Bandeja de Salida)
- * asociados a la cuenta del usuario autenticado.
- */
-export const getSentDocuments = async (): Promise<DocumentMetadata[]> => {
-    const response = await apiClient.get<DocumentMetadata[]>('/api/v1/documents/sent');
-    return response.data;
-};
-/**
- * [SERVICIO DE CARGA DIRIGIDO]: Envía el archivo físico y asocia el ID del destinatario
- * seleccionado de forma obligatoria para persistir el contrato emisor-receptor.
- */
-export const uploadStudentDocument = async (file: File, receiverId: number): Promise<UploadDocumentResponse> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('receiverId', receiverId.toString()); // Payload dirigido obligatorio
-
-    const response = await apiClient.post<UploadDocumentResponse>(
-        '/api/v1/documents/upload',
-        formData,
-        {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        }
-    );
-    return response.data;
-};
-
-// =========================================================================
-// --- CONSULTAS AL DIRECTORIO DINÁMICO ACADÉMICO ---
-// =========================================================================
-
-/**
- * Recupera los profesores de los cursos en los que el alumno está matriculado.
- */
-export const getTeachersDirectory = async (): Promise<UserDirectoryDTO[]> => {
-    const response = await apiClient.get<UserDirectoryDTO[]>('/api/v1/documents/directory/teachers');
-    return response.data;
-};
-
-/**
- * Recupera los compañeros de clase que comparten asignaturas con el alumno.
- */
-export const getClassmatesDirectory = async (): Promise<UserDirectoryDTO[]> => {
-    const response = await apiClient.get<UserDirectoryDTO[]>('/api/v1/documents/directory/classmates');
-    return response.data;
-};
-
-/**
- * Recupera las cuentas de administración de la plataforma.
- */
-export const getAdminsDirectory = async (): Promise<UserDirectoryDTO[]> => {
-    const response = await apiClient.get<UserDirectoryDTO[]>('/api/v1/documents/directory/admins');
-    return response.data;
-};
 
 ================
 File: backend/src/main/java/com/cursosonline/backend/config/jwt/JwtProperties.java
@@ -9271,6 +8428,306 @@ public class CourseController {
         List<RecommendationDTO> recommendations = recommendationService.getRecommendationsForUser(user.getUser_id());
         return ResponseEntity.ok(recommendations);
     }
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/controller/DocumentController.java
+================
+package com.cursosonline.backend.controller;
+
+import com.cursosonline.backend.dto.UserDirectoryDTO;
+import com.cursosonline.backend.entities.DocumentMetadata;
+import com.cursosonline.backend.entities.FolderType;
+import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.repository.DocumentMetadataRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.UserRepository;
+import com.cursosonline.backend.services.FileStorageService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/v1/documents")
+@Transactional
+public class DocumentController {
+
+    private final FileStorageService fileStorageService;
+    private final DocumentMetadataRepository documentMetadataRepository;
+    private final UserRepository userRepository;
+    private final EnrollmentRepository enrollmentRepository;
+
+    // CONSTRUCTOR ACTUALIZADO: Inyectamos el repositorio de matrículas necesario
+    // para el directorio académico
+    public DocumentController(FileStorageService fileStorageService,
+            DocumentMetadataRepository documentMetadataRepository,
+            UserRepository userRepository,
+            EnrollmentRepository enrollmentRepository) {
+        this.fileStorageService = fileStorageService;
+        this.documentMetadataRepository = documentMetadataRepository;
+        this.userRepository = userRepository;
+        this.enrollmentRepository = enrollmentRepository;
+    }
+
+    /**
+     * [ENDPOINT DE CONSULTA MODIFICADO]: Devuelve por defecto los documentos
+     * RECIBIDOS
+     * del usuario autenticado para alimentar la pestaña principal.
+     */
+    @GetMapping
+    public ResponseEntity<?> getUserDocuments(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            String username = authentication.getName();
+            List<DocumentMetadata> documents = documentMetadataRepository.findReceivedDocumentsByUsername(username);
+
+            return ResponseEntity.ok(documents);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error interno al recuperar el listado de documentos",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
+    /**
+     * [NUEVO ENDPOINT]: Devuelve de forma aislada los documentos ENVIADOS por el
+     * usuario.
+     */
+    @GetMapping("/sent")
+    public ResponseEntity<?> getSentDocuments(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            String username = authentication.getName();
+            List<DocumentMetadata> documents = documentMetadataRepository.findSentDocumentsByUsername(username);
+
+            return ResponseEntity.ok(documents);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error al recuperar los documentos enviados",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
+    /**
+     * [ENDPOINT DE CARGA DIRIGIDO]: Recibe el archivo y el ID del destinatario
+     * obligatorio,
+     * persistiendo las copias para las bandejas correspondientes.
+     */
+    @PostMapping("/upload")
+    public ResponseEntity<?> uploadDocument(
+            Authentication authentication,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("receiverId") Long receiverId) {
+
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            if (file == null || file.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "El archivo transmitido está vacío o es inválido."));
+            }
+
+            Users currentUser = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Usuario emisor no encontrado."));
+
+            // 1. REGLA DE NEGOCIO PRIMARIA: Validación perimetral inmediata (Evita llamadas
+            // a BD innecesarias)
+            if (currentUser.getUser_id().equals(receiverId)) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "No puedes enviarte un documento a ti mismo."));
+            }
+
+            // 2. CONTROL DE INFRAESTRUCTURA: Verificamos si el tercero existe
+            Users receiverUser = userRepository.findById(receiverId)
+                    .orElseThrow(() -> new RuntimeException("El usuario destinatario no existe."));
+
+            // 3. Guardar archivo físico en disco
+            String relativePath = fileStorageService.storeFile(file, "documents");
+            String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
+
+            // 4. Registro para la bandeja de ENVIADOS (Emisor)
+            DocumentMetadata sentMetadata = new DocumentMetadata();
+            sentMetadata.setFilename(relativePath);
+            sentMetadata.setOriginalname(cleanOriginalName);
+            sentMetadata.setSender(currentUser);
+            sentMetadata.setReceiver(receiverUser);
+            sentMetadata.setFolder_type(FolderType.SENT);
+            documentMetadataRepository.save(sentMetadata);
+
+            // 5. Registro para la bandeja de RECIBIDOS (Receptor)
+            DocumentMetadata receivedMetadata = new DocumentMetadata();
+            receivedMetadata.setFilename(relativePath);
+            receivedMetadata.setOriginalname(cleanOriginalName);
+            receivedMetadata.setSender(currentUser);
+            receivedMetadata.setReceiver(receiverUser);
+            receivedMetadata.setFolder_type(FolderType.RECEIVED);
+            documentMetadataRepository.save(receivedMetadata);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Documento enviado con éxito al destinatario",
+                    "filename", relativePath,
+                    "originalname", cleanOriginalName));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error crítico al procesar el intercambio del documento",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
+    /**
+     * [DIRECTORIO DINÁMICO]: Recupera los profesores de los cursos en los que el
+     * alumno está matriculado.
+     */
+    @GetMapping("/directory/teachers")
+    public ResponseEntity<?> getMyTeachers(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "No autenticado."));
+            }
+
+            Users currentUser = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Usuario emisor no encontrado."));
+
+            // 1. Obtener todas las matrículas del alumno con sus respectivos cursos
+            List<com.cursosonline.backend.entities.Enrollment> enrollments = enrollmentRepository
+                    .findAllByUserIdWithCourses(currentUser.getUser_id());
+
+            // 2. Traer todos los usuarios con rol PROFESOR del sistema para cruzarlos en
+            // memoria
+            List<Users> allProfessors = userRepository.findByRole(Role.PROFESSOR);
+
+            // 3. Filtrar los profesores cuyos nombres aparezcan en la cadena "instructors"
+            // de los cursos matriculados
+            List<UserDirectoryDTO> myTeachers = allProfessors.stream()
+                    .filter(prof -> enrollments.stream().anyMatch(e -> e.getCourse().getInstructors() != null &&
+                            e.getCourse().getInstructors().contains(prof.getUsername())))
+                    .map(p -> new UserDirectoryDTO(p.getUser_id(), p.getUsername(), p.getEmail(), p.getRole().name()))
+                    .toList();
+
+            return ResponseEntity.ok(myTeachers);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * [DIRECTORIO DINÁMICO]: Recupera los compañeros de clase que comparten
+     * asignaturas con el alumno.
+     */
+    @GetMapping("/directory/classmates")
+    public ResponseEntity<?> getMyClassmates(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "No autenticado."));
+            }
+
+            List<UserDirectoryDTO> classmates = userRepository.findClassmatesByUsername(authentication.getName())
+                    .stream()
+                    .map(c -> new UserDirectoryDTO(c.getUser_id(), c.getUsername(), c.getEmail(), c.getRole().name()))
+                    .toList();
+
+            return ResponseEntity.ok(classmates);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * [DIRECTORIO DINÁMICO]: Recupera las cuentas de administración de la
+     * plataforma.
+     */
+    @GetMapping("/directory/admins")
+    public ResponseEntity<?> getPlatformAdmins(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "No autenticado."));
+            }
+
+            List<UserDirectoryDTO> admins = userRepository.findByRole(Role.ADMIN).stream()
+                    .map(a -> new UserDirectoryDTO(a.getUser_id(), a.getUsername(), a.getEmail(), a.getRole().name()))
+                    .toList();
+
+            return ResponseEntity.ok(admins);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * [NUEVO ENDPOINT ANTI-IDOR]: Descarga segura de archivos con stream binario.
+     * Recupera el recurso del disco solo si el usuario autenticado es emisor o
+     * receptor.
+     */
+    @GetMapping("/download/{documentId}")
+    public ResponseEntity<?> downloadDocumentSecure(
+            Authentication authentication,
+            @PathVariable("documentId") Long documentId) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            String currentUsername = authentication.getName();
+
+            // 1. AUDITORÍA CRÍTICA EN BD: Recuperar metadatos para cruzar la propiedad
+            DocumentMetadata doc = documentMetadataRepository.findById(documentId)
+                    .orElseThrow(() -> new RuntimeException("El documento solicitado no existe en el sistema."));
+
+            // 2. CORTOCUITO DEFENSIVO ANTI-IDOR: Comprobar que pertenece al contrato
+            // dirigido
+            boolean isSender = doc.getSender().getUsername().equals(currentUsername);
+            boolean isReceiver = doc.getReceiver().getUsername().equals(currentUsername);
+
+            if (!isSender && !isReceiver) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error",
+                                "Acceso denegado: No tienes permisos legítimos para descargar este archivo."));
+            }
+
+            // 3. Conversión asíncrona a Stream Binario cargando el recurso de disco
+            org.springframework.core.io.Resource resource = fileStorageService.loadFileAsResource(doc.getFilename());
+
+            if (resource == null || !resource.exists()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "El archivo físico no se encuentra en el servidor."));
+            }
+
+            // 4. Inyección perimetral de cabeceras seguras Content-Disposition
+            return ResponseEntity.ok()
+                    .contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + doc.getOriginalname() + "\"")
+                    .body(resource);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error crítico al procesar la descarga segura por stream",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
 }
 
 ================
@@ -9646,6 +9103,296 @@ public class RecommendationService {
 }
 
 ================
+File: backend/src/test/java/com/cursosonline/backend/controller/DocumentControllerTest.java
+================
+package com.cursosonline.backend.controller;
+
+import com.cursosonline.backend.entities.DocumentMetadata;
+import com.cursosonline.backend.entities.FolderType;
+import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.repository.DocumentMetadataRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.UserRepository;
+import com.cursosonline.backend.services.FileStorageService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+
+@DisplayName("Suite de Pruebas Unitarias de Aislamiento: DocumentController [TFG Backend]")
+public class DocumentControllerTest {
+
+        private MockMvc mockMvc;
+
+        @InjectMocks
+        private DocumentController documentController;
+
+        @Mock
+        private FileStorageService fileStorageService;
+
+        @Mock
+        private DocumentMetadataRepository documentMetadataRepository;
+
+        @Mock
+        private UserRepository userRepository;
+
+        // NUEVO MOCK: Añadimos el repositorio de matrículas para que Mockito lo inyecte
+        // automáticamente en el controlador
+        @Mock
+        private EnrollmentRepository enrollmentRepository;
+
+        @Mock
+        private Authentication authentication;
+
+        private Users mockSender;
+        private Users mockReceiver;
+
+        @BeforeEach
+        void setUp() {
+                MockitoAnnotations.openMocks(this);
+
+                // Configuración del Emisor (Estudiante Luis)
+                mockSender = new Users();
+                mockSender.setUser_id(1L);
+                mockSender.setUsername("luis_student");
+                mockSender.setEmail("luis@tfg.com");
+                mockSender.setRole(Role.STUDENT);
+
+                // Configuración del Receptor (Profesor u otro Alumno)
+                mockReceiver = new Users();
+                mockReceiver.setUser_id(2L);
+                mockReceiver.setUsername("profesor_juan");
+                mockReceiver.setEmail("juan@tfg.com");
+                mockReceiver.setRole(Role.PROFESSOR);
+
+                // Simular que el usuario siempre está autenticado por defecto
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("luis_student");
+                this.mockMvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
+                                .standaloneSetup(documentController)
+                                .build();
+        }
+
+        @Test
+        @DisplayName("Debe retornar lista vacía (HTTP 200) cuando el alumno no posee documentos recibidos en PostgreSQL")
+        void debeRetornarListaVaciaCuandoNoHayDocumentos() {
+                Mockito.when(documentMetadataRepository.findReceivedDocumentsByUsername("luis_student"))
+                                .thenReturn(Collections.emptyList());
+
+                ResponseEntity<?> response = documentController.getUserDocuments(authentication);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertTrue(response.getBody() instanceof List);
+                List<?> bodyList = (List<?>) response.getBody();
+                assertTrue(bodyList.isEmpty());
+        }
+
+        @Test
+        @DisplayName("Debe retornar el listado ordenado de metadatos cuando existen registros recibidos en la base de datos")
+        void debeRetornarMetadatosDeDocumentos() {
+                DocumentMetadata doc1 = new DocumentMetadata(1L, "documents/uuid1_t1.pdf", "Tema1.pdf",
+                                LocalDateTime.now(),
+                                mockSender, mockReceiver, null, FolderType.RECEIVED);
+                DocumentMetadata doc2 = new DocumentMetadata(2L, "documents/uuid2_e1.docx", "Ensayo.docx",
+                                LocalDateTime.now(),
+                                mockSender, mockReceiver, null, FolderType.RECEIVED);
+
+                Mockito.when(documentMetadataRepository.findReceivedDocumentsByUsername("luis_student"))
+                                .thenReturn(Arrays.asList(doc1, doc2));
+
+                ResponseEntity<?> response = documentController.getUserDocuments(authentication);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                List<?> bodyList = (List<?>) response.getBody();
+                assertEquals(2, bodyList.size());
+
+                DocumentMetadata firstResult = (DocumentMetadata) bodyList.get(0);
+                assertEquals("Tema1.pdf", firstResult.getOriginalname());
+        }
+
+        @Test
+        @DisplayName("Debe procesar y persistir con éxito (HTTP 200) un archivo multipart válido duplicando para emisor (SENT) y receptor (RECEIVED)")
+        void debeSubirDocumentoValidoConExito() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "MiPractica.pdf",
+                                "application/pdf",
+                                "Contenido binario simulado de prueba".getBytes());
+
+                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
+                Mockito.when(userRepository.findById(2L)).thenReturn(Optional.of(mockReceiver));
+                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
+                                .thenReturn("documents/uuid_mock.pdf");
+
+                ResponseEntity<?> response = documentController.uploadDocument(authentication, validFile, 2L);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertNotNull(bodyMap);
+                assertEquals("Documento enviado con éxito al destinatario", bodyMap.get("message"));
+                assertEquals("MiPractica.pdf", bodyMap.get("originalname"));
+
+                // Verificación rigurosa: Se deben invocar exactamente dos inserciones en la
+                // base de datos (SENT y RECEIVED)
+                Mockito.verify(documentMetadataRepository, Mockito.times(2)).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("Debe retornar HTTP 400 Bad Request cuando el FileStorageService rechaza el archivo por validación perimetral dual")
+        void debeRechazarSubidaPorExtensionInvalida() {
+                MockMultipartFile invalidFile = new MockMultipartFile(
+                                "file",
+                                "Malware.exe",
+                                "application/x-msdownload",
+                                "Bytes maliciosos".getBytes());
+
+                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
+                Mockito.when(userRepository.findById(2L)).thenReturn(Optional.of(mockReceiver));
+
+                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
+                                .thenThrow(new IllegalArgumentException(
+                                                "Extensión de documento no permitida (.exe). Solo se admite PDF, DOCX o TXT."));
+
+                ResponseEntity<?> response = documentController.uploadDocument(authentication, invalidFile, 2L);
+
+                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertNotNull(bodyMap);
+                assertEquals("Extensión de documento no permitida (.exe). Solo se admite PDF, DOCX o TXT.",
+                                bodyMap.get("error"));
+
+                Mockito.verify(documentMetadataRepository, Mockito.never()).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("Debe retornar HTTP 400 Bad Request cuando la regla perimetral frena el autoenvío sin consultar repositorios")
+        void debeRechazarAutoEnvio() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "MiPractica.pdf",
+                                "application/pdf",
+                                "Contenido binario simulado de prueba".getBytes());
+
+                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
+
+                // Ejecutamos pasando receiverId = 1L (idéntico al del emisor mockSender)
+                ResponseEntity<?> response = documentController.uploadDocument(authentication, validFile, 1L);
+
+                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertNotNull(bodyMap);
+                assertEquals("No puedes enviarte un documento a ti mismo.", bodyMap.get("error"));
+
+                // Verificamos rigurosamente que NO se haya interactuado con la infraestructura
+                // debido al cortocircuito defensivo
+                Mockito.verify(userRepository, Mockito.never()).findById(anyLong());
+                Mockito.verify(documentMetadataRepository, Mockito.never()).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @WithMockUser(username = "luis_student")
+        void debe_permitir_la_descarga_si_el_usuario_es_el_receptor_legitimo_antiIDOR() throws Exception {
+                // Configuración de metadatos del documento contrato emisor-receptor
+                Long documentId = 1L;
+                DocumentMetadata mockDoc = new DocumentMetadata();
+
+                Users sender = new Users();
+                sender.setUsername("profesor_juan");
+
+                Users receiver = new Users();
+                receiver.setUsername("luis_student"); // Coincide con el usuario autenticado
+
+                mockDoc.setSender(sender);
+                mockDoc.setReceiver(receiver);
+                mockDoc.setFilename("documents/uuid_tarea.pdf");
+                mockDoc.setOriginalname("Tarea1.pdf");
+
+                // Mockear las respuestas de la capa de servicios e infraestructura
+                Resource mockResource = mock(Resource.class);
+                when(mockResource.exists()).thenReturn(true);
+                when(mockResource.isReadable()).thenReturn(true);
+
+                when(documentMetadataRepository.findById(documentId)).thenReturn(java.util.Optional.of(mockDoc));
+                when(fileStorageService.loadFileAsResource("documents/uuid_tarea.pdf")).thenReturn(mockResource);
+
+                // Ejecutar petición HTTP simulada
+                // Ejecutar petición HTTP simulada inyectando la autenticación manual del setUp
+                mockMvc.perform(get("/api/v1/documents/download/{documentId}", documentId)
+                                .principal(authentication))
+                                .andExpect(status().isOk())
+                                .andExpect(status().isOk())
+                                .andExpect(content().contentType(MediaType.APPLICATION_OCTET_STREAM))
+                                .andExpect(header().string("Content-Disposition",
+                                                "attachment; filename=\"Tarea1.pdf\""));
+        }
+
+        @Test
+        @WithMockUser(username = "atacante_student")
+        void debe_bloquear_la_descarga_y_devolver_403_si_un_tercero_intenta_un_ataque_IDOR() throws Exception {
+                // Configuración de un documento privado entre Luis y Juan
+                Long documentId = 2L;
+                DocumentMetadata privateDoc = new DocumentMetadata();
+
+                Users sender = new Users();
+                sender.setUsername("profesor_juan");
+
+                Users receiver = new Users();
+                receiver.setUsername("luis_student");
+
+                privateDoc.setSender(sender);
+                privateDoc.setReceiver(receiver); // El atacante NO es emisor ni receptor
+
+                // Mockear el repositorio para que devuelva el documento privado
+                when(documentMetadataRepository.findById(documentId)).thenReturn(java.util.Optional.of(privateDoc));
+
+                // Ejecutar petición: el interceptor perimetral del controlador debe activar el
+                // cortocircuito
+                // Configurar el mock de autenticación para que devuelva el nombre del atacante
+                when(authentication.getName()).thenReturn("atacante_student");
+
+                // Ejecutar petición inyectando el principal de autenticación
+                mockMvc.perform(get("/api/v1/documents/download/{documentId}", documentId)
+                                .principal(authentication))
+                                .andExpect(status().isForbidden())
+                                .andExpect(jsonPath("$.error").value(
+                                                "Acceso denegado: No tienes permisos legítimos para descargar este archivo."));
+
+                // Verificación estricta: El servicio de lectura de disco JAMÁS debe ser
+                // invocado ante un IDOR
+                verify(fileStorageService, never()).loadFileAsResource(anyString());
+        }
+
+}
+
+================
 File: frontend/src/auth/AuthContext.tsx
 ================
 import { createContext } from 'react';
@@ -9914,229 +9661,181 @@ export const CourseCatalog = ({
 };
 
 ================
-File: frontend/src/routes/pages/student/components/DocumentManager.tsx
+File: frontend/src/routes/pages/student/components/EvaluationPanel.tsx
 ================
-import React, { useRef } from 'react';
-import { Upload, FileText, Download, Loader2, AlertCircle, FileUp, Inbox, Send, UserCheck } from 'lucide-react';
+import { useState } from 'react';
+import { Star, MessageSquare, UserCheck, Loader2, AlertCircle, CheckCircle2, Send } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
-import { useDocuments } from './useDocuments';
+import { useActiveEvaluations } from './useActiveEvaluations';
+import type { EvaluationInput } from '../../../../services/evaluationService';
 
-export const DocumentManager = () => {
+/**
+ * Componente de Evaluación Académica [ADR-37].
+ * Permite calificar de forma asimétrica la asignatura y al profesorado.
+ * Implementa un contenedor de scroll controlado para mantener la simetría visual [ADR-19].
+ */
+export const EvaluationPanel = () => {
     const {
-        documentList,
-        activeTab,
-        setActiveTab,
-        loadingDocuments,
-        isUploading,
-        documentError,
-        setDocumentError,
-        directory,
-        loadingDirectory,
-        selectedReceiverId,
-        setSelectedReceiverId,
-        handleUpload
-    } = useDocuments();
+        pendingList,
+        loadingPending,
+        isSubmitting,
+        evaluationError,
+        submitEvaluation
+    } = useActiveEvaluations();
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    // Estado local para gestionar el formulario activo de cada tarjeta
+    const [formStates, setFormStates] = useState<Record<number, Partial<EvaluationInput>>>({});
 
-    const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            const file = e.target.files[0];
-
-            // Validación previa en el cliente para ahorrar ancho de banda (Máx 5MB)
-            if (file.size > 5 * 1024 * 1024) {
-                setDocumentError("El archivo excede el límite de 5MB configurado por el sistema.");
-                return;
-            }
-
-            // Regla de negocio en interfaz: Comprobar que se ha seleccionado un destino antes de transmitir
-            if (!selectedReceiverId) {
-                setDocumentError("Por favor, selecciona un destinatario válido del directorio antes de subir el archivo.");
-                return;
-            }
-
-            const success = await handleUpload(file);
-            if (success && fileInputRef.current) {
-                fileInputRef.current.value = ''; // Limpia el input tras la subida exitosa
-            }
-        }
+    const handleRatingChange = (enrollmentId: number, field: keyof EvaluationInput, value: number | string) => {
+        setFormStates(prev => ({
+            ...prev,
+            [enrollmentId]: { ...prev[enrollmentId], [field]: value }
+        }));
     };
 
-    const handleDownload = (filename: string) => {
-        const fileUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/uploads/${filename}`;
-        window.open(fileUrl, '_blank', 'noopener,noreferrer');
+    const handleSend = async (enrollmentId: number, courseId: number) => {
+        const state = formStates[enrollmentId];
+        if (!state?.course_score || !state?.instructor_score) return;
+
+        await submitEvaluation({
+            course_id: courseId,
+            course_score: state.course_score,
+            course_comment: state.course_comment || '',
+            instructor_score: state.instructor_score,
+            instructor_comment: state.instructor_comment || ''
+        });
     };
 
     return (
-        /* ALINEACIÓN GEOMÉTRICA CONSOLIDADA: Mantiene simetría exacta con tus otras tarjetas en h-109 */
-        <GenericCard className="flex flex-col h-109">
-            {/* CABECERA DEL COMPONENTE */}
-            <div className="flex items-center justify-between mb-3 shrink-0">
-                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                    <FileUp size={18} className="text-blue-600" />
-                    <span>Gestión de Documentos Académicos</span>
-                </h2>
-                <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">
-                    {documentList.length}
-                </span>
+        /* ALINEACIÓN GEOMÉTRICA: h-92 para nivelar con Asignaturas + Documentos */
+        <GenericCard className="h-90 flex flex-col shadow-sm border-slate-200">
+            <div className="flex items-center gap-2 mb-6">
+                <div className="bg-amber-50 p-2 rounded-lg">
+                    <Star className="text-amber-500 fill-amber-500" size={20} />
+                </div>
+                <div>
+                    <h2 className="text-base font-black text-slate-800 leading-tight">
+                        Evaluación académica
+                    </h2>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                        Docentes y asignaturas activas
+                    </p>
+                </div>
             </div>
 
-            {/* BOTONERA DE PESTAÑAS (TABS) INTERACTIVAS */}
-            <div className="flex bg-slate-100 p-1 rounded-xl mb-3 shrink-0">
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('RECEIVED')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${activeTab === 'RECEIVED'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                >
-                    <Inbox size={14} />
-                    <span>Recibidos</span>
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('SENT')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${activeTab === 'SENT'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                >
-                    <Send size={14} />
-                    <span>Enviados</span>
-                </button>
-            </div>
-
-            {/* ALERT BOX CONTROLADO DE ERRORES DEL BACKEND */}
-            {documentError && (
-                <div className="mb-3 p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg flex items-center gap-2 shrink-0">
-                    <AlertCircle size={14} className="shrink-0" />
-                    <p className="truncate">{documentError}</p>
-                </div>
-            )}
-            {/* CONTENEDOR FLEX PRINCIPAL */}
-            <div className="flex-1 flex flex-col space-y-3 min-h-0">
-
-                {/* SELECTOR DE DESTINATARIO Y ZONA DE SUBIDA MULTIPART */}
-                <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-3 space-y-2.5 shrink-0">
-                    <div className="flex items-center gap-2">
-                        <UserCheck size={14} className="text-slate-400 shrink-0" />
-                        <select
-                            value={selectedReceiverId}
-                            aria-label="Seleccionar destinatario obligatorio"
-                            onChange={(e) => {
-                                setSelectedReceiverId(e.target.value ? Number(e.target.value) : '');
-                                setDocumentError('');
-                            }}
-                            disabled={isUploading || loadingDirectory}
-                            className="w-full text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-blue-400 transition-colors disabled:opacity-60"
-                        >
-                            <option value="">-- Seleccionar Destinatario Obligatorio --</option>
-                            {loadingDirectory ? (
-                                <option disabled>Cargando directorio legítimo...</option>
-                            ) : (
-                                directory?.map((user) => (
-                                    <option key={user.userId} value={user.userId}>
-                                        {user.username} ({user.role})
-                                    </option>
-                                ))
-                            )}
-                        </select>
+            {/* CONTENEDOR DE SCROLL [ADR-19][ADR-36] */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+                {loadingPending ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                        <Loader2 className="animate-spin mb-2" size={24} />
+                        <p className="text-xs font-bold">Consultando red académica...</p>
                     </div>
-
-                    <div className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-lg p-2.5 text-center transition-all bg-white group">
-                        <input
-                            type="file"
-                            id="doc-upload-input"
-                            ref={fileInputRef}
-                            hidden
-                            onChange={onFileChange}
-                            accept=".pdf,.docx,.txt"
-                            disabled={isUploading || !selectedReceiverId}
-                        />
-                        <label
-                            htmlFor="doc-upload-input"
-                            className={`flex flex-col items-center gap-1.5 ${isUploading || !selectedReceiverId
-                                ? 'cursor-not-allowed opacity-50'
-                                : 'cursor-pointer'
-                                }`}
-                        >
-                            {isUploading ? (
-                                <Loader2 className="text-blue-500 animate-spin" size={20} />
-                            ) : (
-                                <Upload
-                                    className={`transition-colors ${selectedReceiverId
-                                        ? 'text-slate-400 group-hover:text-blue-500'
-                                        : 'text-slate-300'
-                                        }`}
-                                    size={20}
-                                />
-                            )}
-                            <span className="text-[11px] font-bold text-slate-600">
-                                {isUploading
-                                    ? "Transmitiendo payload seguro..."
-                                    : !selectedReceiverId
-                                        ? "Elige un destinatario arriba para desbloquear"
-                                        : "Seleccionar archivo (.pdf, .docx, .txt)"
-                                }
-                            </span>
-                        </label>
+                ) : pendingList.length === 0 ? (
+                    <div className="bg-slate-50 border-2 border-dashed border-slate-100 rounded-2xl p-8 text-center">
+                        <CheckCircle2 className="mx-auto text-emerald-400 mb-2" size={32} />
+                        <p className="text-slate-500 text-xs font-bold">¡Todo al día! No tienes evaluaciones pendientes.</p>
                     </div>
-                </div>
+                ) : (
+                    pendingList.map((item) => {
+                        // DIRECTION NOTEBOOKLM: Definición estricta del rango exigido en la recomendación
+                        const RATING_RANGE = Array.from({ length: 5 }, (_, i) => i + 1);
+                        const state = formStates[item.enrollmentid] || {};
+                        const canSubmit = state.course_score && state.instructor_score && !isSubmitting;
 
-                {/* ZONA DE LISTADO CON SCROLL GEOMÉTRICO CONTROLADO [ADR-19] */}
-                <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2 min-h-30">
-                    {loadingDocuments ? (
-                        <div className="h-full flex flex-col justify-center items-center bg-white border border-slate-100 rounded-xl text-slate-400 p-4">
-                            <Loader2 size={20} className="animate-spin mb-2 text-blue-600" />
-                            <p className="text-[11px] font-medium text-slate-500">Sincronizando metadatos con PostgreSQL...</p>
-                        </div>
-                    ) : documentList.length === 0 ? (
-                        <div className="p-6 bg-white/80 border border-slate-100 rounded-xl text-center flex flex-col justify-center h-full">
-                            <p className="text-xs font-medium text-slate-400 italic">
-                                {activeTab === 'RECEIVED'
-                                    ? "Tu bandeja de entrada está vacía."
-                                    : "No has enviado ningún documento todavía."
-                                }
-                            </p>
-                        </div>
-                    ) : (
-                        documentList.map((doc) => (
-                            <div
-                                key={doc.documentid}
-                                className="flex justify-between items-center p-2.5 bg-white border border-slate-100 hover:border-slate-200 rounded-lg shadow-sm transition-all"
-                            >
-                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                    <FileText size={16} className="text-slate-400 shrink-0" />
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-xs font-bold text-slate-700 truncate" title={doc.originalname}>
-                                            {doc.originalname}
-                                        </p>
-                                        <p className="text-[10px] text-slate-400 font-medium">
-                                            {activeTab === 'RECEIVED'
-                                                ? `De: ${doc.sender?.username || 'Sistema'}`
-                                                : `Para: ${doc.receiver?.username || 'Desconocido'}`
-                                            }
-                                        </p>
+                        return (
+                            <div key={item.enrollmentid} className="p-4 bg-white border border-slate-100 rounded-xl shadow-xs space-y-4 transition-all hover:border-blue-100">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h3 className="text-[11px] font-black text-slate-800 uppercase leading-tight">
+                                            {item.course.title}
+                                        </h3>
+                                        <div className="flex items-center gap-1.5 mt-1">
+                                            <UserCheck size={12} className="text-blue-500" />
+                                            <span className="text-[10px] text-slate-500 font-bold italic">
+                                                Prof: {item.course.instructors}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
+                                {/* Rating Asimétrico [ADR-37] */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Calidad del curso</label>
+                                        <div className="flex gap-1">
+                                            {RATING_RANGE.map((star) => (
+                                                <button
+                                                    key={star}
+                                                    type="button" // DIRECTION NOTEBOOKLM: Evita comportamientos por defecto
+                                                    title={`Calificar curso con ${star} estrellas`}
+                                                    onClick={() => handleRatingChange(item.enrollmentid, 'course_score', star)}
+                                                    className={`transition-transform active:scale-125 ${(state.course_score || 0) >= star ? 'text-amber-400' : 'text-slate-200'}`}
+                                                >
+                                                    <Star size={16} fill={(state.course_score || 0) >= star ? "currentColor" : "none"} />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Desempeño docente</label>
+                                        <div className="flex gap-1">
+                                            {RATING_RANGE.map((star) => (
+                                                <button
+                                                    key={star}
+                                                    type="button" // DIRECTION NOTEBOOKLM: Evita comportamientos de formulario por defecto
+                                                    title={`Calificar profesor con ${star} estrellas`}
+                                                    onClick={() => handleRatingChange(item.enrollmentid, 'instructor_score', star)}
+                                                    className={`transition-all transform active:scale-150 ${(state.instructor_score || 0) >= star ? 'text-blue-400' : 'text-slate-200'}`}
+                                                >
+                                                    <Star
+                                                        size={16}
+                                                        fill={(state.instructor_score || 0) >= star ? "currentColor" : "none"}
+                                                    />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Comentarios granulares */}
+                                <div className="relative">
+                                    <MessageSquare size={12} className="absolute left-3 top-3 text-slate-300" />
+                                    <textarea
+                                        placeholder="Escribe un comentario opcional..."
+                                        className="w-full bg-slate-50 border-none rounded-lg p-2 pl-8 text-[10px] font-medium focus:ring-1 focus:ring-blue-200 outline-none resize-none"
+                                        rows={2}
+                                        onChange={(e) => handleRatingChange(item.enrollmentid, 'course_comment', e.target.value)}
+                                    />
+                                </div>
+
                                 <button
-                                    type="button"
-                                    onClick={() => handleDownload(doc.filename)}
-                                    className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors cursor-pointer ml-2 shrink-0"
-                                    title="Descargar documento"
+                                    disabled={!canSubmit}
+                                    onClick={() => handleSend(item.enrollmentid, item.course.course_id)}
+                                    className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-black transition-all ${canSubmit
+                                        ? 'bg-slate-800 text-white hover:bg-black'
+                                        : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                                        }`}
                                 >
-                                    <Download size={14} />
+                                    {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                                    ENVIAR EVALUACIÓN
                                 </button>
                             </div>
-                        ))
-                    )}
-                </div>
+                        );
+                    })
+                )}
             </div>
+
+            {evaluationError && (
+                <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-xl flex items-center gap-2 text-[10px] font-bold animate-pulse">
+                    <AlertCircle size={14} />
+                    {evaluationError}
+                </div>
+            )}
         </GenericCard>
     );
 };
+
+export default EvaluationPanel;
 
 ================
 File: frontend/src/routes/pages/student/components/useCourseCatalog.ts
@@ -10214,6 +9913,268 @@ export const useCourseCatalog = (onEnrollSuccess: (course: DBModelCourse) => voi
 };
 
 ================
+File: frontend/src/routes/pages/student/components/useDocuments.ts
+================
+import { useState, useEffect, useCallback } from 'react';
+import { 
+    getUserDocuments, 
+    getSentDocuments, 
+    uploadStudentDocument, 
+    getTeachersDirectory, 
+    getClassmatesDirectory, 
+    getAdminsDirectory, 
+    downloadDocumentSecure,
+    type DocumentMetadata, 
+    type UserDirectoryDTO 
+} from '../../../../services/documentService';
+
+export const useDocuments = (successTrigger?: string) => {
+    // Listas independientes para evitar el "efecto fantasma" visual [ADR-19]
+    const [receivedList, setReceivedList] = useState<DocumentMetadata[]>([]);
+    const [sentList, setSentList] = useState<DocumentMetadata[]>([]);
+    const [activeTab, setActiveTab] = useState<'RECEIVED' | 'SENT'>('RECEIVED');
+    
+    // Estados de carga e interfaz
+    const [loadingDocuments, setLoadingDocuments] = useState<boolean>(false);
+    const [isUploading, setIsUploading] = useState<boolean>(false);
+    const [documentError, setDocumentError] = useState<string>('');
+
+    // Estados del directorio dinámico dirigido
+    const [directory, setDirectory] = useState<UserDirectoryDTO[]>([]);
+    const [loadingDirectory, setLoadingDirectory] = useState<boolean>(false);
+    const [selectedReceiverId, setSelectedReceiverId] = useState<number | ''>('');
+
+    /**
+     * Sincroniza la lista de documentos de la pestaña que se encuentre activa.
+     */
+    const fetchTabDocuments = useCallback(async () => {
+        setLoadingDocuments(true);
+        setDocumentError('');
+        try {
+            if (activeTab === 'RECEIVED') {
+                const data = await getUserDocuments();
+                setReceivedList(data);
+            } else {
+                const data = await getSentDocuments();
+                setSentList(data);
+            }
+        } catch (err: unknown) {
+            console.error("Error al sincronizar documentos con el servidor:", err);
+            setDocumentError("No se pudieron sincronizar tus documentos desde el servidor.");
+        } finally {
+            setLoadingDocuments(false);
+        }
+    }, [activeTab]);
+
+    /**
+     * Agrupa y descarga de forma paralela los tres subgrupos del directorio académico legítimo.
+     */
+    const fetchDirectory = useCallback(async () => {
+        setLoadingDirectory(true);
+        try {
+            const [teachers, classmates, admins] = await Promise.all([
+                getTeachersDirectory(),
+                getClassmatesDirectory(),
+                getAdminsDirectory()
+            ]);
+            // Consolidamos en una única lista limpia para el selector
+            setDirectory([...teachers, ...classmates, ...admins]);
+        } catch (err: unknown) {
+            console.error("Error al recuperar el directorio de contactos:", err);
+            setDocumentError("Error al cargar la lista de destinatarios válidos.");
+        } finally {
+            setLoadingDirectory(false);
+        }
+    }, []);
+    /**
+     * Sube un archivo físico vinculándolo al destinatario seleccionado.
+     */
+    const handleUpload = async (file: File): Promise<boolean> => {
+        if (!file) return false;
+        
+        // Validación perimetral en cliente: Obligatorio haber seleccionado un destino
+        if (!selectedReceiverId) {
+            setDocumentError("Por favor, selecciona un destinatario obligatorio para el documento.");
+            return false;
+        }
+        
+        setIsUploading(true);
+        setDocumentError('');
+        try {
+            await uploadStudentDocument(file, Number(selectedReceiverId));
+            
+            // Limpiamos el selector de destinatario tras el éxito
+            setSelectedReceiverId('');
+            
+            // Refrescamos la lista de la pestaña activa en caliente
+            await fetchTabDocuments(); 
+            return true;
+        } catch (err: unknown) {
+            console.error("Error al procesar la subida del documento:", err);
+            const errorConResponse = err as { response?: { data?: { error?: string } } };
+            const backendError = errorConResponse.response?.data?.error || "Error crítico al subir el archivo.";
+            setDocumentError(backendError);
+            return false;
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    // Efecto 1: Reacciona al cambio de pestaña o trigger externo para sincronizar documentos
+    useEffect(() => {
+        fetchTabDocuments();
+    }, [successTrigger, fetchTabDocuments, activeTab]);
+
+    // Efecto 2: Carga el directorio dinámico legítimo una sola vez al montar el componente
+    useEffect(() => {
+        fetchDirectory();
+    }, [fetchDirectory]);
+
+    return {
+        // Retornamos la lista adecuada según la pestaña activa para simplificar el componente visual
+        documentList: activeTab === 'RECEIVED' ? receivedList : sentList,
+        activeTab,
+        setActiveTab,
+        loadingDocuments,
+        isUploading,
+        documentError,
+        setDocumentError,
+        directory,
+        loadingDirectory,
+        selectedReceiverId,
+        setSelectedReceiverId,
+        handleUpload,
+        handleSecureDownload: downloadDocumentSecure
+    };
+
+};
+
+================
+File: frontend/src/services/documentService.ts
+================
+import { apiClient } from './apiClient';
+
+// Interfaz para el mapeo simplificado del emisor/receptor dentro del documento
+export interface UserDocumentMinDTO {
+    user_id: number;
+    username: string;
+    email: string;
+    role: string;
+}
+
+// Interfaz estricta que mapea la entidad DocumentMetadata de PostgreSQL [ADR-36]
+export interface DocumentMetadata {
+    documentid: number;
+    filename: string;
+    originalname: string;
+    upload_date: string;
+    sender: UserDocumentMinDTO;
+    receiver: UserDocumentMinDTO;
+    folder_type: 'SENT' | 'RECEIVED';
+}
+
+// Interfaz que mapea las respuestas de los tres directorios dinámicos de la API
+export interface UserDirectoryDTO {
+    userId: number;
+    username: string;
+    email: string;
+    role: string;
+}
+
+export interface UploadDocumentResponse {
+    message: string;
+    filename: string;
+    originalname: string;
+}
+
+/**
+ * [SERVICIO MULTI-ROL]: Recupera los documentos RECIBIDOS (Bandeja de Entrada)
+ * asociados a la cuenta del usuario autenticado.
+ */
+export const getUserDocuments = async (): Promise<DocumentMetadata[]> => {
+    const response = await apiClient.get<DocumentMetadata[]>('/api/v1/documents');
+    return response.data;
+};
+
+/**
+ * [NUEVO SERVICIO]: Recupera los documentos ENVIADOS (Bandeja de Salida)
+ * asociados a la cuenta del usuario autenticado.
+ */
+export const getSentDocuments = async (): Promise<DocumentMetadata[]> => {
+    const response = await apiClient.get<DocumentMetadata[]>('/api/v1/documents/sent');
+    return response.data;
+};
+/**
+ * [SERVICIO DE CARGA DIRIGIDO]: Envía el archivo físico y asocia el ID del destinatario
+ * seleccionado de forma obligatoria para persistir el contrato emisor-receptor.
+ */
+export const uploadStudentDocument = async (file: File, receiverId: number): Promise<UploadDocumentResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('receiverId', receiverId.toString()); // Payload dirigido obligatorio
+
+    const response = await apiClient.post<UploadDocumentResponse>(
+        '/api/v1/documents/upload',
+        formData,
+        {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        }
+    );
+    return response.data;
+};
+
+// =========================================================================
+// --- CONSULTAS AL DIRECTORIO DINÁMICO ACADÉMICO ---
+// =========================================================================
+
+/**
+ * Recupera los profesores de los cursos en los que el alumno está matriculado.
+ */
+export const getTeachersDirectory = async (): Promise<UserDirectoryDTO[]> => {
+    const response = await apiClient.get<UserDirectoryDTO[]>('/api/v1/documents/directory/teachers');
+    return response.data;
+};
+
+/**
+ * Recupera los compañeros de clase que comparten asignaturas con el alumno.
+ */
+export const getClassmatesDirectory = async (): Promise<UserDirectoryDTO[]> => {
+    const response = await apiClient.get<UserDirectoryDTO[]>('/api/v1/documents/directory/classmates');
+    return response.data;
+};
+
+/**
+ * Recupera las cuentas de administración de la plataforma.
+ */
+export const getAdminsDirectory = async (): Promise<UserDirectoryDTO[]> => {
+    const response = await apiClient.get<UserDirectoryDTO[]>('/api/v1/documents/directory/admins');
+    return response.data;
+};
+
+/**
+ * [NUEVO SERVICIO ANTI-IDOR]: Solicita el archivo al backend como un flujo de bytes Blob,
+ * garantizando el transporte seguro bajo tokens JWT.
+ */
+export const downloadDocumentSecure = async (documentId: number, originalName: string): Promise<void> => {
+    const response = await apiClient.get(`/api/v1/documents/download/${documentId}`, {
+        responseType: 'blob'
+    });
+
+    const blob = new Blob([response.data], { type: response.headers['content-type'] });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', originalName);
+    document.body.appendChild(link);
+    link.click();
+    
+    link.parentNode?.removeChild(link);
+    window.URL.revokeObjectURL(url);
+};
+
+================
 File: frontend/tsconfig.app.json
 ================
 {
@@ -10275,30 +10236,6 @@ export default defineConfig({
     setupFiles: './src/setupTests.tsx',
   },
 })
-
-================
-File: backend/src/main/java/com/cursosonline/backend/config/WebConfig.java
-================
-package com.cursosonline.backend.config;
-
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-
-@Configuration
-public class WebConfig implements WebMvcConfigurer {
-
-    @Value("${spring.servlet.multipart.location}")
-    private String uploadDir;
-
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // Mapea la URL '/uploads/**' a la carpeta física real del disco
-        registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:" + uploadDir + "/");
-    }
-}
 
 ================
 File: backend/src/main/java/com/cursosonline/backend/controller/ProfileController.java
@@ -10608,126 +10545,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/services/FileStorageService.java
-================
-package com.cursosonline.backend.services;
-
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-import jakarta.annotation.PostConstruct;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
-
-@Service
-public class FileStorageService {
-
-    private final Path rootLocation;
-
-    // Extensiones permitidas por categorías
-    private final List<String> ALLOWED_IMAGE_EXTENSIONS = Arrays.asList("jpg", "jpeg", "png", "webp");
-
-    // [ADR-23 REFACTORIZADO]: Ampliación de lista blanca para incluir formatos de
-    // texto y procesamiento de palabras
-    private final List<String> ALLOWED_DOC_EXTENSIONS = Arrays.asList("pdf", "docx", "txt");
-
-    // Lista blanca estricta de tipos MIME válidos para mitigar ataques de ejecución
-    // remota (RCE) y MIME-sniffing
-    private final List<String> ALLOWED_DOC_MIME_TYPES = Arrays.asList(
-            "application/pdf",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "text/plain");
-
-    public FileStorageService(@Value("${spring.servlet.multipart.location}") String uploadDir) {
-        this.rootLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
-    }
-
-    @PostConstruct
-    public void init() {
-        try {
-            Files.createDirectories(this.rootLocation);
-            Files.createDirectories(this.rootLocation.resolve("avatars"));
-            Files.createDirectories(this.rootLocation.resolve("documents"));
-        } catch (IOException e) {
-            throw new RuntimeException("No se pudieron inicializar las carpetas de almacenamiento", e);
-        }
-    }
-
-    public String storeFile(MultipartFile file, String subFolder) {
-        String originalFileName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
-        try {
-            if (file.isEmpty()) {
-                throw new IllegalArgumentException("No se puede guardar un archivo vacío: " + originalFileName);
-            }
-            if (originalFileName.contains("..")) {
-                throw new IllegalArgumentException("Ruta no permitida fuera del directorio: " + originalFileName);
-            }
-
-            // AUDITORÍA NOTEBOOKLM: Validación estricta de extensiones y tipos de archivo
-            // por carpeta
-            validateFileType(file, originalFileName, subFolder);
-
-            String uniqueFileName = UUID.randomUUID().toString() + "_" + originalFileName;
-            Path targetLocation = this.rootLocation.resolve(subFolder).resolve(uniqueFileName);
-            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-
-            return subFolder + "/" + uniqueFileName;
-        } catch (IOException e) {
-            throw new RuntimeException("Error al almacenar el archivo " + originalFileName, e);
-        }
-    }
-
-    /**
-     * Valida de manera estricta que el archivo corresponda al formato permitido
-     * para su carpeta.
-     */
-    private void validateFileType(MultipartFile file, String filename, String subFolder) {
-        String extension = getFileExtension(filename).toLowerCase();
-        String contentType = file.getContentType();
-
-        if ("avatars".equalsIgnoreCase(subFolder)) {
-            // Validar extensión de imagen
-            if (!ALLOWED_IMAGE_EXTENSIONS.contains(extension)) {
-                throw new IllegalArgumentException(
-                        "Extensión de imagen no permitida (" + extension + "). Use JPG, JPEG, PNG o WEBP.");
-            }
-            // Validar Content-Type de imagen
-            if (contentType == null || !contentType.startsWith("image/")) {
-                throw new IllegalArgumentException("El tipo de contenido no corresponde a una imagen válida.");
-            }
-        } else if ("documents".equalsIgnoreCase(subFolder)) {
-            // [VALIDACIÓN PERIMETRAL DUAL]: Comprobar de forma síncrona que la extensión
-            // esté en la lista blanca
-            if (!ALLOWED_DOC_EXTENSIONS.contains(extension)) {
-                throw new IllegalArgumentException(
-                        "Extensión de documento no permitida (" + extension + "). Solo se admite PDF, DOCX o TXT.");
-            }
-            // [VALIDACIÓN PERIMETRAL DUAL]: Comprobar que el tipo MIME coincida
-            // estrictamente con el payload transmitido
-            if (contentType == null || !ALLOWED_DOC_MIME_TYPES.contains(contentType.toLowerCase())) {
-                throw new IllegalArgumentException("El tipo de contenido del documento no es válido o está corrupto.");
-            }
-        } else {
-            throw new IllegalArgumentException("Carpeta de destino no configurada para validación de seguridad.");
-        }
-    }
-
-    private String getFileExtension(String filename) {
-        int lastIndexOf = filename.lastIndexOf(".");
-        if (lastIndexOf == -1) {
-            return ""; // Archivo sin extensión
-        }
-        return filename.substring(lastIndexOf + 1);
-    }
-}
-
-================
 File: frontend/package.json
 ================
 {
@@ -11030,6 +10847,247 @@ describe("AppRoutes - autorizacion por rol", () => {
         expect(buttons.length).toBeGreaterThan(0);
     });
 });
+
+================
+File: frontend/src/routes/pages/student/components/DocumentManager.tsx
+================
+import React, { useRef, useState } from 'react';
+import { Upload, FileText, Download, Loader2, AlertCircle, FileUp, Inbox, Send, UserCheck } from 'lucide-react';
+import GenericCard from '../../../../components/ui/genericCard/GenericCard';
+import { useDocuments } from './useDocuments';
+
+export const DocumentManager = () => {
+    const {
+        documentList,
+        activeTab,
+        setActiveTab,
+        loadingDocuments,
+        isUploading,
+        documentError,
+        setDocumentError,
+        directory,
+        loadingDirectory,
+        selectedReceiverId,
+        setSelectedReceiverId,
+        handleUpload,
+        handleSecureDownload
+    } = useDocuments();
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+    const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+
+            // Validación previa en el cliente para ahorrar ancho de banda (Máx 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                setDocumentError("El archivo excede el límite de 5MB configurado por el sistema.");
+                return;
+            }
+
+            // Regla de negocio en interfaz: Comprobar que se ha seleccionado un destino antes de transmitir
+            if (!selectedReceiverId) {
+                setDocumentError("Por favor, selecciona un destinatario válido del directorio antes de subir el archivo.");
+                return;
+            }
+
+            const success = await handleUpload(file);
+            if (success && fileInputRef.current) {
+                fileInputRef.current.value = ''; // Limpia el input tras la subida exitosa
+            }
+        }
+    };
+
+    const handleDownload = async (documentId: number, originalName: string) => {
+        if (downloadingId !== null) return;
+        try {
+            setDownloadingId(documentId);
+            setDocumentError('');
+            await handleSecureDownload(documentId, originalName);
+        } catch (error) {
+            console.error("Error en la descarga segura:", error);
+            setDocumentError("No tienes autorización legítima para descargar este documento.");
+        } finally {
+            setDownloadingId(null);
+        }
+    };
+
+
+    return (
+        /* ALINEACIÓN GEOMÉTRICA CONSOLIDADA: Mantiene simetría exacta con tus otras tarjetas en h-109 */
+        <GenericCard className="flex flex-col h-109">
+            {/* CABECERA DEL COMPONENTE */}
+            <div className="flex items-center justify-between mb-3 shrink-0">
+                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <FileUp size={18} className="text-blue-600" />
+                    <span>Gestión de Documentos Académicos</span>
+                </h2>
+                <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">
+                    {documentList.length}
+                </span>
+            </div>
+
+            {/* BOTONERA DE PESTAÑAS (TABS) INTERACTIVAS */}
+            <div className="flex bg-slate-100 p-1 rounded-xl mb-3 shrink-0">
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('RECEIVED')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${activeTab === 'RECEIVED'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                >
+                    <Inbox size={14} />
+                    <span>Recibidos</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('SENT')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${activeTab === 'SENT'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                >
+                    <Send size={14} />
+                    <span>Enviados</span>
+                </button>
+            </div>
+
+            {/* ALERT BOX CONTROLADO DE ERRORES DEL BACKEND */}
+            {documentError && (
+                <div className="mb-3 p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg flex items-center gap-2 shrink-0">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <p className="truncate">{documentError}</p>
+                </div>
+            )}
+            {/* CONTENEDOR FLEX PRINCIPAL */}
+            <div className="flex-1 flex flex-col space-y-3 min-h-0">
+
+                {/* SELECTOR DE DESTINATARIO Y ZONA DE SUBIDA MULTIPART */}
+                <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-3 space-y-2.5 shrink-0">
+                    <div className="flex items-center gap-2">
+                        <UserCheck size={14} className="text-slate-400 shrink-0" />
+                        <select
+                            value={selectedReceiverId}
+                            aria-label="Seleccionar destinatario obligatorio"
+                            onChange={(e) => {
+                                setSelectedReceiverId(e.target.value ? Number(e.target.value) : '');
+                                setDocumentError('');
+                            }}
+                            disabled={isUploading || loadingDirectory}
+                            className="w-full text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-blue-400 transition-colors disabled:opacity-60"
+                        >
+                            <option value="">-- Seleccionar Destinatario Obligatorio --</option>
+                            {loadingDirectory ? (
+                                <option disabled>Cargando directorio legítimo...</option>
+                            ) : (
+                                directory?.map((user) => (
+                                    <option key={user.userId} value={user.userId}>
+                                        {user.username} ({user.role})
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                    </div>
+
+                    <div className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-lg p-2.5 text-center transition-all bg-white group">
+                        <input
+                            type="file"
+                            id="doc-upload-input"
+                            ref={fileInputRef}
+                            hidden
+                            onChange={onFileChange}
+                            accept=".pdf,.docx,.txt"
+                            disabled={isUploading || !selectedReceiverId}
+                        />
+                        <label
+                            htmlFor="doc-upload-input"
+                            className={`flex flex-col items-center gap-1.5 ${isUploading || !selectedReceiverId
+                                ? 'cursor-not-allowed opacity-50'
+                                : 'cursor-pointer'
+                                }`}
+                        >
+                            {isUploading ? (
+                                <Loader2 className="text-blue-500 animate-spin" size={20} />
+                            ) : (
+                                <Upload
+                                    className={`transition-colors ${selectedReceiverId
+                                        ? 'text-slate-400 group-hover:text-blue-500'
+                                        : 'text-slate-300'
+                                        }`}
+                                    size={20}
+                                />
+                            )}
+                            <span className="text-[11px] font-bold text-slate-600">
+                                {isUploading
+                                    ? "Transmitiendo payload seguro..."
+                                    : !selectedReceiverId
+                                        ? "Elige un destinatario arriba para desbloquear"
+                                        : "Seleccionar archivo (.pdf, .docx, .txt)"
+                                }
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                {/* ZONA DE LISTADO CON SCROLL GEOMÉTRICO CONTROLADO [ADR-19] */}
+                <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2 min-h-30">
+                    {loadingDocuments ? (
+                        <div className="h-full flex flex-col justify-center items-center bg-white border border-slate-100 rounded-xl text-slate-400 p-4">
+                            <Loader2 size={20} className="animate-spin mb-2 text-blue-600" />
+                            <p className="text-[11px] font-medium text-slate-500">Sincronizando metadatos con PostgreSQL...</p>
+                        </div>
+                    ) : documentList.length === 0 ? (
+                        <div className="p-6 bg-white/80 border border-slate-100 rounded-xl text-center flex flex-col justify-center h-full">
+                            <p className="text-xs font-medium text-slate-400 italic">
+                                {activeTab === 'RECEIVED'
+                                    ? "Tu bandeja de entrada está vacía."
+                                    : "No has enviado ningún documento todavía."
+                                }
+                            </p>
+                        </div>
+                    ) : (
+                        documentList.map((doc) => (
+                            <div
+                                key={doc.documentid}
+                                className="flex justify-between items-center p-2.5 bg-white border border-slate-100 hover:border-slate-200 rounded-lg shadow-sm transition-all"
+                            >
+                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                    <FileText size={16} className="text-slate-400 shrink-0" />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-xs font-bold text-slate-700 truncate" title={doc.originalname}>
+                                            {doc.originalname}
+                                        </p>
+                                        <p className="text-[10px] text-slate-400 font-medium">
+                                            {activeTab === 'RECEIVED'
+                                                ? `De: ${doc.sender?.username || 'Sistema'}`
+                                                : `Para: ${doc.receiver?.username || 'Desconocido'}`
+                                            }
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDownload(doc.documentid, doc.originalname)}
+                                    disabled={downloadingId !== null}
+                                    className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors cursor-pointer ml-2 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Descargar documento seguro"
+                                >
+                                    {downloadingId === doc.documentid ? (
+                                        <Loader2 size={14} className="animate-spin text-blue-600" />
+                                    ) : (
+                                        <Download size={14} />
+                                    )}
+                                </button>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </GenericCard>
+    );
+};
 
 ================
 File: frontend/src/routes/pages/student/components/useEnrolledCourses.ts
@@ -11754,6 +11812,158 @@ public class JwtService {
         }
         return map;
     }
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/services/FileStorageService.java
+================
+package com.cursosonline.backend.services;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import jakarta.annotation.PostConstruct;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+public class FileStorageService {
+
+    private final Path rootLocation;
+
+    // Extensiones permitidas por categorías
+    private final List<String> ALLOWED_IMAGE_EXTENSIONS = Arrays.asList("jpg", "jpeg", "png", "webp");
+
+    // [ADR-23 REFACTORIZADO]: Ampliación de lista blanca para incluir formatos de
+    // texto y procesamiento de palabras
+    private final List<String> ALLOWED_DOC_EXTENSIONS = Arrays.asList("pdf", "docx", "txt");
+
+    // Lista blanca estricta de tipos MIME válidos para mitigar ataques de ejecución
+    // remota (RCE) y MIME-sniffing
+    private final List<String> ALLOWED_DOC_MIME_TYPES = Arrays.asList(
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain");
+
+    public FileStorageService(@Value("${spring.servlet.multipart.location}") String uploadDir) {
+        this.rootLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
+    }
+
+    @PostConstruct
+    public void init() {
+        try {
+            Files.createDirectories(this.rootLocation);
+            Files.createDirectories(this.rootLocation.resolve("avatars"));
+            Files.createDirectories(this.rootLocation.resolve("documents"));
+        } catch (IOException e) {
+            throw new RuntimeException("No se pudieron inicializar las carpetas de almacenamiento", e);
+        }
+    }
+
+    public String storeFile(MultipartFile file, String subFolder) {
+        String originalFileName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
+        try {
+            if (file.isEmpty()) {
+                throw new IllegalArgumentException("No se puede guardar un archivo vacío: " + originalFileName);
+            }
+            if (originalFileName.contains("..")) {
+                throw new IllegalArgumentException("Ruta no permitida fuera del directorio: " + originalFileName);
+            }
+
+            // AUDITORÍA NOTEBOOKLM: Validación estricta de extensiones y tipos de archivo
+            // por carpeta
+            validateFileType(file, originalFileName, subFolder);
+
+            String uniqueFileName = UUID.randomUUID().toString() + "_" + originalFileName;
+            Path targetLocation = this.rootLocation.resolve(subFolder).resolve(uniqueFileName);
+            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+
+            return subFolder + "/" + uniqueFileName;
+        } catch (IOException e) {
+            throw new RuntimeException("Error al almacenar el archivo " + originalFileName, e);
+        }
+    }
+
+    /**
+     * Valida de manera estricta que el archivo corresponda al formato permitido
+     * para su carpeta.
+     */
+    private void validateFileType(MultipartFile file, String filename, String subFolder) {
+        String extension = getFileExtension(filename).toLowerCase();
+        String contentType = file.getContentType();
+
+        if ("avatars".equalsIgnoreCase(subFolder)) {
+            // Validar extensión de imagen
+            if (!ALLOWED_IMAGE_EXTENSIONS.contains(extension)) {
+                throw new IllegalArgumentException(
+                        "Extensión de imagen no permitida (" + extension + "). Use JPG, JPEG, PNG o WEBP.");
+            }
+            // Validar Content-Type de imagen
+            if (contentType == null || !contentType.startsWith("image/")) {
+                throw new IllegalArgumentException("El tipo de contenido no corresponde a una imagen válida.");
+            }
+        } else if ("documents".equalsIgnoreCase(subFolder)) {
+            // [VALIDACIÓN PERIMETRAL DUAL]: Comprobar de forma síncrona que la extensión
+            // esté en la lista blanca
+            if (!ALLOWED_DOC_EXTENSIONS.contains(extension)) {
+                throw new IllegalArgumentException(
+                        "Extensión de documento no permitida (" + extension + "). Solo se admite PDF, DOCX o TXT.");
+            }
+            // [VALIDACIÓN PERIMETRAL DUAL]: Comprobar que el tipo MIME coincida
+            // estrictamente con el payload transmitido
+            if (contentType == null || !ALLOWED_DOC_MIME_TYPES.contains(contentType.toLowerCase())) {
+                throw new IllegalArgumentException("El tipo de contenido del documento no es válido o está corrupto.");
+            }
+        } else {
+            throw new IllegalArgumentException("Carpeta de destino no configurada para validación de seguridad.");
+        }
+    }
+
+    /**
+     * Obtiene la extensión del archivo a partir de su nombre.
+     * 
+     * @param filename
+     * @return
+     */
+    private String getFileExtension(String filename) {
+        int lastIndexOf = filename.lastIndexOf(".");
+        if (lastIndexOf == -1) {
+            return ""; // Archivo sin extensión
+        }
+        return filename.substring(lastIndexOf + 1);
+    }
+
+    /**
+     * [NUEVO MÉTODO DE LECTURA SEGURO]: Carga un archivo desde el disco como un
+     * recurso
+     * para que pueda ser transmitido de forma autenticada por flujo de datos
+     * (Stream).
+     */
+    public Resource loadFileAsResource(String relativePath) {
+        try {
+            // Resuelve la ruta relativa (ej. "documents/uuid_archivo.pdf") contra el
+            // directorio raiz inmutable
+            Path filePath = this.rootLocation.resolve(relativePath).normalize();
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if (resource.exists() || resource.isReadable()) {
+                return resource;
+            } else {
+                return null;
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Error crítico de infraestructura al leer el recurso: " + relativePath, e);
+        }
+    }
+
 }
 
 ================
@@ -12842,6 +13052,60 @@ const ProfessorDashboard = () => {
 export default ProfessorDashboard;
 
 ================
+File: backend/src/main/resources/application.properties
+================
+spring.application.name=backend
+
+# Perfil activo por defecto para entorno local.
+spring.profiles.default=dev
+
+# Importa variables desde un archivo local opcional (formato .properties).
+spring.config.import=optional:file:.env.properties
+
+# Configuración de base de datos delegada por perfil (dev/prod).
+
+# Estrategia de creación de tablas (usa 'update' para no borrar datos o 'create' para limpiar)
+spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+
+# Mostrar el SQL generado por Hibernate en la consola
+spring.jpa.show-sql=${SPRING_JPA_SHOW_SQL:true}
+
+# Formatear el SQL para una mejor legibilidad 
+spring.jpa.properties.hibernate.format_sql=${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:true}
+
+# Desactivar open-in-view para evitar consultas durante el renderizado de vistas.
+spring.jpa.open-in-view=false
+
+# Configuración de logging para mostrar los parámetros de las consultas SQL
+logging.level.org.hibernate.orm.jdbc.bind=${LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_BIND:trace}
+
+# Evita que Hibernate convierta CamelCase a snake_case automáticamente
+spring.jpa.hibernate.naming.physical-strategy=org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+
+# Propiedades base para la infraestructura JWT. Pueden sobreescribirse con variables de entorno.
+app.jwt.secret=${APP_JWT_SECRET:change-me-in-local-and-tests-please}
+app.jwt.issuer=${APP_JWT_ISSUER:cursosonline-backend}
+app.jwt.access-token-expiration-minutes=${APP_JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:15}
+app.jwt.refresh-token-expiration-days=${APP_JWT_REFRESH_TOKEN_EXPIRATION_DAYS:30}
+app.jwt.clock-skew-seconds=${APP_JWT_CLOCK_SKEW_SECONDS:60}
+
+
+# Configuración de almacenamiento de archivos para fotos y documentos
+spring.servlet.multipart.location=../uploads
+
+# Opcional pero recomendado: Límites de tamaño para el archivo y la petición
+spring.servlet.multipart.max-file-size=5MB
+spring.servlet.multipart.max-request-size=5MB
+
+# Fuerza el log detallado de la seguridad y el procesamiento de peticiones
+logging.level.org.springframework.web=DEBUG
+logging.level.org.springframework.security=DEBUG
+logging.level.org.hibernate.SQL=DEBUG
+
+# Muestra los errores de serialización de Jackson en consola
+logging.level.org.springframework.http.converter.json=TRACE
+
+================
 File: backend/pom.xml
 ================
 <?xml version="1.0" encoding="UTF-8"?>
@@ -13019,60 +13283,6 @@ File: backend/pom.xml
 	</build>
 
 </project>
-
-================
-File: backend/src/main/resources/application.properties
-================
-spring.application.name=backend
-
-# Perfil activo por defecto para entorno local.
-spring.profiles.default=dev
-
-# Importa variables desde un archivo local opcional (formato .properties).
-spring.config.import=optional:file:.env.properties
-
-# Configuración de base de datos delegada por perfil (dev/prod).
-
-# Estrategia de creación de tablas (usa 'update' para no borrar datos o 'create' para limpiar)
-spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
-
-# Mostrar el SQL generado por Hibernate en la consola
-spring.jpa.show-sql=${SPRING_JPA_SHOW_SQL:true}
-
-# Formatear el SQL para una mejor legibilidad 
-spring.jpa.properties.hibernate.format_sql=${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:true}
-
-# Desactivar open-in-view para evitar consultas durante el renderizado de vistas.
-spring.jpa.open-in-view=false
-
-# Configuración de logging para mostrar los parámetros de las consultas SQL
-logging.level.org.hibernate.orm.jdbc.bind=${LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_BIND:trace}
-
-# Evita que Hibernate convierta CamelCase a snake_case automáticamente
-spring.jpa.hibernate.naming.physical-strategy=org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
-
-# Propiedades base para la infraestructura JWT. Pueden sobreescribirse con variables de entorno.
-app.jwt.secret=${APP_JWT_SECRET:change-me-in-local-and-tests-please}
-app.jwt.issuer=${APP_JWT_ISSUER:cursosonline-backend}
-app.jwt.access-token-expiration-minutes=${APP_JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:15}
-app.jwt.refresh-token-expiration-days=${APP_JWT_REFRESH_TOKEN_EXPIRATION_DAYS:30}
-app.jwt.clock-skew-seconds=${APP_JWT_CLOCK_SKEW_SECONDS:60}
-
-
-# Configuración de almacenamiento de archivos para fotos y documentos
-spring.servlet.multipart.location=../uploads
-
-# Opcional pero recomendado: Límites de tamaño para el archivo y la petición
-spring.servlet.multipart.max-file-size=5MB
-spring.servlet.multipart.max-request-size=5MB
-
-# Fuerza el log detallado de la seguridad y el procesamiento de peticiones
-logging.level.org.springframework.web=DEBUG
-logging.level.org.springframework.security=DEBUG
-logging.level.org.hibernate.SQL=DEBUG
-
-# Muestra los errores de serialización de Jackson en consola
-logging.level.org.springframework.http.converter.json=TRACE
 
 ================
 File: backend/src/test/java/com/cursosonline/backend/UserServiceTest.java
@@ -13913,9 +14123,6 @@ public class SecurityConfig {
 
                         // Permitir solicitudes OPTIONS para CORS preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
-                        // Rutas públicas para subidas de archivos
-                        .requestMatchers("/uploads/**").permitAll()
 
                         // Endpoints de autenticación pública (login y registro)
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/{username}").permitAll()
@@ -15438,6 +15645,35 @@ Adicionalmente, bajo las políticas de seguridad perimetral por tokens distribui
 * **Consistencia Analítica:** Se habilita un sistema de puntuación docente y de asignaturas altamente descriptivo sin degradar el dataset preprocesado en Python. Las consultas agregadas computan el String del docente de forma unívoca, resolviendo la carencia de identificadores físicos de instructores en la base de datos.
 * **Validación de Reglas de Negocio:** El controlador bloquea de forma autónoma (HTTP 403 Forbidden / HTTP 400 Bad Request) cualquier intento de inyección de payloads corruptos o evaluaciones duplicadas, protegiendo las tablas relacionales.
 * **Robustez en la Suite de Integración:** La suite de pruebas de interfaz del cliente se eleva a un total consolidado de 46 tests en verde. La integración de bloques asíncronos `await waitFor` dentro de `EvaluationPanel.test.tsx` elimina con éxito las alertas de fugas de estado transitorias de React Testing Library, garantizando la predictibilidad de la plataforma ante futuras auditorías de código.
+
+---
+
+# [ADR-38] Descarga Segura de Documentos Académicos y Control de Acceso Anti-IDOR
+
+## Estado
+
+Aceptado
+
+## Contexto
+
+Para consolidar las directrices de privacidad y control de acceso en el módulo de intercambio bidireccional y dirigido de archivos, se requería una solución técnica que garantizara que los documentos académicos almacenados en el servidor solo pudieran ser descargados por sus destinatarios legítimos o sus emisores originales. El diseño arquitectónico inicial presentaba tres vulnerabilidades críticas:
+
+1. La ruta estática `/uploads/**` estaba configurada como pública en la seguridad perimetral, permitiendo que cualquier usuario malintencionado que conociera el nombre físico del archivo pudiera saltarse los filtros de autenticación y descargarlo de forma directa.
+2. El uso de `window.open(fileUrl)` en el frontend exponía metadatos e identificadores sensibles en la barra de direcciones del navegador, facilitando vectores de ataque basados en la enumeración predecible de recursos.
+3. El sistema carecía de un mecanismo de validación de identidad en tiempo de ejecución, lo que exponía la plataforma a vulnerabilidades de Referencia Directa Insegura a Objetos (IDOR), donde un alumno autenticado válidamente con su token JWT podía consultar recursos privados pertenecientes a otros alumnos modificando los parámetros de la solicitud.
+
+## Decisión
+
+1. **Aislamiento Perimetral y Blindaje de Archivos:** Eliminar por completo la regla estática `.requestMatchers("/uploads/**").permitAll()` en `SecurityConfig.java`. El directorio de almacenamiento físico queda completamente aislado del tráfico de red externo, obligando a que cualquier solicitud de lectura sea interceptada y evaluada por el contexto de Spring Security.
+2. **Cortocircuito Defensivo Anti-IDOR (Backend):** Implementar el endpoint protegido `GET /api/v1/documents/download/{documentId}` en `DocumentController.java`. El método recupera el token JWT a través del objeto `Principal`, intercepta la entidad en la base de datos de PostgreSQL y evalúa mediante una condición excluyente si el `username` del usuario autenticado coincide obligatoriamente con el emisor (`sender_id`) o el receptor (`receiver_id`) del documento. Si la validación falla, el flujo se interrumpe de forma reactiva respondiendo con un estado HTTP 403 Forbidden.
+3. **Consumo por Flujo de Datos Binarios (Frontend):** Sustituir el uso de `window.open` en el cliente por un consumo asíncrono basado en `Blob`. La función `downloadDocumentSecure` inyecta de forma transparente el token JWT en las cabeceras de autorización mediante el cliente HTTP de Axios (`apiClient`) y procesa el flujo de bytes directamente en la memoria del navegador, forzando la descarga local con el nombre real del archivo (`originalname`).
+4. **Control de Concurrencia y Estado Visual en la UI:** Refactorizar el componente `DocumentManager.tsx` inyectando un estado de bloqueo local denominado `downloadingId`. Al activar el evento `onClick`, el componente inhabilita el botón correspondiente (`disabled`) para evitar solicitudes HTTP simultáneas o dobles clics accidentales del usuario. Simultáneamente, se muta el icono estático por un spinner animado (`Loader2`) preservando las dimensiones geométricas y las clases de Tailwind CSS sin alterar la maquetación.
+
+## Consecuencias
+
+* **Mitigación Completa de Vulnerabilidades IDOR:** Se erradica la posibilidad de fugas de información por manipulación de identificadores en la URL. El servidor valida la matriz de permisos de forma interna, garantizando la confidencialidad estricta del material académico.
+* **Flujos de Datos Transparentes:** Las credenciales de autorización y los tokens JWT viajan encapsulados de forma oculta en las cabeceras HTTP, evitando la exposición de firmas digitales en el historial del navegador o en los logs del servidor proxy.
+* **Integridad de la Suite de Pruebas:** Los tests de integración con `MockMvc` en `DocumentControllerTest.java` validan con éxito que los intentos de intrusión devuelvan un error 403. En el cliente, la refactorización mantiene en verde un consolidado absoluto de 46 tests en Vitest, garantizando que el comportamiento asíncrono y los bloqueos de interfaz se ejecutan de manera predecible y libre de regresiones.
 
 ---
 
