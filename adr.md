@@ -791,6 +791,37 @@ Específicamente, se debían mitigar dos vectores de riesgo críticos:
 
 ---
 
+# [ADR-41] Arquitectura de Agregación Analítica Inmutable y Casteo Dinámico para Métricas de Catálogo
+
+## Estado
+
+Aceptado
+
+## Contexto
+
+Para potenciar la madurez pedagógica de la plataforma, se requería la incorporación de un nuevo componente estadístico en el Dashboard del estudiante que consolidara métricas clave en tiempo real: nota media del curso, volumen local de inscritos y valoraciones medias disociadas de la asignatura y del profesorado. Asimismo, el componente debía estructurarse de forma extensible para admitir futuras segmentaciones analíticas basadas en atributos intrínsecos de la entidad de cursos (diferentes plataformas de origen y categorías temáticas).
+
+No obstante, la implementación de este módulo analítico cruzado presentaba tres restricciones estructurales críticas:
+
+1. **Incompatibilidad de Tipos en PostgreSQL:** El campo `score` de la entidad `CourseGrade` se definió originalmente como `String` para dotar de flexibilidad al sistema [ADR-39]. Intentar aplicar una función de agregación estándar `AVG()` sobre una columna de texto provocaría una excepción fatal inmediata en el motor de base de datos.
+2. **Riesgo de Inyección de Payload:** Evitar vulnerabilidades de alteración masiva de datos (*Mass Assignment*), garantizando que las métricas de salida computadas por el servidor no puedan ser manipuladas o inyectadas artificialmente por peticiones maliciosas procedentes del cliente.
+3. **Rendimiento e Integridad de Consultas:** Prevenir el problema de consultas masivas (N+1) o productos cartesianos inválidos al cruzar tablas de alta volatilidad analítica (`Enrollment`, `CourseGrade`, `AcademicEvaluation` y `Courses`).
+
+## Decisión
+
+1. **Casteo Dinámico Condicional en JPQL:** Implementar una directiva de formateo al vuelo dentro de `CoursesRepository.java` utilizando la función nativa `CAST(cg.score AS double)`. Para inmunizar al motor de PostgreSQL contra errores de formato ante cadenas vacías o no numéricas, el casteo se encapsula dentro de una expresión condicional `CASE WHEN` que evalúa la presencia legítima de caracteres válidos antes de computar la media aritmética (`AVG`).
+2. **Mapeo de Proyección Directa mediante Records:** Diseñar la estructura de transferencia de datos `CourseStatsDTO.java` haciendo uso de un `Record` inmutable de Java 17. La consulta del repositorio instancia el DTO directamente desde las tuplas de PostgreSQL mediante la sintaxis `SELECT new ...`, evitando la sobrecarga en memoria que implicaría la hidratación de entidades JPA pesadas.
+3. **Aislamiento Perimetral Analítico:** Configurar todas las propiedades del `Record` con la restricción `@JsonProperty(access = JsonProperty.Access.READ_ONLY)`. Esto establece un blindaje de solo lectura a nivel de API, permitiendo la serialización limpia de las métricas hacia React pero desestimando cualquier intento de manipulación o inserción externa.
+4. **Controlador Analítico Desacoplado:** Centralizar la exposición del servicio en `CourseStatsController.java` bajo la ruta `/api/v1/stats`. El endpoint valida de forma implícita la identidad del alumno mediante el contexto `Authentication` provisto por los Claims firmados del token JWT [ADR-27], neutralizando vectores de ataque por enumeración de recursos.
+
+## Consecuencias
+
+* **Precisión Estadística Segura:** Se consolida un motor de cálculo "al vuelo" que refleja de manera fidedigna la actividad local en tiempo real sin alterar la naturaleza elástica e inmutable del catálogo original extraído de Coursera.
+* **Escalabilidad de Negocio:** El payload del DTO transporta de forma nativa los campos `site` (plataforma) y `category` (temática) de la asignatura. El componente del frontend queda plenamente preparado para expandir sus capacidades hacia ránkings o agrupaciones complejas en fases posteriores sin alterar los contratos de la API.
+* **Consistencia en Entornos de QA:** La suite de pruebas de integración de Spring Boot se mantiene en un estado de compilación e integración 100% limpio (PASS), certificando que la arquitectura de agregación es segura, estable y libre de regresiones colaterales en el ecosistema transaccional.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026
