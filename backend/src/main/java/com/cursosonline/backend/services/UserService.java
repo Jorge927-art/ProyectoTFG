@@ -332,10 +332,15 @@ public class UserService {
         List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(userId);
 
         // 2. Recorremos cada matrícula para inyectar proactivamente el progreso
-        // dinámico transcurrido
+        // dinámico transcurrido e hidratar las notas correspondientes
         for (Enrollment enrollment : enrollments) {
             int currentProgress = calculateCurrentProgress(enrollment);
             enrollment.setProgress_percentage(currentProgress);
+
+            // Forzamos a Hibernate a inicializar la colección de notas desde PostgreSQL
+            if (enrollment.getGrades() != null) {
+                enrollment.getGrades().size();
+            }
         }
 
         // 3. Devolvemos la lista perfectamente calculada y sincronizada

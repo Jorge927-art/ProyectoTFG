@@ -30,13 +30,14 @@ export const EvaluationPanel = () => {
 
     const handleSend = async (enrollmentId: number, courseId: number) => {
         const state = formStates[enrollmentId];
-        if (!state?.course_score || !state?.instructor_score) return;
+        // Cortocircuito de seguridad: Evita el envío si el estado no existe o si ambos campos están vacíos
+        if (!state || (!state.course_score && !state.instructor_score)) return;
 
         await submitEvaluation({
             course_id: courseId,
-            course_score: state.course_score,
+            course_score: state.course_score || 0, // Envía 0 si el alumno decide ignorar el curso
             course_comment: state.course_comment || '',
-            instructor_score: state.instructor_score,
+            instructor_score: state.instructor_score || 0, // Envía 0 si el alumno decide ignorar al profesor
             instructor_comment: state.instructor_comment || ''
         });
     };
@@ -65,7 +66,7 @@ export const EvaluationPanel = () => {
                         <Loader2 className="animate-spin mb-2" size={24} />
                         <p className="text-xs font-bold">Consultando red académica...</p>
                     </div>
-                ) : pendingList.length === 0 ? (
+                ) : pendingList.length === 0 && !evaluationError ? (
                     <div className="bg-slate-50 border-2 border-dashed border-slate-100 rounded-2xl p-8 text-center">
                         <CheckCircle2 className="mx-auto text-emerald-400 mb-2" size={32} />
                         <p className="text-slate-500 text-xs font-bold">¡Todo al día! No tienes evaluaciones pendientes.</p>
@@ -75,7 +76,7 @@ export const EvaluationPanel = () => {
                         // DIRECTION NOTEBOOKLM: Definición estricta del rango exigido en la recomendación
                         const RATING_RANGE = Array.from({ length: 5 }, (_, i) => i + 1);
                         const state = formStates[item.enrollmentid] || {};
-                        const canSubmit = state.course_score && state.instructor_score && !isSubmitting;
+                        const canSubmit = (state.course_score || state.instructor_score) && !isSubmitting;
 
                         return (
                             <div key={item.enrollmentid} className="p-4 bg-white border border-slate-100 rounded-xl shadow-xs space-y-4 transition-all hover:border-blue-100">

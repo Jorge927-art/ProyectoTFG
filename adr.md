@@ -690,7 +690,7 @@ Adicionalmente, bajo las políticas de seguridad perimetral por tokens distribui
 ## Decisión
 
 1. **Arquitectura de Rating Dual:** Implementar un patrón de coexistencia analítica. La interfaz del frontend consumirá de manera diferenciada el "Rating del Catálogo" (proveniente de las columnas originales del dataset) y el "Rating de la Comunidad" (calculado dinámicamente en tiempo de ejecución mediante funciones de agregación `AVG` sobre los registros locales de la plataforma), preservando la pureza de la fuente original de datos.
-2. **Granularidad Disociada en Comentarios:** Diseñar la entidad `AcademicEvaluation.java` segregando las puntuaciones y los bloques de texto explicativos en campos independientes (`course_score`/`course_comment` e `instructor_score`/`instructor_comment`). Esto dota a la interfaz de la flexibilidad necesaria para que el alumno emita retroalimentaciones asimétricas de forma limpia.
+2. **Granularidad Disociada y Envío Asimétrico:** Diseñar la entidad `AcademicEvaluation.java` segregando las puntuaciones y comentarios en campos independientes. Se refactoriza la condición lógica de la UI (`canSubmit`) para habilitar el envío asimétrico del formulario. El estudiante tiene plena libertad para calificar exclusivamente la calidad del curso, únicamente el desempeño docente, o ambos bloques en paralelo, exigiendo como único requisito de negocio que al menos una de las dos métricas sea mayor que cero para mitigar payloads vacíos.
 3. **Validación Perimetral por Subconsulta Cruzada:** Delegar el filtrado de exclusión a una subconsulta nativa en HQL dentro de `EnrollmentRepository.java`. El método descarta en el motor de PostgreSQL cualquier curso que ya posea una fila de evaluación acoplada al `username` extraído de los Claims del JWT, blindando el acceso en el endpoint `/pending` de forma stateless.
 4. **Accesibilidad e Integridad Sintáctica en la UI:** Refactorizar el renderizado iterativo del panel de estrellas inyectando de forma obligatoria propiedades descriptivas `aria-label` y `title` para satisfacer los inspectores automatizados de accesibilidad (*Microsoft Edge Tools / axe*). La estructura se mantiene desacoplada en el hook `useActiveEvaluations.ts` satisfaciendo la directriz anti-objetos mutantes del linter [ADR-20].
 
@@ -758,6 +758,36 @@ No obstante, debido a que el módulo de inserción de calificaciones por parte d
 * **Desacoplamiento Efectivo de Módulos:** El equipo de frontend y backend pueden trabajar de forma asíncrona. La vista del estudiante queda blindada ante futuras modificaciones; cuando el controlador del profesor guarde datos en las tablas relacionales, la UI del alumno los consumirá nativamente sin necesidad de alterar una sola línea de código en la capa de presentación.
 * **Mantenimiento del Espacio Geométrico:** El diseño compacto aprovecha de forma óptima los píxeles recuperados en la cabecera en el [ADR-38], manteniendo a salvo el scroll controlado de la tarjeta y la simetría visual con los componentes adyacentes del catálogo.
 * **Cero Regresiones en la Suite de QA:** La suite de pruebas de **Vitest se consolida exitosamente con sus 46 tests en verde (PASS)**, demostrando que la adición de la lógica condicional y las interfaces tipadas no introducen comportamientos erráticos o fugas de memoria transitorias en React.
+
+---
+
+# [ADR-40] Persistencia Relacional e Hidratación de Calificaciones con Aislamiento Deserializador READ_ONLY
+
+## Estado
+
+Aceptado
+
+## Contexto
+
+Dando continuidad al diseño de contrato anticipado establecido en el [ADR-39] para el módulo de calificaciones académicas, se requería materializar la estructura física de datos en el backend (Spring Boot + PostgreSQL + Hibernate). El reto residía en habilitar el almacenamiento dinámico de múltiples notas por cada matrícula sin vulnerar los principios de seguridad perimetral de la plataforma.
+
+Específicamente, se debían mitigar dos vectores de riesgo críticos:
+
+1. **Ataques de Asignación Masiva (Mass Assignment):** Impedir que un usuario malintencionado intente inyectar o alterar calificaciones enviando colecciones manipuladas en los payloads de solicitudes mutantes (`POST`/`PUT`).
+2. **Degradación de Rendimiento (N+1 Query Problem):** Evitar que la consulta recurrente de matrículas sobrecargue la base de datos PostgreSQL al traer de manera ansiosa (*Eager*) colecciones de notas cuando no son requeridas por el contexto de la vista.
+
+## Decisión
+
+1. **Modelado Físico Normalizado y Bidireccional:** Crear la entidad `CourseGrade.java` vinculada mediante una relación de muchos a uno (`@ManyToOne`) con la matrícula (`Enrollment`). La entidad principal `Enrollment.java` incorpora la contraparte inversa (`@OneToMany`) con estrategias de cascada completa (`CascadeType.ALL`) y remoción de huérfanos para garantizar la integridad referencial en cascada ante limpiezas de historial.
+2. **Aislamiento de Deserialización Perimetral:** Sustituir la anotación restrictiva `@JsonIgnore` por `@JsonProperty(access = JsonProperty.Access.READ_ONLY)` sobre la propiedad `grades`. Esto instruye al serializador Jackson a ignorar de forma proactiva cualquier entrada de datos hacia el servidor a través de esta propiedad, utilizándola exclusivamente como flujo de salida seguro e inmutable hacia el Frontend.
+3. **Optimización por Carga Diferida (Lazy Loading) e Hidratación Explícita:** Configurar la relación con `FetchType.LAZY` para salvaguardar el rendimiento del motor de base de datos. En el método transaccional de lectura `getStudentActiveCoursesWithCalculatedProgress` dentro de `UserService.java`, se fuerza la hidratación controlada de la colección invocando un método de acceso estructural (`.size()`) antes del retorno de la lista, poblando el payload únicamente en este flujo de negocio específico.
+4. **Restauración de Firma de Constructores:** Declarar un constructor explícito de 7 argumentos en `Enrollment.java` que actúe como puente de compatibilidad hacia atrás. Esto inmuniza a la suite preexistente de pruebas unitarias (`UserServiceTest.java`, etc.) contra los cambios en las anotaciones automáticas de Lombok.
+
+## Consecuencias
+
+* **Seguridad por Diseño (Security by Design):** Se blinda el endpoint contra inyecciones fraudulentas de notas desde el cliente. Las calificaciones quedan completamente aisladas en modo de solo lectura desde la perspectiva de la API pública expuesta.
+* **Tolerancia Dual Frontend-Backend:** El backend ahora sirve un arreglo `grades: []` vacío pero estructuralmente válido. React asimila este payload de forma nativa manteniendo el comportamiento inerte actual y reaccionará de manera automatizada en el momento en que se inserten filas reales en la tabla `course_grades`.
+* **Estabilidad del Entorno de Integración:** Tanto el compilador de Java 17 como los tests de JUnit/Mockito mantienen un estado 100% libre de errores y regresiones, preservando la madurez tecnológica de la plataforma de cara a futuras auditorías del tribunal.
 
 ---
 
