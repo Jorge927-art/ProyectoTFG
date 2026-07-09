@@ -1,7 +1,7 @@
 package com.cursosonline.backend.controller;
 
 import com.cursosonline.backend.dto.CourseStatsDTO;
-import com.cursosonline.backend.repository.CoursesRepository;
+import com.cursosonline.backend.services.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,7 +16,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.Collections;
-import java.util.Optional;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -28,8 +27,10 @@ class CourseStatsControllerTest {
 
     private MockMvc mockMvc;
 
+    // [CORREGIDO] Simulamos el servicio en lugar del repositorio para mantener la
+    // consistencia
     @Mock
-    private CoursesRepository coursesRepository;
+    private UserService userService;
 
     @InjectMocks
     private CourseStatsController courseStatsController;
@@ -63,12 +64,13 @@ class CourseStatsControllerTest {
                 "Coursera",
                 "Data Science");
 
-        when(coursesRepository.getCourseAnalyticalStats(targetCourseId)).thenReturn(Optional.of(mockStats));
+        // [CORREGIDO] Vinculamos el mock al nuevo método del servicio que retorna el
+        // objeto DTO directamente
+        when(userService.getCourseStats(targetCourseId)).thenReturn(mockStats);
 
         // ACT & ASSERT: Inyectamos explícitamente el principal simulado en la petición
-        // (.principal)
         mockMvc.perform(get("/api/v1/stats/course/{courseId}", targetCourseId)
-                .principal(mockPrincipal) // <- SOLUCIÓN: Esto evita el error 401 en entornos aislados
+                .principal(mockPrincipal)
                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.courseId").value(targetCourseId))
@@ -77,4 +79,23 @@ class CourseStatsControllerTest {
                 .andExpect(jsonPath("$.platform").value("Coursera"))
                 .andExpect(jsonPath("$.category").value("Data Science"));
     }
+
+    @Test
+    @DisplayName("Debería retornar HTTP 404 cuando se solicitan estadísticas de un curso inexistente o sin datos analíticos")
+    void shouldReturnNotFoundWhenCourseDoesNotExist() throws Exception {
+        // ARRANGE
+        Long nonExistentCourseId = 999L;
+
+        // Simulamos de forma segura que el servicio devuelve nulo (comportamiento
+        // inerte)
+        when(userService.getCourseStats(nonExistentCourseId)).thenReturn(null);
+
+        // ACT & ASSERT: Verificamos con MockMvc que el controlador responda con un 404
+        // defensivo
+        mockMvc.perform(get("/api/v1/stats/course/{courseId}", nonExistentCourseId)
+                .principal(mockPrincipal)
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound());
+    }
+
 }

@@ -1727,7 +1727,7 @@ File: src/main/java/com/cursosonline/backend/controller/CourseStatsController.ja
 package com.cursosonline.backend.controller;
 
 import com.cursosonline.backend.dto.CourseStatsDTO;
-import com.cursosonline.backend.repository.CoursesRepository;
+import com.cursosonline.backend.services.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -1739,10 +1739,11 @@ import java.util.Map;
 @RequestMapping("/api/v1/stats")
 public class CourseStatsController {
 
-    private final CoursesRepository coursesRepository;
+    private final UserService userService;
 
-    public CourseStatsController(CoursesRepository coursesRepository) {
-        this.coursesRepository = coursesRepository;
+    // Modificamos el constructor para inyectar el servicio en lugar del repositorio
+    public CourseStatsController(UserService userService) {
+        this.userService = userService;
     }
 
     /**
@@ -1759,11 +1760,15 @@ public class CourseStatsController {
                         .body(Map.of("error", "Sesión inválida o token JWT ausente."));
             }
 
-            // Consume la consulta analítica segura con pies de plomo desde PostgreSQL
-            return coursesRepository.getCourseAnalyticalStats(courseId)
-                    .map(ResponseEntity::ok)
-                    .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
-                            .body((CourseStatsDTO) null)); // Retorna 404 limpio si el ID de curso no existe
+            // [CORREGIDO] Consume el servicio que procesa la consulta nativa de PostgreSQL
+            CourseStatsDTO stats = userService.getCourseStats(courseId);
+
+            if (stats == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body((CourseStatsDTO) null); // Retorna 404 limpio si el ID de curso no existe o no tiene datos
+            }
+
+            return ResponseEntity.ok(stats);
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
@@ -2549,15 +2554,18 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * salida.
  */
 public record CourseStatsDTO(
-        @JsonProperty(access = JsonProperty.Access.READ_ONLY) Long courseId,
-        @JsonProperty(access = JsonProperty.Access.READ_ONLY) Double averageGrade, // AVG de course_grades (casteado)
-        @JsonProperty(access = JsonProperty.Access.READ_ONLY) Long localEnrollments, // COUNT de alumnos inscritos
-        @JsonProperty(access = JsonProperty.Access.READ_ONLY) Double communityRating, // AVG de course_score en
-                                                                                      // evaluaciones
-        @JsonProperty(access = JsonProperty.Access.READ_ONLY) Double instructorRating, // AVG de instructor_score en
-                                                                                       // evaluaciones
-        @JsonProperty(access = JsonProperty.Access.READ_ONLY) String platform, // Mapeado desde Courses.site
-        @JsonProperty(access = JsonProperty.Access.READ_ONLY) String category // Mapeado desde Courses.category
+                @JsonProperty(access = JsonProperty.Access.READ_ONLY) Long courseId,
+                @JsonProperty(access = JsonProperty.Access.READ_ONLY) Double averageGrade, // AVG de course_grades
+                                                                                           // (casteado)
+                @JsonProperty(access = JsonProperty.Access.READ_ONLY) Long localEnrollments, // COUNT de alumnos
+                                                                                             // inscritos
+                @JsonProperty(access = JsonProperty.Access.READ_ONLY) Double communityRating, // AVG de course_score en
+                                                                                              // // evaluaciones
+                @JsonProperty(access = JsonProperty.Access.READ_ONLY) Double instructorRating, // AVG de
+                                                                                               // instructor_score en //
+                                                                                               // evaluaciones
+                @JsonProperty(access = JsonProperty.Access.READ_ONLY) String platform, // Mapeado desde Courses.site
+                @JsonProperty(access = JsonProperty.Access.READ_ONLY) String category // Mapeado desde Courses.category
 ) {
 }
 
@@ -3450,7 +3458,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import java.util.Optional;
 
 public interface CoursesRepository extends JpaRepository<Courses, Long> {
 
@@ -3473,26 +3480,23 @@ public interface CoursesRepository extends JpaRepository<Courses, Long> {
         /**
          * Consulta analítica de agregación para el panel estadístico [ADR-41].
          * Cruza el catálogo con las métricas locales de matrículas y calificaciones.
-         * Utiliza CAST para transformar de forma segura el score (String) a double
-         * precisión en PostgreSQL.
+         * Utiliza SQL Nativo y la base de datos de PostgreSQL de forma directa.
          */
-        @Query("SELECT new com.cursosonline.backend.dto.CourseStatsDTO(" +
-                        "c.course_id, " +
-                        "AVG(CASE WHEN cg.score IS NOT NULL AND cg.score <> '' THEN CAST(cg.score AS double) ELSE null END), "
+        @Query(value = "SELECT c.course_id as courseId, " +
+                        "AVG(CASE WHEN cg.score IS NOT NULL AND cg.score <> '' THEN CAST(cg.score AS double precision) ELSE null END) as averageGrade, "
                         +
-                        "COUNT(DISTINCT e.enrollmentid), " +
-                        "AVG(ae.course_score), " +
-                        "AVG(ae.instructor_score), " +
-                        "c.site, " +
-                        "c.category) " +
-                        "FROM Courses c " +
-                        "LEFT JOIN Enrollment e ON e.course.course_id = c.course_id " +
-                        "LEFT JOIN CourseGrade cg ON cg.enrollment.enrollmentid = e.enrollmentid " +
-                        "LEFT JOIN AcademicEvaluation ae ON ae.course.course_id = c.course_id " +
+                        "COUNT(DISTINCT e.enrollmentid) as localEnrollments, " +
+                        "AVG(ae.course_score) as communityRating, " +
+                        "AVG(ae.instructor_score) as instructorRating, " +
+                        "c.site as platform, " +
+                        "c.category as category " +
+                        "FROM courses c " +
+                        "LEFT JOIN enrollment e ON e.course_id = c.course_id " +
+                        "LEFT JOIN course_grades cg ON cg.course_id = c.course_id " +
+                        "LEFT JOIN academic_evaluation ae ON ae.course_id = c.course_id " +
                         "WHERE c.course_id = :courseId " +
-                        "GROUP BY c.course_id, c.site, c.category")
-        Optional<com.cursosonline.backend.dto.CourseStatsDTO> getCourseAnalyticalStats(
-                        @Param("courseId") Long courseId);
+                        "GROUP BY c.course_id, c.site, c.category", nativeQuery = true)
+        java.util.Map<String, Object> getCourseAnalyticalStatsNative(@Param("courseId") Long courseId);
 
 }
 
@@ -4712,10 +4716,10 @@ public class UserService {
     }
 
     /**
-     * Recupera de forma transaccional las preferencias de un estudiante desde
-     * PostgreSQL.
-     * Auditoría NotebookLM: Lanzamiento de ResourceNotFoundException (HTTP 404) en
-     * lugar de RuntimeException. Refactorizado con método privado para cumplir DRY.
+     * Recupera de forma transaccional los intereses de un usuario específico.
+     * 
+     * @param username
+     * @return
      */
     @Transactional(readOnly = true)
     public InterestDTO getUserInterests(String username) {
@@ -4943,6 +4947,28 @@ public class UserService {
 
         // 3. Devolvemos la lista perfectamente calculada y sincronizada
         return enrollments;
+    }
+
+    /**
+     * Recupera y consolida de forma segura las métricas analíticas desde SQL Nativo
+     * [ADR-41].
+     */
+    @Transactional(readOnly = true)
+    public com.cursosonline.backend.dto.CourseStatsDTO getCourseStats(Long courseId) {
+        java.util.Map<String, Object> row = coursesRepository.getCourseAnalyticalStatsNative(courseId);
+
+        if (row == null || row.isEmpty() || row.get("courseId") == null) {
+            return null; // Criterio honesto de nulos puros si el curso no existe o no tiene datos
+        }
+
+        return new com.cursosonline.backend.dto.CourseStatsDTO(
+                ((Number) row.get("courseId")).longValue(),
+                row.get("averageGrade") != null ? ((Number) row.get("averageGrade")).doubleValue() : null,
+                row.get("localEnrollments") != null ? ((Number) row.get("localEnrollments")).longValue() : 0L,
+                row.get("communityRating") != null ? ((Number) row.get("communityRating")).doubleValue() : null,
+                row.get("instructorRating") != null ? ((Number) row.get("instructorRating")).doubleValue() : null,
+                (String) row.get("platform"),
+                (String) row.get("category"));
     }
 
 }
@@ -5236,7 +5262,7 @@ File: src/test/java/com/cursosonline/backend/controller/CourseStatsControllerTes
 package com.cursosonline.backend.controller;
 
 import com.cursosonline.backend.dto.CourseStatsDTO;
-import com.cursosonline.backend.repository.CoursesRepository;
+import com.cursosonline.backend.services.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -5251,7 +5277,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.Collections;
-import java.util.Optional;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -5263,8 +5288,10 @@ class CourseStatsControllerTest {
 
     private MockMvc mockMvc;
 
+    // [CORREGIDO] Simulamos el servicio en lugar del repositorio para mantener la
+    // consistencia
     @Mock
-    private CoursesRepository coursesRepository;
+    private UserService userService;
 
     @InjectMocks
     private CourseStatsController courseStatsController;
@@ -5298,12 +5325,13 @@ class CourseStatsControllerTest {
                 "Coursera",
                 "Data Science");
 
-        when(coursesRepository.getCourseAnalyticalStats(targetCourseId)).thenReturn(Optional.of(mockStats));
+        // [CORREGIDO] Vinculamos el mock al nuevo método del servicio que retorna el
+        // objeto DTO directamente
+        when(userService.getCourseStats(targetCourseId)).thenReturn(mockStats);
 
         // ACT & ASSERT: Inyectamos explícitamente el principal simulado en la petición
-        // (.principal)
         mockMvc.perform(get("/api/v1/stats/course/{courseId}", targetCourseId)
-                .principal(mockPrincipal) // <- SOLUCIÓN: Esto evita el error 401 en entornos aislados
+                .principal(mockPrincipal)
                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.courseId").value(targetCourseId))

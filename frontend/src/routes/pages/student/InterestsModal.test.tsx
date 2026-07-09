@@ -37,6 +37,7 @@ describe('InterestsModal Component - Suite de Pruebas Unitarias Estrictas', () =
     beforeEach(() => {
         vi.clearAllMocks();
         localStorage.clear();
+        localStorage.setItem('token', 'mock_jwt_token_luis'); // <── INYECCIÓN DEFENSIVA REQUERIDA
         // Inyección asíncrona real en el useEffect del componente
         vi.mocked(apiClient.get).mockResolvedValue({ data: mockLuisInterests });
     });

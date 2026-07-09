@@ -358,4 +358,26 @@ public class UserService {
         return enrollments;
     }
 
+    /**
+     * Recupera y consolida de forma segura las métricas analíticas desde SQL Nativo
+     * [ADR-41].
+     */
+    @Transactional(readOnly = true)
+    public com.cursosonline.backend.dto.CourseStatsDTO getCourseStats(Long courseId) {
+        java.util.Map<String, Object> row = coursesRepository.getCourseAnalyticalStatsNative(courseId);
+
+        if (row == null || row.isEmpty() || row.get("courseId") == null) {
+            return null; // Criterio honesto de nulos puros si el curso no existe o no tiene datos
+        }
+
+        return new com.cursosonline.backend.dto.CourseStatsDTO(
+                ((Number) row.get("courseId")).longValue(),
+                row.get("averageGrade") != null ? ((Number) row.get("averageGrade")).doubleValue() : null,
+                row.get("localEnrollments") != null ? ((Number) row.get("localEnrollments")).longValue() : 0L,
+                row.get("communityRating") != null ? ((Number) row.get("communityRating")).doubleValue() : null,
+                row.get("instructorRating") != null ? ((Number) row.get("instructorRating")).doubleValue() : null,
+                (String) row.get("platform"),
+                (String) row.get("category"));
+    }
+
 }

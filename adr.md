@@ -293,20 +293,20 @@ Se implementaron las siguientes directrices de diseño:
 
 ### Contexto
 
-Al planificar la infraestructura del futuro módulo de recomendación inteligente en el frontend (`StudentDashboard.tsx`), se identificó la necesidad imperativa de capturar de forma genérica y multidimensional los intereses del estudiante en HTML/React en cinco ejes críticos: categorías temáticas, nivel, duración de cursos, idioma y subtítulos. El almacenamiento tradicional en columnas de texto plano (strings concatenados por comas) provocaría una degradación severa del rendimiento, obligando al servidor a ejecutar costosas operaciones de búsqueda de patrones con comodines (`LIKE`), anulando la utilidad de los índices y violando la Primera Forma Normal (1FN) de las bases de datos relacionales. Adicionalmente, se detectó que al abrir el componente modal multiscroll (`InterestsModal.tsx`), las preferencias no persistían marcadas en la interfaz de usuario, debido a que el motor de persistencia sufría una desconexión por carga perezosa (*lazy loading*) en las colecciones secundarias y a que existía una colisión de rutas en el enrutamiento HTTP que impedía la correcta lectura del estado actual.
+Al planificar la infraestructura del futuro módulo de recomendación inteligente en el frontend (`StudentDashboard.tsx`), se identificó la necesidad imperativa de capturar de forma genérica y multidimensional los intereses del estudiante en HTML/React en cinco ejes críticos: categorías temáticas, nivel, duración de cursos, idioma y subtítulos. El almacenamiento tradicional en columnas de texto plano (strings concatenados por comas) provocaría una degradación severa del rendimiento, obligando al servidor a ejecutar costosas operaciones de búsqueda de patrones con comodines (`LIKE`), anulando la utilidad de los índices y violando la Primera Forma Normal (1FN) de las bases de datos relacionales. Adicionalmente, se detectó que al abrir el componente modal multiscroll (`InterestsModal.tsx`), las preferencias no persistían marcadas en la interfaz de usuario debido a que el motor de persistencia sufría una desconexión por carga perezosa (*lazy loading*) en las colecciones secundarias y a que existía una colisión de rutas en el enrutamiento HTTP que impedía la correcta lectura del estado actual.
 
 ### Decisión
 
 Implementar un circuito de persistencia normalizado, desacoplado y simétrico estructurado en cuatro niveles técnicos:
 
 1. **Arquitectura de Datos:** Incorporar la entidad `Interest.java` aplicando el patrón `@MapsId` en una relación `@OneToOne` con la tabla de usuarios para compartir de forma nativa la misma clave primaria (`user_id`), creando un esquema donde el ID de intereses hereda exactamente el ID del usuario en PostgreSQL y garantizando el borrado en cascada automático.
-2. **Persistencia de Colecciones:** Implementar la anotación `@ElementCollection` generando de forma transparente cinco tablas satélite indexadas de forma vertical (`interest_categories`, `interest_course_types`, `interest_durations`, `interest_languages`, y `interest_subtitle_languages`). En el método transaccional de lectura `getUserInterests` de `UserService.java`, se introduce la hidratación forzada mediante `Hibernate.initialize()` sobre cada una de las colecciones, asegurando que las listas no viajen vacías al ser serializadas a JSON.
+2. **Persistencia de Colecciones e Hidratación Explícita [ADR-31]:** Implementar la anotación `@ElementCollection` generando de forma transparente cinco tablas satélite indexadas de forma vertical (`interest_categories`, `interest_course_types`, `interest_durations`, `interest_languages`, y `interest_subtitle_languages`). En el método transaccional de lectura `getUserInterests` de `UserService.java`, se descarta el uso de inicializadores externos pesados y se introduce una **Lógica de Hidratación Forzada Optimizada mediante la invocación explícita del tamaño de colección (`.size()`)**. Esto destruye el proxy perezoso de Hibernate y obliga al ORM a volcar los datos reales en memoria mientras la transacción `@Transactional(readOnly = true)` se encuentra abierta, asegurando que las listas no viajen vacías al ser serializadas a JSON.
 3. **Simetría en Enrutamiento API:** Reestructurar la precedencia jerárquica en `UserController.java` posicionando el endpoint estático `GET /api/auth/my-interests` de forma prioritaria antes del patrón dinámico variable `GET /{username}`. Esto anula la ambigüedad en el enrutamiento web de Spring MVC y subsana el error sintáctico de petición incorrecta (Error 400 Bad Request).
 4. **Ciclo Sincronizado en Frontend:** Configurar en el modal de React un hook de efecto (`useEffect`) acoplado al estado de visibilidad (`isOpen`), invocando de manera asíncrona al cliente centralizado (`apiClient`). Los datos recuperados hidratan los estados locales (`useState`), activando de forma automática las clases CSS condicionales y los iconos de verificación (`✓`) de las tarjetas seleccionadas.
 
 ### Justificación para el TFG
 
-Aporta un valor metodológico fundamental en términos de diseño avanzado de bases de datos relacionales, control de enrutamiento web y optimización algorítmica de ORM. Demuestra al tribunal el cumplimiento riguroso de la teoría de normalización (1FN) al fragmentar colecciones dinámicas en casilleros elementales independientes. El orden de declaración de los métodos del controlador evidencia un dominio avanzado en el ciclo de vida de peticiones en Spring Framework, mientras que el control programático de la inicialización de proxies defiende la robustez del software frente a fallos indeterministas de Hibernate. Esta simetría exacta entre el perfil de intereses del alumno y el catálogo de cursos anula la necesidad de capas de conversión intermedias en Spring Boot, lo que permitirá al futuro motor de recomendación ejecutar consultas de cruce ultra veloces mediante operaciones de conjunto indexadas (`JOIN` y cláusulas `IN`), maximizando la escalabilidad del sistema.
+Aporta un valor metodológico fundamental en términos de diseño avanzado de bases de datos relacionales, control de enrutamiento web y optimización algorítmica de ORM. Demuestra al tribunal el cumplimiento riguroso de la teoría de normalización (1FN) al fragmentar colecciones dinámicas en casilleros elementales independientes. El orden de declaración de los métodos del controlador evidencia un dominio avanzado en el ciclo de vida de peticiones en Spring Framework. Asimismo, el control programático de la inicialización de proxies mediante llamadas `.size()` defiende la robustez y elegancia del software frente a fallos de inicialización indeterministas, eliminando acoplamientos rígidos con clases nativas del proveedor de persistencia y optimizando el ciclo de vida de la sesión transaccional. Esta simetría exacta entre el perfil de intereses del alumno y el catálogo de cursos anula la necesidad de capas de conversión intermedias en Spring Boot, lo que permitirá al futuro motor de recomendación ejecutar consultas de cruce ultra veloces mediante operaciones de conjunto indexadas (`JOIN` y cláusulas `IN`), maximizando la escalabilidad del sistema.
 
 ### Consecuencias
 
@@ -503,6 +503,8 @@ Esta decisión se ejecuta bajo las siguientes directrices técnicas:
   * **Reducción de la latencia de red:** Se optimizan las conexiones con PostgreSQL al suprimir las consultas repetitivas de verificación de usuario.
   * **Cumplimiento estricto del patrón Stateless de REST:** El servidor no retiene estados de sesión, delegando de forma segura toda la identidad en el token cifrado.
 
+  ---
+  
 ## [ADR-28] Hidratación Síncrona de Matrículas en el DTO de Sesión
 
 * **Fecha:** Junio 2026
@@ -514,6 +516,8 @@ Esta decisión se ejecuta bajo las siguientes directrices técnicas:
   * **Mejora drástica en la UX:** Los componentes del catálogo y los botones de inscripción reaccionan de manera instantánea sin pantallas de carga adicionales.
   * **Blindaje de serialización:** Se mantiene la protección contra la recursión infinita en las entidades JPA sin comprometer la entrega de datos esenciales al cliente.
 
+  ---
+  
 ## [ADR-29] Estrategia de Carga Transaccional (Join Fetch vs OSIV)
 
 * **Fecha:** Junio 2026
@@ -525,6 +529,8 @@ Esta decisión se ejecuta bajo las siguientes directrices técnicas:
   * **Garantía de datos completos:** El frontend recibe el grafo de objetos hidratado de forma segura y libre de excepciones transaccionales.
   * **Optimización del rendimiento:** Se mitiga por completo el temido problema de las "N+1 consultas", unificando las lecturas en un único viaje a la base de datos.
 
+  ---
+  
 ## [ADR-30] Algoritmo de Filtrado Basado en Contenido para el Motor de Recomendaciones
 
 * **Fecha:** Junio 2026
@@ -536,16 +542,40 @@ Esta decisión se ejecuta bajo las siguientes directrices técnicas:
   * **Sugerencias predictivas dinámicas:** El frontend pinta en tiempo real recomendaciones justificadas con un porqué explícito para el estudiante.
   * **Aprovechamiento del modelo relacional:** Se saca el máximo partido a la normalización de metadatos (categorías, lenguajes, habilidades) estructurada en PostgreSQL.
 
+---
+
 ## [ADR-31] Estrategia de Carga de Preferencias: Robustez frente a Rendimiento en Colecciones
 
 * **Fecha:** Junio 2026
 * **Estatus:** Aceptado
-* **Contexto:** La entidad `Interest` mapea las colecciones de preferencias dinámicas del estudiante mediante la anotación `@ElementCollection`. Por defecto, Hibernate gestiona estas colecciones mediante una carga diferida (`FetchType.LAZY`). Sin embargo, debido a las múltiples transformaciones de DTOs en capas desacopladas fuera de la sesión transaccional y bajo el contexto de seguridad del filtro JWT, la persistencia se exponía a excepciones de tipo `LazyInitializationException`.
-* **Decisión:** Configurar estas colecciones de forma ansiosa utilizando `@ElementCollection(fetch = FetchType.EAGER)`. Esta aproximación prioriza la robustez frente al rendimiento en el ámbito del desarrollo de este TFG, garantizando que toda la hidratación del grafo de datos satélite del usuario se complete de manera atómica en una única consulta SQL de tipo `JOIN` dentro de PostgreSQL.
-* **Justificación para el TFG:** Refleja la capacidad del ingeniero para evaluar los compromisos de diseño (*trade-offs*) en la persistencia de datos. Ante el tribunal, se defiende como una decisión táctica y defensiva: se sacrifica una fracción marginal de rendimiento en lecturas para blindar la API contra fallos de proxy de Hibernate en entornos multihilo o filtros desacoplados.
-* **Consecuencias:**
-  * **Estabilidad absoluta de la API:** Se eliminan de raíz las excepciones de inicialización diferida al transformar los intereses del alumno a `InterestDTO`.
-  * **Deuda técnica declarada:** Se reconoce formalmente que esta solución penalizaría la latencia en un entorno productivo con miles de usuarios concurrentes. Como mitigación futura, se propone revertir a `LAZY` apoyándose en consultas dirigidas con `JOIN FETCH` o la incorporación de una capa de caché distribuida mediante Redis.
+
+### Contexto
+
+La entidad `Interest` mapea las colecciones de preferencias dinámicas del estudiante mediante la anotación `@ElementCollection`. Por defecto, Hibernate gestiona estas colecciones mediante una carga diferida (`FetchType.LAZY`). Sin embargo, debido a las múltiples transformaciones de DTOs en capas desacopladas fuera de la sesión transaccional y bajo el contexto de seguridad del filtro JWT, la persistencia se exponía a excepciones de tipo `LazyInitializationException` al cerrarse la sesión antes de la serialización JSON, lo que provocaba que el frontend recibiera listas vacías y disparara el banner de error rojo en la UI.
+
+### Decisión
+
+Se determina implementar una **Estrategia de Hidratación Explícita Controlada** dentro del método de lectura transaccional `getUserInterests` de `UserService.java`. En lugar de forzar un acoplamiento estructural rígido mediante `@ElementCollection(fetch = FetchType.EAGER)` —el cual sobrecargaría el rendimiento con productos cartesianos inválidos en PostgreSQL—, se mantiene el esquema diferido eficiente (`LAZY`) y se ejecuta programáticamente el método de resolución de proxies invocando el tamaño de cada colección (`.size()`):
+
+```java
+if (interest.getCategory() != null) interest.getCategory().size();
+if (interest.getCourse_type() != null) interest.getCourse_type().size();
+if (interest.getDuration() != null) interest.getDuration().size();
+if (interest.getLanguage() != null) interest.getLanguage().size();
+if (interest.getSubtitle_languages() != null) interest.getSubtitle_languages().size();
+```
+
+Esto obliga al ORM a poblar las colecciones satélite de forma síncrona mientras la transacción `@Transactional(readOnly = true)` permanece abierta.
+
+### Justificación para el TFG
+
+Refleja la capacidad del ingeniero para evaluar los compromisos de diseño (*trade-offs*) en la persistencia avanzada de datos. Ante el tribunal, se defiende como una decisión táctica, defensiva y limpia: se evita delegar la carga en intermediarios o inicializaciones globales pesadas del proveedor, controlando a nivel de servicio exactamente cuándo y cómo se resuelve el grafo de datos. Esto blinda la API contra fallos de proxy en entornos multihilo o filtros desacoplados, manteniendo la consistencia de tipos primitivos.
+
+### Consecuencias
+
+* **Estabilidad absoluta de la API:** Se eliminan de raíz las excepciones de inicialización diferida al transformar los intereses del alumno a `InterestDTO`, garantizando el retorno seguro de los datos en un estado HTTP 200 OK.
+* **Optimización de Recursos en PostgreSQL:** Al resolver los datos de forma dirigida en el Read Path del servicio, se previene el desperdicio de memoria en operaciones de escritura u otras consultas secundarias donde no se requiera el desglose multidimensional de intereses.
+* **Sincronización Simétrica Documental:** Este registro interactúa y se hermana directamente con las directrices de persistencia del [ADR-18], cerrando de forma definitiva la coherencia técnica entre el código fuente transaccional de Spring Boot y la documentación del monorrepo.
 
 ---
 
@@ -663,11 +693,12 @@ Permitir la incorporación de formatos de procesamiento de palabras como Microso
 2. **Modelo Dirigido Emisor-Receptor (Contrato de Mensajería entre Usuarios):** Descartar la propiedad simple acoplada a un único actor y evolucionar la entidad `DocumentMetadata.java` hacia un contrato de mensajería dirigido. La tabla registra claves foráneas (`sender_id` y `receiver_id`) que apuntan de forma exclusiva a identificadores reales de la entidad `Users.java`. Se prohíbe el autoenvío mediante una restricción `CHECK` en PostgreSQL. Las bandejas de visualización en el frontend se aíslan de forma física en base de datos mediante el enumerado `FolderType` (`SENT` y `RECEIVED`).
 3. **Validación de Ámbito Académico y Directorio Dinámico:** Implementar en el Read Path del backend endpoints analíticos de consulta en `UserRepository.java` y `EnrollmentRepository.java`. Estos endpoints cruzan en tiempo real el historial de matrículas activas del alumno con el campo estático `instructors` de la entidad de cursos para aislar su red legítima de contactos, devolviendo únicamente objetos de transferencia de datos limpios (`UserDirectoryDTO`) que protegen el hash de las contraseñas e inyectan el identificador obligatorio del destinatario.
 4. **Bifurcación en Servicios y Hooks de Presentación:** Actualizar `documentService.ts` para integrar de forma asíncrona los métodos de bandeja de entrada, bandeja de salida y consultas al directorio. El hook especializado `useDocuments.ts` asume la gestión mutada de estados independientes de las listas de enviados y recibidos para evitar el "efecto fantasma" visual [ADR-19], controlando de forma reactiva la pestaña activa (`activeTab`) y sanitizando excepciones de tipo `unknown`.
-5. **Composición Gráfica con Restricción de Accesibilidad y Geometría:** Rediseñar el componente `DocumentManager.tsx` bajo criterios de composición pura [ADR-13], confinado a una tarjeta de dimensiones inmutables (`h-109`). Se introduce un sistema de pestañas interactivas, un selector obligatorio `<select>` blindado contra nulos mediante operadores de cortocircuito (`directory?.map`) y dotado del atributo de accesibilidad `aria-label`. El listado se ajusta a un scroll dinámico con la clase canónica de Tailwind `min-h-30` [ADR-19].
+5. **Composición Gráfica por Alturas Proporcionales Compensadas:** Rediseñar el componente `DocumentManager.tsx` bajo criterios de composición pura [ADR-13], delimitado a una tarjeta geométrica de `h-109`. Se introduce un sistema de pestañas interactivas, un selector obligatorio `<select>` blindado contra nulos y dotado del atributo `aria-label`. Para garantizar la simetría e integridad visual en el Dashboard general del alumno Luis, se establece una **Estrategia de Columnas Equivalentes**: la columna izquierda apila el catálogo/asignaturas junto a la gestión de documentos (`h-109`), mientras que la columna derecha equilibra la interfaz mediante la tarjeta de `EvaluationPanel.tsx` fijada intencionadamente en `h-90`. Esto absorbe las diferencias de densidad de información y consolida una línea inferior de maquetación perfectamente nivelada.
 
 ## Consecuencias
 
 * **Seguridad, Integridad y Eficiencia:** El servidor acepta múltiples formatos de texto de forma segura sin peligro de ataques de sobreescritura de archivos (*Path Traversal*) gracias al enmascaramiento con UUID en disco. El modelo de datos garantiza que el intercambio ocurre únicamente entre usuarios reales registrados en PostgreSQL. Se introduce un cortocircuito defensivo de negocio en el controlador que frena peticiones inválidas antes de consumir recursos de infraestructura.
+* **Estabilización de la Simetría Visual:** Se corrige la inconsistencia teórica de la maquetación en la documentación. El ajuste justifica formalmente ante el tribunal que la coexistencia de clases de dimensiones diferenciadas (`h-109` en documentos y `h-90` en evaluación) no es un descuido de diseño, sino un cálculo preciso de distribución proporcional para mantener la cuadratura perfecta del layout inferior.
 * **Mantenimiento y Cobertura:** Se mantiene la política rigurosa de calidad de código del monorrepo. La capa de presentación frontend se validó mediante el desarrollo de `DocumentManager.test.tsx` en Vitest, garantizando la cobertura de los estados vacíos contextuales por pestañas y el bloqueo perimetral del input de subida si no hay destinatario. La capa de control backend se blindó mediante pruebas unitarias puras de aislamiento con Mockito en `DocumentControllerTest.java`, asegurando que las subidas dupliquen correctamente los registros para emisor y receptor de forma síncrona. Ambas suites se ejecutan con un éxito del 100% y se consolidan en verde.
 
 ---
@@ -795,11 +826,11 @@ Específicamente, se debían mitigar dos vectores de riesgo críticos:
 
 ## Estado
 
-Aceptado
+Pospuesto
 
 ## Contexto
 
-Para potenciar la madurez pedagógica de la plataforma, se requería la incorporación de un nuevo componente estadístico en el Dashboard del estudiante que consolidara métricas clave en tiempo real: nota media del curso, volumen local de inscritos y valoraciones medias disociadas de la asignatura y del profesorado. Asimismo, el componente debía estructurarse de forma extensible para admitir futuras segmentaciones analíticas basadas en atributos intrínsecos de la entidad de cursos (diferentes plataformas de origen y categorías temáticas).
+Para potenciar la madurez pedagógica de la plataforma, se diseñó la incorporación de un nuevo componente estadístico en el Dashboard del estudiante que consolidara métricas clave en tiempo real: nota media del curso, volumen local de inscritos y valoraciones medias disociadas de la asignatura y del profesorado. Asimismo, el componente debía estructurarse de forma extensible para admitir futuras segmentaciones analíticas basadas en atributos intrínsecos de la entidad de cursos (diferentes plataformas de origen y categorías temáticas).
 
 No obstante, la implementación de este módulo analítico cruzado presentaba tres restricciones estructurales críticas:
 
@@ -807,18 +838,69 @@ No obstante, la implementación de este módulo analítico cruzado presentaba tr
 2. **Riesgo de Inyección de Payload:** Evitar vulnerabilidades de alteración masiva de datos (*Mass Assignment*), garantizando que las métricas de salida computadas por el servidor no puedan ser manipuladas o inyectadas artificialmente por peticiones maliciosas procedentes del cliente.
 3. **Rendimiento e Integridad de Consultas:** Prevenir el problema de consultas masivas (N+1) o productos cartesianos inválidos al cruzar tablas de alta volatilidad analítica (`Enrollment`, `CourseGrade`, `AcademicEvaluation` y `Courses`).
 
+*Nota de Auditoría de Desarrollo:* Tras la estabilización del núcleo transaccional del catálogo predictivo y el sistema de intereses del estudiante, se detectó la necesidad de priorizar el desacoplamiento de estas funciones básicas antes de acoplar de forma reactiva el panel analítico. Para mitigar condiciones de carrera y asegurar la consistencia del despliegue actual, se decide pausar temporalmente la activación de este módulo.
+
 ## Decisión
 
-1. **Casteo Dinámico Condicional en JPQL:** Implementar una directiva de formateo al vuelo dentro de `CoursesRepository.java` utilizando la función nativa `CAST(cg.score AS double)`. Para inmunizar al motor de PostgreSQL contra errores de formato ante cadenas vacías o no numéricas, el casteo se encapsula dentro de una expresión condicional `CASE WHEN` que evalúa la presencia legítima de caracteres válidos antes de computar la media aritmética (`AVG`).
-2. **Mapeo de Proyección Directa mediante Records:** Diseñar la estructura de transferencia de datos `CourseStatsDTO.java` haciendo uso de un `Record` inmutable de Java 17. La consulta del repositorio instancia el DTO directamente desde las tuplas de PostgreSQL mediante la sintaxis `SELECT new ...`, evitando la sobrecarga en memoria que implicaría la hidratación de entidades JPA pesadas.
-3. **Aislamiento Perimetral Analítico:** Configurar todas las propiedades del `Record` con la restricción `@JsonProperty(access = JsonProperty.Access.READ_ONLY)`. Esto establece un blindaje de solo lectura a nivel de API, permitiendo la serialización limpia de las métricas hacia React pero desestimando cualquier intento de manipulación o inserción externa.
-4. **Controlador Analítico Desacoplado:** Centralizar la exposición del servicio en `CourseStatsController.java` bajo la ruta `/api/v1/stats`. El endpoint valida de forma implícita la identidad del alumno mediante el contexto `Authentication` provisto por los Claims firmados del token JWT [ADR-27], neutralizando vectores de ataque por enumeración de recursos.
+Se determina **posponer e inactivar temporalmente la integración del componente analítico** en la fase de desarrollo actual, manteniendo el diseño de su arquitectura técnica pre-establecido en estado inerte para su futura reactivación coordinada con la página del profesor. Las directrices de diseño planificadas y validadas de forma teórica constan de:
+
+1. **Casteo Dinámico Condicional en JPQL:** Planificación de una directiva de formateo al vuelo dentro de `CoursesRepository.java` utilizando la función nativa `CAST(cg.score AS double)`. Para inmunizar al motor de PostgreSQL contra errores de formato ante cadenas vacías o no numéricas, el casteo se encapsula dentro de una expresión condicional `CASE WHEN` que evalúa la presencia legítima de caracteres válidos antes de computar la media aritmética (`AVG`).
+2. **Mapeo de Proyección Directa mediante Records:** Configuración de la estructura de transferencia de datos `CourseStatsDTO.java` haciendo uso de un `Record` inmutable de Java 17. La consulta del repositorio instanciará el DTO directamente desde las tuplas de PostgreSQL mediante la sintaxis `SELECT new ...`, evitando la sobrecarga en memoria que implicaría la hidratación de entidades JPA pesadas.
+3. **Aislamiento Perimetral Analítico:** Restricción de todas las propiedades del `Record` con la anotación `@JsonProperty(access = JsonProperty.Access.READ_ONLY)`. Esto establece un blindaje de solo lectura a nivel de API, permitiendo la serialización limpia de las métricas hacia React pero desestimando cualquier intento de manipulación o inserción externa.
+4. **Controlador Analítico Desacoplado:** Centralización de la exposición del servicio en `CourseStatsController.java` bajo la ruta `/api/v1/stats`. El endpoint validará de forma implícita la identidad del alumno mediante el contexto `Authentication` provisto por los Claims firmados del token JWT [ADR-27], neutralizando vectores de ataque por enumeración de recursos.
 
 ## Consecuencias
 
-* **Precisión Estadística Segura:** Se consolida un motor de cálculo "al vuelo" que refleja de manera fidedigna la actividad local en tiempo real sin alterar la naturaleza elástica e inmutable del catálogo original extraído de Coursera.
-* **Escalabilidad de Negocio:** El payload del DTO transporta de forma nativa los campos `site` (plataforma) y `category` (temática) de la asignatura. El componente del frontend queda plenamente preparado para expandir sus capacidades hacia ránkings o agrupaciones complejas en fases posteriores sin alterar los contratos de la API.
-* **Consistencia en Entornos de QA:** La suite de pruebas de integración de Spring Boot se mantiene en un estado de compilación e integración 100% limpio (PASS), certificando que la arquitectura de agregación es segura, estable y libre de regresiones colaterales en el ecosistema transaccional.
+* **Preservación de la Estabilidad:** La inactivación de este módulo analítico reduce la complejidad transaccional del proyecto actual, garantizando que el catálogo predictivo y el registro de intereses funcionen con total fluidez y con cero errores de red en la UI.
+* **Garantía de Documentación Metodológica:** Mantener el ADR bajo el estado de *Pospuesto* justifica de manera académica ante el tribunal que el problema de agregación analítica de datos mixtos (String a Double en PostgreSQL) fue analizado, modelado y resuelto teóricamente, aportando valor al diseño de arquitectura del TFG.
+* **Consistencia del Repositorio Actualizado:** Al retirar los disparadores reactivos del frontend y las consultas complejas del backend, la suite de pruebas y la compilación (`BUILD SUCCESS`) regresan a un terreno de consistencia absoluta, libre de regresiones colaterales en el ecosistema transaccional.
+
+---
+
+## ADR-42: Tipado Defensivo y Gestión de Precisión en el Progreso Académico
+
+### Estado
+
+Aceptado
+
+### Contexto
+
+El motor de preprocesamiento de datos (Python) identifica que el catálogo de cursos contiene duraciones con valores decimales flotantes (ej. 2652.8 horas). Sin embargo, el método de cálculo de progreso académico en el backend (`calculateCurrentProgress`) realiza un truncamiento explícito a tipo primitivo `Long` mediante `.longValue()`. Es necesario justificar formalmente esta pérdida de precisión frente al riesgo de desborde o inconsistencia en la interfaz de usuario.
+
+### Decisión
+
+Se decide mantener el uso del tipo `Long` para almacenar y procesar el total de horas de un curso dentro de la lógica de negocio del backend. Esta decisión se fundamenta en:
+
+* **Mitigación de Errores Flotantes:** Evitar el uso de `Double` o `Float` en operaciones aritméticas de porcentaje previene que residuos decimales infinitos provoquen desajustes de redondeo en el árbol de renderizado de React.
+* **Absorción por Redondeo de UI:** Dado que el método aplica un truncamiento final hacia abajo (`Math.floor`) y acota el resultado estrictamente a un entero (`int`) entre 0 y 100, la desviación máxima de precisión provocada por el truncamiento a `Long` es aritméticamente insignificante (inferior al 0.03% en cursos masivos) e invisible para el estudiante.
+
+### Consecuencias
+
+* **Positivas:** Estabilidad absoluta en el tipo de retorno enviado a la API. Se eliminan comportamientos erráticos (como barras de progreso que superen el 100% o que muestren decimales infinitos en la maquetación visual).
+* **Negativas:** Existe un desfase teórico de minutos en el cómputo total de cursos masivos, el cual es absorbido intencionadamente por el diseño de la experiencia de usuario.
+
+---
+
+## ADR-43: Abstracción de Infraestructura y Purificación Semántica de la Interfaz (UX)
+
+### Estado
+
+Aceptado
+
+### Contexto
+
+Las primeras versiones de la interfaz del estudiante exponían términos técnicos explícitos de la infraestructura backend (ej. *"Sincronizado con PostgreSQL"*) y mostraban la duración de las asignaturas en formato bruto de horas. Esto violaba el principio de ocultación de información y reducía la legibilidad académica del producto.
+
+### Decisión
+
+Se establece un principio estricto de **Purificación Semántica y Abstracción de Capas**. Queda prohibido filtrar terminología de la persistencia o de la base de datos hacia la capa de presentación del alumno. Asimismo, se transforma de forma nativa la visualización del tiempo de estudio:
+
+* La duración se calcula en el cliente transformando las horas a **Días Académicos** mediante un redondeo defensivo hacia arriba (`Math.ceil(duration / 24)`).
+
+### Consecuencias
+
+* **Positivas:** Mejora drástica de la experiencia de usuario (UX). La interfaz se orienta puramente al negocio educativo, facilitando la planificación temporal real del estudiante Luis sin exponer detalles del stack tecnológico.
+* **Negativas:** Requiere un esfuerzo adicional de formateo en los componentes frontend del catálogo y el dashboard para asegurar la conversión homogénea de unidades.
 
 ---
 

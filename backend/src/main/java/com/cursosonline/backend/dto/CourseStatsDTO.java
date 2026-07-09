@@ -8,14 +8,17 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * salida.
  */
 public record CourseStatsDTO(
-        @JsonProperty(access = JsonProperty.Access.READ_ONLY) Long courseId,
-        @JsonProperty(access = JsonProperty.Access.READ_ONLY) Double averageGrade, // AVG de course_grades (casteado)
-        @JsonProperty(access = JsonProperty.Access.READ_ONLY) Long localEnrollments, // COUNT de alumnos inscritos
-        @JsonProperty(access = JsonProperty.Access.READ_ONLY) Double communityRating, // AVG de course_score en
-                                                                                      // evaluaciones
-        @JsonProperty(access = JsonProperty.Access.READ_ONLY) Double instructorRating, // AVG de instructor_score en
-                                                                                       // evaluaciones
-        @JsonProperty(access = JsonProperty.Access.READ_ONLY) String platform, // Mapeado desde Courses.site
-        @JsonProperty(access = JsonProperty.Access.READ_ONLY) String category // Mapeado desde Courses.category
+                @JsonProperty(access = JsonProperty.Access.READ_ONLY) Long courseId,
+                @JsonProperty(access = JsonProperty.Access.READ_ONLY) Double averageGrade, // AVG de course_grades
+                                                                                           // (casteado)
+                @JsonProperty(access = JsonProperty.Access.READ_ONLY) Long localEnrollments, // COUNT de alumnos
+                                                                                             // inscritos
+                @JsonProperty(access = JsonProperty.Access.READ_ONLY) Double communityRating, // AVG de course_score en
+                                                                                              // // evaluaciones
+                @JsonProperty(access = JsonProperty.Access.READ_ONLY) Double instructorRating, // AVG de
+                                                                                               // instructor_score en //
+                                                                                               // evaluaciones
+                @JsonProperty(access = JsonProperty.Access.READ_ONLY) String platform, // Mapeado desde Courses.site
+                @JsonProperty(access = JsonProperty.Access.READ_ONLY) String category // Mapeado desde Courses.category
 ) {
 }

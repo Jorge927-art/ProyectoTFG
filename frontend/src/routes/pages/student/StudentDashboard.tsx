@@ -16,6 +16,8 @@ import { useSmartRecommendations } from './components/useSmartRecommendations';
 import type { DBModelCourse } from '../../../services/courseTypes';
 import { DocumentManager } from './components/DocumentManager';
 import { EvaluationPanel } from './components/EvaluationPanel';
+import { StudentStatsPanel } from './components/StudentStatsPanel';
+
 
 
 const StudentDashboard = () => {
@@ -63,6 +65,8 @@ const StudentDashboard = () => {
         setSuccessMessage("¡Intereses guardados y actualizados correctamente!");
         setTimeout(() => setSuccessMessage(''), 5000);
     };
+    // Extrae el ID del primer curso activo para alimentar el panel estadístico de forma reactiva
+    const activeCourseId = enrolledList && enrolledList.length > 0 ? enrolledList[0].course?.course_id : null;
 
     return (
         <DashboardLayout>
@@ -150,10 +154,14 @@ const StudentDashboard = () => {
                             />
                         </div>
 
+                        {/* PANEL ANALÍTICO ESTADÍSTICO REACTIVO COMPENSADO [ADR-41] */}
+                        <StudentStatsPanel activeCourseId={activeCourseId} />
+
                         {/* Tarjeta de la Evaluación Académica Dual */}
                         <div className="bg-white border rounded-2xl p-6 shadow-sm">
                             <EvaluationPanel />
                         </div>
+
                     </div>
 
                 </div> {/* Cierre correcto del div grid principal */}

@@ -33,8 +33,25 @@ export interface EnrollmentInfo {
     grades?: CourseGradeInfo[];
 }
 
+/**
+ * Modelo estándar que representa la calificación de un curso.
+ */
 export interface CourseGradeInfo {
     title: string; // Ej: "Examen Parcial", "Trabajo Fin de Curso"
     score: string; // Ej: "8.5", "10"
+}
+
+/**
+ * Modelo analítico para las métricas consolidadas de un curso [ADR-41].
+ * Transporta los promedios numéricos calculados dinámicamente en PostgreSQL.
+ */
+export interface CourseStatsInfo {
+    courseId: number;
+    averageGrade: number | null;
+    localEnrollments: number;
+    communityRating: number | null;
+    instructorRating: number | null;
+    platform: string;
+    category: string;
 }
 

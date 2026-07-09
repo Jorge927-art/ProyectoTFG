@@ -5,7 +5,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import java.util.Optional;
 
 public interface CoursesRepository extends JpaRepository<Courses, Long> {
 
@@ -27,26 +26,25 @@ public interface CoursesRepository extends JpaRepository<Courses, Long> {
 
         /**
          * Consulta analítica de agregación para el panel estadístico [ADR-41].
-         * Cruza el catálogo con las métricas locales de matrículas y calificaciones.
-         * Utiliza CAST para transformar de forma segura el score (String) a double
-         * precisión en PostgreSQL.
+         * Cruza el catálogo con las métricas locales de matrículas, notas y
+         * valoraciones.
+         * Sincronizado estrictamente con course_grades y academic_evaluations en
+         * PostgreSQL.
          */
-        @Query("SELECT new com.cursosonline.backend.dto.CourseStatsDTO(" +
-                        "c.course_id, " +
-                        "AVG(CASE WHEN cg.score IS NOT NULL AND cg.score <> '' THEN CAST(cg.score AS double) ELSE null END), "
+        @Query(value = "SELECT c.course_id as courseId, " +
+                        "AVG(CASE WHEN cg.score IS NOT NULL AND cg.score <> '' THEN CAST(cg.score AS double precision) ELSE null END) as averageGrade, "
                         +
-                        "COUNT(DISTINCT e.enrollmentid), " +
-                        "AVG(ae.course_score), " +
-                        "AVG(ae.instructor_score), " +
-                        "c.site, " +
-                        "c.category) " +
-                        "FROM Courses c " +
-                        "LEFT JOIN Enrollment e ON e.course.course_id = c.course_id " +
-                        "LEFT JOIN CourseGrade cg ON cg.enrollment.enrollmentid = e.enrollmentid " +
-                        "LEFT JOIN AcademicEvaluation ae ON ae.course.course_id = c.course_id " +
+                        "COUNT(DISTINCT e.enrollmentid) as localEnrollments, " +
+                        "AVG(ae.course_score) as communityRating, " +
+                        "AVG(ae.instructor_score) as instructorRating, " +
+                        "c.site as platform, " +
+                        "c.category as category " +
+                        "FROM courses c " +
+                        "LEFT JOIN enrollment e ON e.course_id = c.course_id " +
+                        "LEFT JOIN course_grades cg ON cg.enrollment_id = e.enrollmentid " +
+                        "LEFT JOIN academic_evaluations ae ON ae.course_id = c.course_id " +
                         "WHERE c.course_id = :courseId " +
-                        "GROUP BY c.course_id, c.site, c.category")
-        Optional<com.cursosonline.backend.dto.CourseStatsDTO> getCourseAnalyticalStats(
-                        @Param("courseId") Long courseId);
+                        "GROUP BY c.course_id, c.site, c.category", nativeQuery = true)
+        java.util.Map<String, Object> getCourseAnalyticalStatsNative(@Param("courseId") Long courseId);
 
 }
