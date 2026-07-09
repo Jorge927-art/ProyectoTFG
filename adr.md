@@ -904,6 +904,35 @@ Se establece un principio estricto de **Purificación Semántica y Abstracción 
 
 ---
 
+## [ADR-44] Arquitectura de Agregación Analítica Disociada y Micro-indicadores
+
+**Fecha:** Julio 2026  
+**Estatus:** Aceptado  
+
+### Contexto
+
+Se requiere proyectar métricas en tiempo real que combinen el catálogo base de cursos externos (origen, especialidad) con la analítica dinámica de los usuarios en la plataforma local (inscripciones, notas, valoraciones de docentes).
+
+Los principales desafíos son:
+
+1. **Heterogeneidad de Datos:** Coexistencia de metadatos estáticos de plataformas externas con agregaciones SQL numéricas mutables ejecutadas en PostgreSQL.
+2. **Eficiencia y Carga de Memoria:** Riesgo de saturar el motor de base de datos con consultas costosas de agregación sobre entidades pesadas JPA.
+3. **Manejo de Nulidad Pedagógica:** Gestión defensiva en la UI para representar asignaturas sin actividad o registros iniciales sin desconfigurar la maquetación.
+
+### Decisión
+
+1. **Agregación en Proyección (Spring Boot):** Utilizar consultas nativas o JPQL en el repositorio que mapeen los resultados agregados (`COUNT`, `AVG`) directamente hacia un `CourseStatsDTO`, evitando instanciar entidades completas en memoria.
+2. **Casteo Condicional y Coalesce:** Implementar lógica de control en el backend para gestionar la nulidad pedagógica (ej. retornar `---` en lugar de `NaN` o `0` cuando no existan calificaciones registradas).
+3. **UI de Doble Dimensión Sincronizada (React + Tailwind):** Descartar la unificación masiva de datos en una sola cuadrícula. En su lugar, el componente `StudentStatsPanel` encapsula un contenedor unificado de altura controlada (`GenericCard`) subdividido en dos sub-cajas verticales totalmente independientes:
+   * **Caja A ("Métricas de tu Campus"):** Dedicada a los datos dinámicos locales (Comunidad, Nota Media, Rating de Curso y Rating Docente).
+   * **Caja B ("Ficha Técnica del Curso"):** Dedicada a los metadatos de integración del catálogo base (Origen Remoto y Especialidad).
+4. **Resiliencia Visual:** Ambas sub-cajas operan con scrolling vertical inteligente (`overflow-y-auto`). Esto garantiza que la interfaz mantenga su simetría física actual intacta y permanezca libre de barras de scroll espurias, pero responda de forma adaptativa y automática si la entidad `Course` incrementa sus atributos en el futuro.
+
+### Consecuencias
+
+* **Positivas:** Reducción drástica del overhead de red, renderizado reactivo sin basura visual, interfaz de usuario desacoplada y preparada para futuras extensiones del catálogo sin comprometer la consistencia geométrica del Dashboard.
+* **Negativas:** Obliga a mantener una estricta correspondencia entre las alturas relativas de las sub-cajas dentro del contenedor padre para evitar solapamientos visuales.
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026

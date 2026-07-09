@@ -50,6 +50,5 @@ public class CourseStatsController {
                     "error", "Excepción interna al procesar las agregaciones estadísticas",
                     "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
         }
-
     }
 }
