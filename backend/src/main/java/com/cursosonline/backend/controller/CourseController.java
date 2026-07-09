@@ -31,7 +31,7 @@ public class CourseController {
      */
     @GetMapping("/search")
     public ResponseEntity<List<Courses>> searchCatalog(
-            @RequestParam(required = false, defaultValue = "") String keyword) {
+            @RequestParam(name = "keyword", required = false, defaultValue = "") String keyword) {
         return ResponseEntity.ok(userService.searchCourses(keyword));
     }
 

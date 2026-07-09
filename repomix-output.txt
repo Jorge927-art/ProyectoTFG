@@ -62,12 +62,14 @@ backend/src/main/java/com/cursosonline/backend/config/SecurityConfig.java
 backend/src/main/java/com/cursosonline/backend/config/WebConfig.java
 backend/src/main/java/com/cursosonline/backend/controller/AcademicEvaluationController.java
 backend/src/main/java/com/cursosonline/backend/controller/CourseController.java
+backend/src/main/java/com/cursosonline/backend/controller/CourseStatsController.java
 backend/src/main/java/com/cursosonline/backend/controller/DocumentController.java
 backend/src/main/java/com/cursosonline/backend/controller/ProfileController.java
 backend/src/main/java/com/cursosonline/backend/controller/TestController.java
 backend/src/main/java/com/cursosonline/backend/controller/UserController.java
 backend/src/main/java/com/cursosonline/backend/dto/AuthResponse.java
 backend/src/main/java/com/cursosonline/backend/dto/AuthTokenResponse.java
+backend/src/main/java/com/cursosonline/backend/dto/CourseStatsDTO.java
 backend/src/main/java/com/cursosonline/backend/dto/InterestDTO.java
 backend/src/main/java/com/cursosonline/backend/dto/LoginRequest.java
 backend/src/main/java/com/cursosonline/backend/dto/ProfileResponseDTO.java
@@ -108,6 +110,7 @@ backend/src/main/resources/application-prod.properties
 backend/src/main/resources/application.properties
 backend/src/test/java/com/cursosonline/backend/BackendApplicationTests.java
 backend/src/test/java/com/cursosonline/backend/controller/AcademicEvaluationControllerTest.java
+backend/src/test/java/com/cursosonline/backend/controller/CourseStatsControllerTest.java
 backend/src/test/java/com/cursosonline/backend/controller/DocumentControllerTest.java
 backend/src/test/java/com/cursosonline/backend/controller/UserControllerTest.java
 backend/src/test/java/com/cursosonline/backend/FileStorageServiceTest.java
@@ -768,45 +771,6 @@ try {
 Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/entities/CourseGrade.java
-================
-package com.cursosonline.backend.entities; // <- AJUSTADO A TU PAQUETE REAL
-
-import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-
-/**
- * Entidad relacional para la persistencia de calificaciones académicas
- * [ADR-39].
- * Se vincula mediante una relación de muchos a uno con la matrícula
- * (Enrollment) del alumno.
- */
-@Entity
-@Table(name = "course_grades")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class CourseGrade {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "grade_id")
-    private Long gradeId;
-
-    @Column(name = "title", nullable = false)
-    private String title; // Ej: "Examen Parcial", "Trabajo Fin de Curso"
-
-    @Column(name = "score", nullable = false)
-    private String score; // Ej: "8.5", "10"
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "enrollment_id", nullable = false)
-    private Enrollment enrollment; // Vinculación física con la matrícula del alumno
-}
-
-================
 File: frontend/eslint.config.js
 ================
 import js from '@eslint/js'
@@ -832,6 +796,51 @@ export default defineConfig([
     },
   },
 ])
+
+================
+File: frontend/index.html
+================
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/sombrero-de-graduacion.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cursos OnLine Educativos</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
+================
+File: frontend/public/sombrero-de-graduacion.svg
+================
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="512.000000pt" height="512.000000pt" viewBox="0 0 512.000000 512.000000"
+ preserveAspectRatio="xMidYMid meet">
+
+<g transform="translate(0.000000,512.000000) scale(0.100000,-0.100000)"
+fill="#000000" stroke="none">
+<path d="M1283 4236 c-700 -281 -1273 -513 -1273 -516 0 -8 2533 -1020 2552
+-1020 9 0 445 172 970 381 524 210 961 384 971 386 16 5 17 -33 17 -708 l0
+-714 -58 -30 c-117 -60 -207 -181 -232 -313 -36 -183 56 -378 226 -478 18 -11
+13 -29 -100 -370 -65 -197 -119 -364 -120 -372 -1 -10 40 -29 129 -58 71 -24
+134 -44 140 -44 6 0 44 101 85 225 41 124 77 225 80 225 3 0 39 -101 80 -225
+41 -124 79 -225 85 -225 6 0 69 20 140 44 89 29 130 48 129 58 -1 8 -55 175
+-120 372 -113 341 -118 359 -100 370 170 100 262 295 226 478 -25 132 -115
+253 -232 313 l-58 30 0 776 0 776 145 59 c80 33 145 61 145 64 0 4 -2528 1022
+-2549 1026 -3 1 -579 -228 -1278 -510z"/>
+<path d="M1210 2697 c0 -119 5 -240 11 -269 26 -126 119 -262 248 -360 89 -68
+302 -170 431 -206 235 -67 381 -86 660 -86 279 0 425 19 660 86 129 36 342
+138 431 206 129 98 222 234 248 360 16 78 15 486 -1 479 -7 -2 -311 -125 -675
+-271 l-663 -267 -662 267 c-365 146 -669 269 -675 271 -10 4 -13 -42 -13 -210z"/>
+</g>
+</svg>
 
 ================
 File: frontend/README.md
@@ -2368,6 +2377,11 @@ File: frontend/src/index.css
 @import "tailwindcss";
 
 ================
+File: frontend/src/setupTests.tsx
+================
+import '@testing-library/jest-dom';
+
+================
 File: backend/.env.example
 ================
 # ======================================================
@@ -2713,147 +2727,52 @@ public class WebConfig implements WebMvcConfigurer {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/controller/AcademicEvaluationController.java
+File: backend/src/main/java/com/cursosonline/backend/controller/CourseStatsController.java
 ================
 package com.cursosonline.backend.controller;
 
-import com.cursosonline.backend.entities.AcademicEvaluation;
-import com.cursosonline.backend.entities.Enrollment;
-import com.cursosonline.backend.entities.Courses;
-import com.cursosonline.backend.entities.Users;
-import com.cursosonline.backend.repository.AcademicEvaluationRepository;
-import com.cursosonline.backend.repository.EnrollmentRepository;
-import com.cursosonline.backend.repository.UserRepository;
+import com.cursosonline.backend.dto.CourseStatsDTO;
 import com.cursosonline.backend.repository.CoursesRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1/evaluations")
-@Transactional
-public class AcademicEvaluationController {
+@RequestMapping("/api/v1/stats")
+public class CourseStatsController {
 
-    private final EnrollmentRepository enrollmentRepository;
-    private final AcademicEvaluationRepository academicEvaluationRepository;
-    private final UserRepository userRepository;
     private final CoursesRepository coursesRepository;
 
-    public AcademicEvaluationController(EnrollmentRepository enrollmentRepository,
-            AcademicEvaluationRepository academicEvaluationRepository,
-            UserRepository userRepository,
-            CoursesRepository coursesRepository) {
-        this.enrollmentRepository = enrollmentRepository;
-        this.academicEvaluationRepository = academicEvaluationRepository;
-        this.userRepository = userRepository;
+    public CourseStatsController(CoursesRepository coursesRepository) {
         this.coursesRepository = coursesRepository;
     }
 
     /**
-     * [ENDPOINT FILTRADO DOCENTE]: Obtiene las asignaturas y profesores que el
-     * alumno
-     * cursa activamente y que se encuentran pendientes de recibir calificación.
+     * Endpoint analítico para obtener las estadísticas consolidadas de un curso
+     * [ADR-41].
+     * Valida de forma implícita la sesión mediante el token JWT y responde con el
+     * DTO inmutable.
      */
-    @GetMapping("/pending")
-    public ResponseEntity<?> getPendingEvaluations(Authentication authentication) {
+    @GetMapping("/course/{courseId}")
+    public ResponseEntity<?> getCourseStatistics(@PathVariable Long courseId, Authentication authentication) {
         try {
             if (authentication == null || !authentication.isAuthenticated()) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "No autenticado o sesión inválida."));
+                        .body(Map.of("error", "Sesión inválida o token JWT ausente."));
             }
 
-            String username = authentication.getName();
-            List<Enrollment> pending = enrollmentRepository.findPendingEvaluationsByUsername(username);
-
-            return ResponseEntity.ok(pending);
+            // Consume la consulta analítica segura con pies de plomo desde PostgreSQL
+            return coursesRepository.getCourseAnalyticalStats(courseId)
+                    .map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body((CourseStatsDTO) null)); // Retorna 404 limpio si el ID de curso no existe
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                    "error", "Error interno al recuperar asignaturas pendientes de evaluación",
-                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
-        }
-    }
-
-    /**
-     * [ENDPOINT CARGA PUNTUACIONES]: Valida las precondiciones de seguridad y
-     * almacena el voto granular de estrellas y comentarios en PostgreSQL.
-     */
-    @PostMapping("/submit")
-    public ResponseEntity<?> submitEvaluation(
-            Authentication authentication,
-            @RequestBody Map<String, Object> payload) {
-
-        try {
-            if (authentication == null || !authentication.isAuthenticated()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "No autenticado o sesión inválida."));
-            }
-
-            // 1. Extracción y parseo seguro del payload entrante
-            Long courseId = Long.valueOf(payload.get("course_id").toString());
-            Integer courseScore = Integer.valueOf(payload.get("course_score").toString());
-            Integer instructorScore = Integer.valueOf(payload.get("instructor_score").toString());
-            String courseComment = payload.get("course_comment") != null ? payload.get("course_comment").toString()
-                    : null;
-            String instructorComment = payload.get("instructor_comment") != null
-                    ? payload.get("instructor_comment").toString()
-                    : null;
-
-            // Rango de estrellas aceptado (1 a 5)
-            if (courseScore < 1 || courseScore > 5 || instructorScore < 1 || instructorScore > 5) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "Las puntuaciones deben estar confinadas entre 1 y 5 estrellas."));
-            }
-
-            String username = authentication.getName();
-
-            // 2. [BLINDAJE PERIMETRAL JWT]: Validar que el alumno esté legítimamente
-            // matriculado
-            boolean isEnrolled = enrollmentRepository.existsByUsernameAndCourseId(username, courseId);
-            if (!isEnrolled) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("error",
-                                "Acceso denegado: No puedes evaluar una asignatura en la que no estás matriculado."));
-            }
-
-            // 3. [CONTROL ANTE DUPLICADOS]: Validar que no exista un voto previo
-            boolean alreadyEvaluated = academicEvaluationRepository.existsByUserUsernameAndCourseCourseId(username,
-                    courseId);
-            if (alreadyEvaluated) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "Ya has emitido una calificación para esta asignatura."));
-            }
-
-            // 4. Recuperación de entidades y persistencia
-            Users currentUser = userRepository.findByUsername(username)
-                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado en el sistema."));
-
-            Courses currentCourse = coursesRepository.findById(courseId)
-                    .orElseThrow(() -> new RuntimeException("Asignatura no encontrada en el catálogo."));
-
-            AcademicEvaluation evaluation = new AcademicEvaluation();
-            evaluation.setCourse_score(courseScore);
-            evaluation.setCourseComment(courseComment);
-            evaluation.setInstructor_score(instructorScore);
-            evaluation.setInstructorComment(instructorComment);
-            evaluation.setUser(currentUser);
-            evaluation.setCourse(currentCourse);
-
-            academicEvaluationRepository.save(evaluation);
-
-            return ResponseEntity.ok(Map.of("message", "Evaluación académica guardada y procesada correctamente."));
-
-        } catch (IllegalArgumentException | NullPointerException e) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Estructura de datos de evaluación corrupta o incompleta."));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                    "error", "Error crítico al guardar la evaluación en el servidor",
+                    "error", "Excepción interna al procesar las agregaciones estadísticas",
                     "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
         }
     }
@@ -2901,6 +2820,31 @@ public record AuthResponse(Long userId, String username, Role role, String email
     public static AuthResponse from(Users user) {
         return new AuthResponse(user.getUser_id(), user.getUsername(), user.getRole(), user.getEmail());
     }
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/dto/CourseStatsDTO.java
+================
+package com.cursosonline.backend.dto; // Adapta el paquete a tu estructura real
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/**
+ * DTO Analítico Inmutable para el Componente Estadístico del Alumno [ADR-41].
+ * Transporta las agregaciones calculadas en PostgreSQL protegiendo el flujo de
+ * salida.
+ */
+public record CourseStatsDTO(
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY) Long courseId,
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY) Double averageGrade, // AVG de course_grades (casteado)
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY) Long localEnrollments, // COUNT de alumnos inscritos
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY) Double communityRating, // AVG de course_score en
+                                                                                      // evaluaciones
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY) Double instructorRating, // AVG de instructor_score en
+                                                                                       // evaluaciones
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY) String platform, // Mapeado desde Courses.site
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY) String category // Mapeado desde Courses.category
+) {
 }
 
 ================
@@ -3040,6 +2984,45 @@ public class AcademicEvaluation {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id", nullable = false)
     private Courses course; // El curso asociado (sirve como ancla y contiene el String de instructores)
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/entities/CourseGrade.java
+================
+package com.cursosonline.backend.entities; // <- AJUSTADO A TU PAQUETE REAL
+
+import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
+/**
+ * Entidad relacional para la persistencia de calificaciones académicas
+ * [ADR-39].
+ * Se vincula mediante una relación de muchos a uno con la matrícula
+ * (Enrollment) del alumno.
+ */
+@Entity
+@Table(name = "course_grades")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class CourseGrade {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "grade_id")
+    private Long gradeId;
+
+    @Column(name = "title", nullable = false)
+    private String title; // Ej: "Examen Parcial", "Trabajo Fin de Curso"
+
+    @Column(name = "score", nullable = false)
+    private String score; // Ej: "8.5", "10"
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "enrollment_id", nullable = false)
+    private Enrollment enrollment; // Vinculación física con la matrícula del alumno
 }
 
 ================
@@ -3197,6 +3180,87 @@ package com.cursosonline.backend.entities;
  */
 public enum Role {
     ADMIN, PROFESSOR, STUDENT
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/exception/ErrorResponse.java
+================
+package com.cursosonline.backend.exception;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.util.Map;
+
+@Data // Genera getters, setters, toString, etc. automáticamente
+@AllArgsConstructor
+@NoArgsConstructor
+
+/**
+ * Clase que representa la estructura de la respuesta de error para las
+ * excepciones
+ * personalizadas. Contiene el código de estado HTTP, un mensaje descriptivo, un
+ */
+public class ErrorResponse {
+    private int status;
+    private String message;
+    private long timestamp;
+    private Map<String, String> errors;
+
+    /**
+     * Constructor para crear una instancia de ErrorResponse sin errores de
+     * validación.
+     * 
+     * @param status
+     * @param message
+     * @param timestamp
+     */
+    public ErrorResponse(int status, String message, long timestamp) {
+        this.status = status;
+        this.message = message;
+        this.timestamp = timestamp;
+        this.errors = null;
+    }
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/exception/ServicesException.java
+================
+package com.cursosonline.backend.exception;
+
+/**
+ * Excepción personalizada para errores relacionados con los servicios de la
+ * aplicación. Se utiliza para encapsular errores específicos que pueden ocurrir
+ * durante la ejecución de las operaciones de negocio, como problemas de
+ * autenticación, validación o cualquier otro error que no encaje en las
+ * categorías de excepciones más específicas.
+ * Al extender RuntimeException, esta excepción es una excepción no verificada,
+ * lo que significa que no es obligatorio capturarla o declararla en la firma de
+ * los métodos, permitiendo una mayor flexibilidad en su manejo.
+ */
+public class ServicesException extends RuntimeException {
+    public ServicesException(String message) {
+        super(message);
+    }
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/exception/UserAlreadyExistsException.java
+================
+package com.cursosonline.backend.exception;
+
+/**
+ * Excepción personalizada que se lanza cuando se intenta registrar un usuario
+ * con un nombre de usuario que ya existe en el sistema. Extiende de
+ * ServicesException para
+ * mantener una jerarquía de excepciones coherente en la capa de servicios. El
+ * mensaje de error incluye el nombre de usuario que causó el conflicto para
+ * facilitar la depuración y la comunicación con el frontend.
+ */
+public class UserAlreadyExistsException extends ServicesException {
+    public UserAlreadyExistsException(String username) {
+        super("El usuario " + username + " ya existe en el sistema.");
+    }
 }
 
 ================
@@ -3594,6 +3658,90 @@ public class AcademicEvaluationControllerTest {
         assertEquals("Ya has emitido una calificación para esta asignatura.", bodyMap.get("error"));
 
         Mockito.verify(academicEvaluationRepository, Mockito.never()).save(any(AcademicEvaluation.class));
+    }
+}
+
+================
+File: backend/src/test/java/com/cursosonline/backend/controller/CourseStatsControllerTest.java
+================
+package com.cursosonline.backend.controller;
+
+import com.cursosonline.backend.dto.CourseStatsDTO;
+import com.cursosonline.backend.repository.CoursesRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.util.Collections;
+import java.util.Optional;
+
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@ExtendWith(MockitoExtension.class)
+class CourseStatsControllerTest {
+
+    private MockMvc mockMvc;
+
+    @Mock
+    private CoursesRepository coursesRepository;
+
+    @InjectMocks
+    private CourseStatsController courseStatsController;
+
+    private UsernamePasswordAuthenticationToken mockPrincipal;
+
+    @BeforeEach
+    void setUp() {
+        // Inicializamos MockMvc en modo Standalone (compila en cualquier entorno)
+        this.mockMvc = MockMvcBuilders.standaloneSetup(courseStatsController).build();
+
+        // Creamos un token de autenticación simulado idéntico al que inyecta tu filtro
+        // JWT
+        this.mockPrincipal = new UsernamePasswordAuthenticationToken(
+                "Luis",
+                null,
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_STUDENT")));
+    }
+
+    @Test
+    @DisplayName("Debería retornar HTTP 200 y las métricas analíticas cuando se solicitan estadísticas de un curso válido")
+    void shouldReturnStatsWhenCourseExists() throws Exception {
+        // ARRANGE
+        Long targetCourseId = 101L;
+        CourseStatsDTO mockStats = new CourseStatsDTO(
+                targetCourseId,
+                8.75,
+                15L,
+                4.8,
+                4.9,
+                "Coursera",
+                "Data Science");
+
+        when(coursesRepository.getCourseAnalyticalStats(targetCourseId)).thenReturn(Optional.of(mockStats));
+
+        // ACT & ASSERT: Inyectamos explícitamente el principal simulado en la petición
+        // (.principal)
+        mockMvc.perform(get("/api/v1/stats/course/{courseId}", targetCourseId)
+                .principal(mockPrincipal) // <- SOLUCIÓN: Esto evita el error 401 en entornos aislados
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.courseId").value(targetCourseId))
+                .andExpect(jsonPath("$.averageGrade").value(8.75))
+                .andExpect(jsonPath("$.localEnrollments").value(15))
+                .andExpect(jsonPath("$.platform").value("Coursera"))
+                .andExpect(jsonPath("$.category").value("Data Science"));
     }
 }
 
@@ -5762,51 +5910,6 @@ File: frontend/docs/modules/setupTests.html
 <!DOCTYPE html><html class="default" lang="en" data-base="../"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>setupTests | frontend</title><meta name="description" content="Documentation for frontend"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="../assets/style.css"/><link rel="stylesheet" href="../assets/highlight.css"/><script defer src="../assets/main.js"></script><script async src="../assets/icons.js" id="tsd-icons-script"></script><script async src="../assets/search.js" id="tsd-search-script"></script><script async src="../assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><a href="../index.html" class="title">frontend</a><div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/><ul role="listbox" id="tsd-search-results"></ul><div id="tsd-search-status" aria-live="polite" aria-atomic="true"><div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-menu"></use></svg></a></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><ul class="tsd-breadcrumb" aria-label="Breadcrumb"><li><a href="" aria-current="page">setupTests</a></li></ul><h1>Module setupTests</h1></div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div></div><div class="site-menu"><nav class="tsd-navigation"><a href="../modules.html">frontend</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
 
 ================
-File: frontend/index.html
-================
-<!doctype html>
-<html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/sombrero-de-graduacion.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cursos OnLine Educativos</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
-
-================
-File: frontend/public/sombrero-de-graduacion.svg
-================
-<?xml version="1.0" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
- "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
-<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
- width="512.000000pt" height="512.000000pt" viewBox="0 0 512.000000 512.000000"
- preserveAspectRatio="xMidYMid meet">
-
-<g transform="translate(0.000000,512.000000) scale(0.100000,-0.100000)"
-fill="#000000" stroke="none">
-<path d="M1283 4236 c-700 -281 -1273 -513 -1273 -516 0 -8 2533 -1020 2552
--1020 9 0 445 172 970 381 524 210 961 384 971 386 16 5 17 -33 17 -708 l0
--714 -58 -30 c-117 -60 -207 -181 -232 -313 -36 -183 56 -378 226 -478 18 -11
-13 -29 -100 -370 -65 -197 -119 -364 -120 -372 -1 -10 40 -29 129 -58 71 -24
-134 -44 140 -44 6 0 44 101 85 225 41 124 77 225 80 225 3 0 39 -101 80 -225
-41 -124 79 -225 85 -225 6 0 69 20 140 44 89 29 130 48 129 58 -1 8 -55 175
--120 372 -113 341 -118 359 -100 370 170 100 262 295 226 478 -25 132 -115
-253 -232 313 l-58 30 0 776 0 776 145 59 c80 33 145 61 145 64 0 4 -2528 1022
--2549 1026 -3 1 -579 -228 -1278 -510z"/>
-<path d="M1210 2697 c0 -119 5 -240 11 -269 26 -126 119 -262 248 -360 89 -68
-302 -170 431 -206 235 -67 381 -86 660 -86 279 0 425 19 660 86 129 36 342
-138 431 206 129 98 222 234 248 360 16 78 15 486 -1 479 -7 -2 -311 -125 -675
--271 l-663 -267 -662 267 c-365 146 -669 269 -675 271 -10 4 -13 -42 -13 -210z"/>
-</g>
-</svg>
-
-================
 File: frontend/src/auth/useAuth.ts
 ================
 import { useContext } from 'react';
@@ -6387,11 +6490,6 @@ export interface TeacherMetric {
 }
 
 ================
-File: frontend/src/setupTests.tsx
-================
-import '@testing-library/jest-dom';
-
-================
 File: frontend/tsconfig.json
 ================
 {
@@ -6436,6 +6534,31 @@ File: frontend/tsconfig.node.json
   },
   "include": ["vite.config.ts"]
 }
+
+================
+File: frontend/vite.config.ts
+================
+import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+import path from 'path'
+
+export default defineConfig({
+  plugins: [
+    react(),
+    tailwindcss(),
+  ],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/setupTests.tsx',
+  },
+})
 
 ================
 File: tfg-documentacion-tecnica.md
@@ -6615,6 +6738,169 @@ distributionType=only-script
 distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.14/apache-maven-3.9.14-bin.zip
 
 ================
+File: backend/src/main/java/com/cursosonline/backend/controller/AcademicEvaluationController.java
+================
+package com.cursosonline.backend.controller;
+
+import com.cursosonline.backend.entities.AcademicEvaluation;
+import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.repository.AcademicEvaluationRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.UserRepository;
+import com.cursosonline.backend.repository.CoursesRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/v1/evaluations")
+@Transactional
+public class AcademicEvaluationController {
+
+        private final EnrollmentRepository enrollmentRepository;
+        private final AcademicEvaluationRepository academicEvaluationRepository;
+        private final UserRepository userRepository;
+        private final CoursesRepository coursesRepository;
+
+        public AcademicEvaluationController(EnrollmentRepository enrollmentRepository,
+                        AcademicEvaluationRepository academicEvaluationRepository,
+                        UserRepository userRepository,
+                        CoursesRepository coursesRepository) {
+                this.enrollmentRepository = enrollmentRepository;
+                this.academicEvaluationRepository = academicEvaluationRepository;
+                this.userRepository = userRepository;
+                this.coursesRepository = coursesRepository;
+        }
+
+        /**
+         * [ENDPOINT FILTRADO DOCENTE]: Obtiene las asignaturas y profesores que el
+         * alumno
+         * cursa activamente y que se encuentran pendientes de recibir calificación.
+         */
+        @GetMapping("/pending")
+        public ResponseEntity<?> getPendingEvaluations(Authentication authentication) {
+                try {
+                        if (authentication == null || !authentication.isAuthenticated()) {
+                                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                                .body(Map.of("error", "No autenticado o sesión inválida."));
+                        }
+
+                        String username = authentication.getName();
+                        List<Enrollment> pending = enrollmentRepository.findPendingEvaluationsByUsername(username);
+
+                        // Hidratación controlada de la colección grades para evitar el error 500 de
+                        // Jackson [ADR-40]
+                        for (Enrollment enrollment : pending) {
+                                if (enrollment.getGrades() != null) {
+                                        enrollment.getGrades().size(); // Fuerza la carga limpia desde PostgreSQL antes
+                                                                       // de serializar
+                                }
+                        }
+
+                        return ResponseEntity.ok(pending);
+                } catch (Exception e) {
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                                        "error", "Error interno al recuperar asignaturas pendientes de evaluación",
+                                        "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+                }
+        }
+
+        /**
+         * [ENDPOINT CARGA PUNTUACIONES]: Valida las precondiciones de seguridad y
+         * almacena el voto granular de estrellas y comentarios en PostgreSQL.
+         */
+        @PostMapping("/submit")
+        public ResponseEntity<?> submitEvaluation(
+                        Authentication authentication,
+                        @RequestBody Map<String, Object> payload) {
+
+                try {
+                        if (authentication == null || !authentication.isAuthenticated()) {
+                                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                                .body(Map.of("error", "No autenticado o sesión inválida."));
+                        }
+
+                        // 1. Extracción y parseo seguro del payload entrante
+                        Long courseId = Long.valueOf(payload.get("course_id").toString());
+                        Integer courseScore = Integer.valueOf(payload.get("course_score").toString());
+                        Integer instructorScore = Integer.valueOf(payload.get("instructor_score").toString());
+                        String courseComment = payload.get("course_comment") != null
+                                        ? payload.get("course_comment").toString()
+                                        : null;
+                        String instructorComment = payload.get("instructor_comment") != null
+                                        ? payload.get("instructor_comment").toString()
+                                        : null;
+
+                        // Rango de estrellas aceptado (1 a 5)
+                        if (courseScore < 1 || courseScore > 5 || instructorScore < 1 || instructorScore > 5) {
+                                return ResponseEntity.badRequest()
+                                                .body(Map.of("error",
+                                                                "Las puntuaciones deben estar confinadas entre 1 y 5 estrellas."));
+                        }
+
+                        String username = authentication.getName();
+
+                        // 2. [BLINDAJE PERIMETRAL JWT]: Validar que el alumno esté legítimamente
+                        // matriculado
+                        boolean isEnrolled = enrollmentRepository.existsByUsernameAndCourseId(username, courseId);
+                        if (!isEnrolled) {
+                                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                                .body(Map.of("error",
+                                                                "Acceso denegado: No puedes evaluar una asignatura en la que no estás matriculado."));
+                        }
+
+                        // 3. [CONTROL ANTE DUPLICADOS]: Validar que no exista un voto previo
+                        boolean alreadyEvaluated = academicEvaluationRepository.existsByUserUsernameAndCourseCourseId(
+                                        username,
+                                        courseId);
+                        if (alreadyEvaluated) {
+                                return ResponseEntity.badRequest()
+                                                .body(Map.of("error",
+                                                                "Ya has emitido una calificación para esta asignatura."));
+                        }
+
+                        // 4. Recuperación de entidades y persistencia
+                        Users currentUser = userRepository.findByUsername(username)
+                                        .orElseThrow(() -> new RuntimeException(
+                                                        "Usuario no encontrado en el sistema."));
+
+                        Courses currentCourse = coursesRepository.findById(courseId)
+                                        .orElseThrow(() -> new RuntimeException(
+                                                        "Asignatura no encontrada en el catálogo."));
+
+                        AcademicEvaluation evaluation = new AcademicEvaluation();
+                        evaluation.setCourse_score(courseScore);
+                        evaluation.setCourseComment(courseComment);
+                        evaluation.setInstructor_score(instructorScore);
+                        evaluation.setInstructorComment(instructorComment);
+                        evaluation.setUser(currentUser);
+                        evaluation.setCourse(currentCourse);
+
+                        academicEvaluationRepository.save(evaluation);
+
+                        return ResponseEntity.ok(
+                                        Map.of("message", "Evaluación académica guardada y procesada correctamente."));
+
+                } catch (IllegalArgumentException | NullPointerException e) {
+                        return ResponseEntity.badRequest()
+                                        .body(Map.of("error",
+                                                        "Estructura de datos de evaluación corrupta o incompleta."));
+                } catch (Exception e) {
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                                        "error", "Error crítico al guardar la evaluación en el servidor",
+                                        "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+                }
+        }
+}
+
+================
 File: backend/src/main/java/com/cursosonline/backend/dto/AuthTokenResponse.java
 ================
 package com.cursosonline.backend.dto;
@@ -6787,83 +7073,118 @@ public class UserProfile {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/exception/ErrorResponse.java
+File: backend/src/main/java/com/cursosonline/backend/exception/GlobalExceptionHandler.java
 ================
 package com.cursosonline.backend.exception;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import java.util.Map;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@Data // Genera getters, setters, toString, etc. automáticamente
-@AllArgsConstructor
-@NoArgsConstructor
+@RestControllerAdvice
+public class GlobalExceptionHandler {
 
-/**
- * Clase que representa la estructura de la respuesta de error para las
- * excepciones
- * personalizadas. Contiene el código de estado HTTP, un mensaje descriptivo, un
- */
-public class ErrorResponse {
-    private int status;
-    private String message;
-    private long timestamp;
-    private Map<String, String> errors;
+    // Maneja errores específicos de "No encontrado" -> 404
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex) {
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                ex.getMessage(),
+                System.currentTimeMillis());
+        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    }
 
-    /**
-     * Constructor para crear una instancia de ErrorResponse sin errores de
-     * validación.
-     * 
-     * @param status
-     * @param message
-     * @param timestamp
-     */
-    public ErrorResponse(int status, String message, long timestamp) {
-        this.status = status;
-        this.message = message;
-        this.timestamp = timestamp;
-        this.errors = null;
+    // Maneja errores específicos de "Conflicto" -> 409
+    @ExceptionHandler(UserAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(UserAlreadyExistsException ex) {
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                System.currentTimeMillis());
+        return new ResponseEntity<>(error, HttpStatus.CONFLICT);
+    }
+
+    // Maneja errores específicos de "Error de negocio" -> 400
+    @ExceptionHandler(ServicesException.class)
+    public ResponseEntity<ErrorResponse> handleBusinessError(ServicesException ex) {
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                ex.getMessage(),
+                System.currentTimeMillis());
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    // --- NUEVO: Maneja fallos de Autenticación (Contraseña/Usuario incorrecto) ->
+    // 401 ---
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthenticationError(
+            org.springframework.security.core.AuthenticationException ex) {
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.UNAUTHORIZED.value(),
+                "Credenciales de acceso inválidas.", // Mensaje seguro para el login
+                System.currentTimeMillis());
+        return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+    }
+
+    // --- NUEVO: Maneja denegación de permisos (@PreAuthorize) -> 403 ---
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(
+            org.springframework.security.access.AccessDeniedException ex) {
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.FORBIDDEN.value(),
+                "Acceso denegado: No posee los privilegios requeridos para este recurso.",
+                System.currentTimeMillis());
+        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
+    }
+
+    // --- NUEVO: Maneja parámetros mal formados o roles inválidos en el ENUM -> 400
+    // ---
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                ex.getMessage(), // Envía "Rol inválido..." o "El campo role es requerido"
+                System.currentTimeMillis());
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    // Maneja cualquier otra excepción no capturada de forma genérica -> 500
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleGeneralError(Exception ex) {
+        ex.printStackTrace(); // Mantiene tu traza de depuración en la consola del servidor
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "Error interno en el servidor.",
+                System.currentTimeMillis());
+        return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/exception/ServicesException.java
+File: backend/src/main/java/com/cursosonline/backend/exception/ResourceNotFoundException.java
 ================
 package com.cursosonline.backend.exception;
 
 /**
- * Excepción personalizada para errores relacionados con los servicios de la
- * aplicación. Se utiliza para encapsular errores específicos que pueden ocurrir
- * durante la ejecución de las operaciones de negocio, como problemas de
- * autenticación, validación o cualquier otro error que no encaje en las
- * categorías de excepciones más específicas.
- * Al extender RuntimeException, esta excepción es una excepción no verificada,
- * lo que significa que no es obligatorio capturarla o declararla en la firma de
- * los métodos, permitiendo una mayor flexibilidad en su manejo.
+ * Excepción personalizada para indicar que un recurso no fue encontrado en la
+ * base de datos.
+ * Se utiliza para manejar casos donde se intenta acceder a un recurso que no
+ * existe, como un usuario, curso, etc.
+ * Hereda de ServicesException para mantener una jerarquía de excepciones
+ * coherente en la capa de servicios.
  */
-public class ServicesException extends RuntimeException {
-    public ServicesException(String message) {
+public class ResourceNotFoundException extends ServicesException {
+
+    // Constructor original: Se mantiene para búsquedas por ID numérico
+    public ResourceNotFoundException(String resource, Long id) {
+        super(resource + " con ID " + id + " no encontrado.");
+    }
+
+    // Auditoría NotebookLM: Nuevo constructor sobrecargado para permitir
+    // mensajes directos basados en texto (ej. búsquedas por username).
+    public ResourceNotFoundException(String message) {
         super(message);
-    }
-}
-
-================
-File: backend/src/main/java/com/cursosonline/backend/exception/UserAlreadyExistsException.java
-================
-package com.cursosonline.backend.exception;
-
-/**
- * Excepción personalizada que se lanza cuando se intenta registrar un usuario
- * con un nombre de usuario que ya existe en el sistema. Extiende de
- * ServicesException para
- * mantener una jerarquía de excepciones coherente en la capa de servicios. El
- * mensaje de error incluye el nombre de usuario que causó el conflicto para
- * facilitar la depuración y la comunicación con el frontend.
- */
-public class UserAlreadyExistsException extends ServicesException {
-    public UserAlreadyExistsException(String username) {
-        super("El usuario " + username + " ya existe en el sistema.");
     }
 }
 
@@ -8734,218 +9055,6 @@ public class DocumentController {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/entities/Enrollment.java
-================
-package com.cursosonline.backend.entities;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty; // Importación obligatoria para el contrato JSON
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import java.time.LocalDateTime;
-import java.util.List; // Soporte para colecciones relacionales
-
-@Entity
-@Table(name = "enrollment")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class Enrollment {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long enrollmentid;
-
-    @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    private Users user;
-
-    /**
-     * Relación con el curso.
-     * Se fuerza mediante @JsonProperty que la propiedad JSON sea "course" (en
-     * singular)
-     * para asegurar compatibilidad absoluta con la interfaz de TypeScript del
-     * Frontend,
-     * independientemente del tipo de clase 'Courses' en plural del compilador.
-     */
-    @JsonProperty("course")
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "course_id")
-    private Courses course;
-
-    @Column(nullable = false)
-    private LocalDateTime enrolled_at = LocalDateTime.now();
-
-    @Column(nullable = false)
-    private String status = "EN_PROGRESO";
-
-    @Column(name = "progress", nullable = false)
-    private int progress_percentage = 0;
-
-    @Column(name = "started_at")
-    private LocalDateTime started_at;
-
-    /**
-     * Relación bidireccional con las calificaciones del curso [ADR-39].
-     * Mapeado por el campo 'enrollment' de la entidad CourseGrade.
-     * Se usa cascade ALL y orphanRemoval para que al borrar una matrícula se
-     * limpien sus notas.
-     */
-    @JsonIgnore
-    @OneToMany(mappedBy = "enrollment", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<CourseGrade> grades;
-
-    /**
-     * Getter explícito para la salida JSON del frontend de asignaturas en curso
-     * [ADR-39].
-     * Al llamarse diferente, Jackson lo serializa como "grades" en la API de cursos
-     * activos,
-     * pero no interfiere de ninguna manera en las subconsultas del repositorio de
-     * evaluaciones.
-     */
-    @JsonProperty("grades")
-    public List<CourseGrade> getGradesForFrontend() {
-        return this.grades;
-    }
-
-    /**
-     * Constructor explícito de compatibilidad hacia atrás.
-     * Evita que la suite de tests existente (UserServiceTest, etc.) falle al exigir
-     * el nuevo parámetro 'grades' añadido por la anotación @AllArgsConstructor.
-     */
-    public Enrollment(Long enrollmentid, Users user, Courses course, LocalDateTime enrolled_at, String status,
-            int progress_percentage, LocalDateTime started_at) {
-        this.enrollmentid = enrollmentid;
-        this.user = user;
-        this.course = course;
-        this.enrolled_at = enrolled_at != null ? enrolled_at : LocalDateTime.now();
-        this.status = status != null ? status : "EN_PROGRESO";
-        this.progress_percentage = progress_percentage;
-        this.started_at = started_at;
-        this.grades = null;
-    }
-}
-
-================
-File: backend/src/main/java/com/cursosonline/backend/exception/GlobalExceptionHandler.java
-================
-package com.cursosonline.backend.exception;
-
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
-
-@RestControllerAdvice
-public class GlobalExceptionHandler {
-
-    // Maneja errores específicos de "No encontrado" -> 404
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex) {
-        ErrorResponse error = new ErrorResponse(
-                HttpStatus.NOT_FOUND.value(),
-                ex.getMessage(),
-                System.currentTimeMillis());
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
-    }
-
-    // Maneja errores específicos de "Conflicto" -> 409
-    @ExceptionHandler(UserAlreadyExistsException.class)
-    public ResponseEntity<ErrorResponse> handleConflict(UserAlreadyExistsException ex) {
-        ErrorResponse error = new ErrorResponse(
-                HttpStatus.CONFLICT.value(),
-                ex.getMessage(),
-                System.currentTimeMillis());
-        return new ResponseEntity<>(error, HttpStatus.CONFLICT);
-    }
-
-    // Maneja errores específicos de "Error de negocio" -> 400
-    @ExceptionHandler(ServicesException.class)
-    public ResponseEntity<ErrorResponse> handleBusinessError(ServicesException ex) {
-        ErrorResponse error = new ErrorResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                ex.getMessage(),
-                System.currentTimeMillis());
-        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
-    }
-
-    // --- NUEVO: Maneja fallos de Autenticación (Contraseña/Usuario incorrecto) ->
-    // 401 ---
-    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
-    public ResponseEntity<ErrorResponse> handleAuthenticationError(
-            org.springframework.security.core.AuthenticationException ex) {
-        ErrorResponse error = new ErrorResponse(
-                HttpStatus.UNAUTHORIZED.value(),
-                "Credenciales de acceso inválidas.", // Mensaje seguro para el login
-                System.currentTimeMillis());
-        return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
-    }
-
-    // --- NUEVO: Maneja denegación de permisos (@PreAuthorize) -> 403 ---
-    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDenied(
-            org.springframework.security.access.AccessDeniedException ex) {
-        ErrorResponse error = new ErrorResponse(
-                HttpStatus.FORBIDDEN.value(),
-                "Acceso denegado: No posee los privilegios requeridos para este recurso.",
-                System.currentTimeMillis());
-        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
-    }
-
-    // --- NUEVO: Maneja parámetros mal formados o roles inválidos en el ENUM -> 400
-    // ---
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
-        ErrorResponse error = new ErrorResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                ex.getMessage(), // Envía "Rol inválido..." o "El campo role es requerido"
-                System.currentTimeMillis());
-        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
-    }
-
-    // Maneja cualquier otra excepción no capturada de forma genérica -> 500
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGeneralError(Exception ex) {
-        ex.printStackTrace(); // Mantiene tu traza de depuración en la consola del servidor
-        ErrorResponse error = new ErrorResponse(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "Error interno en el servidor.",
-                System.currentTimeMillis());
-        return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-}
-
-================
-File: backend/src/main/java/com/cursosonline/backend/exception/ResourceNotFoundException.java
-================
-package com.cursosonline.backend.exception;
-
-/**
- * Excepción personalizada para indicar que un recurso no fue encontrado en la
- * base de datos.
- * Se utiliza para manejar casos donde se intenta acceder a un recurso que no
- * existe, como un usuario, curso, etc.
- * Hereda de ServicesException para mantener una jerarquía de excepciones
- * coherente en la capa de servicios.
- */
-public class ResourceNotFoundException extends ServicesException {
-
-    // Constructor original: Se mantiene para búsquedas por ID numérico
-    public ResourceNotFoundException(String resource, Long id) {
-        super(resource + " con ID " + id + " no encontrado.");
-    }
-
-    // Auditoría NotebookLM: Nuevo constructor sobrecargado para permitir
-    // mensajes directos basados en texto (ej. búsquedas por username).
-    public ResourceNotFoundException(String message) {
-        super(message);
-    }
-}
-
-================
 File: backend/src/main/java/com/cursosonline/backend/services/RecommendationService.java
 ================
 package com.cursosonline.backend.services;
@@ -9437,6 +9546,53 @@ public class DocumentControllerTest {
 }
 
 ================
+File: frontend/package.json
+================
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "axios": "^1.13.6",
+    "lucide-react": "^0.577.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.14.2",
+    "tailwindcss": "^4.1.18"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "jsdom": "^29.0.0",
+    "typedoc": "^0.28.18",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.48.0",
+    "vite": "^7.3.1",
+    "vitest": "^4.1.0"
+  }
+}
+
+================
 File: frontend/src/auth/AuthContext.tsx
 ================
 import { createContext } from 'react';
@@ -9703,183 +9859,6 @@ export const CourseCatalog = ({
         </div>
     );
 };
-
-================
-File: frontend/src/routes/pages/student/components/EvaluationPanel.tsx
-================
-import { useState } from 'react';
-import { Star, MessageSquare, UserCheck, Loader2, AlertCircle, CheckCircle2, Send } from 'lucide-react';
-import GenericCard from '../../../../components/ui/genericCard/GenericCard';
-import { useActiveEvaluations } from './useActiveEvaluations';
-import type { EvaluationInput } from '../../../../services/evaluationService';
-
-/**
- * Componente de Evaluación Académica [ADR-37].
- * Permite calificar de forma asimétrica la asignatura y al profesorado.
- * Implementa un contenedor de scroll controlado para mantener la simetría visual [ADR-19].
- */
-export const EvaluationPanel = () => {
-    const {
-        pendingList,
-        loadingPending,
-        isSubmitting,
-        evaluationError,
-        submitEvaluation
-    } = useActiveEvaluations();
-
-    // Estado local para gestionar el formulario activo de cada tarjeta
-    const [formStates, setFormStates] = useState<Record<number, Partial<EvaluationInput>>>({});
-
-    const handleRatingChange = (enrollmentId: number, field: keyof EvaluationInput, value: number | string) => {
-        setFormStates(prev => ({
-            ...prev,
-            [enrollmentId]: { ...prev[enrollmentId], [field]: value }
-        }));
-    };
-
-    const handleSend = async (enrollmentId: number, courseId: number) => {
-        const state = formStates[enrollmentId];
-        if (!state?.course_score || !state?.instructor_score) return;
-
-        await submitEvaluation({
-            course_id: courseId,
-            course_score: state.course_score,
-            course_comment: state.course_comment || '',
-            instructor_score: state.instructor_score,
-            instructor_comment: state.instructor_comment || ''
-        });
-    };
-
-    return (
-        /* ALINEACIÓN GEOMÉTRICA: h-92 para nivelar con Asignaturas + Documentos */
-        <GenericCard className="h-90 flex flex-col shadow-sm border-slate-200">
-            <div className="flex items-center gap-2 mb-6">
-                <div className="bg-amber-50 p-2 rounded-lg">
-                    <Star className="text-amber-500 fill-amber-500" size={20} />
-                </div>
-                <div>
-                    <h2 className="text-base font-black text-slate-800 leading-tight">
-                        Evaluación académica
-                    </h2>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                        Docentes y asignaturas activas
-                    </p>
-                </div>
-            </div>
-
-            {/* CONTENEDOR DE SCROLL [ADR-19][ADR-36] */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
-                {loadingPending ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                        <Loader2 className="animate-spin mb-2" size={24} />
-                        <p className="text-xs font-bold">Consultando red académica...</p>
-                    </div>
-                ) : pendingList.length === 0 ? (
-                    <div className="bg-slate-50 border-2 border-dashed border-slate-100 rounded-2xl p-8 text-center">
-                        <CheckCircle2 className="mx-auto text-emerald-400 mb-2" size={32} />
-                        <p className="text-slate-500 text-xs font-bold">¡Todo al día! No tienes evaluaciones pendientes.</p>
-                    </div>
-                ) : (
-                    pendingList.map((item) => {
-                        // DIRECTION NOTEBOOKLM: Definición estricta del rango exigido en la recomendación
-                        const RATING_RANGE = Array.from({ length: 5 }, (_, i) => i + 1);
-                        const state = formStates[item.enrollmentid] || {};
-                        const canSubmit = state.course_score && state.instructor_score && !isSubmitting;
-
-                        return (
-                            <div key={item.enrollmentid} className="p-4 bg-white border border-slate-100 rounded-xl shadow-xs space-y-4 transition-all hover:border-blue-100">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <h3 className="text-[11px] font-black text-slate-800 uppercase leading-tight">
-                                            {item.course.title}
-                                        </h3>
-                                        <div className="flex items-center gap-1.5 mt-1">
-                                            <UserCheck size={12} className="text-blue-500" />
-                                            <span className="text-[10px] text-slate-500 font-bold italic">
-                                                Prof: {item.course.instructors}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Rating Asimétrico [ADR-37] */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Calidad del curso</label>
-                                        <div className="flex gap-1">
-                                            {RATING_RANGE.map((star) => (
-                                                <button
-                                                    key={star}
-                                                    type="button" // DIRECTION NOTEBOOKLM: Evita comportamientos por defecto
-                                                    title={`Calificar curso con ${star} estrellas`}
-                                                    onClick={() => handleRatingChange(item.enrollmentid, 'course_score', star)}
-                                                    className={`transition-transform active:scale-125 ${(state.course_score || 0) >= star ? 'text-amber-400' : 'text-slate-200'}`}
-                                                >
-                                                    <Star size={16} fill={(state.course_score || 0) >= star ? "currentColor" : "none"} />
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Desempeño docente</label>
-                                        <div className="flex gap-1">
-                                            {RATING_RANGE.map((star) => (
-                                                <button
-                                                    key={star}
-                                                    type="button" // DIRECTION NOTEBOOKLM: Evita comportamientos de formulario por defecto
-                                                    title={`Calificar profesor con ${star} estrellas`}
-                                                    onClick={() => handleRatingChange(item.enrollmentid, 'instructor_score', star)}
-                                                    className={`transition-all transform active:scale-150 ${(state.instructor_score || 0) >= star ? 'text-blue-400' : 'text-slate-200'}`}
-                                                >
-                                                    <Star
-                                                        size={16}
-                                                        fill={(state.instructor_score || 0) >= star ? "currentColor" : "none"}
-                                                    />
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Comentarios granulares */}
-                                <div className="relative">
-                                    <MessageSquare size={12} className="absolute left-3 top-3 text-slate-300" />
-                                    <textarea
-                                        placeholder="Escribe un comentario opcional..."
-                                        className="w-full bg-slate-50 border-none rounded-lg p-2 pl-8 text-[10px] font-medium focus:ring-1 focus:ring-blue-200 outline-none resize-none"
-                                        rows={2}
-                                        onChange={(e) => handleRatingChange(item.enrollmentid, 'course_comment', e.target.value)}
-                                    />
-                                </div>
-
-                                <button
-                                    disabled={!canSubmit}
-                                    onClick={() => handleSend(item.enrollmentid, item.course.course_id)}
-                                    className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-black transition-all ${canSubmit
-                                        ? 'bg-slate-800 text-white hover:bg-black'
-                                        : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-                                        }`}
-                                >
-                                    {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                                    ENVIAR EVALUACIÓN
-                                </button>
-                            </div>
-                        );
-                    })
-                )}
-            </div>
-
-            {evaluationError && (
-                <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-xl flex items-center gap-2 text-[10px] font-bold animate-pulse">
-                    <AlertCircle size={14} />
-                    {evaluationError}
-                </div>
-            )}
-        </GenericCard>
-    );
-};
-
-export default EvaluationPanel;
 
 ================
 File: frontend/src/routes/pages/student/components/useCourseCatalog.ts
@@ -10300,31 +10279,6 @@ File: frontend/tsconfig.app.json
 }
 
 ================
-File: frontend/vite.config.ts
-================
-import { defineConfig } from 'vitest/config'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import path from 'path'
-
-export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
-  ],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: './src/setupTests.tsx',
-  },
-})
-
-================
 File: backend/src/main/java/com/cursosonline/backend/controller/ProfileController.java
 ================
 package com.cursosonline.backend.controller;
@@ -10491,34 +10445,99 @@ public class ProfileController {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/repository/CoursesRepository.java
+File: backend/src/main/java/com/cursosonline/backend/entities/Enrollment.java
 ================
-package com.cursosonline.backend.repository;
+package com.cursosonline.backend.entities;
 
-import com.cursosonline.backend.entities.Courses;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty; // Importación obligatoria para el contrato JSON
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
+import java.util.List; // Soporte para colecciones relacionales
 
-public interface CoursesRepository extends JpaRepository<Courses, Long> {
+@Entity
+@Table(name = "enrollment")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Enrollment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long enrollmentid;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private Users user;
 
     /**
-     * Búsqueda predictiva optimizada y corregida.
-     * Evalúa el título y la categoría en simetría estricta con el Service de Java.
+     * Relación con el curso.
+     * Se fuerza mediante @JsonProperty que la propiedad JSON sea "course" (en
+     * singular)
+     * para asegurar compatibilidad absoluta con la interfaz de TypeScript del
+     * Frontend,
+     * independientemente del tipo de clase 'Courses' en plural del compilador.
      */
-    @Query("SELECT c FROM Courses c WHERE " +
-            "LOWER(c.title) LIKE LOWER(:formattedKeyword) OR " +
-            "LOWER(c.category) LIKE LOWER(:formattedKeyword) " +
-            "ORDER BY " +
-            "CASE WHEN LOWER(c.title) LIKE LOWER(:startKeyword) THEN 1 " +
-            "     WHEN LOWER(c.title) LIKE LOWER(:formattedKeyword) THEN 2 " +
-            "     ELSE 3 END, c.title ASC")
-    List<Courses> searchCoursesPredictive(
-            @Param("formattedKeyword") String formattedKeyword,
-            @Param("startKeyword") String startKeyword,
-            Pageable pageable);
+    @JsonProperty("course")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "course_id")
+    private Courses course;
+
+    @Column(nullable = false)
+    private LocalDateTime enrolled_at = LocalDateTime.now();
+
+    @Column(nullable = false)
+    private String status = "EN_PROGRESO";
+
+    @Column(name = "progress", nullable = false)
+    private int progress_percentage = 0;
+
+    @Column(name = "started_at")
+    private LocalDateTime started_at;
+
+    /**
+     * Relación bidireccional con las calificaciones del curso [ADR-39].
+     * Mapeado por el campo 'enrollment' de la entidad CourseGrade.
+     * Se usa cascade ALL y orphanRemoval para que al borrar una matrícula se
+     * limpien sus notas.
+     */
+    @JsonIgnore
+    @OneToMany(mappedBy = "enrollment", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CourseGrade> grades;
+
+    /**
+     * Getter explícito para la salida JSON del frontend de asignaturas en curso
+     * [ADR-39].
+     * Al llamarse diferente, Jackson lo serializa como "grades" en la API de cursos
+     * activos,
+     * pero no interfiere de ninguna manera en las subconsultas del repositorio de
+     * evaluaciones.
+     */
+    @JsonProperty("grades")
+    public List<CourseGrade> getGradesForFrontend() {
+        return this.grades;
+    }
+
+    /**
+     * Constructor explícito de compatibilidad hacia atrás.
+     * Evita que la suite de tests existente (UserServiceTest, etc.) falle al exigir
+     * el nuevo parámetro 'grades' añadido por la anotación @AllArgsConstructor.
+     */
+    public Enrollment(Long enrollmentid, Users user, Courses course, LocalDateTime enrolled_at, String status,
+            int progress_percentage, LocalDateTime started_at) {
+        this.enrollmentid = enrollmentid;
+        this.user = user;
+        this.course = course;
+        this.enrolled_at = enrolled_at != null ? enrolled_at : LocalDateTime.now();
+        this.status = status != null ? status : "EN_PROGRESO";
+        this.progress_percentage = progress_percentage;
+        this.started_at = started_at;
+        this.grades = null;
+    }
 }
 
 ================
@@ -10672,53 +10691,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 }
 
 ================
-File: frontend/package.json
-================
-{
-  "name": "frontend",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview",
-    "test": "vitest",
-    "test:ui": "vitest --ui"
-  },
-  "dependencies": {
-    "@tailwindcss/vite": "^4.1.18",
-    "axios": "^1.13.6",
-    "lucide-react": "^0.577.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "react-router-dom": "^7.14.2",
-    "tailwindcss": "^4.1.18"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.1",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
-    "jsdom": "^29.0.0",
-    "typedoc": "^0.28.18",
-    "typescript": "~5.9.3",
-    "typescript-eslint": "^8.48.0",
-    "vite": "^7.3.1",
-    "vitest": "^4.1.0"
-  }
-}
-
-================
 File: frontend/src/components/admin/UserScrollList.tsx
 ================
 // src/components/admin/UserScrollList.tsx
@@ -10859,6 +10831,84 @@ const MainNavbar = () => {
 };
 
 export default MainNavbar;
+
+================
+File: frontend/src/components/navbar/Navbar.test.tsx
+================
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import type { ReactElement } from 'react';
+import Navbar from './Navbar';
+import { AuthProvider } from '@/auth';
+
+// 1. AUDITORÍA DE CALIDAD: Mockeo semántico del AuthModal para aislar las pruebas de la Navbar
+// Creamos una versión de juguete controlada con un botón de cierre explícito e inmune a cambios de iconos
+vi.mock('../ui/authModal/AuthModal', () => {
+    return {
+        default: ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
+            if (!isOpen) return null;
+            return (
+                <div data-testid="mock-auth-modal">
+                    <h2>Iniciar Sesión</h2>
+                    <button onClick={onClose} aria-label="Cerrar modal">X</button>
+                </div>
+            );
+        }
+    };
+});
+
+// Mockeamos también el catálogo por si acaso para aligerar el árbol de renderizado de React
+vi.mock('../ui/courseInfoModal/CourseInfoModal', () => {
+    return {
+        default: () => null
+    };
+});
+
+const renderWithAuthProvider = (ui: ReactElement) => {
+    return render(<AuthProvider>{ui}</AuthProvider>);
+};
+
+/**
+ * Pruebas unitarias para el componente Navbar.
+ * Estas pruebas verifican que el Navbar renderice correctamente, 
+ * muestre los botones de navegación y maneje la apertura y cierre del modal de autenticación.
+ */
+describe('Navbar Component', () => {
+
+    it('debe renderizar el logo o nombre de la aplicación', () => {
+        renderWithAuthProvider(<Navbar />);
+        expect(screen.getByText(/GESTIÓN DE CURSOS ONLINE/i)).toBeInTheDocument();
+    });
+
+    it('debe mostrar los botones de navegación principales', () => {
+        renderWithAuthProvider(<Navbar />);
+        expect(screen.getByRole('button', { name: /Entrar/i })).toBeInTheDocument();
+    });
+
+    it('debe abrir el modal de login al hacer clic en "Entrar"', () => {
+        renderWithAuthProvider(<Navbar />);
+
+        const loginButton = screen.getByRole('button', { name: /Entrar \/ Registro/i });
+        fireEvent.click(loginButton);
+
+        expect(screen.getByText(/Iniciar Sesión/i)).toBeInTheDocument();
+    });
+
+    it('debe cerrar el modal al pulsar la X dentro del mismo', async () => {
+        renderWithAuthProvider(<Navbar />);
+
+        // Abrimos el modal de autenticación desde el botón real de la navbar
+        fireEvent.click(screen.getByRole('button', { name: /Entrar \/ Registro/i }));
+        expect(screen.getByText(/Iniciar Sesión/i)).toBeInTheDocument();
+
+        // Al usar el mock controlado, queryByLabelText localiza el botón de cierre al 100% de certeza
+        const closeButton = screen.getByLabelText(/Cerrar modal/i);
+        fireEvent.click(closeButton);
+
+        // Verificamos que el componente del formulario se haya desmontado con éxito
+        expect(screen.queryByText(/Iniciar Sesión/i)).not.toBeInTheDocument();
+    });
+});
 
 ================
 File: frontend/src/routes/AppRoutes.test.tsx
@@ -11215,6 +11265,184 @@ export const DocumentManager = () => {
         </GenericCard>
     );
 };
+
+================
+File: frontend/src/routes/pages/student/components/EvaluationPanel.tsx
+================
+import { useState } from 'react';
+import { Star, MessageSquare, UserCheck, Loader2, AlertCircle, CheckCircle2, Send } from 'lucide-react';
+import GenericCard from '../../../../components/ui/genericCard/GenericCard';
+import { useActiveEvaluations } from './useActiveEvaluations';
+import type { EvaluationInput } from '../../../../services/evaluationService';
+
+/**
+ * Componente de Evaluación Académica [ADR-37].
+ * Permite calificar de forma asimétrica la asignatura y al profesorado.
+ * Implementa un contenedor de scroll controlado para mantener la simetría visual [ADR-19].
+ */
+export const EvaluationPanel = () => {
+    const {
+        pendingList,
+        loadingPending,
+        isSubmitting,
+        evaluationError,
+        submitEvaluation
+    } = useActiveEvaluations();
+
+    // Estado local para gestionar el formulario activo de cada tarjeta
+    const [formStates, setFormStates] = useState<Record<number, Partial<EvaluationInput>>>({});
+
+    const handleRatingChange = (enrollmentId: number, field: keyof EvaluationInput, value: number | string) => {
+        setFormStates(prev => ({
+            ...prev,
+            [enrollmentId]: { ...prev[enrollmentId], [field]: value }
+        }));
+    };
+
+    const handleSend = async (enrollmentId: number, courseId: number) => {
+        const state = formStates[enrollmentId];
+        // Cortocircuito de seguridad: Evita el envío si el estado no existe o si ambos campos están vacíos
+        if (!state || (!state.course_score && !state.instructor_score)) return;
+
+        await submitEvaluation({
+            course_id: courseId,
+            course_score: state.course_score || 0, // Envía 0 si el alumno decide ignorar el curso
+            course_comment: state.course_comment || '',
+            instructor_score: state.instructor_score || 0, // Envía 0 si el alumno decide ignorar al profesor
+            instructor_comment: state.instructor_comment || ''
+        });
+    };
+
+    return (
+        /* ALINEACIÓN GEOMÉTRICA: h-92 para nivelar con Asignaturas + Documentos */
+        <GenericCard className="h-90 flex flex-col shadow-sm border-slate-200">
+            <div className="flex items-center gap-2 mb-6">
+                <div className="bg-amber-50 p-2 rounded-lg">
+                    <Star className="text-amber-500 fill-amber-500" size={20} />
+                </div>
+                <div>
+                    <h2 className="text-base font-black text-slate-800 leading-tight">
+                        Evaluación académica
+                    </h2>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                        Docentes y asignaturas activas
+                    </p>
+                </div>
+            </div>
+
+            {/* CONTENEDOR DE SCROLL [ADR-19][ADR-36] */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+                {loadingPending ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                        <Loader2 className="animate-spin mb-2" size={24} />
+                        <p className="text-xs font-bold">Consultando red académica...</p>
+                    </div>
+                ) : pendingList.length === 0 && !evaluationError ? (
+                    <div className="bg-slate-50 border-2 border-dashed border-slate-100 rounded-2xl p-8 text-center">
+                        <CheckCircle2 className="mx-auto text-emerald-400 mb-2" size={32} />
+                        <p className="text-slate-500 text-xs font-bold">¡Todo al día! No tienes evaluaciones pendientes.</p>
+                    </div>
+                ) : (
+                    pendingList.map((item) => {
+                        // DIRECTION NOTEBOOKLM: Definición estricta del rango exigido en la recomendación
+                        const RATING_RANGE = Array.from({ length: 5 }, (_, i) => i + 1);
+                        const state = formStates[item.enrollmentid] || {};
+                        const canSubmit = (state.course_score || state.instructor_score) && !isSubmitting;
+
+                        return (
+                            <div key={item.enrollmentid} className="p-4 bg-white border border-slate-100 rounded-xl shadow-xs space-y-4 transition-all hover:border-blue-100">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h3 className="text-[11px] font-black text-slate-800 uppercase leading-tight">
+                                            {item.course.title}
+                                        </h3>
+                                        <div className="flex items-center gap-1.5 mt-1">
+                                            <UserCheck size={12} className="text-blue-500" />
+                                            <span className="text-[10px] text-slate-500 font-bold italic">
+                                                Prof: {item.course.instructors}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Rating Asimétrico [ADR-37] */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Calidad del curso</label>
+                                        <div className="flex gap-1">
+                                            {RATING_RANGE.map((star) => (
+                                                <button
+                                                    key={star}
+                                                    type="button" // DIRECTION NOTEBOOKLM: Evita comportamientos por defecto
+                                                    title={`Calificar curso con ${star} estrellas`}
+                                                    onClick={() => handleRatingChange(item.enrollmentid, 'course_score', star)}
+                                                    className={`transition-transform active:scale-125 ${(state.course_score || 0) >= star ? 'text-amber-400' : 'text-slate-200'}`}
+                                                >
+                                                    <Star size={16} fill={(state.course_score || 0) >= star ? "currentColor" : "none"} />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Desempeño docente</label>
+                                        <div className="flex gap-1">
+                                            {RATING_RANGE.map((star) => (
+                                                <button
+                                                    key={star}
+                                                    type="button" // DIRECTION NOTEBOOKLM: Evita comportamientos de formulario por defecto
+                                                    title={`Calificar profesor con ${star} estrellas`}
+                                                    onClick={() => handleRatingChange(item.enrollmentid, 'instructor_score', star)}
+                                                    className={`transition-all transform active:scale-150 ${(state.instructor_score || 0) >= star ? 'text-blue-400' : 'text-slate-200'}`}
+                                                >
+                                                    <Star
+                                                        size={16}
+                                                        fill={(state.instructor_score || 0) >= star ? "currentColor" : "none"}
+                                                    />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Comentarios granulares */}
+                                <div className="relative">
+                                    <MessageSquare size={12} className="absolute left-3 top-3 text-slate-300" />
+                                    <textarea
+                                        placeholder="Escribe un comentario opcional..."
+                                        className="w-full bg-slate-50 border-none rounded-lg p-2 pl-8 text-[10px] font-medium focus:ring-1 focus:ring-blue-200 outline-none resize-none"
+                                        rows={2}
+                                        onChange={(e) => handleRatingChange(item.enrollmentid, 'course_comment', e.target.value)}
+                                    />
+                                </div>
+
+                                <button
+                                    disabled={!canSubmit}
+                                    onClick={() => handleSend(item.enrollmentid, item.course.course_id)}
+                                    className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-black transition-all ${canSubmit
+                                        ? 'bg-slate-800 text-white hover:bg-black'
+                                        : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                                        }`}
+                                >
+                                    {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                                    ENVIAR EVALUACIÓN
+                                </button>
+                            </div>
+                        );
+                    })
+                )}
+            </div>
+
+            {evaluationError && (
+                <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-xl flex items-center gap-2 text-[10px] font-bold animate-pulse">
+                    <AlertCircle size={14} />
+                    {evaluationError}
+                </div>
+            )}
+        </GenericCard>
+    );
+};
+
+export default EvaluationPanel;
 
 ================
 File: frontend/src/routes/pages/student/components/useEnrolledCourses.ts
@@ -11574,6 +11802,63 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
         </div>
     );
 };
+
+================
+File: backend/src/main/java/com/cursosonline/backend/repository/CoursesRepository.java
+================
+package com.cursosonline.backend.repository;
+
+import com.cursosonline.backend.entities.Courses;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import java.util.List;
+import java.util.Optional;
+
+public interface CoursesRepository extends JpaRepository<Courses, Long> {
+
+        /**
+         * Búsqueda predictiva optimizada y corregida.
+         * Evalúa el título y la categoría en simetría estricta con el Service de Java.
+         */
+        @Query("SELECT c FROM Courses c WHERE " +
+                        "LOWER(c.title) LIKE LOWER(:formattedKeyword) OR " +
+                        "LOWER(c.category) LIKE LOWER(:formattedKeyword) " +
+                        "ORDER BY " +
+                        "CASE WHEN LOWER(c.title) LIKE LOWER(:startKeyword) THEN 1 " +
+                        "     WHEN LOWER(c.title) LIKE LOWER(:formattedKeyword) THEN 2 " +
+                        "     ELSE 3 END, c.title ASC")
+        List<Courses> searchCoursesPredictive(
+                        @Param("formattedKeyword") String formattedKeyword,
+                        @Param("startKeyword") String startKeyword,
+                        Pageable pageable);
+
+        /**
+         * Consulta analítica de agregación para el panel estadístico [ADR-41].
+         * Cruza el catálogo con las métricas locales de matrículas y calificaciones.
+         * Utiliza CAST para transformar de forma segura el score (String) a double
+         * precisión en PostgreSQL.
+         */
+        @Query("SELECT new com.cursosonline.backend.dto.CourseStatsDTO(" +
+                        "c.course_id, " +
+                        "AVG(CASE WHEN cg.score IS NOT NULL AND cg.score <> '' THEN CAST(cg.score AS double) ELSE null END), "
+                        +
+                        "COUNT(DISTINCT e.enrollmentid), " +
+                        "AVG(ae.course_score), " +
+                        "AVG(ae.instructor_score), " +
+                        "c.site, " +
+                        "c.category) " +
+                        "FROM Courses c " +
+                        "LEFT JOIN Enrollment e ON e.course.course_id = c.course_id " +
+                        "LEFT JOIN CourseGrade cg ON cg.enrollment.enrollmentid = e.enrollmentid " +
+                        "LEFT JOIN AcademicEvaluation ae ON ae.course.course_id = c.course_id " +
+                        "WHERE c.course_id = :courseId " +
+                        "GROUP BY c.course_id, c.site, c.category")
+        Optional<com.cursosonline.backend.dto.CourseStatsDTO> getCourseAnalyticalStats(
+                        @Param("courseId") Long courseId);
+
+}
 
 ================
 File: backend/src/main/java/com/cursosonline/backend/repository/EnrollmentRepository.java
@@ -12204,84 +12489,6 @@ export interface AuthContextType {
 }
 
 ================
-File: frontend/src/components/navbar/Navbar.test.tsx
-================
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
-import type { ReactElement } from 'react';
-import Navbar from './Navbar';
-import { AuthProvider } from '@/auth';
-
-// 1. AUDITORÍA DE CALIDAD: Mockeo semántico del AuthModal para aislar las pruebas de la Navbar
-// Creamos una versión de juguete controlada con un botón de cierre explícito e inmune a cambios de iconos
-vi.mock('../ui/authModal/AuthModal', () => {
-    return {
-        default: ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
-            if (!isOpen) return null;
-            return (
-                <div data-testid="mock-auth-modal">
-                    <h2>Iniciar Sesión</h2>
-                    <button onClick={onClose} aria-label="Cerrar modal">X</button>
-                </div>
-            );
-        }
-    };
-});
-
-// Mockeamos también el catálogo por si acaso para aligerar el árbol de renderizado de React
-vi.mock('../ui/courseInfoModal/CourseInfoModal', () => {
-    return {
-        default: () => null
-    };
-});
-
-const renderWithAuthProvider = (ui: ReactElement) => {
-    return render(<AuthProvider>{ui}</AuthProvider>);
-};
-
-/**
- * Pruebas unitarias para el componente Navbar.
- * Estas pruebas verifican que el Navbar renderice correctamente, 
- * muestre los botones de navegación y maneje la apertura y cierre del modal de autenticación.
- */
-describe('Navbar Component', () => {
-
-    it('debe renderizar el logo o nombre de la aplicación', () => {
-        renderWithAuthProvider(<Navbar />);
-        expect(screen.getByText(/GESTIÓN DE CURSOS ONLINE/i)).toBeInTheDocument();
-    });
-
-    it('debe mostrar los botones de navegación principales', () => {
-        renderWithAuthProvider(<Navbar />);
-        expect(screen.getByRole('button', { name: /Entrar/i })).toBeInTheDocument();
-    });
-
-    it('debe abrir el modal de login al hacer clic en "Entrar"', () => {
-        renderWithAuthProvider(<Navbar />);
-
-        const loginButton = screen.getByRole('button', { name: /Entrar \/ Registro/i });
-        fireEvent.click(loginButton);
-
-        expect(screen.getByText(/Iniciar Sesión/i)).toBeInTheDocument();
-    });
-
-    it('debe cerrar el modal al pulsar la X dentro del mismo', async () => {
-        renderWithAuthProvider(<Navbar />);
-
-        // Abrimos el modal de autenticación desde el botón real de la navbar
-        fireEvent.click(screen.getByRole('button', { name: /Entrar \/ Registro/i }));
-        expect(screen.getByText(/Iniciar Sesión/i)).toBeInTheDocument();
-
-        // Al usar el mock controlado, queryByLabelText localiza el botón de cierre al 100% de certeza
-        const closeButton = screen.getByLabelText(/Cerrar modal/i);
-        fireEvent.click(closeButton);
-
-        // Verificamos que el componente del formulario se haya desmontado con éxito
-        expect(screen.queryByText(/Iniciar Sesión/i)).not.toBeInTheDocument();
-    });
-});
-
-================
 File: frontend/src/routes/index.tsx
 ================
 import { Navigate, Route, Routes, Outlet } from "react-router-dom";
@@ -12438,6 +12645,196 @@ export const SmartRecommendations = ({ recommendations }: SmartRecommendationsPr
 };
 
 ================
+File: frontend/src/App.tsx
+================
+import AppRoutes from "@/routes";
+
+function App() {
+  return <AppRoutes />;
+}
+
+export default App;
+
+================
+File: backend/pom.xml
+================
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.6"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.0.6</version>
+		<relativePath/>
+		<!-- lookup parent from repository -->
+	</parent>
+	<groupId>com.cursosonline</groupId>
+	<artifactId>backend</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>backend</name>
+	<description>Backend server for Online Courses platform</description>
+	<url/>
+	<licenses>
+		<license/>
+	</licenses>
+	<developers>
+		<developer/>
+	</developers>
+	<scm>
+		<connection/>
+		<developerConnection/>
+		<tag/>
+		<url/>
+	</scm>
+	<properties>
+		<java.version>21</java.version>
+		<lombok.version>1.18.32</lombok.version>
+		<!-- CVE Fixes for Security Vulnerabilities -->
+		<json-smart.version>2.6.0</json-smart.version>
+		<assertj.version>3.27.7</assertj.version>
+	</properties>
+
+	<!-- Override BOM-managed dependency versions to fix CVEs -->
+	<dependencyManagement>
+		<dependencies>
+			<!-- CVE Fixes: Explicit version overrides for transitive dependencies -->
+			<!-- CVE-2024-57699: Stack Exhaustion in json-smart 2.5.1 -->
+			<dependency>
+				<groupId>net.minidev</groupId>
+				<artifactId>json-smart</artifactId>
+				<version>${json-smart.version}</version>
+			</dependency>
+
+			<!-- CVE-2026-24400: XXE Vulnerability in assertj-core 3.24.2 -->
+			<dependency>
+				<groupId>org.assertj</groupId>
+				<artifactId>assertj-core</artifactId>
+				<version>${assertj.version}</version>
+				<scope>test</scope>
+			</dependency>
+
+		</dependencies>
+	</dependencyManagement>
+	<dependencies>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<!-- Esta dependencia sustituye a todos tus errores actuales de 'test' -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Si usas seguridad, esta es la única de test adicional que necesitas -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-junit-jupiter</artifactId>
+			<version>5.12.0</version>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-configuration-processor</artifactId>
+			<optional>true</optional>
+		</dependency>
+
+
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>${lombok.version}</version>
+						</path>
+						<path>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-configuration-processor</artifactId>
+							<version>4.0.6</version>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<excludes>
+						<exclude>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</exclude>
+					</excludes>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>3.5.5</version>
+				<configuration>
+					<argLine>-XX:+EnableDynamicAgentLoading</argLine>
+					<systemPropertyVariables>
+						<mockito.mock-maker>inline</mockito.mock-maker>
+					</systemPropertyVariables>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>
+
+================
 File: backend/src/main/java/com/cursosonline/backend/entities/Users.java
 ================
 package com.cursosonline.backend.entities;
@@ -12517,17 +12914,6 @@ public class Users implements UserDetails {
         return true;
     }
 }
-
-================
-File: frontend/src/App.tsx
-================
-import AppRoutes from "@/routes";
-
-function App() {
-  return <AppRoutes />;
-}
-
-export default App;
 
 ================
 File: frontend/src/routes/pages/student/components/EnrolledCourses.tsx
@@ -13143,185 +13529,6 @@ const ProfessorDashboard = () => {
 };
 
 export default ProfessorDashboard;
-
-================
-File: backend/pom.xml
-================
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.6"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
-	<parent>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.0.6</version>
-		<relativePath/>
-		<!-- lookup parent from repository -->
-	</parent>
-	<groupId>com.cursosonline</groupId>
-	<artifactId>backend</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
-	<name>backend</name>
-	<description>Backend server for Online Courses platform</description>
-	<url/>
-	<licenses>
-		<license/>
-	</licenses>
-	<developers>
-		<developer/>
-	</developers>
-	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
-	</scm>
-	<properties>
-		<java.version>21</java.version>
-		<lombok.version>1.18.32</lombok.version>
-		<!-- CVE Fixes for Security Vulnerabilities -->
-		<json-smart.version>2.6.0</json-smart.version>
-		<assertj.version>3.27.7</assertj.version>
-	</properties>
-
-	<!-- Override BOM-managed dependency versions to fix CVEs -->
-	<dependencyManagement>
-		<dependencies>
-			<!-- CVE Fixes: Explicit version overrides for transitive dependencies -->
-			<!-- CVE-2024-57699: Stack Exhaustion in json-smart 2.5.1 -->
-			<dependency>
-				<groupId>net.minidev</groupId>
-				<artifactId>json-smart</artifactId>
-				<version>${json-smart.version}</version>
-			</dependency>
-
-			<!-- CVE-2026-24400: XXE Vulnerability in assertj-core 3.24.2 -->
-			<dependency>
-				<groupId>org.assertj</groupId>
-				<artifactId>assertj-core</artifactId>
-				<version>${assertj.version}</version>
-				<scope>test</scope>
-			</dependency>
-
-		</dependencies>
-	</dependencyManagement>
-	<dependencies>
-
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-actuator</artifactId>
-		</dependency>
-
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-jpa</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-security</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-validation</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
-		</dependency>
-
-		<dependency>
-			<groupId>org.postgresql</groupId>
-			<artifactId>postgresql</artifactId>
-			<scope>runtime</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.projectlombok</groupId>
-			<artifactId>lombok</artifactId>
-			<optional>true</optional>
-		</dependency>
-		<!-- Esta dependencia sustituye a todos tus errores actuales de 'test' -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-
-		<!-- Si usas seguridad, esta es la única de test adicional que necesitas -->
-		<dependency>
-			<groupId>org.springframework.security</groupId>
-			<artifactId>spring-security-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter</artifactId>
-			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.mockito</groupId>
-			<artifactId>mockito-junit-jupiter</artifactId>
-			<version>5.12.0</version>
-			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-configuration-processor</artifactId>
-			<optional>true</optional>
-		</dependency>
-
-
-	</dependencies>
-
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<configuration>
-					<annotationProcessorPaths>
-						<path>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok</artifactId>
-							<version>${lombok.version}</version>
-						</path>
-						<path>
-							<groupId>org.springframework.boot</groupId>
-							<artifactId>spring-boot-configuration-processor</artifactId>
-							<version>4.0.6</version>
-						</path>
-					</annotationProcessorPaths>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-				<configuration>
-					<excludes>
-						<exclude>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok</artifactId>
-						</exclude>
-					</excludes>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-surefire-plugin</artifactId>
-				<version>3.5.5</version>
-				<configuration>
-					<argLine>-XX:+EnableDynamicAgentLoading</argLine>
-					<systemPropertyVariables>
-						<mockito.mock-maker>inline</mockito.mock-maker>
-					</systemPropertyVariables>
-				</configuration>
-			</plugin>
-		</plugins>
-	</build>
-
-</project>
 
 ================
 File: backend/src/main/resources/application.properties
@@ -15734,7 +15941,7 @@ Adicionalmente, bajo las políticas de seguridad perimetral por tokens distribui
 ## Decisión
 
 1. **Arquitectura de Rating Dual:** Implementar un patrón de coexistencia analítica. La interfaz del frontend consumirá de manera diferenciada el "Rating del Catálogo" (proveniente de las columnas originales del dataset) y el "Rating de la Comunidad" (calculado dinámicamente en tiempo de ejecución mediante funciones de agregación `AVG` sobre los registros locales de la plataforma), preservando la pureza de la fuente original de datos.
-2. **Granularidad Disociada en Comentarios:** Diseñar la entidad `AcademicEvaluation.java` segregando las puntuaciones y los bloques de texto explicativos en campos independientes (`course_score`/`course_comment` e `instructor_score`/`instructor_comment`). Esto dota a la interfaz de la flexibilidad necesaria para que el alumno emita retroalimentaciones asimétricas de forma limpia.
+2. **Granularidad Disociada y Envío Asimétrico:** Diseñar la entidad `AcademicEvaluation.java` segregando las puntuaciones y comentarios en campos independientes. Se refactoriza la condición lógica de la UI (`canSubmit`) para habilitar el envío asimétrico del formulario. El estudiante tiene plena libertad para calificar exclusivamente la calidad del curso, únicamente el desempeño docente, o ambos bloques en paralelo, exigiendo como único requisito de negocio que al menos una de las dos métricas sea mayor que cero para mitigar payloads vacíos.
 3. **Validación Perimetral por Subconsulta Cruzada:** Delegar el filtrado de exclusión a una subconsulta nativa en HQL dentro de `EnrollmentRepository.java`. El método descarta en el motor de PostgreSQL cualquier curso que ya posea una fila de evaluación acoplada al `username` extraído de los Claims del JWT, blindando el acceso en el endpoint `/pending` de forma stateless.
 4. **Accesibilidad e Integridad Sintáctica en la UI:** Refactorizar el renderizado iterativo del panel de estrellas inyectando de forma obligatoria propiedades descriptivas `aria-label` y `title` para satisfacer los inspectores automatizados de accesibilidad (*Microsoft Edge Tools / axe*). La estructura se mantiene desacoplada en el hook `useActiveEvaluations.ts` satisfaciendo la directriz anti-objetos mutantes del linter [ADR-20].
 
@@ -15832,6 +16039,37 @@ Específicamente, se debían mitigar dos vectores de riesgo críticos:
 * **Seguridad por Diseño (Security by Design):** Se blinda el endpoint contra inyecciones fraudulentas de notas desde el cliente. Las calificaciones quedan completamente aisladas en modo de solo lectura desde la perspectiva de la API pública expuesta.
 * **Tolerancia Dual Frontend-Backend:** El backend ahora sirve un arreglo `grades: []` vacío pero estructuralmente válido. React asimila este payload de forma nativa manteniendo el comportamiento inerte actual y reaccionará de manera automatizada en el momento en que se inserten filas reales en la tabla `course_grades`.
 * **Estabilidad del Entorno de Integración:** Tanto el compilador de Java 17 como los tests de JUnit/Mockito mantienen un estado 100% libre de errores y regresiones, preservando la madurez tecnológica de la plataforma de cara a futuras auditorías del tribunal.
+
+---
+
+# [ADR-41] Arquitectura de Agregación Analítica Inmutable y Casteo Dinámico para Métricas de Catálogo
+
+## Estado
+
+Aceptado
+
+## Contexto
+
+Para potenciar la madurez pedagógica de la plataforma, se requería la incorporación de un nuevo componente estadístico en el Dashboard del estudiante que consolidara métricas clave en tiempo real: nota media del curso, volumen local de inscritos y valoraciones medias disociadas de la asignatura y del profesorado. Asimismo, el componente debía estructurarse de forma extensible para admitir futuras segmentaciones analíticas basadas en atributos intrínsecos de la entidad de cursos (diferentes plataformas de origen y categorías temáticas).
+
+No obstante, la implementación de este módulo analítico cruzado presentaba tres restricciones estructurales críticas:
+
+1. **Incompatibilidad de Tipos en PostgreSQL:** El campo `score` de la entidad `CourseGrade` se definió originalmente como `String` para dotar de flexibilidad al sistema [ADR-39]. Intentar aplicar una función de agregación estándar `AVG()` sobre una columna de texto provocaría una excepción fatal inmediata en el motor de base de datos.
+2. **Riesgo de Inyección de Payload:** Evitar vulnerabilidades de alteración masiva de datos (*Mass Assignment*), garantizando que las métricas de salida computadas por el servidor no puedan ser manipuladas o inyectadas artificialmente por peticiones maliciosas procedentes del cliente.
+3. **Rendimiento e Integridad de Consultas:** Prevenir el problema de consultas masivas (N+1) o productos cartesianos inválidos al cruzar tablas de alta volatilidad analítica (`Enrollment`, `CourseGrade`, `AcademicEvaluation` y `Courses`).
+
+## Decisión
+
+1. **Casteo Dinámico Condicional en JPQL:** Implementar una directiva de formateo al vuelo dentro de `CoursesRepository.java` utilizando la función nativa `CAST(cg.score AS double)`. Para inmunizar al motor de PostgreSQL contra errores de formato ante cadenas vacías o no numéricas, el casteo se encapsula dentro de una expresión condicional `CASE WHEN` que evalúa la presencia legítima de caracteres válidos antes de computar la media aritmética (`AVG`).
+2. **Mapeo de Proyección Directa mediante Records:** Diseñar la estructura de transferencia de datos `CourseStatsDTO.java` haciendo uso de un `Record` inmutable de Java 17. La consulta del repositorio instancia el DTO directamente desde las tuplas de PostgreSQL mediante la sintaxis `SELECT new ...`, evitando la sobrecarga en memoria que implicaría la hidratación de entidades JPA pesadas.
+3. **Aislamiento Perimetral Analítico:** Configurar todas las propiedades del `Record` con la restricción `@JsonProperty(access = JsonProperty.Access.READ_ONLY)`. Esto establece un blindaje de solo lectura a nivel de API, permitiendo la serialización limpia de las métricas hacia React pero desestimando cualquier intento de manipulación o inserción externa.
+4. **Controlador Analítico Desacoplado:** Centralizar la exposición del servicio en `CourseStatsController.java` bajo la ruta `/api/v1/stats`. El endpoint valida de forma implícita la identidad del alumno mediante el contexto `Authentication` provisto por los Claims firmados del token JWT [ADR-27], neutralizando vectores de ataque por enumeración de recursos.
+
+## Consecuencias
+
+* **Precisión Estadística Segura:** Se consolida un motor de cálculo "al vuelo" que refleja de manera fidedigna la actividad local en tiempo real sin alterar la naturaleza elástica e inmutable del catálogo original extraído de Coursera.
+* **Escalabilidad de Negocio:** El payload del DTO transporta de forma nativa los campos `site` (plataforma) y `category` (temática) de la asignatura. El componente del frontend queda plenamente preparado para expandir sus capacidades hacia ránkings o agrupaciones complejas en fases posteriores sin alterar los contratos de la API.
+* **Consistencia en Entornos de QA:** La suite de pruebas de integración de Spring Boot se mantiene en un estado de compilación e integración 100% limpio (PASS), certificando que la arquitectura de agregación es segura, estable y libre de regresiones colaterales en el ecosistema transaccional.
 
 ---
 

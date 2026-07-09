@@ -4,15 +4,7 @@ import { useCourseCatalog } from './useCourseCatalog';
 import type { DBModelCourse } from '../../../../services/courseTypes';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import { useAuth } from '../../../../auth/useAuth';
-
-interface EnrollmentInfo {
-    course: {
-        course_id?: number;
-        title: string;
-        category?: string;
-        instructors?: string;
-    };
-}
+import type { EnrollmentInfo } from '../../../../services/courseTypes';
 
 
 interface CourseCatalogProps {

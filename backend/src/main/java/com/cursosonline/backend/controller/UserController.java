@@ -63,6 +63,7 @@ public class UserController {
     /**
      * Endpoint para recuperar los intereses y criterios de filtrado guardados del
      * alumno en sesión.
+     * [PRIORIDAD RUTA ESTÁTICA - ADR-18]
      */
     @GetMapping("/my-interests")
     public ResponseEntity<?> getStudentInterests(Principal principal) {
@@ -71,6 +72,55 @@ public class UserController {
         }
         com.cursosonline.backend.dto.InterestDTO interestDTO = userService.getUserInterests(principal.getName());
         return ResponseEntity.ok(interestDTO);
+    }
+
+    /**
+     * Endpoint unificado para guardar o actualizar los intereses y criterios de
+     * filtrado del alumno en sesión.
+     * Soporta POST y PUT de forma segura para evitar fallos de parpadeo (405 Method
+     * Not Allowed) in el frontend.
+     * [PRIORIDAD RUTA ESTÁTICA - ADR-18]
+     */
+    @RequestMapping(value = "/my-interests", method = { RequestMethod.POST, RequestMethod.PUT })
+    public ResponseEntity<?> saveStudentInterests(@RequestBody com.cursosonline.backend.dto.InterestDTO interestDTO,
+            Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
+        // Invocación a tu servicio (que ya tiene la corrección de sincronización de ID)
+        userService.saveUserInterests(principal.getName(), interestDTO);
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Tus preferencias de recomendación han sido guardadas con éxito en PostgreSQL."));
+    }
+
+    /**
+     * Endpoint especializado para la hidratación del bloque de asignaturas en
+     * progreso.
+     * Recibe el username de forma explícita para evitar fallos de inyección (HTTP
+     * 400) con el filtro JWT.
+     * [PRIORIDAD RUTA ESTÁTICA - ADR-18]
+     */
+    @GetMapping("/my-active-courses")
+    public ResponseEntity<List<Enrollment>> getMyActiveCourses(@RequestParam("username") String username) {
+        if (username == null || username.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        // 1. Conservamos el username exacto almacenado en sesión para respetar el
+        // contrato del repositorio
+        String normalizedUsername = username.trim();
+
+        // 2. Resolución de identidad transaccional mediante el servicio
+        Users user = userService.findByUsername(normalizedUsername)
+                .orElseThrow(
+                        () -> new ServicesException("Usuario no encontrado para el nombre: " + normalizedUsername));
+
+        // 3. Consulta indexada por clave primaria sobre la relación JOIN FETCH
+        List<Enrollment> enrollments = userService.getStudentActiveCoursesWithCalculatedProgress(user.getUser_id());
+        return ResponseEntity.ok(enrollments);
     }
 
     /**
@@ -133,54 +183,8 @@ public class UserController {
     }
 
     /**
-     * Endpoint unificado para guardar o actualizar los intereses y criterios de
-     * filtrado del alumno en sesión.
-     * Soporta POST y PUT de forma segura para evitar fallos de parpadeo (405 Method
-     * Not Allowed) en el frontend.
-     */
-    @RequestMapping(value = "/my-interests", method = { RequestMethod.POST, RequestMethod.PUT })
-    public ResponseEntity<?> saveStudentInterests(@RequestBody com.cursosonline.backend.dto.InterestDTO interestDTO,
-            Principal principal) {
-        if (principal == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
-        }
-
-        // Invocación a tu servicio (que ya tiene la corrección de sincronización de ID)
-        userService.saveUserInterests(principal.getName(), interestDTO);
-
-        return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Tus preferencias de recomendación han sido guardadas con éxito en PostgreSQL."));
-    }
-
-    /**
-     * Endpoint especializado para la hidratación del bloque de asignaturas en
-     * progreso.
-     * Recibe el username de forma explícita para evitar fallos de inyección (HTTP
-     * 400) con el filtro JWT.
-     */
-    @GetMapping("/my-active-courses")
-    public ResponseEntity<List<Enrollment>> getMyActiveCourses(@RequestParam("username") String username) {
-        if (username == null || username.trim().isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        // 1. Conservamos el username exacto almacenado en sesión para respetar el
-        // contrato del repositorio
-        String normalizedUsername = username.trim();
-
-        // 2. Resolución de identidad transaccional mediante el servicio
-        Users user = userService.findByUsername(normalizedUsername)
-                .orElseThrow(
-                        () -> new ServicesException("Usuario no encontrado para el nombre: " + normalizedUsername));
-
-        // 3. Consulta indexada por clave primaria sobre la relación JOIN FETCH
-        List<Enrollment> enrollments = userService.getStudentActiveCoursesWithCalculatedProgress(user.getUser_id());
-        return ResponseEntity.ok(enrollments);
-    }
-
-    /**
      * Endpoint para obtener el perfil de un usuario específico.
+     * [UBICADO AL FINAL DE LOS GET PARA EVITAR INTERCEPTAR LAS RUTAS ESTÁTICAS]
      */
     @GetMapping("/{username}")
     public ResponseEntity<Users> getUserProfile(@PathVariable String username) {

@@ -18,11 +18,18 @@ export const useCourseCatalog = (onEnrollSuccess: (course: DBModelCourse) => voi
         return () => clearTimeout(delayDebounceFn);
     }, [searchKeyword]);
 
-    const fetchCatalogData = async (keyword: string) => {
+        const fetchCatalogData = async (keyword: string) => {
         setLoadingCatalog(true);
         setCatalogError('');
         try {
-            const response = await apiClient.get(`/api/courses/search?keyword=${encodeURIComponent(keyword)}`);
+            const cleanKeyword = keyword?.trim() || "";
+
+            // Pasamos el parámetro de forma estructurada en el objeto de configuración de Axios
+            // Si está vacío, evitamos mandar la cadena de texto rota '?keyword=' para neutralizar el 400 Bad Request
+            const response = await apiClient.get('/api/courses/search', {
+                params: cleanKeyword ? { keyword: cleanKeyword } : {}
+            });
+
             if (response.status === 200 && response.data) {
                 setCatalogCourses(response.data as DBModelCourse[]);
             }

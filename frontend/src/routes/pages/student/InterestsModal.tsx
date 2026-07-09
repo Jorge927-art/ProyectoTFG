@@ -1,3 +1,5 @@
+// frontend/src/routes/pages/student/components/InterestsModal.tsx (Parte 1 de 2)
+
 import { useState, useEffect } from 'react';
 import { X, Layers, BarChart, Clock, Globe, Subtitles, Check, Loader2 } from 'lucide-react';
 import { apiClient } from '@/services/apiClient';
@@ -32,9 +34,11 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
     // Estado de carga para feedback visual y evitar doble post
     const [loading, setLoading] = useState(false);
 
-    // 3. HIDRATACIÓN: Cargar intereses existentes al abrir el modal [4]
+    // 3. HIDRATACIÓN DE PREFERENCIAS CON DOBLE CORTOCIRCUITO DEFENSIVO
     useEffect(() => {
-        if (isOpen) {
+        const token = localStorage.getItem('token');
+
+        if (isOpen && token) {
             const fetchCurrentInterests = async () => {
                 try {
                     const response = await apiClient.get('/api/auth/my-interests');
@@ -65,9 +69,8 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
 
     // 5. ENVIAR DATOS A POSTGRESQL CON PREVENCIÓN DE CONCURRENCIA
     const handleSave = async () => {
-        setLoading(true); // <── Activamos el feedback visual en la UI
+        setLoading(true);
         try {
-            // Sincronización Real: Mapeamos los arrays reactivos que mutan con los checkboxes
             const payload = {
                 categories: selectedCategories,
                 levels: selectedLevels,
@@ -76,19 +79,18 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
                 subtitles: selectedSubtitles
             };
 
-            // Petición POST al endpoint tolerante del UserController
             await apiClient.post('/api/auth/my-interests', payload);
-
-            onSave(payload); // Notifica al Dashboard padre para actualizar el feed beige
-            onClose();       // Cierra el modal de forma limpia
+            onSave(payload);
+            onClose();
         } catch (error) {
             console.error("Error al guardar intereses:", error);
         } finally {
-            setLoading(false); // <── Aseguramos el apagado del spinner pase lo que pase
+            setLoading(false);
         }
     };
 
     if (!isOpen) return null;
+    // frontend/src/routes/pages/student/components/InterestsModal.tsx (Parte 2 - Bloque A)
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
@@ -110,7 +112,7 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
                 {/* CONTENIDO SCROLLABLE */}
                 <div className="p-6 overflow-y-auto space-y-8 custom-scrollbar">
 
-                    {/* SECCIÓN CATEGORÍAS (ESTANDARIZADA COMO EL RESTO) */}
+                    {/* SECCIÓN CATEGORÍAS */}
                     <section className="space-y-4">
                         <div className="flex items-center gap-2 text-blue-600">
                             <Layers size={18} />
@@ -174,8 +176,10 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
                             </div>
                         </section>
                     </div>
+// frontend/src/routes/pages/student/components/InterestsModal.tsx (Parte 2 - Bloque B)
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* IDIOMAS (ESTANDARIZADO COMO EL RESTO) */}
+                        {/* IDIOMAS */}
                         <section className="space-y-4">
                             <div className="flex items-center gap-2 text-indigo-600">
                                 <Globe size={18} />
@@ -196,7 +200,7 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
                             </div>
                         </section>
 
-                        {/* SUBTÍTULOS (ESTANDARIZADO COMO EL RESTO) */}
+                        {/* SUBTÍTULOS */}
                         <section className="space-y-4">
                             <div className="flex items-center gap-2 text-purple-600">
                                 <Subtitles size={18} />
@@ -219,32 +223,34 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
                     </div>
                 </div>
 
-                {/* PIE DE MODAL (ACCIONES) */}
-                <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50">
+                {/* ACCIONES DEL MODAL */}
+                <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 shrink-0">
                     <button
                         onClick={onClose}
-                        className="px-6 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-200 transition-colors"
+                        disabled={loading}
+                        className="px-5 py-2.5 rounded-2xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-50"
                     >
                         Cancelar
                     </button>
                     <button
                         onClick={handleSave}
                         disabled={loading}
-                        className="bg-slate-800 text-white px-8 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-900 transition-all shadow-lg shadow-slate-200 active:scale-95 flex items-center gap-2 disabled:opacity-70"
+                        className="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm flex items-center gap-2 transition-colors disabled:opacity-50"
                     >
                         {loading ? (
                             <>
-                                <Loader2 className="animate-spin" size={16} />
-                                <span>Guardando...</span>
+                                <Loader2 className="animate-spin" size={14} />
+                                Guardando...
                             </>
                         ) : (
                             <>
-                                <Check size={16} />
-                                <span>Guardar Preferencias</span>
+                                <Check size={14} />
+                                Guardar Preferencias
                             </>
                         )}
                     </button>
                 </div>
+
             </div>
         </div>
     );

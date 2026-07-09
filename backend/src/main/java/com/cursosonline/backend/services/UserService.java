@@ -125,10 +125,10 @@ public class UserService {
     }
 
     /**
-     * Recupera de forma transaccional las preferencias de un estudiante desde
-     * PostgreSQL.
-     * Auditoría NotebookLM: Lanzamiento de ResourceNotFoundException (HTTP 404) en
-     * lugar de RuntimeException. Refactorizado con método privado para cumplir DRY.
+     * Recupera de forma transaccional los intereses de un usuario específico.
+     * 
+     * @param username
+     * @return
      */
     @Transactional(readOnly = true)
     public InterestDTO getUserInterests(String username) {
@@ -147,9 +147,19 @@ public class UserService {
                     Collections.emptyList());
         }
 
-        // CORRECCIÓN SEGURO: Eliminamos initializeUserInterests(interest) para liberar
-        // la sesión de Hibernate y permitir que el método POST/PUT posterior escriba en
-        // PostgreSQL.
+        // [HIDRATACIÓN EXPLÍCITA FORZADA - ADR-31]
+        // Obliga a Hibernate a resolver los proxies de colecciones y serializar los
+        // datos antes de cerrar la sesión
+        if (interest.getCategory() != null)
+            interest.getCategory().size();
+        if (interest.getCourse_type() != null)
+            interest.getCourse_type().size();
+        if (interest.getDuration() != null)
+            interest.getDuration().size();
+        if (interest.getLanguage() != null)
+            interest.getLanguage().size();
+        if (interest.getSubtitle_languages() != null)
+            interest.getSubtitle_languages().size();
 
         return new InterestDTO(
                 interest.getCategory(),
@@ -229,8 +239,9 @@ public class UserService {
         String formattedKeyword = "%" + cleanKeyword + "%"; // Para buscar en cualquier parte
         String startKeyword = cleanKeyword + "%"; // Para priorizar si empieza por la palabra
 
-        // Enviamos los parámetros limpios al repositorio
-        return coursesRepository.searchCoursesPredictive(formattedKeyword, startKeyword, pageSize);
+        // [CORREGIDO] Invocamos al repositorio paginado y desenvolvemos la lista con
+        // .getContent()
+        return coursesRepository.searchCoursesPredictive(formattedKeyword, startKeyword, pageSize).getContent();
     }
 
     /**
