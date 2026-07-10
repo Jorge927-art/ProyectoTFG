@@ -82,7 +82,7 @@ export const CourseCatalog = ({
     };
 
     return (
-        <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm mb-8 max-w-5xl mt-6">
+        <GenericCard className="p-5 mb-8 max-w-5xl mt-6 flex flex-col">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                     <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
@@ -163,6 +163,6 @@ export const CourseCatalog = ({
                     })
                 )}
             </div>
-        </div>
+        </GenericCard>
     );
 };

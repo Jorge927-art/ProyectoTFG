@@ -143,7 +143,7 @@ const StudentDashboard = () => {
 
                     {/* COLUMNA 2 Y 3 (DERECHA): Reordenamiento estratégico de componentes */}
                     <div className="lg:col-span-2 space-y-6">
-                        {/* 1. Tarjeta del Catálogo de Cursos Disponibles */}
+                        {/* Tarjeta del Catálogo de Cursos Disponibles */}
                         <div className="bg-white border rounded-2xl p-6 shadow-sm">
                             <h2 className="text-xl font-bold text-gray-900 mb-4">Catálogo de Cursos Disponibles</h2>
                             <CourseCatalog
@@ -153,19 +153,17 @@ const StudentDashboard = () => {
                                 onSetGlobalSuccess={setSuccessMessage}
                             />
                         </div>
-
                         {/* 2. Tarjeta de la Evaluación Académica Dual (Sube al centro) */}
                         <div className="bg-white border rounded-2xl p-6 shadow-sm">
                             <EvaluationPanel />
                         </div>
 
                         {/* 3. PANEL ANALÍTICO ESTADÍSTICO REACTIVO COMPENSADO [ADR-41] (Baja a la base) */}
-                        <StudentStatsPanel activeCourseId={activeCourseId} enrolledList={enrolledList} />
-
+                        <div className="bg-white border rounded-2xl p-6 shadow-sm">
+                            <StudentStatsPanel activeCourseId={activeCourseId} enrolledList={enrolledList} />
+                        </div>
                     </div>
-
                 </div> {/* Cierre correcto del div grid principal */}
-
                 {/* Modal de Configuración de Intereses */}
                 <InterestsModal
                     isOpen={isModalOpen}
