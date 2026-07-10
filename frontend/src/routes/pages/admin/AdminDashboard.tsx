@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Users, Search, Loader2, Shield } from 'lucide-react';
 import { apiClient } from '@/services/apiClient';
 import axios from 'axios';
+import GenericButton from '../../../components/ui/genericButton/GenericButton';
 import AdminLayout from '../../layouts/DashboardLayout';
 import { UserScrollList } from '../../../components/admin/UserScrollList';
 import type { UserEntity } from '../../../services/userDomains';
@@ -162,15 +163,14 @@ const AdminDashboard = () => {
                             required
                             className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
                         />
-                        <button
+                        <GenericButton
                             type="submit"
                             disabled={loading}
-                            className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-md transition-colors disabled:bg-gray-400 flex items-center justify-center"
-                            title="Buscar en base de datos"
-                            aria-label="Buscar en base de datos"
-                        >
-                            {loading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
-                        </button>
+                            variant="white"
+                            ariaLabel="Buscar en base de datos"
+                            icon={loading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+                            className="p-2! bg-red-600! hover:bg-red-700! text-white! rounded-xl! shadow-md! border border-transparent!"
+                        />
                     </form>
 
                     {/* Manejo de Errores */}
@@ -236,31 +236,25 @@ const AdminDashboard = () => {
                                             Esta es tu cuenta actual. No puedes eliminarte a ti mismo.
                                         </div>
                                     ) : foundUser.enabled === false ? (
-                                        <button
+                                        <GenericButton
                                             type="button"
                                             onClick={handleDeleteUser}
                                             disabled={deleting || updatingId !== null}
-                                            className="w-full py-2 bg-emerald-50 border-2 border-emerald-200 text-emerald-600 rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-emerald-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                                        >
-                                            {deleting ? (
-                                                <Loader2 size={14} className="animate-spin" />
-                                            ) : (
-                                                <>Reactivar y dar de alta usuario</>
-                                            )}
-                                        </button>
+                                            variant="success"
+                                            label={deleting ? 'Reactivando...' : 'Reactivar y dar de alta usuario'}
+                                            icon={deleting ? <Loader2 size={14} className="animate-spin" /> : undefined}
+                                            className="w-full py-2! bg-emerald-50! border-2! border-emerald-200! text-emerald-600! rounded-xl! text-xs! font-bold! uppercase! tracking-wide! hover:bg-emerald-100! transition-all! justify-center! gap-2!"
+                                        />
                                     ) : (
-                                        <button
+                                        <GenericButton
                                             type="button"
                                             onClick={handleDeleteUser}
                                             disabled={deleting || updatingId !== null}
-                                            className="w-full py-2 bg-white border-2 border-blue-200 text-blue-600 rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-blue-50 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                                        >
-                                            {deleting ? (
-                                                <Loader2 size={14} className="animate-spin" />
-                                            ) : (
-                                                <>Baja Temporal Usuario</>
-                                            )}
-                                        </button>
+                                            variant="white"
+                                            label={deleting ? 'Procesando...' : 'Baja Temporal Usuario'}
+                                            icon={deleting ? <Loader2 size={14} className="animate-spin" /> : undefined}
+                                            className="w-full py-2! bg-white! border-2! border-blue-200! text-blue-600! rounded-xl! text-xs! font-bold! uppercase! tracking-wide! hover:bg-blue-50! transition-all! justify-center! gap-2!"
+                                        />
                                     )}
                                 </div>
 

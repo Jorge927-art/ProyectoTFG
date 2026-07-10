@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Upload, FileText, Download, Loader2, AlertCircle, FileUp, Inbox, Send, UserCheck } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
+import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import { useDocuments } from './useDocuments';
 
 export const DocumentManager = () => {
@@ -77,28 +78,28 @@ export const DocumentManager = () => {
 
             {/* BOTONERA DE PESTAÑAS (TABS) INTERACTIVAS */}
             <div className="flex bg-slate-100 p-1 rounded-xl mb-3 shrink-0">
-                <button
+                <GenericButton
                     type="button"
                     onClick={() => setActiveTab('RECEIVED')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${activeTab === 'RECEIVED'
+                    variant="white"
+                    icon={<Inbox size={14} />}
+                    label="Recibidos"
+                    className={`flex-1 justify-center gap-2 py-1.5! text-xs! font-bold! rounded-lg! transition-all! cursor-pointer ${activeTab === 'RECEIVED'
                         ? 'bg-white text-blue-600 shadow-sm'
                         : 'text-slate-500 hover:text-slate-800'
                         }`}
-                >
-                    <Inbox size={14} />
-                    <span>Recibidos</span>
-                </button>
-                <button
+                />
+                <GenericButton
                     type="button"
                     onClick={() => setActiveTab('SENT')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${activeTab === 'SENT'
+                    variant="white"
+                    icon={<Send size={14} />}
+                    label="Enviados"
+                    className={`flex-1 justify-center gap-2 py-1.5! text-xs! font-bold! rounded-lg! transition-all! cursor-pointer ${activeTab === 'SENT'
                         ? 'bg-white text-blue-600 shadow-sm'
                         : 'text-slate-500 hover:text-slate-800'
                         }`}
-                >
-                    <Send size={14} />
-                    <span>Enviados</span>
-                </button>
+                />
             </div>
 
             {/* ALERT BOX CONTROLADO DE ERRORES DEL BACKEND */}
@@ -214,19 +215,15 @@ export const DocumentManager = () => {
                                         </p>
                                     </div>
                                 </div>
-                                <button
+                                <GenericButton
                                     type="button"
                                     onClick={() => handleDownload(doc.documentid, doc.originalname)}
                                     disabled={downloadingId !== null}
-                                    className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors cursor-pointer ml-2 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Descargar documento seguro"
-                                >
-                                    {downloadingId === doc.documentid ? (
-                                        <Loader2 size={14} className="animate-spin text-blue-600" />
-                                    ) : (
-                                        <Download size={14} />
-                                    )}
-                                </button>
+                                    variant="text"
+                                    ariaLabel="Descargar documento seguro"
+                                    icon={downloadingId === doc.documentid ? <Loader2 size={14} className="animate-spin text-blue-600" /> : <Download size={14} />}
+                                    className="p-1.5! text-slate-500! hover:text-blue-600! hover:bg-blue-50! rounded-md! transition-colors! cursor-pointer! ml-2! shrink-0! disabled:opacity-50! disabled:cursor-not-allowed! bg-transparent! shadow-none!"
+                                />
                             </div>
                         ))
                     )}

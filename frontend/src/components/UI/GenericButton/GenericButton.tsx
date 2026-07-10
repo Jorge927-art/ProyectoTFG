@@ -1,91 +1,103 @@
+// frontend/src/components/ui/genericButton/GenericButton.tsx
 import type { ReactNode, MouseEventHandler } from "react";
 
-/** Variantes visuales disponibles para el botón. */
-type ButtonVariant = 'white' | 'search' | 'category';
+/** Variantes visuales disponibles para el botón extendidas según [ADR-13]. */
+type ButtonVariant = 'white' | 'search' | 'category' | 'dark' | 'primary' | 'success' | 'text';
 
 /**
- * Props del componente GenericButton.
+ * Props del componente GenericButton con soporte para atributos HTML nativos.
  * 
  * @interface GenericButtonProps
- * @property {string} [label] - Texto que se muestra en el botón. Si no se proporciona, solo se renderiza el icono.
- * @property {ReactNode} [icon] - Icono que se muestra a la izquierda del texto. Debe ser un elemento React o componente.
- * @property {MouseEventHandler} [onClick] - Callback ejecutado al hacer clic en el botón.
- * @property {ButtonVariant} [variant='white'] - Variante visual del botón que determina estilos y comportamiento.
- *   - 'white': Botón blanco con bordes grises (default, para contextos claros)
- *   - 'search': Botón redondeado para barra de búsqueda (forma más suave)
- *   - 'category': Botón sin relleno hasta hover, para listas de categorías
  */
 interface GenericButtonProps {
     label?: string;
+    ariaLabel?: string;
+    title?: string;
     icon?: ReactNode;
     onClick?: MouseEventHandler<HTMLButtonElement>;
     variant?: ButtonVariant;
+    type?: 'button' | 'submit' | 'reset'; // Soporte para comportamiento de formularios
+    disabled?: boolean;                   // Soporte para estados operacionales de carga
+    className?: string;                  // Inyección segura de márgenes/posiciones externas
 }
 
 /**
- * Botón genérico reutilizable con múltiples variantes visuales.
+ * Botón genérico reutilizable con múltiples variantes visuales y funcionales.
  * 
- * CASOS DE USO:
- * - variant='white': Botones de acción general (login, submit, etc.)
- * - variant='search': Botón en barras de búsqueda
- * - variant='category': Elementos seleccionables en listas
- * 
- * El componente soporta renderizar solo icono, solo texto, o ambos combinados.
- * Los estilos se aplican en cascada: clases base → variantes específicas → validaciones.
- * 
- * @component
- * @example
- * // Botón con icono y texto
- * <GenericButton label="Search" icon={<SearchIcon />} variant="search" />
- * 
- * @example
- * // Botón de categoría sin icono
- * <GenericButton label="Technology" variant="category" onClick={handleSelect} />
+ * CASOS DE USO ASIGNADOS:
+ * - variant='white': Botones de acción general o secundaria.
+ * - variant='search': Botón redondeado para barras de búsqueda.
+ * - variant='category': Elementos seleccionables en listas laterales.
+ * - variant='dark': Acciones críticas oscuras (Access Denied / Auth base).
+ * - variant='primary': Acciones principales del flujo (Matriculación / Configuración).
+ * - variant='success': Éxito académico en hot-reload (Iniciar/Continuar asignatura).
  * 
  * @param {GenericButtonProps} props - Props del botón
- * @returns {JSX.Element} El elemento button con estilos aplicados
+ * @returns {JSX.Element} El elemento button con estilos unificados y reactivos
  */
-const GenericButton = ({ label, icon, onClick, variant = 'white' }: GenericButtonProps) => {
-    // Flags booleanos para determinar qué variante se está usando.
-    // Simplifica la lógica de renderizado comparando contra la variante elegida.
+const GenericButton = ({
+    label,
+    ariaLabel,
+    title,
+    icon,
+    onClick,
+    variant = 'white',
+    type = 'button',
+    disabled = false,
+    className = ''
+}: GenericButtonProps) => {
+
+    // Identificadores booleanos de variante para el enrutador de clases Tailwind v4
     const isSearch = variant === 'search';
     const isCategory = variant === 'category';
+    const isDark = variant === 'dark';
+    const isPrimary = variant === 'primary';
+    const isSuccess = variant === 'success';
 
-    // Clases base aplicadas a todas las variantes.
-    // Incluyen: flexbox layout, transiciones suaves, estados de foco/activo.
+    // Clases base transversales: interactividad, transiciones y anillos de foco estandarizados
     const baseClasses = [
-        'flex items-center gap-3',
+        'flex items-center gap-3 font-medium text-xs sm:text-sm',
         'transition-all duration-300 ease-in-out',
-        'active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500',
+        'active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500/50',
+        'disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100'
     ].join(' ');
+    // Enrutador semántico de clases específicas por variante visual
+    const isText = variant === 'text'; // Agrega este flag arriba con los demás
 
-    // Clases específicas por variante visual.
-    // Cada variante tiene su propio estilo de fondo, bordes y comportamiento hover.
-    // Se aplica una sola variante a la vez (se usan condicionales ternarios).
     const variantClasses = isSearch
         ? 'bg-white text-gray-700 border border-gray-200 p-3 rounded-full hover:bg-blue-300'
         : isCategory
             ? 'w-full px-4 py-3 text-left rounded-xl hover:bg-blue-50 hover:text-blue-600 border border-transparent hover:border-blue-100'
-            : 'bg-white text-gray-700 border border-gray-200 shadow-sm hover:bg-blue-300'; // white (default)
+            : isDark
+                ? 'bg-slate-800 text-white hover:bg-slate-900 border border-transparent shadow-sm'
+                : isPrimary
+                    ? 'bg-indigo-600 text-white hover:bg-indigo-700 border border-transparent shadow-sm'
+                    : isSuccess
+                        ? 'bg-emerald-600 text-white hover:bg-emerald-700 border border-transparent shadow-sm'
+                        : isText
+                            ? 'bg-transparent text-slate-500 hover:bg-slate-100 border border-transparent' // Nueva variante limpia
+                            : 'bg-white text-gray-700 border border-gray-200 shadow-sm hover:bg-blue-300';
 
-    // Clases adicionales solo para la variante 'white'.
-    // Se añaden padding y centrado, pero solo si NO es search ni category.
-    const additionalClasses = !isSearch && !isCategory ? 'px-6 py-2 rounded-lg justify-center' : '';
+    // Clases de padding y centrado estándar para variantes no-atómicas (Excluye búsqueda y categorías)
+    const additionalClasses = !isSearch && !isCategory ? 'px-4 py-2 rounded-lg justify-center' : '';
 
-    // Combinamos todas las clases en orden: base → variante → adicionales
-    const buttonClasses = `${baseClasses} ${variantClasses} ${additionalClasses}`;
+    // Unión limpia de clases: base → variante → adicionales fijas → inyección personalizada externa
+    const buttonClasses = `${baseClasses} ${variantClasses} ${additionalClasses} ${className}`.trim();
 
     return (
         <button
+            type={type}
             onClick={onClick}
             className={buttonClasses}
-            aria-label={label}
+            disabled={disabled}
+            aria-label={ariaLabel || label}
+            title={title}
         >
-            {/* Renderizar icono si existe. Se envuelve en un contenedor flex para alineación. */}
-            {icon && <span className="flex items-center">{icon}</span>}
+            {/* Renderizado dinámico del icono respetando la alineación flex */}
+            {icon && <span className="flex items-center shrink-0">{icon}</span>}
 
-            {/* Renderizar etiqueta de texto si existe. Usa font-medium para resalte visual. */}
-            {label && <span className="font-medium leading-none">{label}</span>}
+            {/* Renderizado del texto adaptivo leading-none */}
+            {label && <span className="leading-none">{label}</span>}
         </button>
     );
 };

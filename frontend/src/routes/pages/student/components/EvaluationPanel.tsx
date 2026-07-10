@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Star, MessageSquare, UserCheck, Loader2, AlertCircle, CheckCircle2, Send } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
+import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import { useActiveEvaluations } from './useActiveEvaluations';
 import type { EvaluationInput } from '../../../../services/evaluationService';
 
@@ -100,15 +101,16 @@ export const EvaluationPanel = () => {
                                         <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Calidad del curso</label>
                                         <div className="flex gap-1">
                                             {RATING_RANGE.map((star) => (
-                                                <button
+                                                <GenericButton
                                                     key={star}
                                                     type="button" // DIRECTION NOTEBOOKLM: Evita comportamientos por defecto
                                                     title={`Calificar curso con ${star} estrellas`}
                                                     onClick={() => handleRatingChange(item.enrollmentid, 'course_score', star)}
-                                                    className={`transition-transform active:scale-125 ${(state.course_score || 0) >= star ? 'text-amber-400' : 'text-slate-200'}`}
-                                                >
-                                                    <Star size={16} fill={(state.course_score || 0) >= star ? "currentColor" : "none"} />
-                                                </button>
+                                                    variant="text"
+                                                    ariaLabel={`Calificar curso con ${star} estrellas`}
+                                                    icon={<Star size={16} fill={(state.course_score || 0) >= star ? "currentColor" : "none"} />}
+                                                    className={`p-0! gap-0! bg-transparent! shadow-none! transition-transform! active:scale-125! ${(state.course_score || 0) >= star ? 'text-amber-400!' : 'text-slate-200!'}`}
+                                                />
                                             ))}
                                         </div>
                                     </div>
@@ -116,18 +118,16 @@ export const EvaluationPanel = () => {
                                         <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Desempeño docente</label>
                                         <div className="flex gap-1">
                                             {RATING_RANGE.map((star) => (
-                                                <button
+                                                <GenericButton
                                                     key={star}
                                                     type="button" // DIRECTION NOTEBOOKLM: Evita comportamientos de formulario por defecto
                                                     title={`Calificar profesor con ${star} estrellas`}
                                                     onClick={() => handleRatingChange(item.enrollmentid, 'instructor_score', star)}
-                                                    className={`transition-all transform active:scale-150 ${(state.instructor_score || 0) >= star ? 'text-blue-400' : 'text-slate-200'}`}
-                                                >
-                                                    <Star
-                                                        size={16}
-                                                        fill={(state.instructor_score || 0) >= star ? "currentColor" : "none"}
-                                                    />
-                                                </button>
+                                                    variant="text"
+                                                    ariaLabel={`Calificar profesor con ${star} estrellas`}
+                                                    icon={<Star size={16} fill={(state.instructor_score || 0) >= star ? "currentColor" : "none"} />}
+                                                    className={`p-0! gap-0! bg-transparent! shadow-none! transition-all! transform! active:scale-150! ${(state.instructor_score || 0) >= star ? 'text-blue-400!' : 'text-slate-200!'}`}
+                                                />
                                             ))}
                                         </div>
                                     </div>
@@ -144,17 +144,15 @@ export const EvaluationPanel = () => {
                                     />
                                 </div>
 
-                                <button
+                                <GenericButton
+                                    variant="dark"
                                     disabled={!canSubmit}
                                     onClick={() => handleSend(item.enrollmentid, item.course.course_id)}
-                                    className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-black transition-all ${canSubmit
-                                        ? 'bg-slate-800 text-white hover:bg-black'
-                                        : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-                                        }`}
-                                >
-                                    {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                                    ENVIAR EVALUACIÓN
-                                </button>
+                                    className="w-full text-[10px] font-black uppercase tracking-wider py-2"
+                                    label={isSubmitting ? "Enviando..." : "ENVIAR EVALUACIÓN"}
+                                    icon={isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                                />
+
                             </div>
                         );
                     })

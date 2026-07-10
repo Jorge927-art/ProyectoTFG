@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { X, Layers, BarChart, Clock, Globe, Subtitles, Check, Loader2 } from 'lucide-react';
 import { apiClient } from '@/services/apiClient';
+import GenericButton from "../../../components/ui/genericButton/GenericButton";
+
 
 interface InterestsModalProps {
     isOpen: boolean;
@@ -102,11 +104,12 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
                         <h2 className="text-xl font-black text-slate-800 tracking-tight">Personaliza tu Experiencia</h2>
                         <p className="text-slate-500 text-xs font-medium">Ajusta tus preferencias para mejorar el motor de recomendaciones.</p>
                     </div>
-                    <button onClick={onClose}
-                        aria-label="Cerrar Modal"
-                        className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-400">
-                        <X size={20} />
-                    </button>
+                    <GenericButton
+                        variant="search"
+                        onClick={onClose}
+                        icon={<X size={20} className="text-slate-400" />}
+                        className="!p-2 hover:bg-slate-200"
+                    />
                 </div>
 
                 {/* CONTENIDO SCROLLABLE */}
@@ -176,7 +179,6 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
                             </div>
                         </section>
                     </div>
-// frontend/src/routes/pages/student/components/InterestsModal.tsx (Parte 2 - Bloque B)
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {/* IDIOMAS */}
@@ -222,35 +224,28 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
                         </section>
                     </div>
                 </div>
-
-                {/* ACCIONES DEL MODAL */}
+                {/* ACCIONES DEL MODAL MIGRADAS A GENERICBUTTON [ADR-13] */}
                 <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 shrink-0">
-                    <button
-                        onClick={onClose}
-                        disabled={loading}
-                        className="px-5 py-2.5 rounded-2xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-50"
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={loading}
-                        className="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm flex items-center gap-2 transition-colors disabled:opacity-50"
-                    >
-                        {loading ? (
-                            <>
-                                <Loader2 className="animate-spin" size={14} />
-                                Guardando...
-                            </>
-                        ) : (
-                            <>
-                                <Check size={14} />
-                                Guardar Preferencias
-                            </>
-                        )}
-                    </button>
-                </div>
 
+                    {/* Botón secundario Cancelar */}
+                    <GenericButton
+                        variant="white"
+                        disabled={loading}
+                        onClick={onClose}
+                        label="Cancelar"
+                        className="rounded-2xl text-xs font-bold px-6 py-2.5 shadow-sm bg-slate-200! hover:bg-slate-200!"
+                    />
+
+                    {/* Botón principal Guardar Preferencias */}
+                    <GenericButton
+                        variant="primary"
+                        disabled={loading}
+                        onClick={handleSave}
+                        className="rounded-2xl text-xs font-bold px-6 py-2.5 shadow-sm bg-blue-600! hover:bg-blue-700!"
+                        label={loading ? "Guardando..." : "Guardar Preferencias"}
+                        icon={loading ? <Loader2 className="animate-spin" size={14} /> : <Check size={14} />}
+                    />
+                </div>
             </div>
         </div>
     );

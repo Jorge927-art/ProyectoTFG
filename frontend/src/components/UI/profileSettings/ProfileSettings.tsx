@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { User, Phone, MapPin, Upload, RefreshCw, CheckCircle, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import GenericCard from '../genericCard/GenericCard';
+import GenericButton from '../genericButton/GenericButton';
+
 import { getProfile, updateProfileData, uploadAvatarFile } from '../../../services/profileService';
 import type { ProfileData } from '../../../services/profileService';
 
@@ -103,21 +105,17 @@ export default function ProfileSettings() {
                     </h1>
                     <p className="text-xs text-slate-400 mt-1">Amplía tus datos de contacto y gestiona tu imagen de usuario</p>
                 </div>
-
-                <button
+                <GenericButton
+                    variant="success"
+                    label="Volver al Panel"
+                    icon={<ArrowLeft size={14} />}
                     onClick={() => {
                         if (profile?.role === 'ADMIN') navigate('/admin');
                         else if (profile?.role === 'PROFESSOR') navigate('/professor');
                         else navigate('/student');
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors shadow-sm self-start sm:self-center cursor-pointer border border-transparent"
-                >
-                    <ArrowLeft size={14} />
-                    <span>Volver al Panel</span>
-                </button>
-
-
-
+                    className="gap-1.5! px-3! py-1.5! text-xs! font-bold! rounded-lg shadow-sm self-start sm:self-center cursor-pointer border border-transparent"
+                />
 
             </header>
 
@@ -186,20 +184,14 @@ export default function ProfileSettings() {
                             </div>
 
                             <div className="flex justify-end pt-2">
-                                <button
+                                <GenericButton
                                     type="submit"
+                                    variant="primary"
                                     disabled={updatingText}
-                                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-bold py-2 px-4 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
-                                >
-                                    {updatingText ? (
-                                        <>
-                                            <RefreshCw size={14} className="animate-spin" />
-                                            <span>Guardando...</span>
-                                        </>
-                                    ) : (
-                                        <span>Guardar Cambios</span>
-                                    )}
-                                </button>
+                                    className="gap-1.5! text-xs! font-bold! py-2! px-4! rounded-lg cursor-pointer shadow-sm"
+                                    label={updatingText ? 'Guardando...' : 'Guardar Cambios'}
+                                    icon={updatingText ? <RefreshCw size={14} className="animate-spin" /> : undefined}
+                                />
                             </div>
                         </form>
                     </GenericCard>

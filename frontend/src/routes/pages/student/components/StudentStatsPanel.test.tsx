@@ -38,7 +38,7 @@ describe('StudentStatsPanel - Pruebas de Control [ADR-41]', () => {
 
     it('debería renderizar el mensaje de respaldo cuando no existen valoraciones registradas', () => {
         // ACT
-        render(<StudentStatsPanel activeCourseId={1} />);
+        render(<StudentStatsPanel activeCourseId={1} enrolledList={[]} />);
 
         // ASSERT: Validamos que se muestren tus textos reales de nulidad pedagógica
         const fallbackTexts = screen.getAllByText(/Sin valoraciones/i);
@@ -47,10 +47,11 @@ describe('StudentStatsPanel - Pruebas de Control [ADR-41]', () => {
 
     it('debería mantener de forma estricta la clase h-102 para garantizar la simetría geométrica de la UI', () => {
         // ACT
-        const { container } = render(<StudentStatsPanel activeCourseId={1} />);
-        const card = container.querySelector('article');
-
-        // ASSERT: Verificamos tu clase real h-102 para evitar falsos negativos en Vitest
-        expect(card).toHaveClass('h-102');
+        render(<StudentStatsPanel activeCourseId={1} enrolledList={[]} />);
+        // ASSERT: Como la altura h-120 se gestiona en el layout del Dashboard, 
+        // el componente estadístico debe ser flexible (flex-1) para ocupar todo el espacio asignado.
+        const article = screen.getByRole('article');
+        expect(article).toHaveClass('flex-1');
     });
+
 });

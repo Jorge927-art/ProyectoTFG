@@ -1,6 +1,7 @@
 import { useState } from 'react'; // Añadido useEffect para capturar la estampa de tiempo
 import { BookOpen, Loader2, ArrowRight, Clock } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
+import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import type { EnrollmentInfo } from '../../../../services/courseTypes';
 import { apiClient } from '../../../../services/apiClient';
 
@@ -145,24 +146,15 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh }:
 
                                         {/* CONDICIONAL: Si no está iniciado, pinta el botón azul de acción */}
                                         {!isStarted ? (
-                                            <button
+                                            <GenericButton
                                                 type="button"
                                                 disabled={mutatingId !== null}
                                                 onClick={() => handleStartCourse(enroll.enrollmentid)}
-                                                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-bold py-2 px-3 rounded-lg transition-all active:scale-[0.98] flex items-center justify-center gap-1 shrink-0 cursor-pointer disabled:cursor-not-allowed"
-                                            >
-                                                {isThisMutating ? (
-                                                    <>
-                                                        <Loader2 size={14} className="animate-spin" />
-                                                        <span>Iniciando...</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <span>Iniciar curso</span>
-                                                        <ArrowRight size={14} />
-                                                    </>
-                                                )}
-                                            </button>
+                                                variant="primary"
+                                                label={isThisMutating ? 'Iniciando...' : 'Iniciar curso'}
+                                                icon={isThisMutating ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+                                                className="w-full gap-1! text-xs! font-bold! py-2! px-3! rounded-lg! transition-all! active:scale-[0.98]! justify-center! shrink-0! cursor-pointer! disabled:cursor-not-allowed!"
+                                            />
                                         ) : (
                                             /* Si ya está en curso, se despliega un estado deshabilitado elegante en tono esmeralda */
                                             <div className="w-full bg-emerald-50 text-emerald-700 text-xs font-bold py-2 px-3 rounded-lg border border-emerald-100 flex items-center justify-center gap-1 text-center select-none">

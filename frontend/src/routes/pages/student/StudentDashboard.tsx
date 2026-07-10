@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Sparkles, SlidersHorizontal, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import GenericButton from '../../../components/ui/genericButton/GenericButton';
 
 // Importación del Layout unificado según [ADR-10]
 import DashboardLayout from '../../layouts/DashboardLayout';
@@ -77,13 +78,13 @@ const StudentDashboard = () => {
                         <h1 className="text-3xl font-bold tracking-tight text-gray-900">Intereses del Estudiante</h1>
                         <p className="text-gray-500 mt-1">Configura tus intereses académicos para recibir sugerencias exclusivas y optimizar tu catálogo</p>
                     </div>
-                    <button
+                    <GenericButton
                         onClick={() => setIsModalOpen(true)}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm transition-colors shadow-sm self-start md:self-auto"
-                    >
-                        <SlidersHorizontal className="h-4 w-4" />
-                        <span>Configurar Intereses</span>
-                    </button>
+                        variant="primary"
+                        icon={<SlidersHorizontal className="h-4 w-4" />}
+                        label="Configurar Intereses"
+                        className="gap-2! px-4! py-2! text-sm! font-medium! rounded-lg! shadow-sm self-start md:self-auto"
+                    />
                 </div>
 
                 {/* Mensajes de Estado Operacionales */}

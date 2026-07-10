@@ -1,6 +1,7 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ChangeEvent } from 'react';
 import Input from '../Input';
+import GenericButton from '../genericButton/GenericButton';
 import axios from 'axios';
 import { useAuth } from '@/auth';
 import type { AuthTokenResponse } from '@/auth/authTypes';
@@ -140,17 +141,24 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
                 <form onSubmit={handleSubmit} className='flex flex-col gap-4'>
                     <Input name='username' type='text' placeholder='Nombre de usuario' value={formData.username} onChange={handleChange} autoComplete='off' required />
                     <Input name='password' type='password' placeholder='Contraseña' value={formData.password} onChange={handleChange} autoComplete='current-password' required />
-                    <button type='submit' disabled={loading} className={`py-3 rounded-xl font-bold transition-all active:scale-95 shadow-lg ${loading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'} text-white`}>
-                        {loading ? 'Procesando...' : 'Entrar'}
-                    </button>
+                    <GenericButton
+                        type='submit'
+                        variant='primary'
+                        disabled={loading}
+                        label={loading ? 'Procesando...' : 'Entrar'}
+                        className='w-full py-3! rounded-xl! font-bold! shadow-lg!'
+                    />
                 </form>
 
                 <div className='mt-6 text-center text-sm text-gray-600'>
                     <p>
                         {isLoginView ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}
-                        <button onClick={() => { setIsLoginView(!isLoginView); setError(''); setFormData(initialFormState); }} className='text-blue-600 font-bold hover:underline ml-1'>
-                            {isLoginView ? 'Regístrate aquí' : 'Inicia sesión'}
-                        </button>
+                        <GenericButton
+                            variant='text'
+                            onClick={() => { setIsLoginView(!isLoginView); setError(''); setFormData(initialFormState); }}
+                            label={isLoginView ? 'Regístrate aquí' : 'Inicia sesión'}
+                            className='ml-1! px-0! py-0! text-blue-600! font-bold! bg-transparent! shadow-none! hover:bg-transparent!'
+                        />
                     </p>
                 </div>
             </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BookOpen, ArrowRight, Activity } from 'lucide-react';
+import GenericButton from '../../../components/ui/genericButton/GenericButton';
 import GenericCard from '../../../components/ui/genericCard/GenericCard';
 import ProfessorLayout from '../../layouts/DashboardLayout';
 
@@ -79,10 +80,12 @@ const ProfessorDashboard = () => {
                                         <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
                                             <div className={`bg-blue-600 h-full transition-all duration-500 ${tailwindWidthClass}`} />
                                         </div>
-                                        <button className="w-full bg-slate-800 hover:bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1">
-                                            <span>Gestionar Curso</span>
-                                            <ArrowRight size={14} />
-                                        </button>
+                                        <GenericButton
+                                            variant="dark"
+                                            label="Gestionar Curso"
+                                            icon={<ArrowRight size={14} />}
+                                            className="w-full flex-row-reverse! gap-1! text-xs! font-bold! py-2! px-3! rounded-lg! justify-center"
+                                        />
                                     </div>
                                 </GenericCard>
                             );

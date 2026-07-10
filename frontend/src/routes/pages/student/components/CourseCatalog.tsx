@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useCourseCatalog } from './useCourseCatalog';
 import type { DBModelCourse } from '../../../../services/courseTypes';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
+import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import { useAuth } from '../../../../auth/useAuth';
 import type { EnrollmentInfo } from '../../../../services/courseTypes';
 
@@ -133,28 +134,24 @@ export const CourseCatalog = ({
                                         </div>
 
                                         {enrolled ? (
-                                            <button
+                                            <GenericButton
                                                 type="button"
                                                 disabled
-                                                className="bg-emerald-50 text-emerald-700 text-[10px] font-bold py-1.5 px-3 rounded-lg flex items-center gap-1 border border-emerald-200 cursor-not-allowed w-fit"
-                                            >
-                                                <CheckCircle2 size={12} className="text-emerald-600" />
-                                                <span>✓ Inscrito</span>
-                                            </button>
+                                                variant="success"
+                                                label="✓ Inscrito"
+                                                icon={<CheckCircle2 size={12} className="text-emerald-600" />}
+                                                className="bg-emerald-50! text-emerald-700! text-[10px]! font-bold! py-1.5! px-3! rounded-lg! border border-emerald-200! cursor-not-allowed! w-fit! gap-1!"
+                                            />
                                         ) : (
-                                            <button
+                                            <GenericButton
                                                 type="button"
                                                 disabled={enrollingId === course.course_id}
                                                 onClick={() => handleEnrollCourse(course.course_id)}
-                                                className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:bg-slate-300 disabled:cursor-not-allowed w-fit"
-                                            >
-                                                {enrollingId === course.course_id ? (
-                                                    <Loader2 size={12} className="animate-spin" />
-                                                ) : (
-                                                    <PlusCircle size={12} />
-                                                )}
-                                                <span>Matricularme</span>
-                                            </button>
+                                                variant="primary"
+                                                label="Matricularme"
+                                                icon={enrollingId === course.course_id ? <Loader2 size={12} className="animate-spin" /> : <PlusCircle size={12} />}
+                                                className="bg-blue-600! hover:bg-blue-700! text-white! text-[10px]! font-bold! py-1.5! px-3! rounded-lg! transition-colors! cursor-pointer! disabled:bg-slate-300! disabled:cursor-not-allowed! w-fit! gap-1!"
+                                            />
                                         )}
                                     </div>
                                 </div>

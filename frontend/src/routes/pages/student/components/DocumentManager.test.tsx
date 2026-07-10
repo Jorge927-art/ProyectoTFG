@@ -11,6 +11,7 @@ vi.mock('./useDocuments', () => ({
 describe('DocumentManager Component [TFG Test Suite]', () => {
     // Definimos variables de mock que satisfacen estrictamente la interfaz del hook
     const mockHandleUpload = vi.fn();
+    const mockHandleSecureDownload = vi.fn();
     const mockSetDocumentError = vi.fn();
     const mockSetActiveTab = vi.fn();
     const mockSetSelectedReceiverId = vi.fn();
@@ -34,7 +35,8 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
             loadingDirectory: false,
             selectedReceiverId: '',
             setSelectedReceiverId: mockSetSelectedReceiverId,
-            handleUpload: mockHandleUpload
+            handleUpload: mockHandleUpload,
+            handleSecureDownload: mockHandleSecureDownload
         });
     });
     it('debe renderizar el estado vacío contextualizado en la bandeja de entrada por defecto', () => {
@@ -58,7 +60,8 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
             loadingDirectory: false,
             selectedReceiverId: '',
             setSelectedReceiverId: mockSetSelectedReceiverId,
-            handleUpload: mockHandleUpload
+            handleUpload: mockHandleUpload,
+            handleSecureDownload: mockHandleSecureDownload
         });
 
         render(<DocumentManager />);
@@ -91,7 +94,8 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
             loadingDirectory: false,
             selectedReceiverId: '',
             setSelectedReceiverId: mockSetSelectedReceiverId,
-            handleUpload: mockHandleUpload
+            handleUpload: mockHandleUpload,
+            handleSecureDownload: mockHandleSecureDownload
         });
 
         render(<DocumentManager />);
@@ -114,7 +118,8 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
             loadingDirectory: false,
             selectedReceiverId: '',
             setSelectedReceiverId: mockSetSelectedReceiverId,
-            handleUpload: mockHandleUpload
+            handleUpload: mockHandleUpload,
+            handleSecureDownload: mockHandleSecureDownload
         });
 
         render(<DocumentManager />);
@@ -146,7 +151,8 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
             loadingDirectory: false,
             selectedReceiverId: 2, // Desbloqueado
             setSelectedReceiverId: mockSetSelectedReceiverId,
-            handleUpload: mockHandleUpload
+            handleUpload: mockHandleUpload,
+            handleSecureDownload: mockHandleSecureDownload
         });
 
         render(<DocumentManager />);

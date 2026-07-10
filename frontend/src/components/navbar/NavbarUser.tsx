@@ -100,14 +100,13 @@ const NavbarUser = ({ username, userPhoto, onLogout }: NavbarUserProps) => {
                     icon={avatarIcon}
                 />
 
-                <button
+                <GenericButton
                     onClick={onLogout}
-                    className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                    title="Cerrar sesión"
-                    aria-label="Cerrar sesión"
-                >
-                    <LogOut size={18} />
-                </button>
+                    variant="text"
+                    ariaLabel="Cerrar sesión"
+                    icon={<LogOut size={18} />}
+                    className="p-2! text-gray-400! hover:text-red-500! bg-transparent! shadow-none!"
+                />
             </div>
         </nav>
     );

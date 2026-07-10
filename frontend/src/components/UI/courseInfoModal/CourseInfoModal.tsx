@@ -1,5 +1,6 @@
 import { useState } from "react";
 import AuthModal from "../authModal/AuthModal";
+import GenericButton from "../genericButton/GenericButton";
 
 interface CourseCategory {
     /** Identificador único de la categoría. */
@@ -89,15 +90,13 @@ const CourseInfoModal = ({ isOpen, onClose }: CourseInfoModalProps) => {
                                 <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Catálogo de Especialidades</h2>
                                 <p className="text-slate-500 text-sm">Contamos con más de 10,000 cursos activos.</p>
                             </div>
-                            <button
+                            <GenericButton
                                 onClick={onClose}
-                                className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
-                                aria-label="Cerrar modal"
-                            >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
+                                variant="text"
+                                ariaLabel="Cerrar modal"
+                                icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>}
+                                className="p-2! text-slate-400! hover:text-slate-600! bg-transparent! shadow-none!"
+                            />
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-6 bg-white">
@@ -124,7 +123,7 @@ const CourseInfoModal = ({ isOpen, onClose }: CourseInfoModalProps) => {
                                     Regístrate ahora y accede al cuestionario para obtener recomendaciones personalizadas.
                                 </p>
                             </div>
-                            <button
+                            <GenericButton
                                 onClick={() => {
                                     // PASO 1: Cerrar el modal informativo de cursos.
                                     // El usuario ha visto el catálogo y está listo para avanzar al siguiente paso.
@@ -153,10 +152,10 @@ const CourseInfoModal = ({ isOpen, onClose }: CourseInfoModalProps) => {
                                     // setIsAuthModalOpen(true) primero, React intentaría renderizar ambos
                                     // modales simultáneamente, causando conflictos visuales.
                                 }}
-                                className="px-8 py-3 bg-white text-blue-600 font-bold rounded-xl shadow-lg hover:bg-blue-50 transition-all active:scale-95"
-                            >
-                                Registrarme y recibir recomendaciones
-                            </button>
+                                variant="white"
+                                label="Registrarme y recibir recomendaciones"
+                                className="px-8! py-3! text-blue-600! font-bold! rounded-xl! shadow-lg! hover:bg-blue-50!"
+                            />
                         </div>
                     </div>
                 </div>
