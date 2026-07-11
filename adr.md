@@ -982,6 +982,34 @@ La vista de error por falta de privilegios (`AccessDenied.tsx`) utilizaba etique
 
 ---
 
+## ADR-47: Purificación Visual de Dashboards y Centralización de Componentes de Enrutamiento
+
+### Estado
+
+Aceptado (Julio 2026)
+
+### Contexto
+
+Tras la auditoría del frontend y la optimización de seguridad stateless basada en JWT [ADR-20], el sistema presentaba acoplamientos y redundancias arquitectónicas:
+
+1. Las cabeceras principales de entrada en los paneles principales (Dashboards de Alumno, Profesor y Administrador) utilizaban etiquetas HTML cableadas manualmente, desalineadas con las directrices de reutilización de la interfaz [ADR-13].
+2. Los filtros del buscador del catálogo de asignaturas y de usuarios administrativos utilizaban inputs nativos independientes en lugar de delegar en el componente genérico del sistema.
+3. Existían tres guardianes de ruta satélites redundantes (`StudentRoute.tsx`, `AdminRoute.tsx` y `ProfessorRoute.tsx`) que actuaban como simples envoltorios de una línea hacia el componente central de seguridad.
+
+### Decisiones
+
+1. **Unificación Visual de Dashboards [ADR-13]:** Se implementó de forma obligatoria el componente core reutilizable `<GenericHeader />` en la raíz de los tres paneles principales para proporcionar la bienvenida institucional, separándolo de las tarjetas internas con micro-encabezados ligeros.
+2. **Adopción de Componente Input Core:** Se sustituyeron todas las etiquetas `<input>` manuales en los buscadores por el componente corporativo `<Input />`, estandarizando de forma nativa el estilo `bg-gray-50` y el anillo de enfoque `focus:ring-blue-500`.
+3. **Eliminación Física de Guardianes Satélites:** Se borraron de manera definitiva del disco duro los archivos `StudentRoute.tsx`, `AdminRoute.tsx` y `ProfessorRoute.tsx`. Los roles se parametrizan directamente de forma centralizada en el archivo de rutas `index.tsx` mediante el atributo `allowedRoles` del componente unificado `ProtectedRoute.tsx`.
+4. **Blindaje de Punteros Nulos en Backend [ADR-19]:** Se refactorizó el stream de afinidad académica en `RecommendationService.java` para evaluar sobre una colección segura (`safeEnrollments`), eliminando riesgos de regresión `NullPointerException` en caliente.
+
+### Consecuencias
+
+* **Positivas:** Reducción drástica del acoplamiento en el árbol de componentes del frontend (*component hell*). Consistencia visual estricta en toda la experiencia de usuario. Estructura de directorios del repositorio 100% limpia de código inerte o de andamiaje.
+* **Negativas:** Ninguna. Las suites de pruebas automatizadas de Vitest (`test ok`) y de integración de Maven (`BUILD SUCCESS`) se mantienen al 100% en verde.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026
