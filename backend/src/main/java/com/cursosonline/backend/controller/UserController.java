@@ -9,6 +9,7 @@ import com.cursosonline.backend.exception.ServicesException;
 import com.cursosonline.backend.security.jwt.JwtService;
 import com.cursosonline.backend.services.UserService;
 import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.UserProfileRepository;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,6 +31,7 @@ public class UserController {
     private final UserService userService;
     private final JwtService jwtService;
     private final EnrollmentRepository enrollmentRepository;
+    private final UserProfileRepository userProfileRepository;
 
     /**
      * Endpoint para el registro de nuevos usuarios.
@@ -46,6 +48,9 @@ public class UserController {
     public ResponseEntity<AuthTokenResponse> login(@RequestBody LoginRequest loginRequest) {
         Users user = userService.login(loginRequest.username(), loginRequest.password());
         List<Long> enrolledCourseIds = enrollmentRepository.findEnrolledCourseIdsByUserId(user.getUser_id());
+        String avatarPath = userProfileRepository.findById(user.getUser_id())
+                .map(profile -> profile.getAvatarPath() != null ? profile.getAvatarPath() : "")
+                .orElse("");
 
         String jwtToken = jwtService.generateAccessToken(
                 (org.springframework.security.core.userdetails.UserDetails) user,
@@ -57,7 +62,8 @@ public class UserController {
                 ? (expirationInstant.getEpochSecond() - Instant.now().getEpochSecond())
                 : 0;
 
-        return ResponseEntity.ok(AuthTokenResponse.from(user, jwtToken, expiresInSeconds, enrolledCourseIds));
+        return ResponseEntity.ok(AuthTokenResponse.from(user, jwtToken, expiresInSeconds, enrolledCourseIds,
+                avatarPath));
     }
 
     /**

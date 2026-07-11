@@ -5,6 +5,7 @@ import GenericButton from "../ui/genericButton/GenericButton";
 import { useAuth } from '@/auth';
 // Auditoría NotebookLM: Importación de la constante centralizada para mitigar hardcoding de roles.
 import { ROLES } from '@/auth/authTypes';
+import { resolveAvatarUrl } from '@/auth/avatarUrl';
 
 /**
  * Props del componente NavbarUser.
@@ -39,9 +40,11 @@ const NavbarUser = ({ username, userPhoto, onLogout }: NavbarUserProps) => {
         navigate(targetPath);
     };
 
-    const avatarIcon: ReactNode = userPhoto ? (
+    const resolvedAvatarUrl = resolveAvatarUrl(userPhoto);
+
+    const avatarIcon: ReactNode = resolvedAvatarUrl ? (
         <img
-            src={userPhoto}
+            src={resolvedAvatarUrl}
             alt={`Perfil de ${username}`}
             className="w-7 h-7 rounded-full object-cover border border-blue-200"
         />

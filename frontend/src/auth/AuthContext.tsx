@@ -10,6 +10,7 @@ export const AuthContext = createContext<AuthContextType>({
     isAuthenticated: false,
     isLoading: false,
     login: () => { }, // Firma vacía por defecto adaptada al nuevo contrato de tipos
+    updateUser: () => { },
     logout: () => { },
 });
 

@@ -16,9 +16,10 @@ interface GenericButtonProps {
     icon?: ReactNode;
     onClick?: MouseEventHandler<HTMLButtonElement>;
     variant?: ButtonVariant;
-    type?: 'button' | 'submit' | 'reset'; // Soporte para comportamiento de formularios
-    disabled?: boolean;                   // Soporte para estados operacionales de carga
-    className?: string;                  // Inyección segura de márgenes/posiciones externas
+    type?: 'button' | 'submit' | 'reset';
+    disabled?: boolean;
+    className?: string;
+    isActive?: boolean;
 }
 
 /**
@@ -44,7 +45,8 @@ const GenericButton = ({
     variant = 'white',
     type = 'button',
     disabled = false,
-    className = ''
+    className = '',
+    isActive = false
 }: GenericButtonProps) => {
 
     // Identificadores booleanos de variante para el enrutador de clases Tailwind v4
@@ -67,7 +69,9 @@ const GenericButton = ({
     const variantClasses = isSearch
         ? 'bg-white text-gray-700 border border-gray-200 p-3 rounded-full hover:bg-blue-300'
         : isCategory
-            ? 'w-full px-4 py-3 text-left rounded-xl hover:bg-blue-50 hover:text-blue-600 border border-transparent hover:border-blue-100'
+            ? (isActive
+                ? 'w-full px-4 py-3 text-left rounded-xl bg-blue-100 text-blue-700 shadow-inner border border-blue-300 font-bold'
+                : 'w-full px-4 py-3 text-left rounded-xl bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-600 border border-transparent hover:border-blue-100') // 
             : isDark
                 ? 'bg-slate-800 text-white hover:bg-slate-900 border border-transparent shadow-sm'
                 : isPrimary

@@ -69,6 +69,10 @@ public class SecurityConfig {
                         // Endpoints de autenticación pública (login y registro)
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/{username}").permitAll()
 
+                        // ✅ SEGURIDAD ESTRUCTURAL: Permitir ver imágenes de perfil públicamente (Solo
+                        // lectura)
+                        .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
+
                         // 🚨 CONTROL DE ACCESO CRÍTICO: NUEVOS ENDPOINTS DE CURSOS Y MATRÍCULAS
                         // Permitimos el acceso para que el buscador predictivo funcione en tiempo real
                         .requestMatchers(HttpMethod.GET, "/api/courses/search").permitAll()

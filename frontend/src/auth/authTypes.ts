@@ -35,6 +35,7 @@ export interface AuthTokenResponse {
     role: UserRole;
     email: string;
     enrolledCourseIds: number[]; // Coincidencia exacta con la hidratación de Spring Boot
+    avatarPath?: string | null;
 }
 
 /**
@@ -45,5 +46,6 @@ export interface AuthContextType {
     isAuthenticated: boolean;
     isLoading: boolean;
     login: (tokenData: AuthTokenResponse) => void;
+    updateUser: (updates: Partial<AuthUser>) => void;
     logout: () => void;
 }

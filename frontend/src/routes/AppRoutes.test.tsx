@@ -23,6 +23,7 @@ const buildAuthValue = (user: AuthUser | null): AuthContextValue => ({
     isAuthenticated: Boolean(user),
     isLoading: false,
     login: vi.fn(),
+    updateUser: vi.fn(),
     logout: vi.fn(),
 });
 

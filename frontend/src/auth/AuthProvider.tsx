@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { AuthUser, AuthTokenResponse } from './authTypes';
 import { AuthContext } from './AuthContext';
 import { clearStoredAuth, readStoredAuthUser, writeStoredAuthUser, writeStoredToken } from './authStorage';
+import { resolveAvatarUrl } from './avatarUrl';
 
 interface AuthProviderProps {
     children: ReactNode;
@@ -77,6 +78,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             role: tokenData.role,
             email: tokenData.email,
             enrolledCourseIds: tokenData.enrolledCourseIds || [],
+            photo: resolveAvatarUrl(tokenData.avatarPath),
             token: tokenData.accessToken,
             expiresAt: expiresAt
         };
@@ -86,6 +88,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         writeStoredAuthUser(nextUser);
         writeStoredToken(tokenData.accessToken);
     };
+
+    /**
+     * Actualiza parcialmente la sesión activa sin romper el resto de metadatos.
+     */
+    const updateUser = useCallback((updates: Partial<AuthUser>) => {
+        setUser((currentUser) => {
+            if (!currentUser) return null;
+
+            const updatedUser = {
+                ...currentUser,
+                ...updates,
+            };
+
+            writeStoredAuthUser(updatedUser);
+            return updatedUser;
+        });
+    }, []);
 
     /**
      * MONITOR DE ACTIVIDAD GLOBAL DEL USUARIO (DOM LISTENERS) [ADR-34]
@@ -166,9 +185,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             isAuthenticated: Boolean(user),
             isLoading: false,
             login,
+            updateUser,
             logout,
         }),
-        [user, logout]
+        [user, logout, updateUser]
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

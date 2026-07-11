@@ -6,6 +6,7 @@ import axios from 'axios';
 import { useAuth } from '@/auth';
 import type { AuthTokenResponse } from '@/auth/authTypes';
 import { apiClient } from '@/services/apiClient';
+import { resolveAvatarUrl } from '@/auth/avatarUrl';
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -84,7 +85,7 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
 
                     // 2. Cerramos el modal de forma limpia
                     handleClose();
-                    onSuccess?.({ username: tokenData.username });
+                    onSuccess?.({ username: tokenData.username, photo: resolveAvatarUrl(tokenData.avatarPath) });
 
                     // 3. Forzamos la redirección nativa según el rol asignado
                     const userRole = String(tokenData.role).toUpperCase().trim();

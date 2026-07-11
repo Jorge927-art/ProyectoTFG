@@ -3,12 +3,15 @@ import { User, Phone, MapPin, Upload, RefreshCw, CheckCircle, ArrowLeft } from '
 import { useNavigate } from 'react-router-dom';
 import GenericCard from '../genericCard/GenericCard';
 import GenericButton from '../genericButton/GenericButton';
+import { useAuth } from '@/auth';
+import { resolveAvatarUrl } from '@/auth/avatarUrl';
 
 import { getProfile, updateProfileData, uploadAvatarFile } from '../../../services/profileService';
 import type { ProfileData } from '../../../services/profileService';
 
 export default function ProfileSettings() {
     const navigate = useNavigate();
+    const { user, updateUser } = useAuth();
 
     // BANDERAS DE ENTRADA AL COMPONENTE REUTILIZABLE
     console.log("[F1_PROFILE_COMP]: El componente ProfileSettings se está intentando montar en pantalla.");
@@ -75,10 +78,12 @@ export default function ProfileSettings() {
         setMessage(null);
         try {
             const response = await uploadAvatarFile(file);
+            const resolvedAvatarUrl = resolveAvatarUrl(response.path);
             setMessage({ text: 'Foto de perfil actualizada correctamente', type: 'success' });
             if (profile) {
                 setProfile({ ...profile, avatarPath: response.path });
             }
+            updateUser({ photo: resolvedAvatarUrl });
         } catch (error) {
             console.error(error);
             setMessage({ text: 'Error al subir la imagen', type: 'error' });
@@ -91,10 +96,9 @@ export default function ProfileSettings() {
         return <div className="p-6 text-center text-slate-500 font-medium">Cargando configuración de perfil...</div>;
     }
 
-    const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-    const avatarUrl = profile?.avatarPath
-        ? `${BACKEND_URL}/uploads/${profile.avatarPath}`
-        : `data:image/svg+xml;utf8,<svg xmlns="http://w3.org" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%23cbd5e1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+    const avatarUrl = resolveAvatarUrl(profile?.avatarPath)
+        ?? resolveAvatarUrl(user?.photo)
+        ?? `data:image/svg+xml;utf8,<svg xmlns="http://w3.org" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%23cbd5e1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
     return (
         <div className="max-w-4xl mx-auto space-y-6">
             <header className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

@@ -108,7 +108,7 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
                         variant="search"
                         onClick={onClose}
                         icon={<X size={20} className="text-slate-400" />}
-                        className="!p-2 hover:bg-slate-200"
+                        className="p-2! hover:bg-slate-200"
                     />
                 </div>
 
@@ -122,17 +122,20 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
                             <h3 className="font-bold text-sm uppercase tracking-wider">Áreas de Interés</h3>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {availableCategories.map(cat => (
-                                <label key={cat} className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedCategories.includes(cat)}
-                                        onChange={() => toggleSelection(cat, selectedCategories, setSelectedCategories)}
-                                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            {availableCategories.map(cat => {
+                                const isSelected = selectedCategories.includes(cat);
+                                return (
+                                    <GenericButton
+                                        key={cat}
+                                        variant="category"
+                                        label={cat}
+                                        isActive={isSelected}
+                                        icon={isSelected ? <Check size={14} className="text-emerald-600" /> : undefined}
+                                        onClick={() => toggleSelection(cat, selectedCategories, setSelectedCategories)}
+                                        className={isSelected ? "bg-emerald-100! text-emerald-700! border-emerald-300!" : ""}
                                     />
-                                    <span className="text-xs font-semibold text-slate-700">{cat}</span>
-                                </label>
-                            ))}
+                                );
+                            })}
                         </div>
                     </section>
 
@@ -144,17 +147,20 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
                                 <h3 className="font-bold text-sm uppercase tracking-wider">Nivel de Dificultad</h3>
                             </div>
                             <div className="grid grid-cols-1 gap-2">
-                                {availableLevels.map(level => (
-                                    <label key={level} className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedLevels.includes(level)}
-                                            onChange={() => toggleSelection(level, selectedLevels, setSelectedLevels)}
-                                            className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                {availableLevels.map(level => {
+                                    const isSelected = selectedLevels.includes(level);
+                                    return (
+                                        <GenericButton
+                                            key={level}
+                                            variant="category"
+                                            label={level}
+                                            isActive={isSelected}
+                                            icon={isSelected ? <Check size={14} className="text-emerald-600" /> : undefined}
+                                            onClick={() => toggleSelection(level, selectedLevels, setSelectedLevels)}
+                                            className={isSelected ? "bg-emerald-100! text-emerald-700! border-emerald-300!" : ""}
                                         />
-                                        <span className="text-xs font-semibold text-slate-700">{level}</span>
-                                    </label>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </section>
 
@@ -165,17 +171,20 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
                                 <h3 className="font-bold text-sm uppercase tracking-wider">Disponibilidad de Tiempo</h3>
                             </div>
                             <div className="grid grid-cols-1 gap-2">
-                                {availableDurations.map(dur => (
-                                    <label key={dur} className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedDurations.includes(dur)}
-                                            onChange={() => toggleSelection(dur, selectedDurations, setSelectedDurations)}
-                                            className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                                {availableDurations.map(dur => {
+                                    const isSelected = selectedDurations.includes(dur);
+                                    return (
+                                        <GenericButton
+                                            key={dur}
+                                            variant="category"
+                                            label={dur}
+                                            isActive={isSelected}
+                                            icon={isSelected ? <Check size={14} className="text-emerald-600" /> : undefined}
+                                            onClick={() => toggleSelection(dur, selectedDurations, setSelectedDurations)}
+                                            className={isSelected ? "bg-emerald-100! text-emerald-700! border-emerald-300!" : ""}
                                         />
-                                        <span className="text-xs font-semibold text-slate-700">{dur}</span>
-                                    </label>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </section>
                     </div>
@@ -188,17 +197,20 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
                                 <h3 className="font-bold text-sm uppercase tracking-wider">Idioma del Curso</h3>
                             </div>
                             <div className="grid grid-cols-1 gap-2">
-                                {availableLanguages.map(lang => (
-                                    <label key={lang} className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedLanguages.includes(lang)}
-                                            onChange={() => toggleSelection(lang, selectedLanguages, setSelectedLanguages)}
-                                            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                {availableLanguages.map(lang => {
+                                    const isSelected = selectedLanguages.includes(lang);
+                                    return (
+                                        <GenericButton
+                                            key={lang}
+                                            variant="category"
+                                            label={lang}
+                                            isActive={isSelected}
+                                            icon={isSelected ? <Check size={14} className="text-emerald-600" /> : undefined}
+                                            onClick={() => toggleSelection(lang, selectedLanguages, setSelectedLanguages)}
+                                            className={isSelected ? "bg-emerald-100! text-emerald-700! border-emerald-300!" : ""}
                                         />
-                                        <span className="text-xs font-semibold text-slate-700">{lang}</span>
-                                    </label>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </section>
 
@@ -209,17 +221,20 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
                                 <h3 className="font-bold text-sm uppercase tracking-wider">Preferencias de Subtítulos</h3>
                             </div>
                             <div className="grid grid-cols-1 gap-2">
-                                {availableSubtitles.map(sub => (
-                                    <label key={sub} className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedSubtitles.includes(sub)}
-                                            onChange={() => toggleSelection(sub, selectedSubtitles, setSelectedSubtitles)}
-                                            className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                                {availableSubtitles.map(sub => {
+                                    const isSelected = selectedSubtitles.includes(sub);
+                                    return (
+                                        <GenericButton
+                                            key={sub}
+                                            variant="category"
+                                            label={sub}
+                                            isActive={isSelected}
+                                            icon={isSelected ? <Check size={14} className="text-emerald-600" /> : undefined}
+                                            onClick={() => toggleSelection(sub, selectedSubtitles, setSelectedSubtitles)}
+                                            className={isSelected ? "bg-emerald-100! text-emerald-700! border-emerald-300!" : ""}
                                         />
-                                        <span className="text-xs font-semibold text-slate-700">{sub}</span>
-                                    </label>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </section>
                     </div>

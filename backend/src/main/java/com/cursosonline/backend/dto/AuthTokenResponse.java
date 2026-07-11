@@ -13,13 +13,15 @@ public record AuthTokenResponse(
         String username,
         Role role,
         String email,
-        List<Long> enrolledCourseIds) {
+        List<Long> enrolledCourseIds,
+        String avatarPath) {
     /**
      * Método estático de factoría corregido.
      * Se añade 'List<Long> enrolledCourseIds' en los parámetros de entrada
      * para mapear la hidratación de matrículas.
      */
-    public static AuthTokenResponse from(Users user, String token, long expirationTime, List<Long> enrolledCourseIds) {
+    public static AuthTokenResponse from(Users user, String token, long expirationTime, List<Long> enrolledCourseIds,
+            String avatarPath) {
         return new AuthTokenResponse(
                 token,
                 "Bearer",
@@ -28,6 +30,7 @@ public record AuthTokenResponse(
                 user.getUsername(),
                 user.getRole(),
                 user.getEmail(),
-                enrolledCourseIds);
+                enrolledCourseIds,
+                avatarPath);
     }
 }
