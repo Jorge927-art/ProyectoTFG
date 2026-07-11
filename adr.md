@@ -933,6 +933,55 @@ Los principales desafíos son:
 * **Positivas:** Reducción drástica del overhead de red, renderizado reactivo sin basura visual, interfaz de usuario desacoplada y preparada para futuras extensiones del catálogo sin comprometer la consistencia geométrica del Dashboard.
 * **Negativas:** Obliga a mantener una estricta correspondencia entre las alturas relativas de las sub-cajas dentro del contenedor padre para evitar solapamientos visuales.
 
+---
+
+## ADR-45: Canal de Alarmas Académicas Dinámicas en Barra de Navegación
+
+### Estatus
+
+Aceptado (Julio 2026)
+
+### Contexto
+
+El estudiante requería avisos visuales inmediatos sobre la llegada de nuevos documentos a su bandeja de entrada y alertas automáticas cuando el progreso de un curso alcanzara un porcentaje $\geq 90\%$. Mantener estas consultas acopladas a las vistas principales degradaba el rendimiento y violaba los principios de segregación de interfaces.
+
+### Decisión
+
+* Se centralizó la lógica analítica de detección en un endpoint seguro de Spring Boot (`/api/auth/notifications`).
+* Se encapsuló el consumo de red en React mediante un hook aislado denominado `useNotifications` para respetar el aislamiento de infraestructura **[ADR-20]**.
+* La interfaz visual se construyó utilizando la iconografía de Lucide envuelta de forma estricta en el componente core `GenericButton` **[ADR-13]**.
+* Se inyectó el componente de forma condicional en la barra superior (`NavbarUser.tsx`) únicamente cuando el rol de la sesión activa coincide con `STUDENT`, garantizando la simetría geométrica y la limpieza visual para los roles de profesor y administrador.
+
+### Consecuencias
+
+* **Positivas:** Sincronización de alertas en tiempo real con PostgreSQL sin sobrecargar las cabeceras de otros roles.
+* **Positivas:** Cobertura de pruebas unitarias e integración completadas al 100% y en verde mediante Vitest y MockMvc de Spring Security.
+
+---
+
+## ADR-46: Purificación del Sistema de Contingencia y Control de Permisos
+
+### Estatus
+
+Aceptado (Julio 2026)
+
+### Contexto
+
+La vista de error por falta de privilegios (`AccessDenied.tsx`) utilizaba etiquetas de texto y enlaces HTML manuales (`<h1>`, `<p>`, `<a>`), introduciendo inconsistencias de diseño y violando el principio de abstracción e identidad visual unificada de la plataforma.
+
+### Decisión
+
+* Se refactorizó la vista de contingencia eliminando el HTML plano y las clases manuales de Tailwind v4.
+* Se delegó la presentación estructural del mensaje de error en el componente core corporativo `GenericHeader` **[ADR-43]**.
+* Se reemplazaron las etiquetas de enlace nativas por el componente de acción core `GenericButton`, gestionando la redirección interna mediante el hook seguro `useNavigate` de React Router.
+
+### Consecuencias
+
+* **Positivas:** Reducción de líneas de código duplicadas y eliminación de estilos manuales en la capa de presentación privada.
+* **Positivas:** Alineación total con las directivas de Purificación UI **[ADR-13]** de cara a la evaluación del tribunal del TFG.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026

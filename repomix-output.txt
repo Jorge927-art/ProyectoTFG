@@ -336,23 +336,6 @@ public class TestController {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/dto/NotificationDTO.java
-================
-package com.cursosonline.backend.dto;
-
-/**
- * DTO Inmutable para transportar las alertas del estudiante.
- * Alineado con el estándar de agregación analítica de solo lectura.
- */
-public record NotificationDTO(
-        String type, // 'DOCUMENT_INBOX' o 'COURSE_PROGRESS'
-        String title, // Título descriptivo (ej: "Nuevo documento recibido")
-        String message, // Mensaje detallado para el alumno
-        String redirectUrl // Ruta interna del frontend para redirigir al hacer clic
-) {
-}
-
-================
 File: backend/src/main/java/com/cursosonline/backend/entities/Role.java
 ================
 package com.cursosonline.backend.entities;
@@ -4401,233 +4384,6 @@ const Input = ({ label, error, className, ...props }: InputProps) => {
 export default Input;
 
 ================
-File: frontend/src/routes/pages/student/components/NotificationBell.test.tsx
-================
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import NotificationBell from './NotificationBell';
-import { useNotifications } from './useNotifications';
-
-// 1. Creamos un mock simulado del hook aislado para controlar los escenarios
-vi.mock('./useNotifications', () => ({
-    useNotifications: vi.fn()
-}));
-
-describe('NotificationBell - Suite de Alertas Académicas', () => {
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    it('debe mostrar la campana en color slate neutro cuando NO hay alertas', () => {
-        // Configuramos el mock para simular bandeja vacía
-        vi.mocked(useNotifications).mockReturnValue({
-            alerts: [],
-            hasAlerts: false,
-            refreshAlerts: vi.fn(),
-            loading: false
-        });
-
-        render(<NotificationBell />);
-
-        // Buscamos el botón de la campana por su rol de accesibilidad
-        const bellButton = screen.getByRole('button');
-
-        // Verificamos que contenga las clases de fondo blanco estándar
-        expect(bellButton.className).toContain('bg-white');
-        expect(bellButton.className).not.toContain('bg-red-50!');
-    });
-
-    it('debe cambiar la campana a ROJO parpadeante cuando existen alertas activas', () => {
-        // Configuramos el mock simulando un documento y un progreso del curso >= 90%
-        vi.mocked(useNotifications).mockReturnValue({
-            alerts: [
-                { type: 'DOCUMENT_INBOX', title: 'Bandeja', message: '1 doc', redirectUrl: '/docs' }
-            ],
-            hasAlerts: true,
-            refreshAlerts: vi.fn(),
-            loading: false
-        });
-
-        render(<NotificationBell />);
-
-        const bellButton = screen.getByRole('button');
-
-        // ✅ VALIDACIÓN CRÍTICA: Certificar el cambio al color de alerta rojo canónico de Tailwind v4
-        expect(bellButton.className).toContain('bg-red-50!');
-    });
-
-    it('debe desplegar el panel flotante y listar las alertas al hacer clic', async () => {
-        vi.mocked(useNotifications).mockReturnValue({
-            alerts: [
-                { type: 'DOCUMENT_INBOX', title: 'Nuevo Documento', message: 'Tienes 1 documento pendiente', redirectUrl: '/docs' }
-            ],
-            hasAlerts: true,
-            refreshAlerts: vi.fn(),
-            loading: false
-        });
-
-        render(<NotificationBell />);
-
-        // Simulamos la apertura del desplegable interactivo mediante un clic
-        const bellButton = screen.getByRole('button');
-        fireEvent.click(bellButton);
-
-        // Verificamos que el título del panel flotante aparezca en el DOM virtual
-        expect(screen.getByText('Avisos del Sistema')).toBeInTheDocument();
-        expect(screen.getByText('Nuevo Documento')).toBeInTheDocument();
-        expect(screen.getByText('Tienes 1 documento pendiente')).toBeInTheDocument();
-    });
-});
-
-================
-File: frontend/src/routes/pages/student/components/NotificationBell.tsx
-================
-import { useState, useRef, useEffect } from 'react';
-import { Bell, FileText, TrendingUp } from 'lucide-react';
-import { useNotifications } from './useNotifications';
-import GenericButton from '../../../../components/ui/genericButton/GenericButton'; // Asegura la ruta a tu botón core
-
-export default function NotificationBell() {
-    const { alerts, hasAlerts } = useNotifications();
-    const [isOpen, setIsOpen] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
-
-    // Cerrar el panel flotante si el usuario hace clic fuera de él
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        }
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    return (
-        <div className="relative" ref={dropdownRef}>
-            {/* Botón de la Campana usando el componente core variant="search" para que sea circular */}
-            <GenericButton
-                variant="search"
-                onClick={() => setIsOpen(!isOpen)}
-                className={`relative p-2.5! transition-all ${hasAlerts
-                        ? 'bg-red-50! border-red-200! hover:bg-red-100!'
-                        : 'bg-white hover:bg-slate-100'
-                    }`}
-                icon={
-                    <Bell
-                        size={20}
-                        className={hasAlerts ? 'text-red-500 animate-pulse' : 'text-slate-500'}
-                    />
-                }
-                ariaLabel="Campana de notificaciones"
-            />
-
-            {/* Punto rojo flotante indicador sobre la campana si hay alertas activas */}
-            {hasAlerts && (
-                <span className="absolute top-1 right-1 flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-                </span>
-            )}
-
-            {/* DESPLEGABLE DE NOTIFICACIONES */}
-            {isOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                    {/* Encabezado */}
-                    <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-100 flex justify-between items-center">
-                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Avisos del Sistema</span>
-                        {hasAlerts && (
-                            <span className="px-2 py-0.5 text-[10px] font-bold bg-red-100 text-red-700 rounded-full">
-                                {alerts.length} nuevos
-                            </span>
-                        )}
-                    </div>
-
-                    {/* Cuerpo de Alertas */}
-                    <div className="max-h-64 overflow-y-auto divide-y divide-slate-50 custom-scrollbar">
-                        {!hasAlerts ? (
-                            <div className="p-6 text-center space-y-1">
-                                <p className="text-xs font-semibold text-slate-700">Tu bandeja está limpia</p>
-                                <p className="text-[11px] text-slate-400">No tienes avisos pendientes por el momento.</p>
-                            </div>
-                        ) : (
-                            alerts.map((alert, index) => {
-                                // Seleccionamos el icono temático limpio según el tipo de aviso
-                                const isDoc = alert.type === 'DOCUMENT_INBOX';
-                                const iconColor = isDoc ? 'text-blue-500 bg-blue-50' : 'text-emerald-500 bg-emerald-50';
-                                const IconComponent = isDoc ? FileText : TrendingUp;
-
-                                return (
-                                    <div
-                                        key={index}
-                                        className="p-3 hover:bg-slate-50/80 transition-colors flex gap-3 items-start"
-                                    >
-                                        <div className={`p-2 rounded-xl shrink-0 ${iconColor}`}>
-                                            <IconComponent size={16} />
-                                        </div>
-                                        <div className="space-y-0.5 flex-1 min-w-0">
-                                            <p className="text-xs font-bold text-slate-800 truncate">{alert.title}</p>
-                                            <p className="text-[11px] text-slate-500 leading-normal">{alert.message}</p>
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-================
-File: frontend/src/routes/pages/student/components/useNotifications.ts
-================
-import { useState, useEffect } from 'react';
-import { apiClient } from '../../../../services/apiClient';
-
-/** Contrato estricto del DTO de notificaciones devuelto por Spring Boot */
-export interface NotificationDTO {
-    type: 'DOCUMENT_INBOX' | 'COURSE_PROGRESS';
-    title: string;
-    message: string;
-    redirectUrl: string;
-}
-
-/** Hook aislado para el consumo y refresco dinámico de alarmas académicas [ADR-20] */
-export const useNotifications = () => {
-    const [alerts, setAlerts] = useState<NotificationDTO[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
-
-    const fetchAlerts = async () => {
-        try {
-            setLoading(true);
-            // Impacta directamente en nuestro nuevo endpoint protegido del controlador
-            const response = await apiClient.get<NotificationDTO[]>('/api/auth/notifications');
-            setAlerts(response.data || []);
-        } catch (err) {
-            console.error("Error al sincronizar el canal de alarmas académicas:", err);
-            setAlerts([]); // Fallback seguro en blanco ante caídas de red o tokens expirados
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Sincronización inicial automatizada al montar el componente en la Navbar
-    useEffect(() => {
-        fetchAlerts();
-    }, []);
-
-    return { 
-        alerts, 
-        hasAlerts: alerts.length > 0,
-        refreshAlerts: fetchAlerts,
-        loading 
-    };
-};
-
-================
 File: frontend/src/App.css
 ================
 #root {
@@ -5174,6 +4930,23 @@ package com.cursosonline.backend.dto;
  * Centraliza la captura de credenciales enviadas por el frontend.
  */
 public record LoginRequest(String username, String password) {
+}
+
+================
+File: backend/src/main/java/com/cursosonline/backend/dto/NotificationDTO.java
+================
+package com.cursosonline.backend.dto;
+
+/**
+ * DTO Inmutable para transportar las alertas del estudiante.
+ * Alineado con el estándar de agregación analítica de solo lectura.
+ */
+public record NotificationDTO(
+        String type, // 'DOCUMENT_INBOX' o 'COURSE_PROGRESS'
+        String title, // Título descriptivo (ej: "Nuevo documento recibido")
+        String message, // Mensaje detallado para el alumno
+        String redirectUrl // Ruta interna del frontend para redirigir al hacer clic
+) {
 }
 
 ================
@@ -6439,24 +6212,31 @@ describe('Auditoría de Calidad: Composición Paramétrica de DashboardLayout', 
 ================
 File: frontend/src/routes/pages/public/AccessDenied.tsx
 ================
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import GenericHeader from "@/components/ui/genericHeader/GenericHeader"; // Ajusta la ruta a tu GenericHeader
+import GenericButton from "@/components/ui/genericButton/GenericButton"; // Ajusta la ruta a tu GenericButton
 
 const AccessDenied = () => {
+    const navigate = useNavigate();
+
     return (
         <main className="min-h-screen bg-slate-50 grid place-items-center px-6">
-            <section className="max-w-xl w-full bg-white border border-slate-200 rounded-xl shadow-sm p-8 text-center">
-                <h1 className="text-2xl font-bold text-slate-800">Acceso denegado</h1>
-                <p className="mt-3 text-slate-600">
-                    Tu usuario está autenticado, pero no tiene permisos para acceder a esta sección.
-                </p>
-                <div className="mt-6 flex justify-center gap-3">
-                    <Link
-                        to="/"
-                        className="px-4 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-900 transition-colors"
-                    >
-                        Volver al inicio
-                    </Link>
-                </div>
+            <section className="max-w-xl w-full bg-white border border-slate-200 rounded-2xl shadow-sm p-8 flex flex-col items-center">
+
+                {/* REFACTORIZACIÓN CORE: Cabecera estructural purificada sin propiedades inválidas [ADR-13] */}
+                <GenericHeader
+                    title="Acceso denegado"
+                    description="Tu usuario está autenticado, pero no tiene los privilegios necesarios para acceder a esta sección."
+                    align="center"
+                />
+
+                {/* REFACTORIZACIÓN CORE: Uso de componente de acción corporativo [ADR-13] */}
+                <GenericButton
+                    label="Volver al inicio"
+                    variant="primary"
+                    onClick={() => navigate("/")}
+                />
+
             </section>
         </main>
     );
@@ -6572,6 +6352,187 @@ describe('Auditoría UI: Aislamiento de Estados en EnrolledCourses', () => {
 });
 
 ================
+File: frontend/src/routes/pages/student/components/NotificationBell.test.tsx
+================
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import NotificationBell from './NotificationBell';
+import { useNotifications } from './useNotifications';
+
+// 1. Creamos un mock simulado del hook aislado para controlar los escenarios
+vi.mock('./useNotifications', () => ({
+    useNotifications: vi.fn()
+}));
+
+describe('NotificationBell - Suite de Alertas Académicas', () => {
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('debe mostrar la campana en color slate neutro cuando NO hay alertas', () => {
+        // Configuramos el mock para simular bandeja vacía
+        vi.mocked(useNotifications).mockReturnValue({
+            alerts: [],
+            hasAlerts: false,
+            refreshAlerts: vi.fn(),
+            loading: false
+        });
+
+        render(<NotificationBell />);
+
+        // Buscamos el botón de la campana por su rol de accesibilidad
+        const bellButton = screen.getByRole('button');
+
+        // Verificamos que contenga las clases de fondo blanco estándar
+        expect(bellButton.className).toContain('bg-white');
+        expect(bellButton.className).not.toContain('bg-red-50!');
+    });
+
+    it('debe cambiar la campana a ROJO parpadeante cuando existen alertas activas', () => {
+        // Configuramos el mock simulando un documento y un progreso del curso >= 90%
+        vi.mocked(useNotifications).mockReturnValue({
+            alerts: [
+                { type: 'DOCUMENT_INBOX', title: 'Bandeja', message: '1 doc', redirectUrl: '/docs' }
+            ],
+            hasAlerts: true,
+            refreshAlerts: vi.fn(),
+            loading: false
+        });
+
+        render(<NotificationBell />);
+
+        const bellButton = screen.getByRole('button');
+
+        // ✅ VALIDACIÓN CRÍTICA: Certificar el cambio al color de alerta rojo canónico de Tailwind v4
+        expect(bellButton.className).toContain('bg-red-50!');
+    });
+
+    it('debe desplegar el panel flotante y listar las alertas al hacer clic', async () => {
+        vi.mocked(useNotifications).mockReturnValue({
+            alerts: [
+                { type: 'DOCUMENT_INBOX', title: 'Nuevo Documento', message: 'Tienes 1 documento pendiente', redirectUrl: '/docs' }
+            ],
+            hasAlerts: true,
+            refreshAlerts: vi.fn(),
+            loading: false
+        });
+
+        render(<NotificationBell />);
+
+        // Simulamos la apertura del desplegable interactivo mediante un clic
+        const bellButton = screen.getByRole('button');
+        fireEvent.click(bellButton);
+
+        // Verificamos que el título del panel flotante aparezca en el DOM virtual
+        expect(screen.getByText('Avisos del Sistema')).toBeInTheDocument();
+        expect(screen.getByText('Nuevo Documento')).toBeInTheDocument();
+        expect(screen.getByText('Tienes 1 documento pendiente')).toBeInTheDocument();
+    });
+});
+
+================
+File: frontend/src/routes/pages/student/components/NotificationBell.tsx
+================
+import { useState, useRef, useEffect } from 'react';
+import { Bell, FileText, TrendingUp } from 'lucide-react';
+import { useNotifications } from './useNotifications';
+import GenericButton from '../../../../components/ui/genericButton/GenericButton'; // Asegura la ruta a tu botón core
+
+export default function NotificationBell() {
+    const { alerts, hasAlerts } = useNotifications();
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Cerrar el panel flotante si el usuario hace clic fuera de él
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    return (
+        <div className="relative" ref={dropdownRef}>
+            {/* Botón de la Campana usando el componente core variant="search" para que sea circular */}
+            <GenericButton
+                variant="search"
+                onClick={() => setIsOpen(!isOpen)}
+                className={`relative p-2.5! transition-all ${hasAlerts
+                        ? 'bg-red-50! border-red-200! hover:bg-red-100!'
+                        : 'bg-white hover:bg-slate-100'
+                    }`}
+                icon={
+                    <Bell
+                        size={20}
+                        className={hasAlerts ? 'text-red-500 animate-pulse' : 'text-slate-500'}
+                    />
+                }
+                ariaLabel="Campana de notificaciones"
+            />
+
+            {/* Punto rojo flotante indicador sobre la campana si hay alertas activas */}
+            {hasAlerts && (
+                <span className="absolute top-1 right-1 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                </span>
+            )}
+
+            {/* DESPLEGABLE DE NOTIFICACIONES */}
+            {isOpen && (
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    {/* Encabezado */}
+                    <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-100 flex justify-between items-center">
+                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Avisos del Sistema</span>
+                        {hasAlerts && (
+                            <span className="px-2 py-0.5 text-[10px] font-bold bg-red-100 text-red-700 rounded-full">
+                                {alerts.length} nuevos
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Cuerpo de Alertas */}
+                    <div className="max-h-64 overflow-y-auto divide-y divide-slate-50 custom-scrollbar">
+                        {!hasAlerts ? (
+                            <div className="p-6 text-center space-y-1">
+                                <p className="text-xs font-semibold text-slate-700">Tu bandeja está limpia</p>
+                                <p className="text-[11px] text-slate-400">No tienes avisos pendientes por el momento.</p>
+                            </div>
+                        ) : (
+                            alerts.map((alert, index) => {
+                                // Seleccionamos el icono temático limpio según el tipo de aviso
+                                const isDoc = alert.type === 'DOCUMENT_INBOX';
+                                const iconColor = isDoc ? 'text-blue-500 bg-blue-50' : 'text-emerald-500 bg-emerald-50';
+                                const IconComponent = isDoc ? FileText : TrendingUp;
+
+                                return (
+                                    <div
+                                        key={index}
+                                        className="p-3 hover:bg-slate-50/80 transition-colors flex gap-3 items-start"
+                                    >
+                                        <div className={`p-2 rounded-xl shrink-0 ${iconColor}`}>
+                                            <IconComponent size={16} />
+                                        </div>
+                                        <div className="space-y-0.5 flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-slate-800 truncate">{alert.title}</p>
+                                            <p className="text-[11px] text-slate-500 leading-normal">{alert.message}</p>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+================
 File: frontend/src/routes/pages/student/components/useCourseStats.ts
 ================
 import { useState, useEffect, useCallback } from 'react';
@@ -6624,6 +6585,52 @@ export const useCourseStats = (courseId: number | undefined | null) => {
         loadingStats,
         statsError,
         refreshStats: () => courseId && fetchStats(courseId)
+    };
+};
+
+================
+File: frontend/src/routes/pages/student/components/useNotifications.ts
+================
+import { useState, useEffect } from 'react';
+import { apiClient } from '../../../../services/apiClient';
+
+/** Contrato estricto del DTO de notificaciones devuelto por Spring Boot */
+export interface NotificationDTO {
+    type: 'DOCUMENT_INBOX' | 'COURSE_PROGRESS';
+    title: string;
+    message: string;
+    redirectUrl: string;
+}
+
+/** Hook aislado para el consumo y refresco dinámico de alarmas académicas [ADR-20] */
+export const useNotifications = () => {
+    const [alerts, setAlerts] = useState<NotificationDTO[]>([]);
+    const [loading, setLoading] = useState<boolean>(true);
+
+    const fetchAlerts = async () => {
+        try {
+            setLoading(true);
+            // Impacta directamente en nuestro nuevo endpoint protegido del controlador
+            const response = await apiClient.get<NotificationDTO[]>('/api/auth/notifications');
+            setAlerts(response.data || []);
+        } catch (err) {
+            console.error("Error al sincronizar el canal de alarmas académicas:", err);
+            setAlerts([]); // Fallback seguro en blanco ante caídas de red o tokens expirados
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Sincronización inicial automatizada al montar el componente en la Navbar
+    useEffect(() => {
+        fetchAlerts();
+    }, []);
+
+    return { 
+        alerts, 
+        hasAlerts: alerts.length > 0,
+        refreshAlerts: fetchAlerts,
+        loading 
     };
 };
 
@@ -14542,6 +14549,7 @@ import { ROLES } from "../../auth/authTypes";
 
 // Política de acceso específica para la zona de estudiante.
 const STUDENT_ALLOWED_ROLES = [ROLES.STUDENT];
+
 const REDIRECT_IF_UNAUTHORIZED = "/acceso-denegado";
 
 const StudentRoute = () => {
@@ -16080,166 +16088,6 @@ public class DocumentControllerTest {
 }
 
 ================
-File: backend/src/test/java/com/cursosonline/backend/controller/UserControllerTest.java
-================
-package com.cursosonline.backend.controller;
-
-import com.cursosonline.backend.entities.Courses;
-import com.cursosonline.backend.entities.Enrollment;
-import com.cursosonline.backend.entities.Role;
-import com.cursosonline.backend.entities.Users;
-import com.cursosonline.backend.repository.EnrollmentRepository;
-import com.cursosonline.backend.repository.UserProfileRepository; // ✅ Importación necesaria
-import com.cursosonline.backend.security.jwt.JwtService;
-import com.cursosonline.backend.services.UserService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
-@ExtendWith(MockitoExtension.class)
-class UserControllerTest {
-
-        @Mock
-        private UserService userService;
-
-        @Mock
-        private JwtService jwtService;
-
-        @Mock
-        private EnrollmentRepository enrollmentRepository;
-
-        @Mock // ✅ Inyección del mock que faltaba para evitar el NullPointerException
-        private UserProfileRepository userProfileRepository;
-
-        @InjectMocks
-        private UserController userController;
-
-        private MockMvc mockMvc;
-
-        @BeforeEach
-        void setUp() {
-                mockMvc = MockMvcBuilders.standaloneSetup(userController).build();
-        }
-
-        @Test
-        void loginDebeIncluirLasMatriculasDelUsuario() throws Exception {
-                Users user = new Users(1L, "Luis", "encoded", Role.STUDENT, "luis@example.com", true,
-                                new java.util.ArrayList<>());
-
-                // Entrenamos los mocks existentes
-                when(userService.login("Luis", "secret123")).thenReturn(user);
-                when(enrollmentRepository.findEnrolledCourseIdsByUserId(1L)).thenReturn(List.of(101L));
-
-                // ✅ Evita el fallo simulando que el usuario aún no tiene un avatar guardado en
-                // base de datos
-                when(userProfileRepository.findById(1L)).thenReturn(Optional.empty());
-
-                when(jwtService.generateAccessToken(user, 1L, "luis@example.com")).thenReturn("jwt-token");
-                when(jwtService.extractExpiration("jwt-token")).thenReturn(Instant.now().plusSeconds(900));
-
-                mockMvc.perform(post("/api/auth/login")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"username\":\"Luis\",\"password\":\"secret123\"}"))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.username").value("Luis"))
-                                .andExpect(jsonPath("$.enrolledCourseIds[0]").value(101));
-        }
-
-        @Test
-        void myActiveCoursesDebeDevolverLaMatrículaConElCurso() throws Exception {
-                // 1. ESCENARIO REAL CON LOS DATOS ORIGINALES DE LUIS
-                Users user = new Users(1L, "Luis", "encoded", Role.STUDENT, "luis@example.com", true,
-                                new java.util.ArrayList<>());
-                Courses course = new Courses();
-                course.setCourse_id(101L);
-                course.setTitle("Introduction to Data Science Specialization");
-                course.setCategory("Data Science");
-                course.setInstructors("John Doe");
-
-                Enrollment enrollment = new Enrollment();
-                enrollment.setEnrollmentid(77L);
-                enrollment.setUser(user);
-                enrollment.setCourse(course);
-                enrollment.setStatus("EN_PROGRESO");
-                enrollment.setProgress_percentage(25);
-
-                // 2. CONFIGURACIÓN EN CADENA RIGUROSA
-                when(userService.findByUsername("Luis")).thenReturn(Optional.of(user));
-                when(userService.getStudentActiveCoursesWithCalculatedProgress(user.getUser_id()))
-                                .thenReturn(List.of(enrollment));
-
-                // 3. EJECUCIÓN Y VALIDACIÓN IMPLACABLE DEL CONTRATO HTTP
-                mockMvc.perform(get("/api/auth/my-active-courses")
-                                .param("username", "Luis"))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$[0].enrollmentid").value(77))
-                                .andExpect(jsonPath("$[0].status").value("EN_PROGRESO"))
-                                .andExpect(jsonPath("$[0].course.course_id").value(101))
-                                .andExpect(jsonPath("$[0].course.title")
-                                                .value("Introduction to Data Science Specialization"));
-        }
-
-        /**
-         * Prueba de integración que valida la recuperación exitosa de alertas
-         * académicas
-         * siguiendo la configuración de contexto nativa y limpia de la suite de
-         * pruebas.
-         */
-        @Test
-        void debeRecuperarAlertasDelEstudianteAutenticadoConExito() throws Exception {
-                // 1. Entrenamos el Mock de negocio simulando un escenario con las dos alertas
-                // requeridas
-                java.util.List<com.cursosonline.backend.dto.NotificationDTO> mockNotifications = List.of(
-                                new com.cursosonline.backend.dto.NotificationDTO(
-                                                "DOCUMENT_INBOX",
-                                                "Bandeja de Entrada",
-                                                "Tienes 1 documento(s) pendiente(s).",
-                                                "/student/documents"),
-                                new com.cursosonline.backend.dto.NotificationDTO(
-                                                "COURSE_PROGRESS",
-                                                "Asignatura por finalizar",
-                                                "Tu curso está al 92%.",
-                                                "/student/courses"));
-
-                // Simulamos el comportamiento del principal inyectado pasándole el nombre de
-                // Luis
-                org.mockito.Mockito.when(userService.getUserNotifications("Luis"))
-                                .thenReturn(mockNotifications);
-
-                // 2. Creamos un objeto Principal simulado para inyectarlo directamente en la
-                // petición HTTP
-                java.security.Principal mockPrincipal = () -> "Luis";
-
-                // 3. Ejecutamos la petición HTTP limpia de forma idéntica al resto de tests de
-                // la clase
-                mockMvc.perform(get("/api/auth/notifications")
-                                .principal(mockPrincipal) // Inyectamos la identidad de Luis directamente
-                                .contentType(org.springframework.http.MediaType.APPLICATION_JSON))
-                                // ✅ VALIDACIONES DE CONTRATO HTTP
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(2)))
-                                .andExpect(jsonPath("$[0].type").value("DOCUMENT_INBOX"))
-                                .andExpect(jsonPath("$[1].type").value("COURSE_PROGRESS"));
-        }
-}
-
-================
 File: frontend/src/auth/index.ts
 ================
 export { AuthProvider } from './AuthProvider'; 
@@ -17540,6 +17388,166 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // Solo si el token es 100% válido permitimos continuar hacia los controladores
         filterChain.doFilter(request, response);
     }
+}
+
+================
+File: backend/src/test/java/com/cursosonline/backend/controller/UserControllerTest.java
+================
+package com.cursosonline.backend.controller;
+
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.UserProfileRepository; // ✅ Importación necesaria
+import com.cursosonline.backend.security.jwt.JwtService;
+import com.cursosonline.backend.services.UserService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@ExtendWith(MockitoExtension.class)
+class UserControllerTest {
+
+        @Mock
+        private UserService userService;
+
+        @Mock
+        private JwtService jwtService;
+
+        @Mock
+        private EnrollmentRepository enrollmentRepository;
+
+        @Mock // ✅ Inyección del mock que faltaba para evitar el NullPointerException
+        private UserProfileRepository userProfileRepository;
+
+        @InjectMocks
+        private UserController userController;
+
+        private MockMvc mockMvc;
+
+        @BeforeEach
+        void setUp() {
+                mockMvc = MockMvcBuilders.standaloneSetup(userController).build();
+        }
+
+        @Test
+        void loginDebeIncluirLasMatriculasDelUsuario() throws Exception {
+                Users user = new Users(1L, "Luis", "encoded", Role.STUDENT, "luis@example.com", true,
+                                new java.util.ArrayList<>());
+
+                // Entrenamos los mocks existentes
+                when(userService.login("Luis", "secret123")).thenReturn(user);
+                when(enrollmentRepository.findEnrolledCourseIdsByUserId(1L)).thenReturn(List.of(101L));
+
+                // ✅ Evita el fallo simulando que el usuario aún no tiene un avatar guardado en
+                // base de datos
+                when(userProfileRepository.findById(1L)).thenReturn(Optional.empty());
+
+                when(jwtService.generateAccessToken(user, 1L, "luis@example.com")).thenReturn("jwt-token");
+                when(jwtService.extractExpiration("jwt-token")).thenReturn(Instant.now().plusSeconds(900));
+
+                mockMvc.perform(post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"username\":\"Luis\",\"password\":\"secret123\"}"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.username").value("Luis"))
+                                .andExpect(jsonPath("$.enrolledCourseIds[0]").value(101));
+        }
+
+        @Test
+        void myActiveCoursesDebeDevolverLaMatrículaConElCurso() throws Exception {
+                // 1. ESCENARIO REAL CON LOS DATOS ORIGINALES DE LUIS
+                Users user = new Users(1L, "Luis", "encoded", Role.STUDENT, "luis@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses course = new Courses();
+                course.setCourse_id(101L);
+                course.setTitle("Introduction to Data Science Specialization");
+                course.setCategory("Data Science");
+                course.setInstructors("John Doe");
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(77L);
+                enrollment.setUser(user);
+                enrollment.setCourse(course);
+                enrollment.setStatus("EN_PROGRESO");
+                enrollment.setProgress_percentage(25);
+
+                // 2. CONFIGURACIÓN EN CADENA RIGUROSA
+                when(userService.findByUsername("Luis")).thenReturn(Optional.of(user));
+                when(userService.getStudentActiveCoursesWithCalculatedProgress(user.getUser_id()))
+                                .thenReturn(List.of(enrollment));
+
+                // 3. EJECUCIÓN Y VALIDACIÓN IMPLACABLE DEL CONTRATO HTTP
+                mockMvc.perform(get("/api/auth/my-active-courses")
+                                .param("username", "Luis"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].enrollmentid").value(77))
+                                .andExpect(jsonPath("$[0].status").value("EN_PROGRESO"))
+                                .andExpect(jsonPath("$[0].course.course_id").value(101))
+                                .andExpect(jsonPath("$[0].course.title")
+                                                .value("Introduction to Data Science Specialization"));
+        }
+
+        /**
+         * Prueba de integración que valida la recuperación exitosa de alertas
+         * académicas
+         * siguiendo la configuración de contexto nativa y limpia de la suite de
+         * pruebas.
+         */
+        @Test
+        void debeRecuperarAlertasDelEstudianteAutenticadoConExito() throws Exception {
+                // 1. Entrenamos el Mock de negocio simulando un escenario con las dos alertas
+                // requeridas
+                java.util.List<com.cursosonline.backend.dto.NotificationDTO> mockNotifications = List.of(
+                                new com.cursosonline.backend.dto.NotificationDTO(
+                                                "DOCUMENT_INBOX",
+                                                "Bandeja de Entrada",
+                                                "Tienes 1 documento(s) pendiente(s).",
+                                                "/student/documents"),
+                                new com.cursosonline.backend.dto.NotificationDTO(
+                                                "COURSE_PROGRESS",
+                                                "Asignatura por finalizar",
+                                                "Tu curso está al 92%.",
+                                                "/student/courses"));
+
+                // Simulamos el comportamiento del principal inyectado pasándole el nombre de
+                // Luis
+                org.mockito.Mockito.when(userService.getUserNotifications("Luis"))
+                                .thenReturn(mockNotifications);
+
+                // 2. Creamos un objeto Principal simulado para inyectarlo directamente en la
+                // petición HTTP
+                java.security.Principal mockPrincipal = () -> "Luis";
+
+                // 3. Ejecutamos la petición HTTP limpia de forma idéntica al resto de tests de
+                // la clase
+                mockMvc.perform(get("/api/auth/notifications")
+                                .principal(mockPrincipal) // Inyectamos la identidad de Luis directamente
+                                .contentType(org.springframework.http.MediaType.APPLICATION_JSON))
+                                // ✅ VALIDACIONES DE CONTRATO HTTP
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(2)))
+                                .andExpect(jsonPath("$[0].type").value("DOCUMENT_INBOX"))
+                                .andExpect(jsonPath("$[1].type").value("COURSE_PROGRESS"));
+        }
 }
 
 ================
@@ -19834,6 +19842,226 @@ export interface AuthContextType {
 }
 
 ================
+File: frontend/src/components/navbar/Navbar.tsx
+================
+import { useRef, useState } from 'react';
+import { Home, Search, LogIn } from 'lucide-react';
+import GenericButton from '../ui/genericButton/GenericButton';
+import AuthModal from '../ui/authModal/AuthModal';
+import CourseInfoModal from '../ui/courseInfoModal/CourseInfoModal';
+
+/**
+ * Props del componente Navbar.
+ * 
+ * @interface NavbarProps
+ */
+interface NavbarProps {
+    /**
+     * Callback opcional ejecutado cuando el usuario completa un login exitoso.
+     * 
+     * Se dispara desde AuthModal (onSuccess) y propaga los datos del usuario al padre.
+     * Típicamente el padre (MainNavbar) actualiza su estado de sesión global con esta información.
+     * 
+     * @param userData Objeto con datos del usuario autenticado
+     * @param userData.username - Nombre de usuario
+     * @param userData.photo - URL de la foto de perfil (opcional)
+     * @returns void
+     */
+    onLoginSuccess?: (userData: { username: string; photo?: string }) => void;
+}
+
+/**
+ * Barra de navegación principal (unauthenticated).
+ * 
+ * Renderiza la navbar fija superior con:
+ * - Botón "Inicio" a la izquierda
+ * - Título "GESTIÓN DE CURSOS ONLINE" en el centro
+ * - Botones de búsqueda y autenticación a la derecha
+ * 
+ * GESTIÓN DE ESTADO:
+ * Mantiene 3 estados locales independientes:
+ * 1. isAuthModalOpen - Modal de login/registro
+ * 2. isCourseInfoModalOpen - Modal de catálogo de cursos
+ * 3. isLoginView - Bug 'Login' vs 'Registro' dentro de AuthModal
+ * 
+ * Estos estados son INDEPENDIENTES (no hay dependencias entre ellos) para evitar
+ * renderizados en cascada y permitir que múltiples modales coexistan en el árbol de React.
+ * 
+ * FLUJOS:
+ * 1. User_clicks "¿Qué deseas aprender?" → abre CourseInfoModal
+ *    → User clickea "Registrarme" → cierra CourseInfoModal pero abre AuthModal
+ * 2. User_clicks "Entrar / Registro" → abre AuthModal en modo Login (isLoginView=true)
+ * 3. User completa login exitoso → AuthModal dispara onSuccess → padre actualiza estado global
+ * 
+ * LAYOUT:
+ * - fixed top-0: navbar pegada al top (z-50 para estar encima)
+ * - grid grid-cols-3: tres columnas iguales para distribuir contenido
+ * - Columna 1: Botón "Inicio" (justify-start)
+ * - Columna 2: Título centrado (justify-center)
+ * - Columna 3: Botones secundarios (justify-end, gap-2)
+ * 
+ * PATRONES APLICADOS:
+ * - Splitting de modales: cada modal es independiente, no depende de otro.
+ * - Callback lifting: onLoginSuccess se propaga desde AuthModal hasta el padre (MainNavbar).
+ * - Composición: reutiliza GenericButton para botones principales.
+ * 
+ * @component
+ * @example
+ * // Uso en MainNavbar con handler de login
+ * <Navbar
+ *   onLoginSuccess={(userData) => {
+ *      setUser(userData);
+ *      localStorage.setItem('user', JSON.stringify(userData));
+ *   }}
+ * />
+ * 
+ * @param {NavbarProps} props - Props del componente
+ * @returns {JSX.Element} Fragment con navbar y modalidades (AuthModal, CourseInfoModal)
+ */
+const Navbar = ({ onLoginSuccess }: NavbarProps) => {
+    const preventReopenUntilRef = useRef(0);
+    /**
+     * Control de visibilidad del modal de autenticación (login/registro).
+     * Independiente de isCourseInfoModalOpen para permitir flujo de:
+     * CourseInfoModal → AuthModal (cuando user clickea "Registrarme")
+     */
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+    /**
+     * Control de visibilidad del modal de catálogo de cursos (especialidades).
+     * Independiente de isAuthModalOpen para que cada modal sea autocontrolado.
+     */
+    const [isCourseInfoModalOpen, setIsCourseInfoModalOpen] = useState(false);
+
+    /**
+     * Determina qué formulario mostrar dentro de AuthModal.
+     * - true: mostrar formulario de Login (para users con cuenta existente)
+     * - false: mostrar formulario de Registro (para nuevos users)
+     * 
+     * Se inicializa en true porque el flujo principal es "Entrar / Registro" (botón del navbar).
+     * Cuando se abre desde CourseInfoModal, el padre lo cambia a false.
+     */
+    const [isLoginView, setIsLoginView] = useState(true);
+
+    return (
+        <>
+            {/* 
+                Navbar fija principal.
+                - fixed top-0: pegada al top de la ventana
+                - z-50: por encima del contenido principal
+                - bg-white/80 backdrop-blur-md: fondo blanco transparente con blur (efecto moderno)
+                - border-b border-gray-100: línea separadora sutil
+            */}
+            <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 py-3 z-50">
+                {/* 
+                    Contenedor principal con layout grid de 3 columnas.
+                    - grid grid-cols-3: tres columnas iguales
+                    - items-center: alinea verticalmente en el eje transversal
+                    - h-16: altura fija (64px) para mantener proporciones
+                */}
+                <div className="w-full px-6 grid grid-cols-3 items-center h-16">
+                    {/* 
+                        Columna 1: Botón "Inicio".
+                        - flex justify-start: botón alineado a la izquierda
+                        - scroll al top con smooth behavior
+                    */}
+                    <div className="flex justify-start">
+                        <GenericButton
+                            label="Inicio"
+                            icon={<Home size={18} />}
+                            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                        />
+                    </div>
+
+                    {/* 
+                        Columna 2: Título principal centrado.
+                        - flex justify-center items-center: centra completamente
+                        - font-bold text-gray-600: estilo semibold y color discreto
+                        - text-3xl: tamaño grande pero no dominante
+                    */}
+                    <div className="flex justify-center items-center font-bold text-gray-600">
+                        <span className="text-3xl">GESTIÓN DE CURSOS ONLINE</span>
+                    </div>
+
+                    {/* 
+                        Columna 3: Botones secundarios (búsqueda y autenticación).
+                        - flex justify-end gap-2: alinea a la derecha con separación
+                    */}
+                    <div className="flex justify-end gap-2">
+                        {/* 
+                            Botón "¿Qué deseas aprender?" (búsqueda).
+                            - variant="search": forma redondeada (rounded-full)
+                            - Abre CourseInfoModal con catálogo de especialidades
+                        */}
+                        <GenericButton
+                            label="¿Qué deseas aprender?"
+                            variant="search"
+                            icon={<Search size={20} className="text-gray-500" />}
+                            onClick={() => setIsCourseInfoModalOpen(true)}
+                        />
+
+                        {/* 
+                            Botón "Entrar / Registro".
+                            - Abre AuthModal en modo LOGIN (isLoginView=true)
+                            - Si user quiere registrarse, puede dar clic en "¿No tengo cuenta?" dentro del modal
+                        */}
+                        <GenericButton
+                            label="Entrar / Registro"
+                            icon={<LogIn size={18} />}
+                            onClick={() => {
+                                if (Date.now() < preventReopenUntilRef.current) {
+                                    return;
+                                }
+                                setIsLoginView(true);  // Mostrar formulario Login por defecto
+                                setIsAuthModalOpen(true);
+                            }}
+                        />
+                    </div>
+                </div>
+            </nav>
+
+            {/* 
+                Modal de autenticación (login/registro).
+                - isOpen={isAuthModalOpen}: controlado por estado local
+                - onClose={() => setIsAuthModalOpen(false)}: cierra el modal
+                - isLoginView y setIsLoginView: controlan qué formulario mostrar
+                - onSuccess={onLoginSuccess}: propaga user autenticado al padre
+                
+                NOTA: Renderizado siempre en el árbol de React, solo se muestra si isOpen=true.
+                Esto evita destruir/recrear el componente en cada open/close.
+            */}
+            <AuthModal
+                isOpen={isAuthModalOpen}
+                onClose={() => setIsAuthModalOpen(false)}
+                isLoginView={isLoginView}
+                setIsLoginView={setIsLoginView}
+                onSuccess={(userData) => {
+                    // Evita reaperturas por rebote justo despues de cerrar por login exitoso.
+                    preventReopenUntilRef.current = Date.now() + 700;
+                    setIsAuthModalOpen(false);
+                    onLoginSuccess?.(userData);
+                }}
+            />
+
+            {/* 
+                Modal de catálogo de cursos (especialidades).
+                - isOpen={isCourseInfoModalOpen}: controlado por estado local
+                - onClose={() => setIsCourseInfoModalOpen(false)}: cierra el modal
+                
+                NOTA: Independiente de AuthModal. Si user clickea "Registrarme" dentro,
+                CourseInfoModal se cierra pero AuthModal se abre, sin conflictos.
+            */}
+            <CourseInfoModal
+                isOpen={isCourseInfoModalOpen}
+                onClose={() => setIsCourseInfoModalOpen(false)}
+            />
+        </>
+    );
+};
+
+export default Navbar;
+
+================
 File: frontend/src/routes/pages/student/components/CourseCatalog.tsx
 ================
 import { Search, Loader2, Star, PlusCircle, CheckCircle2 } from 'lucide-react';
@@ -20055,226 +20283,6 @@ public interface CoursesRepository extends JpaRepository<Courses, Long> {
         java.util.Map<String, Object> getCourseAnalyticalStatsNative(@Param("courseId") Long courseId);
 
 }
-
-================
-File: frontend/src/components/navbar/Navbar.tsx
-================
-import { useRef, useState } from 'react';
-import { Home, Search, LogIn } from 'lucide-react';
-import GenericButton from '../ui/genericButton/GenericButton';
-import AuthModal from '../ui/authModal/AuthModal';
-import CourseInfoModal from '../ui/courseInfoModal/CourseInfoModal';
-
-/**
- * Props del componente Navbar.
- * 
- * @interface NavbarProps
- */
-interface NavbarProps {
-    /**
-     * Callback opcional ejecutado cuando el usuario completa un login exitoso.
-     * 
-     * Se dispara desde AuthModal (onSuccess) y propaga los datos del usuario al padre.
-     * Típicamente el padre (MainNavbar) actualiza su estado de sesión global con esta información.
-     * 
-     * @param userData Objeto con datos del usuario autenticado
-     * @param userData.username - Nombre de usuario
-     * @param userData.photo - URL de la foto de perfil (opcional)
-     * @returns void
-     */
-    onLoginSuccess?: (userData: { username: string; photo?: string }) => void;
-}
-
-/**
- * Barra de navegación principal (unauthenticated).
- * 
- * Renderiza la navbar fija superior con:
- * - Botón "Inicio" a la izquierda
- * - Título "GESTIÓN DE CURSOS ONLINE" en el centro
- * - Botones de búsqueda y autenticación a la derecha
- * 
- * GESTIÓN DE ESTADO:
- * Mantiene 3 estados locales independientes:
- * 1. isAuthModalOpen - Modal de login/registro
- * 2. isCourseInfoModalOpen - Modal de catálogo de cursos
- * 3. isLoginView - Bug 'Login' vs 'Registro' dentro de AuthModal
- * 
- * Estos estados son INDEPENDIENTES (no hay dependencias entre ellos) para evitar
- * renderizados en cascada y permitir que múltiples modales coexistan en el árbol de React.
- * 
- * FLUJOS:
- * 1. User_clicks "¿Qué deseas aprender?" → abre CourseInfoModal
- *    → User clickea "Registrarme" → cierra CourseInfoModal pero abre AuthModal
- * 2. User_clicks "Entrar / Registro" → abre AuthModal en modo Login (isLoginView=true)
- * 3. User completa login exitoso → AuthModal dispara onSuccess → padre actualiza estado global
- * 
- * LAYOUT:
- * - fixed top-0: navbar pegada al top (z-50 para estar encima)
- * - grid grid-cols-3: tres columnas iguales para distribuir contenido
- * - Columna 1: Botón "Inicio" (justify-start)
- * - Columna 2: Título centrado (justify-center)
- * - Columna 3: Botones secundarios (justify-end, gap-2)
- * 
- * PATRONES APLICADOS:
- * - Splitting de modales: cada modal es independiente, no depende de otro.
- * - Callback lifting: onLoginSuccess se propaga desde AuthModal hasta el padre (MainNavbar).
- * - Composición: reutiliza GenericButton para botones principales.
- * 
- * @component
- * @example
- * // Uso en MainNavbar con handler de login
- * <Navbar
- *   onLoginSuccess={(userData) => {
- *      setUser(userData);
- *      localStorage.setItem('user', JSON.stringify(userData));
- *   }}
- * />
- * 
- * @param {NavbarProps} props - Props del componente
- * @returns {JSX.Element} Fragment con navbar y modalidades (AuthModal, CourseInfoModal)
- */
-const Navbar = ({ onLoginSuccess }: NavbarProps) => {
-    const preventReopenUntilRef = useRef(0);
-    /**
-     * Control de visibilidad del modal de autenticación (login/registro).
-     * Independiente de isCourseInfoModalOpen para permitir flujo de:
-     * CourseInfoModal → AuthModal (cuando user clickea "Registrarme")
-     */
-    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-
-    /**
-     * Control de visibilidad del modal de catálogo de cursos (especialidades).
-     * Independiente de isAuthModalOpen para que cada modal sea autocontrolado.
-     */
-    const [isCourseInfoModalOpen, setIsCourseInfoModalOpen] = useState(false);
-
-    /**
-     * Determina qué formulario mostrar dentro de AuthModal.
-     * - true: mostrar formulario de Login (para users con cuenta existente)
-     * - false: mostrar formulario de Registro (para nuevos users)
-     * 
-     * Se inicializa en true porque el flujo principal es "Entrar / Registro" (botón del navbar).
-     * Cuando se abre desde CourseInfoModal, el padre lo cambia a false.
-     */
-    const [isLoginView, setIsLoginView] = useState(true);
-
-    return (
-        <>
-            {/* 
-                Navbar fija principal.
-                - fixed top-0: pegada al top de la ventana
-                - z-50: por encima del contenido principal
-                - bg-white/80 backdrop-blur-md: fondo blanco transparente con blur (efecto moderno)
-                - border-b border-gray-100: línea separadora sutil
-            */}
-            <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 py-3 z-50">
-                {/* 
-                    Contenedor principal con layout grid de 3 columnas.
-                    - grid grid-cols-3: tres columnas iguales
-                    - items-center: alinea verticalmente en el eje transversal
-                    - h-16: altura fija (64px) para mantener proporciones
-                */}
-                <div className="w-full px-6 grid grid-cols-3 items-center h-16">
-                    {/* 
-                        Columna 1: Botón "Inicio".
-                        - flex justify-start: botón alineado a la izquierda
-                        - scroll al top con smooth behavior
-                    */}
-                    <div className="flex justify-start">
-                        <GenericButton
-                            label="Inicio"
-                            icon={<Home size={18} />}
-                            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                        />
-                    </div>
-
-                    {/* 
-                        Columna 2: Título principal centrado.
-                        - flex justify-center items-center: centra completamente
-                        - font-bold text-gray-600: estilo semibold y color discreto
-                        - text-3xl: tamaño grande pero no dominante
-                    */}
-                    <div className="flex justify-center items-center font-bold text-gray-600">
-                        <span className="text-3xl">GESTIÓN DE CURSOS ONLINE</span>
-                    </div>
-
-                    {/* 
-                        Columna 3: Botones secundarios (búsqueda y autenticación).
-                        - flex justify-end gap-2: alinea a la derecha con separación
-                    */}
-                    <div className="flex justify-end gap-2">
-                        {/* 
-                            Botón "¿Qué deseas aprender?" (búsqueda).
-                            - variant="search": forma redondeada (rounded-full)
-                            - Abre CourseInfoModal con catálogo de especialidades
-                        */}
-                        <GenericButton
-                            label="¿Qué deseas aprender?"
-                            variant="search"
-                            icon={<Search size={20} className="text-gray-500" />}
-                            onClick={() => setIsCourseInfoModalOpen(true)}
-                        />
-
-                        {/* 
-                            Botón "Entrar / Registro".
-                            - Abre AuthModal en modo LOGIN (isLoginView=true)
-                            - Si user quiere registrarse, puede dar clic en "¿No tengo cuenta?" dentro del modal
-                        */}
-                        <GenericButton
-                            label="Entrar / Registro"
-                            icon={<LogIn size={18} />}
-                            onClick={() => {
-                                if (Date.now() < preventReopenUntilRef.current) {
-                                    return;
-                                }
-                                setIsLoginView(true);  // Mostrar formulario Login por defecto
-                                setIsAuthModalOpen(true);
-                            }}
-                        />
-                    </div>
-                </div>
-            </nav>
-
-            {/* 
-                Modal de autenticación (login/registro).
-                - isOpen={isAuthModalOpen}: controlado por estado local
-                - onClose={() => setIsAuthModalOpen(false)}: cierra el modal
-                - isLoginView y setIsLoginView: controlan qué formulario mostrar
-                - onSuccess={onLoginSuccess}: propaga user autenticado al padre
-                
-                NOTA: Renderizado siempre en el árbol de React, solo se muestra si isOpen=true.
-                Esto evita destruir/recrear el componente en cada open/close.
-            */}
-            <AuthModal
-                isOpen={isAuthModalOpen}
-                onClose={() => setIsAuthModalOpen(false)}
-                isLoginView={isLoginView}
-                setIsLoginView={setIsLoginView}
-                onSuccess={(userData) => {
-                    // Evita reaperturas por rebote justo despues de cerrar por login exitoso.
-                    preventReopenUntilRef.current = Date.now() + 700;
-                    setIsAuthModalOpen(false);
-                    onLoginSuccess?.(userData);
-                }}
-            />
-
-            {/* 
-                Modal de catálogo de cursos (especialidades).
-                - isOpen={isCourseInfoModalOpen}: controlado por estado local
-                - onClose={() => setIsCourseInfoModalOpen(false)}: cierra el modal
-                
-                NOTA: Independiente de AuthModal. Si user clickea "Registrarme" dentro,
-                CourseInfoModal se cierra pero AuthModal se abre, sin conflictos.
-            */}
-            <CourseInfoModal
-                isOpen={isCourseInfoModalOpen}
-                onClose={() => setIsCourseInfoModalOpen(false)}
-            />
-        </>
-    );
-};
-
-export default Navbar;
 
 ================
 File: frontend/src/routes/pages/student/InterestsModal.tsx
@@ -21244,165 +21252,6 @@ const NavbarUser = ({ username, userPhoto, onLogout }: NavbarUserProps) => {
 export default NavbarUser;
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/config/SecurityConfig.java
-================
-package com.cursosonline.backend.config;
-
-import com.cursosonline.backend.security.jwt.JwtAuthenticationFilter;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.Arrays;
-import java.util.List;
-
-@Configuration
-@EnableWebSecurity
-/**
- * Clase de configuración de seguridad para la aplicación.
- * Configura la seguridad HTTP, CORS, CSRF, gestión de sesiones y filtros de
- * autenticación.
- */
-public class SecurityConfig {
-
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-
-    // Sincronizado con application.properties usando la estructura estandar
-    // 'app.cors.allowed-origins'
-    @Value("${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}")
-    private List<String> allowedOrigins;
-
-    /**
-     * Constructor de la clase SecurityConfig.
-     * 
-     * @param jwtAuthenticationFilter Filtro interceptor del token JWT
-     */
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-    }
-
-    /**
-     * Configura la cadena de filtros de seguridad para la aplicación.
-     * 
-     * @param http Componente inyectado de HttpSecurity
-     * @return La cadena de filtros configurada
-     * @throws Exception Si ocurre un error de configuración
-     */
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
-
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                .authorizeHttpRequests(auth -> auth
-
-                        // Permitir solicitudes OPTIONS para CORS preflight
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
-                        // Endpoints de autenticación pública (login y registro)
-                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/{username}").permitAll()
-
-                        // ✅ SEGURIDAD ESTRUCTURAL: Permitir ver imágenes de perfil públicamente (Solo
-                        // lectura)
-                        .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
-
-                        // 🚨 CONTROL DE ACCESO CRÍTICO: NUEVOS ENDPOINTS DE CURSOS Y MATRÍCULAS
-                        // Permitimos el acceso para que el buscador predictivo funcione en tiempo real
-                        .requestMatchers(HttpMethod.GET, "/api/courses/search").permitAll()
-                        // Protegemos la matrícula exigiendo obligatoriamente sesión activa (JWT)
-                        .requestMatchers(HttpMethod.POST, "/api/courses/enroll/**").authenticated()
-
-                        // Endpoint para obtener el perfil del usuario autenticado (requiere
-                        // autenticación)
-                        .requestMatchers("/api/auth/me").authenticated()
-
-                        // Endpoint para obtener las notificaciones del usuario autenticado (requiere
-                        // autenticación)
-                        .requestMatchers("/api/auth/notifications").authenticated()
-
-                        // Endpoint para obtener el perfil de un usuario específico (requiere
-                        // autenticación)
-                        .requestMatchers("/api/v1/profile/**").authenticated()
-
-                        // Exclusivo Administrador
-                        .requestMatchers("/api/auth/users/**").hasAuthority("ADMIN")
-                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
-                        .requestMatchers("/api/users/**").hasAuthority("ADMIN")
-
-                        // Exclusivo Profesor y Administrador
-                        .requestMatchers("/api/professor/**").hasAnyAuthority("PROFESSOR", "ADMIN")
-                        .requestMatchers("/api/student/**").hasAnyAuthority("STUDENT", "ADMIN")
-
-                        // Cualquier otra solicitud requiere autenticación
-                        .anyRequest().authenticated())
-                .formLogin(form -> form.disable())
-                .httpBasic(basic -> basic.disable());
-
-        // Agrega el filtro de autenticación JWT antes del filtro estándar de Spring
-        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
-        return http.build();
-    }
-
-    /**
-     * Configura la fuente de configuración CORS para la aplicación.
-     * 
-     * @return La fuente de configuración CORS configurada.
-     */
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        // Asignamos la lista inyectada directamente
-        config.setAllowedOrigins(allowedOrigins);
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
-    }
-
-    /**
-     * Configura el codificador de contraseñas para la aplicación.
-     * 
-     * @return El codificador de contraseñas configurado.
-     */
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    /**
-     * Configura el administrador de autenticación para la aplicación.
-     * 
-     * @param configuration La configuración de autenticación.
-     * @return El administrador de autenticación configurado.
-     * @throws Exception si ocurre un error al obtener el administrador de
-     *                   autenticación.
-     */
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
-        return configuration.getAuthenticationManager();
-    }
-}
-
-================
 File: frontend/src/routes/pages/admin/AdminDashboard.tsx
 ================
 import { useState } from 'react';
@@ -21681,6 +21530,165 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
+
+================
+File: backend/src/main/java/com/cursosonline/backend/config/SecurityConfig.java
+================
+package com.cursosonline.backend.config;
+
+import com.cursosonline.backend.security.jwt.JwtAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.List;
+
+@Configuration
+@EnableWebSecurity
+/**
+ * Clase de configuración de seguridad para la aplicación.
+ * Configura la seguridad HTTP, CORS, CSRF, gestión de sesiones y filtros de
+ * autenticación.
+ */
+public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    // Sincronizado con application.properties usando la estructura estandar
+    // 'app.cors.allowed-origins'
+    @Value("${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}")
+    private List<String> allowedOrigins;
+
+    /**
+     * Constructor de la clase SecurityConfig.
+     * 
+     * @param jwtAuthenticationFilter Filtro interceptor del token JWT
+     */
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    }
+
+    /**
+     * Configura la cadena de filtros de seguridad para la aplicación.
+     * 
+     * @param http Componente inyectado de HttpSecurity
+     * @return La cadena de filtros configurada
+     * @throws Exception Si ocurre un error de configuración
+     */
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable())
+
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                .authorizeHttpRequests(auth -> auth
+
+                        // Permitir solicitudes OPTIONS para CORS preflight
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // Endpoints de autenticación pública (login y registro)
+                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/{username}").permitAll()
+
+                        // ✅ SEGURIDAD ESTRUCTURAL: Permitir ver imágenes de perfil públicamente (Solo
+                        // lectura)
+                        .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
+
+                        // 🚨 CONTROL DE ACCESO CRÍTICO: NUEVOS ENDPOINTS DE CURSOS Y MATRÍCULAS
+                        // Permitimos el acceso para que el buscador predictivo funcione en tiempo real
+                        .requestMatchers(HttpMethod.GET, "/api/courses/search").permitAll()
+                        // Protegemos la matrícula exigiendo obligatoriamente sesión activa (JWT)
+                        .requestMatchers(HttpMethod.POST, "/api/courses/enroll/**").authenticated()
+
+                        // Endpoint para obtener el perfil del usuario autenticado (requiere
+                        // autenticación)
+                        .requestMatchers("/api/auth/me").authenticated()
+
+                        // Endpoint para obtener las notificaciones del usuario autenticado (requiere
+                        // autenticación)
+                        .requestMatchers("/api/auth/notifications").authenticated()
+
+                        // Endpoint para obtener el perfil de un usuario específico (requiere
+                        // autenticación)
+                        .requestMatchers("/api/v1/profile/**").authenticated()
+
+                        // Exclusivo Administrador
+                        .requestMatchers("/api/auth/users/**").hasAuthority("ADMIN")
+                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
+                        .requestMatchers("/api/users/**").hasAuthority("ADMIN")
+
+                        // Exclusivo Profesor y Administrador
+                        .requestMatchers("/api/professor/**").hasAnyAuthority("PROFESSOR", "ADMIN")
+                        .requestMatchers("/api/student/**").hasAnyAuthority("STUDENT", "ADMIN")
+
+                        // Cualquier otra solicitud requiere autenticación
+                        .anyRequest().authenticated())
+                .formLogin(form -> form.disable())
+                .httpBasic(basic -> basic.disable());
+
+        // Agrega el filtro de autenticación JWT antes del filtro estándar de Spring
+        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    /**
+     * Configura la fuente de configuración CORS para la aplicación.
+     * 
+     * @return La fuente de configuración CORS configurada.
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        // Asignamos la lista inyectada directamente
+        config.setAllowedOrigins(allowedOrigins);
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+
+    /**
+     * Configura el codificador de contraseñas para la aplicación.
+     * 
+     * @return El codificador de contraseñas configurado.
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    /**
+     * Configura el administrador de autenticación para la aplicación.
+     * 
+     * @param configuration La configuración de autenticación.
+     * @return El administrador de autenticación configurado.
+     * @throws Exception si ocurre un error al obtener el administrador de
+     *                   autenticación.
+     */
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+        return configuration.getAuthenticationManager();
+    }
+}
 
 ================
 File: backend/src/main/java/com/cursosonline/backend/services/UserService.java
@@ -23470,6 +23478,55 @@ Los principales desafíos son:
 
 * **Positivas:** Reducción drástica del overhead de red, renderizado reactivo sin basura visual, interfaz de usuario desacoplada y preparada para futuras extensiones del catálogo sin comprometer la consistencia geométrica del Dashboard.
 * **Negativas:** Obliga a mantener una estricta correspondencia entre las alturas relativas de las sub-cajas dentro del contenedor padre para evitar solapamientos visuales.
+
+---
+
+## ADR-45: Canal de Alarmas Académicas Dinámicas en Barra de Navegación
+
+### Estatus
+
+Aceptado (Julio 2026)
+
+### Contexto
+
+El estudiante requería avisos visuales inmediatos sobre la llegada de nuevos documentos a su bandeja de entrada y alertas automáticas cuando el progreso de un curso alcanzara un porcentaje $\geq 90\%$. Mantener estas consultas acopladas a las vistas principales degradaba el rendimiento y violaba los principios de segregación de interfaces.
+
+### Decisión
+
+* Se centralizó la lógica analítica de detección en un endpoint seguro de Spring Boot (`/api/auth/notifications`).
+* Se encapsuló el consumo de red en React mediante un hook aislado denominado `useNotifications` para respetar el aislamiento de infraestructura **[ADR-20]**.
+* La interfaz visual se construyó utilizando la iconografía de Lucide envuelta de forma estricta en el componente core `GenericButton` **[ADR-13]**.
+* Se inyectó el componente de forma condicional en la barra superior (`NavbarUser.tsx`) únicamente cuando el rol de la sesión activa coincide con `STUDENT`, garantizando la simetría geométrica y la limpieza visual para los roles de profesor y administrador.
+
+### Consecuencias
+
+* **Positivas:** Sincronización de alertas en tiempo real con PostgreSQL sin sobrecargar las cabeceras de otros roles.
+* **Positivas:** Cobertura de pruebas unitarias e integración completadas al 100% y en verde mediante Vitest y MockMvc de Spring Security.
+
+---
+
+## ADR-46: Purificación del Sistema de Contingencia y Control de Permisos
+
+### Estatus
+
+Aceptado (Julio 2026)
+
+### Contexto
+
+La vista de error por falta de privilegios (`AccessDenied.tsx`) utilizaba etiquetas de texto y enlaces HTML manuales (`<h1>`, `<p>`, `<a>`), introduciendo inconsistencias de diseño y violando el principio de abstracción e identidad visual unificada de la plataforma.
+
+### Decisión
+
+* Se refactorizó la vista de contingencia eliminando el HTML plano y las clases manuales de Tailwind v4.
+* Se delegó la presentación estructural del mensaje de error en el componente core corporativo `GenericHeader` **[ADR-43]**.
+* Se reemplazaron las etiquetas de enlace nativas por el componente de acción core `GenericButton`, gestionando la redirección interna mediante el hook seguro `useNavigate` de React Router.
+
+### Consecuencias
+
+* **Positivas:** Reducción de líneas de código duplicadas y eliminación de estilos manuales en la capa de presentación privada.
+* **Positivas:** Alineación total con las directivas de Purificación UI **[ADR-13]** de cara a la evaluación del tribunal del TFG.
+
+---
 
 # Notas de Migración: Transición a JWT y Compatibilidad
 
