@@ -4,9 +4,11 @@ import com.cursosonline.backend.dto.RecommendationDTO;
 import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Interest;
+import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.repository.CoursesRepository;
-import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.InterestRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,37 +23,70 @@ public class RecommendationService {
     private final CoursesRepository coursesRepository;
     private final InterestRepository interestRepository;
     private final EnrollmentRepository enrollmentRepository;
-    private final SemanticNormalizer normalizer; // <--- Inyección del nuevo componente
+    private final UserRepository userRepository;
+
+    @Transactional(readOnly = true)
+    public List<RecommendationDTO> getRecommendations(String username) {
+        if (username == null || username.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Users user = userRepository.findByUsername(username.trim()).orElse(null);
+        if (user == null || user.getUser_id() == null) {
+            return Collections.emptyList();
+        }
+
+        Interest interests = interestRepository.findByUser_Username(username.trim()).orElse(null);
+        List<Enrollment> myEnrollments = enrollmentRepository.findAllByUserIdWithCourses(user.getUser_id());
+        List<Courses> allCourses = coursesRepository.findAll();
+
+        return buildRecommendations(interests, myEnrollments, allCourses);
+    }
 
     @Transactional(readOnly = true)
     public List<RecommendationDTO> getRecommendationsForUser(Long userId) {
+        if (userId == null) {
+            return Collections.emptyList();
+        }
+
         Interest interests = interestRepository.findById(userId).orElse(null);
         List<Enrollment> myEnrollments = enrollmentRepository.findAllByUserIdWithCourses(userId);
+        List<Courses> allCourses = coursesRepository.findAll();
 
-        Set<Long> excludedIds = myEnrollments.stream()
+        return buildRecommendations(interests, myEnrollments, allCourses);
+    }
+
+    private List<RecommendationDTO> buildRecommendations(
+            Interest interests,
+            List<Enrollment> myEnrollments,
+            List<Courses> allCourses) {
+
+        List<Enrollment> safeEnrollments = myEnrollments != null ? myEnrollments : Collections.emptyList();
+        List<Courses> safeCourses = allCourses != null ? allCourses : Collections.emptyList();
+
+        Set<Long> excludedIds = safeEnrollments.stream()
                 .filter(e -> e.getCourse() != null)
                 .map(e -> e.getCourse().getCourse_id())
                 .collect(Collectors.toSet());
 
-        List<Courses> allCourses = coursesRepository.findAll();
-
-        // FASE DE TRADUCCIÓN: Extracción previa y unificación a Tokens Invariables
-        Set<String> userCategoryTokens = interests != null ? normalizer.normalizeCategories(interests.getCategory())
+        // FASE DE TRADUCCIÓN: Extracción previa y unificación a Tokens nativos
+        // independientes
+        Set<String> userCategoryTokens = interests != null ? normalizeCollection(interests.getCategory())
                 : Collections.emptySet();
-        Set<String> userLevelTokens = interests != null ? normalizer.normalizeLevels(interests.getCourse_type())
+        Set<String> userLevelTokens = interests != null ? normalizeCollection(interests.getCourse_type())
                 : Collections.emptySet();
-        Set<String> userLanguageTokens = interests != null ? normalizer.normalizeLanguages(interests.getLanguage())
+        Set<String> userLanguageTokens = interests != null ? normalizeCollection(interests.getLanguage())
                 : Collections.emptySet();
         Set<String> userSubtitleTokens = interests != null
-                ? normalizer.normalizeLanguages(interests.getSubtitle_languages())
+                ? normalizeCollection(interests.getSubtitle_languages())
                 : Collections.emptySet();
         List<String> rawDurations = interests != null ? interests.getDuration() : Collections.emptyList();
 
-        return allCourses.stream()
+        return safeCourses.stream()
                 .filter(course -> course != null && course.getCourse_id() != null)
                 .filter(course -> !excludedIds.contains(course.getCourse_id()))
                 .map(course -> calculateAffinityWithTokens(course, userCategoryTokens, userLevelTokens,
-                        userLanguageTokens, userSubtitleTokens, rawDurations, myEnrollments))
+                        userLanguageTokens, userSubtitleTokens, rawDurations, safeEnrollments))
                 .sorted((dto1, dto2) -> Integer.compare(dto2.score(), dto1.score()))
                 .limit(6)
                 .collect(Collectors.toList());
@@ -69,27 +104,23 @@ public class RecommendationService {
         double score = 0;
         StringBuilder reason = new StringBuilder();
 
-        // 1. Evaluación de Precondiciones emparejando a nivel de Token Semántico
-        String courseCategoryToken = normalizer.normalizeCategory(course.getCategory());
+        // 1. Evaluación de Precondiciones emparejando a nivel de Token Semántico local
+        String courseCategoryToken = normalizeSingle(course.getCategory());
         boolean isCategoryMatch = userCategoryTokens.contains(courseCategoryToken);
 
-        String courseLevelToken = normalizer.normalizeLevel(course.getCourseType());
-        // CORRECCIÓN SECCIÓN NIVEL: Concede el match si coincide el token exacto O si
-        // Luis marcó que acepta todos los niveles
+        String courseLevelToken = normalizeSingle(course.getCourseType());
         boolean isLevelMatch = userLevelTokens.contains("ALL_LEVELS") || userLevelTokens.contains(courseLevelToken);
 
-        String courseLanguageToken = normalizer.normalizeLanguage(course.getLanguage());
+        String courseLanguageToken = normalizeSingle(course.getLanguage());
         boolean isLanguageMatch = userLanguageTokens.contains(courseLanguageToken);
 
-        // Subtítulos: Al ser una columna de texto libre (ej: "English, Spanish"),
-        // comprobamos inclusión lingüística mediante tokens
+        // Subtítulos: Comprobamos inclusión lingüística nativa mediante tokens
+        // normalizados
         boolean isSubtitleMatch = false;
         if (course.getSubtitleLanguages() != null && !userSubtitleTokens.isEmpty()) {
             String cleanSubs = course.getSubtitleLanguages().toLowerCase();
             isSubtitleMatch = userSubtitleTokens.stream()
                     .anyMatch(token -> {
-                        // CORRECCIÓN SECCIÓN SUBTÍTULOS: Sincronizado en minúsculas con las salidas de
-                        // SemanticNormalizer
                         if (token.equals("spanish") && (cleanSubs.contains("esp") || cleanSubs.contains("spa")))
                             return true;
                         if (token.equals("english") && (cleanSubs.contains("ing") || cleanSubs.contains("eng")))
@@ -103,7 +134,6 @@ public class RecommendationService {
                         return cleanSubs.contains(token.toLowerCase());
                     });
         }
-
         boolean isDurationMatch = checkDurationMatch(course.getDuration(), rawDurations);
 
         // 2. MODELO POR ESCALONES CRECIENTES DEL HISTORIAL ACADÉMICO
@@ -113,7 +143,7 @@ public class RecommendationService {
         if (myEnrollments != null && !myEnrollments.isEmpty() && course.getCategory() != null) {
             for (Enrollment enrollment : myEnrollments) {
                 if (enrollment.getCourse() != null && enrollment.getCourse().getCategory() != null) {
-                    String enrollmentCatToken = normalizer.normalizeCategory(enrollment.getCourse().getCategory());
+                    String enrollmentCatToken = normalizeSingle(enrollment.getCourse().getCategory());
                     if (courseCategoryToken.equals(enrollmentCatToken)) {
                         int currentProgress = enrollment.getProgress_percentage();
                         if (currentProgress > maxProgressInTemplate) {
@@ -144,8 +174,7 @@ public class RecommendationService {
         if (isDurationMatch)
             score += 5;
 
-        // 4. GENERACIÓN DE EXPLICABILIDAD DINÁMICA (Mapeada en español usando el
-        // catálogo real)
+        // 4. GENERACIÓN DE EXPLICABILIDAD DINÁMICA
         if (isCategoryMatch) {
             reason.append("Coincide con tus categorías preferidas (").append(course.getCategory()).append("). ");
         }
@@ -193,5 +222,53 @@ public class RecommendationService {
                 return true;
             return hours > 40 && target.contains("Largo");
         });
+    }
+
+    /**
+     * ABSORCIÓN NATIVA DE SEMANTIC NORMALIZER:
+     * Convierte una cadena de texto libre en un token unificado e invariable.
+     */
+    private static String normalizeSingle(String input) {
+        if (input == null) {
+            return "";
+        }
+        return input.trim()
+                .toLowerCase()
+                .replace("á", "a")
+                .replace("é", "e")
+                .replace("í", "i")
+                .replace("ó", "o")
+                .replace("ú", "u")
+                .replaceAll("[^a-z0-8_\\s-]", "")
+                .replaceAll("\\s+", "_");
+    }
+
+    /**
+     * ABSORCIÓN NATIVA DE SEMANTIC NORMALIZER:
+     * Transforma colecciones o estructuras delimitadas por comas en colecciones de
+     * tokens semánticos únicos.
+     * Blindado con supresión de alertas de casteo y validación anticipada de nulos.
+     */
+    @SuppressWarnings("unchecked")
+    private static Set<String> normalizeCollection(Object input) {
+        if (input == null) {
+            return Collections.emptySet();
+        }
+
+        List<String> rawElements;
+        if (input instanceof List) {
+            rawElements = (List<String>) input;
+        } else if (input instanceof String) {
+            rawElements = Arrays.asList(((String) input).split(","));
+        } else {
+            return Collections.emptySet();
+        }
+
+        return rawElements.stream()
+                .filter(Objects::nonNull) // 1. Filtro preventivo de nulos en la cabecera del Stream
+                .map(s -> s.trim()) // 2. Ejecución segura para evitar alertas de puntero nulo
+                .filter(s -> !s.isEmpty())
+                .map(RecommendationService::normalizeSingle)
+                .collect(Collectors.toSet());
     }
 }

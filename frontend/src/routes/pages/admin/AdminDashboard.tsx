@@ -6,6 +6,10 @@ import GenericButton from '../../../components/ui/genericButton/GenericButton';
 import AdminLayout from '../../layouts/DashboardLayout';
 import { UserScrollList } from '../../../components/admin/UserScrollList';
 import type { UserEntity } from '../../../services/userDomains';
+import Input from '../../../components/ui/Input';
+
+// Importación del componente core unificado según [ADR-13]
+import GenericHeader from '../../../components/ui/genericHeader/GenericHeader';
 
 const AdminDashboard = () => {
     const [searchName, setSearchName] = useState<string>('');
@@ -72,7 +76,6 @@ const AdminDashboard = () => {
     const handleDeleteUser = async () => {
         if (!foundUser) return;
 
-        // Obtenemos el objeto del usuario desde la persistencia que maneja tu AuthProvider
         const storedAuth = localStorage.getItem('auth_user');
         let currentAdminUsername = '';
 
@@ -85,7 +88,6 @@ const AdminDashboard = () => {
             }
         }
 
-        // Validación preventiva en UI contra autoborrado
         if (foundUser.username.toLowerCase() === currentAdminUsername.toLowerCase()) {
             setError("Acción denegada: El sistema bloquea el autoborrado por seguridad.");
             return;
@@ -99,20 +101,17 @@ const AdminDashboard = () => {
         setError('');
 
         try {
-            // PETICIÓN HTTP: Invoca al controlador conmutador de estado
             const response = await apiClient.delete(`/api/auth/users/${foundUser.username}`);
 
             if (response.status === 200) {
                 alert(response.data.message);
-
-                // SINCRONIZACIÓN SEGURA: Actualizamos la tarjeta con el valor real devuelto por el servidor
                 setFoundUser({
                     ...foundUser,
-                    enabled: response.data.enabled // Sincroniza de forma atómica con el backend
+                    enabled: response.data.enabled
                 });
             }
         } catch (errHttp) {
-            console.error("Error en la petición de baja temporl:", errHttp);
+            console.error("Error en la petición de baja temporal:", errHttp);
             let message = "Error crítico: No se pudo modificar el estado del usuario.";
             if (axios.isAxiosError(errHttp) && errHttp.response?.data?.error) {
                 message = errHttp.response.data.error;
@@ -123,7 +122,6 @@ const AdminDashboard = () => {
         }
     };
 
-    // Auxiliar para obtener el nombre del admin actual directamente en la renderización
     const getAdminUsername = (): string => {
         const storedAuth = localStorage.getItem('auth_user');
         if (!storedAuth) return '';
@@ -136,11 +134,30 @@ const AdminDashboard = () => {
 
     return (
         <AdminLayout>
-            {/* CONTENEDOR GRID EN PARALELO: Una al lado de la otra en pantallas grandes (lg), una encima de otra en móviles */}
+            {/* 
+               CABECERA PRINCIPAL UNIFICADA CON BIENVENIDA INSTITUCIONAL [ADR-13]:
+               Inyección de datos dinámicos extraídos en tiempo de renderizado de forma fluida.
+            */}
+            <GenericHeader
+                title="Panel de Administración"
+                titleSize="text-2xl font-bold tracking-tight"
+                titleColor="text-slate-800"
+                textPadding="p-0"
+                containerClass="border-b border-slate-200 pb-4 mb-6"
+                align="left"
+                description={
+                    <p className="text-sm font-medium text-slate-600 mt-1.5">
+                        Consola del sistema: monitorización de persistencia y gestión de accesos corporativos.
+                    </p>
+                }
+            />
+
+            {/* CONTENEDOR GRID EN PARALELO */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start w-full">
+
                 {/* COLUMNA IZQUIERDA: TARJETA DEL BUSCADOR DE USUARIOS */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-lg px-5 py-15 w-full">
-                    {/* Encabezado */}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-lg px-5 py-6 w-full">
+                    {/* Encabezado de tarjeta interna */}
                     <div className="flex items-center gap-3 mb-5 border-b border-slate-100 pb-4">
                         <div className="p-2.5 bg-red-50 rounded-xl text-red-600">
                             <Users size={22} />
@@ -153,15 +170,15 @@ const AdminDashboard = () => {
                         </div>
                     </div>
 
-                    {/* Formulario de Búsqueda */}
-                    <form onSubmit={handleSearchUser} className="flex gap-2 mb-4">
-                        <input
+                    {/* Formulario de Búsqueda Purificado con Componente Core */}
+                    <form onSubmit={handleSearchUser} className="flex gap-2 mb-4 items-end">
+                        <Input
                             type="text"
                             placeholder="Introduce el nombre (ej. Laura)"
                             value={searchName}
                             onChange={(e) => setSearchName(e.target.value)}
                             required
-                            className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
+                            className="flex-1 text-sm font-medium text-slate-800 placeholder-slate-400"
                         />
                         <GenericButton
                             type="submit"
@@ -169,7 +186,7 @@ const AdminDashboard = () => {
                             variant="white"
                             ariaLabel="Buscar en base de datos"
                             icon={loading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
-                            className="p-2! bg-red-600! hover:bg-red-700! text-white! rounded-xl! shadow-md! border border-transparent!"
+                            className="p-2! bg-red-600! hover:bg-red-700! text-white! rounded-xl! shadow-md! border border-transparent! h-11.5 flex items-center justify-center"
                         />
                     </form>
 
@@ -180,7 +197,7 @@ const AdminDashboard = () => {
                         </div>
                     )}
 
-                    {/* RESULTADO DINÁMICO RECOLECTADO DE POSTGRESQL CON SELECTOR DE ROL */}
+                    {/* RESULTADO DINÁMICO CON SELECTOR DE ROL */}
                     {foundUser && (
                         <div className="mt-4 border-t border-slate-100 pt-4 animate-in fade-in zoom-in-95 duration-200">
                             <div className="bg-slate-50/50 p-3.5 rounded-xl border border-slate-100 flex flex-col gap-3">
@@ -228,8 +245,7 @@ const AdminDashboard = () => {
                                         )}
                                     </div>
                                 </div>
-
-                                {/* BOTÓN DE BORRADO DESTRUCTIVO BLINDADO */}
+                                {/* BOTÓN DE ACCIÓN ADMINISTRATIVA CORREGIDO */}
                                 <div className="mt-2 pt-3 border-t border-red-100">
                                     {foundUser.username.toLowerCase() === getAdminUsername().toLowerCase() ? (
                                         <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 p-2.5 rounded-xl text-center font-medium">
@@ -240,7 +256,7 @@ const AdminDashboard = () => {
                                             type="button"
                                             onClick={handleDeleteUser}
                                             disabled={deleting || updatingId !== null}
-                                            variant="success"
+                                            variant="white"
                                             label={deleting ? 'Reactivando...' : 'Reactivar y dar de alta usuario'}
                                             icon={deleting ? <Loader2 size={14} className="animate-spin" /> : undefined}
                                             className="w-full py-2! bg-emerald-50! border-2! border-emerald-200! text-emerald-600! rounded-xl! text-xs! font-bold! uppercase! tracking-wide! hover:bg-emerald-100! transition-all! justify-center! gap-2!"
@@ -250,24 +266,22 @@ const AdminDashboard = () => {
                                             type="button"
                                             onClick={handleDeleteUser}
                                             disabled={deleting || updatingId !== null}
-                                            variant="white"
-                                            label={deleting ? 'Procesando...' : 'Baja Temporal Usuario'}
+                                            variant="primary"
+                                            label={deleting ? 'Procesando...' : 'Dar de baja temporal usuario'}
                                             icon={deleting ? <Loader2 size={14} className="animate-spin" /> : undefined}
-                                            className="w-full py-2! bg-white! border-2! border-blue-200! text-blue-600! rounded-xl! text-xs! font-bold! uppercase! tracking-wide! hover:bg-blue-50! transition-all! justify-center! gap-2!"
+                                            className="w-full py-2! bg-red-50! border-2! border-red-200! text-red-600! rounded-xl! text-xs! font-bold! uppercase! tracking-wide! hover:bg-red-100! transition-all! justify-center! gap-2!"
                                         />
                                     )}
                                 </div>
-
                             </div>
                         </div>
                     )}
                 </div>
 
-                {/* COLUMNA DERECHA: CONSOLA DE USUARIOS CON SCROLL INFRAESTRUCTURA */}
-                <div className="w-full h-full">
+                {/* COLUMNA DERECHA: LISTA COMPLEMENTARIA */}
+                <div className="w-full">
                     <UserScrollList />
                 </div>
-
             </div>
         </AdminLayout>
     );

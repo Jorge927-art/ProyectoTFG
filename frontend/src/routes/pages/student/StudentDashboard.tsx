@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Sparkles, SlidersHorizontal, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import GenericButton from '../../../components/ui/genericButton/GenericButton';
 
+// Importación del componente core unificado según [ADR-13]
+import GenericHeader from '../../../components/ui/genericHeader/GenericHeader';
+
 // Importación del Layout unificado según [ADR-10]
 import DashboardLayout from '../../layouts/DashboardLayout';
 
@@ -18,8 +21,6 @@ import type { DBModelCourse } from '../../../services/courseTypes';
 import { DocumentManager } from './components/DocumentManager';
 import { EvaluationPanel } from './components/EvaluationPanel';
 import { StudentStatsPanel } from './components/StudentStatsPanel';
-
-
 
 const StudentDashboard = () => {
     // --- ESTADOS DE UI Y FEEDBACK ---
@@ -66,26 +67,41 @@ const StudentDashboard = () => {
         setSuccessMessage("¡Intereses guardados y actualizados correctamente!");
         setTimeout(() => setSuccessMessage(''), 5000);
     };
+
     // Evalúa dinámicamente el foco analítico dando prioridad a la selección del alumno [ADR-41]
     const activeCourseId = enrolledList && enrolledList.length > 0 ? enrolledList[0].course?.course_id : null;
 
     return (
         <DashboardLayout>
             <div className="p-6 max-w-7xl mx-auto space-y-6">
-                {/* Cabecera Principal */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b pb-5">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Intereses del Estudiante</h1>
-                        <p className="text-gray-500 mt-1">Configura tus intereses académicos para recibir sugerencias exclusivas y optimizar tu catálogo</p>
-                    </div>
-                    <GenericButton
-                        onClick={() => setIsModalOpen(true)}
-                        variant="primary"
-                        icon={<SlidersHorizontal className="h-4 w-4" />}
-                        label="Configurar Intereses"
-                        className="gap-2! px-4! py-2! text-sm! font-medium! rounded-lg! shadow-sm self-start md:self-auto"
-                    />
-                </div>
+
+                {/* 
+                   CABECERA PRINCIPAL UNIFICADA [ADR-13]:
+                   Sustitución del div cableado por el componente core GenericHeader utilizando
+                   composición limpia mediante la prop 'description' para inyectar la acción.
+                */}
+                <GenericHeader
+                    title="Intereses del Estudiante"
+                    titleSize="text-3xl font-bold tracking-tight"
+                    titleColor="text-gray-900"
+                    textPadding="p-0"
+                    containerClass="border-b pb-5"
+                    align="left"
+                    description={
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 w-full mt-1">
+                            <p className="text-gray-500">
+                                Configura tus intereses académicos para recibir sugerencias exclusivas y optimizar tu catálogo
+                            </p>
+                            <GenericButton
+                                onClick={() => setIsModalOpen(true)}
+                                variant="primary"
+                                icon={<SlidersHorizontal className="h-4 w-4" />}
+                                label="Configurar Intereses"
+                                className="gap-2! px-4! py-2! text-sm! font-medium! rounded-lg! shadow-sm self-start md:self-auto shrink-0"
+                            />
+                        </div>
+                    }
+                />
 
                 {/* Mensajes de Estado Operacionales */}
                 {(error || enrollmentError || recommendationsError) && (
@@ -124,11 +140,11 @@ const StudentDashboard = () => {
 
                 {/* 
                    GRID SINCRONIZADO ORIGINAL RESTAURADO AL 100% [ADR-19]:
-                   - Recuperamos tus bordes exteriores exactos y tu alineación superior perfecta.
+                   - Contenedores exteriores y alineación perfectamente intactos.
                 */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
 
-                    {/* COLUMNA 1 (IZQUIERDA): Tu contenedor máster intacto que funciona a la perfección */}
+                    {/* COLUMNA 1 (IZQUIERDA): Contenedor máster intacto */}
                     <div className="bg-white border rounded-2xl p-6 shadow-sm space-y-6">
                         <EnrolledCourses
                             enrolledList={enrolledList}
@@ -142,7 +158,7 @@ const StudentDashboard = () => {
                         <DocumentManager />
                     </div>
 
-                    {/* COLUMNA 2 Y 3 (DERECHA): Reordenamiento estratégico de componentes */}
+                    {/* COLUMNA 2 Y 3 (DERECHA): Distribución estratégica de componentes */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Tarjeta del Catálogo de Cursos Disponibles */}
                         <div className="bg-white border rounded-2xl p-6 shadow-sm">
@@ -154,17 +170,18 @@ const StudentDashboard = () => {
                                 onSetGlobalSuccess={setSuccessMessage}
                             />
                         </div>
-                        {/* 2. Tarjeta de la Evaluación Académica Dual (Sube al centro) */}
+                        {/* Tarjeta de la Evaluación Académica Dual */}
                         <div className="bg-white border rounded-2xl p-6 shadow-sm">
                             <EvaluationPanel />
                         </div>
 
-                        {/* 3. PANEL ANALÍTICO ESTADÍSTICO REACTIVO COMPENSADO [ADR-41] (Baja a la base) */}
+                        {/* PANEL ANALÍTICO ESTADÍSTICO REACTIVO COMPENSADO [ADR-41] */}
                         <div className="bg-white border rounded-2xl p-6 shadow-sm">
                             <StudentStatsPanel activeCourseId={activeCourseId} enrolledList={enrolledList} />
                         </div>
                     </div>
-                </div> {/* Cierre correcto del div grid principal */}
+                </div>
+
                 {/* Modal de Configuración de Intereses */}
                 <InterestsModal
                     isOpen={isModalOpen}

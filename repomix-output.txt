@@ -69,10 +69,8 @@ backend/
                 CourseStatsController.java
                 DocumentController.java
                 ProfileController.java
-                TestController.java
                 UserController.java
               dto/
-                AuthResponse.java
                 AuthTokenResponse.java
                 CourseStatsDTO.java
                 InterestDTO.java
@@ -115,7 +113,6 @@ backend/
                 FileStorageService.java
                 RecommendationService.java
                 SemanticNormalizer.java
-                SessionAuthenticationService.java
                 UserService.java
               BackendApplication.java
       resources/
@@ -232,11 +229,8 @@ frontend/
       Testimonials.tsx
     routes/
       guards/
-        AdminRoute.tsx
         index.ts
-        ProfessorRoute.tsx
         ProtectedRoute.tsx
-        StudentRoute.tsx
       layouts/
         DashboardLayout.test.tsx
         DashboardLayout.tsx
@@ -305,35 +299,6 @@ tfg-documentacion-tecnica.md
 ================================================================
 Files
 ================================================================
-
-================
-File: backend/src/main/java/com/cursosonline/backend/controller/TestController.java
-================
-package com.cursosonline.backend.controller;
-
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import java.util.Map;
-
-/**
- * Controlador de prueba para verificar la conexión entre el frontend
- * (React/Vite) y el backend (Spring Boot).
- * Contiene un endpoint GET /api/prueba que devuelve un mensaje de confirmación.
- */
-@RestController
-@RequestMapping("/api")
-public class TestController {
-    private static final Logger logger = LoggerFactory.getLogger(TestController.class);
-
-    @GetMapping("/prueba")
-    public Map<String, String> saludar() {
-        logger.info(">>> Test de conexión: recibido desde el Frontend (React/Vite)");
-        return Map.of("mensaje", "Conexión establecida con Java 21 y PostgreSQL");
-    }
-}
 
 ================
 File: backend/src/main/java/com/cursosonline/backend/entities/Role.java
@@ -4886,21 +4851,6 @@ public class WebConfig implements WebMvcConfigurer {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/dto/AuthResponse.java
-================
-package com.cursosonline.backend.dto;
-
-import com.cursosonline.backend.entities.Role;
-import com.cursosonline.backend.entities.Users;
-
-public record AuthResponse(Long userId, String username, Role role, String email) {
-
-    public static AuthResponse from(Users user) {
-        return new AuthResponse(user.getUser_id(), user.getUsername(), user.getRole(), user.getEmail());
-    }
-}
-
-================
 File: backend/src/main/java/com/cursosonline/backend/dto/InterestDTO.java
 ================
 package com.cursosonline.backend.dto;
@@ -6210,41 +6160,6 @@ describe('Auditoría de Calidad: Composición Paramétrica de DashboardLayout', 
 });
 
 ================
-File: frontend/src/routes/pages/public/AccessDenied.tsx
-================
-import { useNavigate } from "react-router-dom";
-import GenericHeader from "@/components/ui/genericHeader/GenericHeader"; // Ajusta la ruta a tu GenericHeader
-import GenericButton from "@/components/ui/genericButton/GenericButton"; // Ajusta la ruta a tu GenericButton
-
-const AccessDenied = () => {
-    const navigate = useNavigate();
-
-    return (
-        <main className="min-h-screen bg-slate-50 grid place-items-center px-6">
-            <section className="max-w-xl w-full bg-white border border-slate-200 rounded-2xl shadow-sm p-8 flex flex-col items-center">
-
-                {/* REFACTORIZACIÓN CORE: Cabecera estructural purificada sin propiedades inválidas [ADR-13] */}
-                <GenericHeader
-                    title="Acceso denegado"
-                    description="Tu usuario está autenticado, pero no tiene los privilegios necesarios para acceder a esta sección."
-                    align="center"
-                />
-
-                {/* REFACTORIZACIÓN CORE: Uso de componente de acción corporativo [ADR-13] */}
-                <GenericButton
-                    label="Volver al inicio"
-                    variant="primary"
-                    onClick={() => navigate("/")}
-                />
-
-            </section>
-        </main>
-    );
-};
-
-export default AccessDenied;
-
-================
 File: frontend/src/routes/pages/public/LandingPage.tsx
 ================
 import { MainNavbar } from "@/components/navbar";
@@ -7426,46 +7341,6 @@ public interface UserRepository extends JpaRepository<Users, Long> {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/services/SessionAuthenticationService.java
-================
-package com.cursosonline.backend.services;
-
-import com.cursosonline.backend.dto.AuthResponse;
-import com.cursosonline.backend.entities.Users;
-import com.cursosonline.backend.exception.ServicesException;
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-
-@Service
-@RequiredArgsConstructor
-public class SessionAuthenticationService {
-
-        private final AuthenticationManager authenticationManager;
-        private final UserService userService;
-
-        public AuthResponse login(String username, String rawPassword) {
-                // 1. Autentica contra PostgreSQL de forma limpia
-                Authentication authentication = authenticationManager.authenticate(
-                                new UsernamePasswordAuthenticationToken(username, rawPassword));
-
-                // 2. Establece la autenticación en el hilo actual de Spring Security
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-
-                // 3. Forzamos a buscar el usuario actualizado directamente en PostgreSQL
-                Users user = userService.findByUsername(username)
-                                .orElseThrow(() -> new ServicesException("Usuario no encontrado"));
-
-                // 4. Retornamos el DTO fresco para el frontend
-                return AuthResponse.from(user);
-        }
-
-}
-
-================
 File: backend/src/test/java/com/cursosonline/backend/controller/CourseStatsControllerTest.java
 ================
 package com.cursosonline.backend.controller;
@@ -7577,20 +7452,23 @@ package com.cursosonline.backend.services;
 
 import com.cursosonline.backend.dto.RecommendationDTO;
 import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Interest;
+import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.InterestRepository;
+import com.cursosonline.backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -7598,114 +7476,110 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@DisplayName("Auditoría de Calidad: Pruebas del Motor de Recomendación Algorítmica")
 class RecommendationServiceTest {
 
-        @Mock
-        private CoursesRepository coursesRepository;
+    @Mock
+    private CoursesRepository coursesRepository;
 
-        @Mock
-        private InterestRepository interestRepository;
+    @Mock
+    private EnrollmentRepository enrollmentRepository;
 
-        @Mock
-        private EnrollmentRepository enrollmentRepository;
+    @Mock
+    private InterestRepository interestRepository;
 
-        @Spy // Usamos @Spy para que se ejecute la lógica real del normalizador semántico
-        private SemanticNormalizer semanticNormalizer;
+    @Mock
+    private UserRepository userRepository;
 
-        @InjectMocks
-        private RecommendationService recommendationService;
+    @InjectMocks
+    private RecommendationService recommendationService;
 
-        private Interest luisInterests;
-        private List<Courses> courseCatalog;
+    private Users mockUser;
+    private Courses course1;
+    private Courses course2;
+    private Interest userInterests;
 
-        @BeforeEach
-        void setUp() {
-                // Configurar los intereses en español del alumno Luis (Escenario Real)
-                luisInterests = new Interest();
-                luisInterests.setId(1L);
-                luisInterests.setCategory(new ArrayList<>(List.of("Ciencias Sociales")));
-                luisInterests.setCourse_type(new ArrayList<>(List.of("Principiante")));
-                luisInterests.setLanguage(new ArrayList<>(List.of("Español")));
-                luisInterests.setSubtitle_languages(new ArrayList<>(List.of("Español")));
-                luisInterests.setDuration(new ArrayList<>(List.of("Corto")));
+    @BeforeEach
+    void setUp() {
+        // 1. Configurar usuario de prueba
+        mockUser = new Users();
+        mockUser.setUser_id(1L);
+        mockUser.setUsername("luis");
 
-                // Configurar el catálogo de cursos simulado (Híbrido/Inglés)
-                courseCatalog = new ArrayList<>();
+        // 2. Configurar catálogo de cursos (Dataset de Coursera) [3]
+        course1 = new Courses();
+        course1.setCourse_id(101L);
+        course1.setTitle("Data Science Avanzado");
+        course1.setCategory("Ciencia de Datos");
+        course1.setInstructors("Profesor A");
 
-                // Curso A: Coincide semánticamente en categoría ("Social Sciences" = "Ciencias
-                // Sociales")
-                Courses socialScienceCourse = new Courses();
-                socialScienceCourse.setCourse_id(101L);
-                socialScienceCourse.setTitle("Introduction to Social Sciences");
-                socialScienceCourse.setCategory("Social Sciences"); // <── Variante en Inglés
-                socialScienceCourse.setCourseType("Beginner");
-                socialScienceCourse.setLanguage("English");
-                socialScienceCourse.setSubtitleLanguages("English, Spanish");
-                socialScienceCourse.setDuration(8.5f); // <── Corto (<10h)
-                socialScienceCourse.setRating(4.8f);
+        course2 = new Courses();
+        course2.setCourse_id(102L);
+        course2.setTitle("Introducción al Marketing");
+        course2.setCategory("Negocios");
+        course2.setInstructors("Profesor B");
 
-                // Curso B: Categoría diferente ("Business")
-                Courses businessCourse = new Courses();
-                businessCourse.setCourse_id(102L);
-                businessCourse.setTitle("Key Technologies for Business Specialization");
-                businessCourse.setCategory("Business");
-                businessCourse.setCourseType("Beginner");
-                businessCourse.setLanguage("English");
-                businessCourse.setSubtitleLanguages("English");
-                businessCourse.setDuration(12.0f); // <── Medio (10h-40h)
-                businessCourse.setRating(4.5f);
+        // 3. Configurar intereses del alumno [4, 5]
+        userInterests = new Interest();
+        userInterests.setUser(mockUser);
+        userInterests.setCategory(new ArrayList<>(Arrays.asList("Ciencia de Datos")));
+    }
 
-                courseCatalog.add(socialScienceCourse);
-                courseCatalog.add(businessCourse);
-        }
+    @Test
+    @DisplayName("Debe recomendar cursos basados en la categoría de interés")
+    void getRecommendations_Success() {
+        // Arrange
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>()); // Sin matrículas previas
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1, course2));
 
-        @Test
-        @DisplayName("Debería recomendar curso de Ciencias Sociales resolviendo la brecha multilingüe con tokens")
-        void shouldRecommendSocialSciencesCourseResolvingMultilingualGap() {
-                // Arrange (Configuración de comportamientos de los Mocks)
-                Long userId = 1L;
-                when(interestRepository.findById(userId)).thenReturn(Optional.of(luisInterests));
-                when(enrollmentRepository.findAllByUserIdWithCourses(userId)).thenReturn(new ArrayList<>()); // Sin
-                                                                                                             // matrículas
-                                                                                                             // previas
-                when(coursesRepository.findAll()).thenReturn(courseCatalog);
+        // Act
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
 
-                // Act (Ejecución del método del servicio bajo test)
-                List<RecommendationDTO> results = recommendationService.getRecommendationsForUser(userId);
+        // Assert
+        assertNotNull(results);
+        assertFalse(results.isEmpty());
+        assertEquals("Data Science Avanzado", results.get(0).title());
+        assertTrue(results.get(0).reason().contains("Ciencia de Datos"), "El motivo debe mencionar la categoría");
+        assertEquals(101L, results.get(0).id());
+    }
 
-                // Assert (Verificaciones estrictas del comportamiento esperado)
-                assertNotNull(results, "La lista de recomendaciones no debe ser nula");
-                assertFalse(results.isEmpty(), "La lista de recomendaciones debe contener elementos");
-                assertTrue(results.size() <= 6, "No debe superar el límite fijado de 6 elementos");
+    @Test
+    @DisplayName("Debe excluir estrictamente cursos donde el alumno ya está matriculado [ADR-32]")
+    void getRecommendations_ExcludesEnrolled() {
+        // Arrange
+        Enrollment existingEnrollment = new Enrollment();
+        existingEnrollment.setCourse(course1); // El alumno ya está en el curso 101
 
-                // El primer curso sugerido debe ser el de Ciencias Sociales gracias a los 30
-                // puntos adicionales de la categoría
-                RecommendationDTO topRecommendation = results.get(0);
-                assertEquals(101L, topRecommendation.id(),
-                                "El curso con mayor afinidad debe ser el de Ciencias Sociales");
-                assertEquals("Social Sciences", topRecommendation.category(),
-                                "La categoría devuelta debe coincidir con la de la entidad");
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(Arrays.asList(existingEnrollment));
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1, course2));
 
-                // Verificar que la cadena explicativa generada no esté vacía ni sea el fallback
-                // de seguridad genérico
-                assertNotNull(topRecommendation.reason());
-                assertTrue(topRecommendation.reason().contains("Coincide con tus categorías preferidas"),
-                                "El texto de explicabilidad debe reflejar el match exitoso de la categoría");
-                assertTrue(topRecommendation.reason().contains("Se ajusta a tu disponibilidad de tiempo"),
-                                "El texto debe reflejar que también se calculó la coincidencia de duración");
+        // Act
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
 
-                // El curso de Ciencias Sociales debe tener mayor puntuación que el de Negocios
-                if (results.size() > 1) {
-                        RecommendationDTO secondRecommendation = results.get(1);
-                        assertTrue(topRecommendation.score() > secondRecommendation.score(),
-                                        "El curso de la categoría de interés debe puntuar más alto que el catálogo general");
-                }
+        // Assert
+        // Solo debe quedar el curso 2 (Marketing), aunque no sea su interés principal, 
+        // porque el curso 1 (Data Science) debe ser excluido.
+        boolean containsEnrolled = results.stream().anyMatch(r -> r.id().equals(101L));
+        assertFalse(containsEnrolled, "No debe recomendar cursos ya matriculados");
+    }
 
-                // Verificar interacciones seguras con la persistencia
-                verify(interestRepository, times(1)).findById(userId);
-                verify(coursesRepository, times(1)).findAll();
-                verify(enrollmentRepository, times(1)).findAllByUserIdWithCourses(userId);
-        }
+    @Test
+    @DisplayName("Debe devolver lista vacía si el usuario no existe")
+    void getRecommendations_UserNotFound() {
+        // Arrange
+        when(userRepository.findByUsername("desconocido")).thenReturn(Optional.empty());
+
+        // Act
+        List<RecommendationDTO> results = recommendationService.getRecommendations("desconocido");
+
+        // Assert
+        assertTrue(results.isEmpty());
+        verify(coursesRepository, never()).findAll();
+    }
 }
 
 ================
@@ -14418,54 +14292,6 @@ const Testimonials = () => {
 export default Testimonials;
 
 ================
-File: frontend/src/routes/guards/AdminRoute.tsx
-================
-import ProtectedRoute from "./ProtectedRoute";
-// Importamos la constante centralizada de roles (ajusta la ruta '../auth/authTypes' según corresponda)
-import { ROLES } from "../../auth/authTypes";
-
-// Política de acceso específica para la zona de administración usando la constante blindada
-const ADMIN_ALLOWED_ROLES = [ROLES.ADMIN];
-const REDIRECT_IF_UNAUTHORIZED = "/acceso-denegado";
-
-const AdminRoute = () => {
-    // Esta guardia de seguridad delega la validación de sesión/rol en ProtectedRoute
-    // y solo define la política de autorización para ADMIN de manera estricta.
-    return (
-        <ProtectedRoute
-            allowedRoles={ADMIN_ALLOWED_ROLES}
-            redirectIfUnauthorized={REDIRECT_IF_UNAUTHORIZED}
-        />
-    );
-};
-
-export default AdminRoute;
-
-================
-File: frontend/src/routes/guards/ProfessorRoute.tsx
-================
-import ProtectedRoute from "./ProtectedRoute";
-
-import { ROLES } from "../../auth/authTypes";
-
-// Política de acceso específica para la zona de profesor.
-const PROFESSOR_ALLOWED_ROLES = [ROLES.PROFESSOR];
-const REDIRECT_IF_UNAUTHORIZED = "/acceso-denegado";
-
-const ProfessorRoute = () => {
-    // Esta guardia delega la validación de sesión/rol en ProtectedRoute
-    // y solo define la política de autorización para PROFESSOR.
-    return (
-        <ProtectedRoute
-            allowedRoles={PROFESSOR_ALLOWED_ROLES}
-            redirectIfUnauthorized={REDIRECT_IF_UNAUTHORIZED}
-        />
-    );
-};
-
-export default ProfessorRoute;
-
-================
 File: frontend/src/routes/guards/ProtectedRoute.tsx
 ================
 import { Navigate, Outlet, useLocation } from "react-router-dom";
@@ -14541,31 +14367,6 @@ const ProtectedRoute = ({
 export default ProtectedRoute;
 
 ================
-File: frontend/src/routes/guards/StudentRoute.tsx
-================
-import ProtectedRoute from "./ProtectedRoute";
-
-import { ROLES } from "../../auth/authTypes";
-
-// Política de acceso específica para la zona de estudiante.
-const STUDENT_ALLOWED_ROLES = [ROLES.STUDENT];
-
-const REDIRECT_IF_UNAUTHORIZED = "/acceso-denegado";
-
-const StudentRoute = () => {
-    // StudentRoute ya no duplica lógica de sesión.
-    // Solo define la regla de rol y delega la validación en ProtectedRoute.
-    return (
-        <ProtectedRoute
-            allowedRoles={STUDENT_ALLOWED_ROLES}
-            redirectIfUnauthorized={REDIRECT_IF_UNAUTHORIZED}
-        />
-    );
-};
-
-export default StudentRoute;
-
-================
 File: frontend/src/routes/layouts/DashboardLayout.tsx
 ================
 import { type ReactNode } from 'react';
@@ -14631,6 +14432,41 @@ export default function ProfessorProfilePage() {
         </DashboardLayout>
     );
 }
+
+================
+File: frontend/src/routes/pages/public/AccessDenied.tsx
+================
+import { useNavigate } from "react-router-dom";
+import GenericHeader from "@/components/ui/genericHeader/GenericHeader"; // Ajusta la ruta a tu GenericHeader
+import GenericButton from "@/components/ui/genericButton/GenericButton"; // Ajusta la ruta a tu GenericButton
+
+const AccessDenied = () => {
+    const navigate = useNavigate();
+
+    return (
+        <main className="min-h-screen bg-slate-50 grid place-items-center px-6">
+            <section className="max-w-xl w-full bg-white border border-slate-200 rounded-2xl shadow-sm p-8 flex flex-col items-center">
+
+                {/* REFACTORIZACIÓN CORE: Cabecera estructural purificada sin propiedades inválidas [ADR-13] */}
+                <GenericHeader
+                    title="Acceso denegado"
+                    description="Tu usuario está autenticado, pero no tiene los privilegios necesarios para acceder a esta sección."
+                    align="center"
+                />
+
+                {/* REFACTORIZACIÓN CORE: Uso de componente de acción corporativo [ADR-13] */}
+                <GenericButton
+                    label="Volver al inicio"
+                    variant="primary"
+                    onClick={() => navigate("/")}
+                />
+
+            </section>
+        </main>
+    );
+};
+
+export default AccessDenied;
 
 ================
 File: frontend/src/routes/pages/student/components/EvaluationPanel.test.tsx
@@ -15605,9 +15441,11 @@ import com.cursosonline.backend.dto.RecommendationDTO;
 import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Interest;
+import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.repository.CoursesRepository;
-import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.InterestRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15622,37 +15460,70 @@ public class RecommendationService {
     private final CoursesRepository coursesRepository;
     private final InterestRepository interestRepository;
     private final EnrollmentRepository enrollmentRepository;
-    private final SemanticNormalizer normalizer; // <--- Inyección del nuevo componente
+    private final UserRepository userRepository;
+
+    @Transactional(readOnly = true)
+    public List<RecommendationDTO> getRecommendations(String username) {
+        if (username == null || username.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Users user = userRepository.findByUsername(username.trim()).orElse(null);
+        if (user == null || user.getUser_id() == null) {
+            return Collections.emptyList();
+        }
+
+        Interest interests = interestRepository.findByUser_Username(username.trim()).orElse(null);
+        List<Enrollment> myEnrollments = enrollmentRepository.findAllByUserIdWithCourses(user.getUser_id());
+        List<Courses> allCourses = coursesRepository.findAll();
+
+        return buildRecommendations(interests, myEnrollments, allCourses);
+    }
 
     @Transactional(readOnly = true)
     public List<RecommendationDTO> getRecommendationsForUser(Long userId) {
+        if (userId == null) {
+            return Collections.emptyList();
+        }
+
         Interest interests = interestRepository.findById(userId).orElse(null);
         List<Enrollment> myEnrollments = enrollmentRepository.findAllByUserIdWithCourses(userId);
+        List<Courses> allCourses = coursesRepository.findAll();
 
-        Set<Long> excludedIds = myEnrollments.stream()
+        return buildRecommendations(interests, myEnrollments, allCourses);
+    }
+
+    private List<RecommendationDTO> buildRecommendations(
+            Interest interests,
+            List<Enrollment> myEnrollments,
+            List<Courses> allCourses) {
+
+        List<Enrollment> safeEnrollments = myEnrollments != null ? myEnrollments : Collections.emptyList();
+        List<Courses> safeCourses = allCourses != null ? allCourses : Collections.emptyList();
+
+        Set<Long> excludedIds = safeEnrollments.stream()
                 .filter(e -> e.getCourse() != null)
                 .map(e -> e.getCourse().getCourse_id())
                 .collect(Collectors.toSet());
 
-        List<Courses> allCourses = coursesRepository.findAll();
-
-        // FASE DE TRADUCCIÓN: Extracción previa y unificación a Tokens Invariables
-        Set<String> userCategoryTokens = interests != null ? normalizer.normalizeCategories(interests.getCategory())
+        // FASE DE TRADUCCIÓN: Extracción previa y unificación a Tokens nativos
+        // independientes
+        Set<String> userCategoryTokens = interests != null ? normalizeCollection(interests.getCategory())
                 : Collections.emptySet();
-        Set<String> userLevelTokens = interests != null ? normalizer.normalizeLevels(interests.getCourse_type())
+        Set<String> userLevelTokens = interests != null ? normalizeCollection(interests.getCourse_type())
                 : Collections.emptySet();
-        Set<String> userLanguageTokens = interests != null ? normalizer.normalizeLanguages(interests.getLanguage())
+        Set<String> userLanguageTokens = interests != null ? normalizeCollection(interests.getLanguage())
                 : Collections.emptySet();
         Set<String> userSubtitleTokens = interests != null
-                ? normalizer.normalizeLanguages(interests.getSubtitle_languages())
+                ? normalizeCollection(interests.getSubtitle_languages())
                 : Collections.emptySet();
         List<String> rawDurations = interests != null ? interests.getDuration() : Collections.emptyList();
 
-        return allCourses.stream()
+        return safeCourses.stream()
                 .filter(course -> course != null && course.getCourse_id() != null)
                 .filter(course -> !excludedIds.contains(course.getCourse_id()))
                 .map(course -> calculateAffinityWithTokens(course, userCategoryTokens, userLevelTokens,
-                        userLanguageTokens, userSubtitleTokens, rawDurations, myEnrollments))
+                        userLanguageTokens, userSubtitleTokens, rawDurations, safeEnrollments))
                 .sorted((dto1, dto2) -> Integer.compare(dto2.score(), dto1.score()))
                 .limit(6)
                 .collect(Collectors.toList());
@@ -15670,27 +15541,23 @@ public class RecommendationService {
         double score = 0;
         StringBuilder reason = new StringBuilder();
 
-        // 1. Evaluación de Precondiciones emparejando a nivel de Token Semántico
-        String courseCategoryToken = normalizer.normalizeCategory(course.getCategory());
+        // 1. Evaluación de Precondiciones emparejando a nivel de Token Semántico local
+        String courseCategoryToken = normalizeSingle(course.getCategory());
         boolean isCategoryMatch = userCategoryTokens.contains(courseCategoryToken);
 
-        String courseLevelToken = normalizer.normalizeLevel(course.getCourseType());
-        // CORRECCIÓN SECCIÓN NIVEL: Concede el match si coincide el token exacto O si
-        // Luis marcó que acepta todos los niveles
+        String courseLevelToken = normalizeSingle(course.getCourseType());
         boolean isLevelMatch = userLevelTokens.contains("ALL_LEVELS") || userLevelTokens.contains(courseLevelToken);
 
-        String courseLanguageToken = normalizer.normalizeLanguage(course.getLanguage());
+        String courseLanguageToken = normalizeSingle(course.getLanguage());
         boolean isLanguageMatch = userLanguageTokens.contains(courseLanguageToken);
 
-        // Subtítulos: Al ser una columna de texto libre (ej: "English, Spanish"),
-        // comprobamos inclusión lingüística mediante tokens
+        // Subtítulos: Comprobamos inclusión lingüística nativa mediante tokens
+        // normalizados
         boolean isSubtitleMatch = false;
         if (course.getSubtitleLanguages() != null && !userSubtitleTokens.isEmpty()) {
             String cleanSubs = course.getSubtitleLanguages().toLowerCase();
             isSubtitleMatch = userSubtitleTokens.stream()
                     .anyMatch(token -> {
-                        // CORRECCIÓN SECCIÓN SUBTÍTULOS: Sincronizado en minúsculas con las salidas de
-                        // SemanticNormalizer
                         if (token.equals("spanish") && (cleanSubs.contains("esp") || cleanSubs.contains("spa")))
                             return true;
                         if (token.equals("english") && (cleanSubs.contains("ing") || cleanSubs.contains("eng")))
@@ -15704,7 +15571,6 @@ public class RecommendationService {
                         return cleanSubs.contains(token.toLowerCase());
                     });
         }
-
         boolean isDurationMatch = checkDurationMatch(course.getDuration(), rawDurations);
 
         // 2. MODELO POR ESCALONES CRECIENTES DEL HISTORIAL ACADÉMICO
@@ -15714,7 +15580,7 @@ public class RecommendationService {
         if (myEnrollments != null && !myEnrollments.isEmpty() && course.getCategory() != null) {
             for (Enrollment enrollment : myEnrollments) {
                 if (enrollment.getCourse() != null && enrollment.getCourse().getCategory() != null) {
-                    String enrollmentCatToken = normalizer.normalizeCategory(enrollment.getCourse().getCategory());
+                    String enrollmentCatToken = normalizeSingle(enrollment.getCourse().getCategory());
                     if (courseCategoryToken.equals(enrollmentCatToken)) {
                         int currentProgress = enrollment.getProgress_percentage();
                         if (currentProgress > maxProgressInTemplate) {
@@ -15745,8 +15611,7 @@ public class RecommendationService {
         if (isDurationMatch)
             score += 5;
 
-        // 4. GENERACIÓN DE EXPLICABILIDAD DINÁMICA (Mapeada en español usando el
-        // catálogo real)
+        // 4. GENERACIÓN DE EXPLICABILIDAD DINÁMICA
         if (isCategoryMatch) {
             reason.append("Coincide con tus categorías preferidas (").append(course.getCategory()).append("). ");
         }
@@ -15794,6 +15659,54 @@ public class RecommendationService {
                 return true;
             return hours > 40 && target.contains("Largo");
         });
+    }
+
+    /**
+     * ABSORCIÓN NATIVA DE SEMANTIC NORMALIZER:
+     * Convierte una cadena de texto libre en un token unificado e invariable.
+     */
+    private static String normalizeSingle(String input) {
+        if (input == null) {
+            return "";
+        }
+        return input.trim()
+                .toLowerCase()
+                .replace("á", "a")
+                .replace("é", "e")
+                .replace("í", "i")
+                .replace("ó", "o")
+                .replace("ú", "u")
+                .replaceAll("[^a-z0-8_\\s-]", "")
+                .replaceAll("\\s+", "_");
+    }
+
+    /**
+     * ABSORCIÓN NATIVA DE SEMANTIC NORMALIZER:
+     * Transforma colecciones o estructuras delimitadas por comas en colecciones de
+     * tokens semánticos únicos.
+     * Blindado con supresión de alertas de casteo y validación anticipada de nulos.
+     */
+    @SuppressWarnings("unchecked")
+    private static Set<String> normalizeCollection(Object input) {
+        if (input == null) {
+            return Collections.emptySet();
+        }
+
+        List<String> rawElements;
+        if (input instanceof List) {
+            rawElements = (List<String>) input;
+        } else if (input instanceof String) {
+            rawElements = Arrays.asList(((String) input).split(","));
+        } else {
+            return Collections.emptySet();
+        }
+
+        return rawElements.stream()
+                .filter(Objects::nonNull) // 1. Filtro preventivo de nulos en la cabecera del Stream
+                .map(s -> s.trim()) // 2. Ejecución segura para evitar alertas de puntero nulo
+                .filter(s -> !s.isEmpty())
+                .map(RecommendationService::normalizeSingle)
+                .collect(Collectors.toSet());
     }
 }
 
@@ -18073,6 +17986,17 @@ export interface CourseStatsInfo {
 }
 
 ================
+File: frontend/src/App.tsx
+================
+import AppRoutes from "@/routes";
+
+function App() {
+  return <AppRoutes />;
+}
+
+export default App;
+
+================
 File: backend/src/main/java/com/cursosonline/backend/repository/EnrollmentRepository.java
 ================
 package com.cursosonline.backend.repository;
@@ -18827,6 +18751,226 @@ export function clearStoredAuth() {
 }
 
 ================
+File: frontend/src/components/navbar/Navbar.tsx
+================
+import { useRef, useState } from 'react';
+import { Home, Search, LogIn } from 'lucide-react';
+import GenericButton from '../ui/genericButton/GenericButton';
+import AuthModal from '../ui/authModal/AuthModal';
+import CourseInfoModal from '../ui/courseInfoModal/CourseInfoModal';
+
+/**
+ * Props del componente Navbar.
+ * 
+ * @interface NavbarProps
+ */
+interface NavbarProps {
+    /**
+     * Callback opcional ejecutado cuando el usuario completa un login exitoso.
+     * 
+     * Se dispara desde AuthModal (onSuccess) y propaga los datos del usuario al padre.
+     * Típicamente el padre (MainNavbar) actualiza su estado de sesión global con esta información.
+     * 
+     * @param userData Objeto con datos del usuario autenticado
+     * @param userData.username - Nombre de usuario
+     * @param userData.photo - URL de la foto de perfil (opcional)
+     * @returns void
+     */
+    onLoginSuccess?: (userData: { username: string; photo?: string }) => void;
+}
+
+/**
+ * Barra de navegación principal (unauthenticated).
+ * 
+ * Renderiza la navbar fija superior con:
+ * - Botón "Inicio" a la izquierda
+ * - Título "GESTIÓN DE CURSOS ONLINE" en el centro
+ * - Botones de búsqueda y autenticación a la derecha
+ * 
+ * GESTIÓN DE ESTADO:
+ * Mantiene 3 estados locales independientes:
+ * 1. isAuthModalOpen - Modal de login/registro
+ * 2. isCourseInfoModalOpen - Modal de catálogo de cursos
+ * 3. isLoginView - Bug 'Login' vs 'Registro' dentro de AuthModal
+ * 
+ * Estos estados son INDEPENDIENTES (no hay dependencias entre ellos) para evitar
+ * renderizados en cascada y permitir que múltiples modales coexistan en el árbol de React.
+ * 
+ * FLUJOS:
+ * 1. User_clicks "¿Qué deseas aprender?" → abre CourseInfoModal
+ *    → User clickea "Registrarme" → cierra CourseInfoModal pero abre AuthModal
+ * 2. User_clicks "Entrar / Registro" → abre AuthModal en modo Login (isLoginView=true)
+ * 3. User completa login exitoso → AuthModal dispara onSuccess → padre actualiza estado global
+ * 
+ * LAYOUT:
+ * - fixed top-0: navbar pegada al top (z-50 para estar encima)
+ * - grid grid-cols-3: tres columnas iguales para distribuir contenido
+ * - Columna 1: Botón "Inicio" (justify-start)
+ * - Columna 2: Título centrado (justify-center)
+ * - Columna 3: Botones secundarios (justify-end, gap-2)
+ * 
+ * PATRONES APLICADOS:
+ * - Splitting de modales: cada modal es independiente, no depende de otro.
+ * - Callback lifting: onLoginSuccess se propaga desde AuthModal hasta el padre (MainNavbar).
+ * - Composición: reutiliza GenericButton para botones principales.
+ * 
+ * @component
+ * @example
+ * // Uso en MainNavbar con handler de login
+ * <Navbar
+ *   onLoginSuccess={(userData) => {
+ *      setUser(userData);
+ *      localStorage.setItem('user', JSON.stringify(userData));
+ *   }}
+ * />
+ * 
+ * @param {NavbarProps} props - Props del componente
+ * @returns {JSX.Element} Fragment con navbar y modalidades (AuthModal, CourseInfoModal)
+ */
+const Navbar = ({ onLoginSuccess }: NavbarProps) => {
+    const preventReopenUntilRef = useRef(0);
+    /**
+     * Control de visibilidad del modal de autenticación (login/registro).
+     * Independiente de isCourseInfoModalOpen para permitir flujo de:
+     * CourseInfoModal → AuthModal (cuando user clickea "Registrarme")
+     */
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+    /**
+     * Control de visibilidad del modal de catálogo de cursos (especialidades).
+     * Independiente de isAuthModalOpen para que cada modal sea autocontrolado.
+     */
+    const [isCourseInfoModalOpen, setIsCourseInfoModalOpen] = useState(false);
+
+    /**
+     * Determina qué formulario mostrar dentro de AuthModal.
+     * - true: mostrar formulario de Login (para users con cuenta existente)
+     * - false: mostrar formulario de Registro (para nuevos users)
+     * 
+     * Se inicializa en true porque el flujo principal es "Entrar / Registro" (botón del navbar).
+     * Cuando se abre desde CourseInfoModal, el padre lo cambia a false.
+     */
+    const [isLoginView, setIsLoginView] = useState(true);
+
+    return (
+        <>
+            {/* 
+                Navbar fija principal.
+                - fixed top-0: pegada al top de la ventana
+                - z-50: por encima del contenido principal
+                - bg-white/80 backdrop-blur-md: fondo blanco transparente con blur (efecto moderno)
+                - border-b border-gray-100: línea separadora sutil
+            */}
+            <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 py-3 z-50">
+                {/* 
+                    Contenedor principal con layout grid de 3 columnas.
+                    - grid grid-cols-3: tres columnas iguales
+                    - items-center: alinea verticalmente en el eje transversal
+                    - h-16: altura fija (64px) para mantener proporciones
+                */}
+                <div className="w-full px-6 grid grid-cols-3 items-center h-16">
+                    {/* 
+                        Columna 1: Botón "Inicio".
+                        - flex justify-start: botón alineado a la izquierda
+                        - scroll al top con smooth behavior
+                    */}
+                    <div className="flex justify-start">
+                        <GenericButton
+                            label="Inicio"
+                            icon={<Home size={18} />}
+                            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                        />
+                    </div>
+
+                    {/* 
+                        Columna 2: Título principal centrado.
+                        - flex justify-center items-center: centra completamente
+                        - font-bold text-gray-600: estilo semibold y color discreto
+                        - text-3xl: tamaño grande pero no dominante
+                    */}
+                    <div className="flex justify-center items-center font-bold text-gray-600">
+                        <span className="text-3xl">GESTIÓN DE CURSOS ONLINE</span>
+                    </div>
+
+                    {/* 
+                        Columna 3: Botones secundarios (búsqueda y autenticación).
+                        - flex justify-end gap-2: alinea a la derecha con separación
+                    */}
+                    <div className="flex justify-end gap-2">
+                        {/* 
+                            Botón "¿Qué deseas aprender?" (búsqueda).
+                            - variant="search": forma redondeada (rounded-full)
+                            - Abre CourseInfoModal con catálogo de especialidades
+                        */}
+                        <GenericButton
+                            label="¿Qué deseas aprender?"
+                            variant="search"
+                            icon={<Search size={20} className="text-gray-500" />}
+                            onClick={() => setIsCourseInfoModalOpen(true)}
+                        />
+
+                        {/* 
+                            Botón "Entrar / Registro".
+                            - Abre AuthModal en modo LOGIN (isLoginView=true)
+                            - Si user quiere registrarse, puede dar clic en "¿No tengo cuenta?" dentro del modal
+                        */}
+                        <GenericButton
+                            label="Entrar / Registro"
+                            icon={<LogIn size={18} />}
+                            onClick={() => {
+                                if (Date.now() < preventReopenUntilRef.current) {
+                                    return;
+                                }
+                                setIsLoginView(true);  // Mostrar formulario Login por defecto
+                                setIsAuthModalOpen(true);
+                            }}
+                        />
+                    </div>
+                </div>
+            </nav>
+
+            {/* 
+                Modal de autenticación (login/registro).
+                - isOpen={isAuthModalOpen}: controlado por estado local
+                - onClose={() => setIsAuthModalOpen(false)}: cierra el modal
+                - isLoginView y setIsLoginView: controlan qué formulario mostrar
+                - onSuccess={onLoginSuccess}: propaga user autenticado al padre
+                
+                NOTA: Renderizado siempre en el árbol de React, solo se muestra si isOpen=true.
+                Esto evita destruir/recrear el componente en cada open/close.
+            */}
+            <AuthModal
+                isOpen={isAuthModalOpen}
+                onClose={() => setIsAuthModalOpen(false)}
+                isLoginView={isLoginView}
+                setIsLoginView={setIsLoginView}
+                onSuccess={(userData) => {
+                    // Evita reaperturas por rebote justo despues de cerrar por login exitoso.
+                    preventReopenUntilRef.current = Date.now() + 700;
+                    setIsAuthModalOpen(false);
+                    onLoginSuccess?.(userData);
+                }}
+            />
+
+            {/* 
+                Modal de catálogo de cursos (especialidades).
+                - isOpen={isCourseInfoModalOpen}: controlado por estado local
+                - onClose={() => setIsCourseInfoModalOpen(false)}: cierra el modal
+                
+                NOTA: Independiente de AuthModal. Si user clickea "Registrarme" dentro,
+                CourseInfoModal se cierra pero AuthModal se abre, sin conflictos.
+            */}
+            <CourseInfoModal
+                isOpen={isCourseInfoModalOpen}
+                onClose={() => setIsCourseInfoModalOpen(false)}
+            />
+        </>
+    );
+};
+
+export default Navbar;
+
+================
 File: frontend/src/routes/pages/student/components/DocumentManager.tsx
 ================
 import React, { useRef, useState } from 'react';
@@ -19513,17 +19657,6 @@ const AppRoutes = () => {
 export default AppRoutes;
 
 ================
-File: frontend/src/App.tsx
-================
-import AppRoutes from "@/routes";
-
-function App() {
-  return <AppRoutes />;
-}
-
-export default App;
-
-================
 File: backend/src/test/java/com/cursosonline/backend/UserServiceTest.java
 ================
 package com.cursosonline.backend;
@@ -19842,226 +19975,6 @@ export interface AuthContextType {
 }
 
 ================
-File: frontend/src/components/navbar/Navbar.tsx
-================
-import { useRef, useState } from 'react';
-import { Home, Search, LogIn } from 'lucide-react';
-import GenericButton from '../ui/genericButton/GenericButton';
-import AuthModal from '../ui/authModal/AuthModal';
-import CourseInfoModal from '../ui/courseInfoModal/CourseInfoModal';
-
-/**
- * Props del componente Navbar.
- * 
- * @interface NavbarProps
- */
-interface NavbarProps {
-    /**
-     * Callback opcional ejecutado cuando el usuario completa un login exitoso.
-     * 
-     * Se dispara desde AuthModal (onSuccess) y propaga los datos del usuario al padre.
-     * Típicamente el padre (MainNavbar) actualiza su estado de sesión global con esta información.
-     * 
-     * @param userData Objeto con datos del usuario autenticado
-     * @param userData.username - Nombre de usuario
-     * @param userData.photo - URL de la foto de perfil (opcional)
-     * @returns void
-     */
-    onLoginSuccess?: (userData: { username: string; photo?: string }) => void;
-}
-
-/**
- * Barra de navegación principal (unauthenticated).
- * 
- * Renderiza la navbar fija superior con:
- * - Botón "Inicio" a la izquierda
- * - Título "GESTIÓN DE CURSOS ONLINE" en el centro
- * - Botones de búsqueda y autenticación a la derecha
- * 
- * GESTIÓN DE ESTADO:
- * Mantiene 3 estados locales independientes:
- * 1. isAuthModalOpen - Modal de login/registro
- * 2. isCourseInfoModalOpen - Modal de catálogo de cursos
- * 3. isLoginView - Bug 'Login' vs 'Registro' dentro de AuthModal
- * 
- * Estos estados son INDEPENDIENTES (no hay dependencias entre ellos) para evitar
- * renderizados en cascada y permitir que múltiples modales coexistan en el árbol de React.
- * 
- * FLUJOS:
- * 1. User_clicks "¿Qué deseas aprender?" → abre CourseInfoModal
- *    → User clickea "Registrarme" → cierra CourseInfoModal pero abre AuthModal
- * 2. User_clicks "Entrar / Registro" → abre AuthModal en modo Login (isLoginView=true)
- * 3. User completa login exitoso → AuthModal dispara onSuccess → padre actualiza estado global
- * 
- * LAYOUT:
- * - fixed top-0: navbar pegada al top (z-50 para estar encima)
- * - grid grid-cols-3: tres columnas iguales para distribuir contenido
- * - Columna 1: Botón "Inicio" (justify-start)
- * - Columna 2: Título centrado (justify-center)
- * - Columna 3: Botones secundarios (justify-end, gap-2)
- * 
- * PATRONES APLICADOS:
- * - Splitting de modales: cada modal es independiente, no depende de otro.
- * - Callback lifting: onLoginSuccess se propaga desde AuthModal hasta el padre (MainNavbar).
- * - Composición: reutiliza GenericButton para botones principales.
- * 
- * @component
- * @example
- * // Uso en MainNavbar con handler de login
- * <Navbar
- *   onLoginSuccess={(userData) => {
- *      setUser(userData);
- *      localStorage.setItem('user', JSON.stringify(userData));
- *   }}
- * />
- * 
- * @param {NavbarProps} props - Props del componente
- * @returns {JSX.Element} Fragment con navbar y modalidades (AuthModal, CourseInfoModal)
- */
-const Navbar = ({ onLoginSuccess }: NavbarProps) => {
-    const preventReopenUntilRef = useRef(0);
-    /**
-     * Control de visibilidad del modal de autenticación (login/registro).
-     * Independiente de isCourseInfoModalOpen para permitir flujo de:
-     * CourseInfoModal → AuthModal (cuando user clickea "Registrarme")
-     */
-    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-
-    /**
-     * Control de visibilidad del modal de catálogo de cursos (especialidades).
-     * Independiente de isAuthModalOpen para que cada modal sea autocontrolado.
-     */
-    const [isCourseInfoModalOpen, setIsCourseInfoModalOpen] = useState(false);
-
-    /**
-     * Determina qué formulario mostrar dentro de AuthModal.
-     * - true: mostrar formulario de Login (para users con cuenta existente)
-     * - false: mostrar formulario de Registro (para nuevos users)
-     * 
-     * Se inicializa en true porque el flujo principal es "Entrar / Registro" (botón del navbar).
-     * Cuando se abre desde CourseInfoModal, el padre lo cambia a false.
-     */
-    const [isLoginView, setIsLoginView] = useState(true);
-
-    return (
-        <>
-            {/* 
-                Navbar fija principal.
-                - fixed top-0: pegada al top de la ventana
-                - z-50: por encima del contenido principal
-                - bg-white/80 backdrop-blur-md: fondo blanco transparente con blur (efecto moderno)
-                - border-b border-gray-100: línea separadora sutil
-            */}
-            <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 py-3 z-50">
-                {/* 
-                    Contenedor principal con layout grid de 3 columnas.
-                    - grid grid-cols-3: tres columnas iguales
-                    - items-center: alinea verticalmente en el eje transversal
-                    - h-16: altura fija (64px) para mantener proporciones
-                */}
-                <div className="w-full px-6 grid grid-cols-3 items-center h-16">
-                    {/* 
-                        Columna 1: Botón "Inicio".
-                        - flex justify-start: botón alineado a la izquierda
-                        - scroll al top con smooth behavior
-                    */}
-                    <div className="flex justify-start">
-                        <GenericButton
-                            label="Inicio"
-                            icon={<Home size={18} />}
-                            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                        />
-                    </div>
-
-                    {/* 
-                        Columna 2: Título principal centrado.
-                        - flex justify-center items-center: centra completamente
-                        - font-bold text-gray-600: estilo semibold y color discreto
-                        - text-3xl: tamaño grande pero no dominante
-                    */}
-                    <div className="flex justify-center items-center font-bold text-gray-600">
-                        <span className="text-3xl">GESTIÓN DE CURSOS ONLINE</span>
-                    </div>
-
-                    {/* 
-                        Columna 3: Botones secundarios (búsqueda y autenticación).
-                        - flex justify-end gap-2: alinea a la derecha con separación
-                    */}
-                    <div className="flex justify-end gap-2">
-                        {/* 
-                            Botón "¿Qué deseas aprender?" (búsqueda).
-                            - variant="search": forma redondeada (rounded-full)
-                            - Abre CourseInfoModal con catálogo de especialidades
-                        */}
-                        <GenericButton
-                            label="¿Qué deseas aprender?"
-                            variant="search"
-                            icon={<Search size={20} className="text-gray-500" />}
-                            onClick={() => setIsCourseInfoModalOpen(true)}
-                        />
-
-                        {/* 
-                            Botón "Entrar / Registro".
-                            - Abre AuthModal en modo LOGIN (isLoginView=true)
-                            - Si user quiere registrarse, puede dar clic en "¿No tengo cuenta?" dentro del modal
-                        */}
-                        <GenericButton
-                            label="Entrar / Registro"
-                            icon={<LogIn size={18} />}
-                            onClick={() => {
-                                if (Date.now() < preventReopenUntilRef.current) {
-                                    return;
-                                }
-                                setIsLoginView(true);  // Mostrar formulario Login por defecto
-                                setIsAuthModalOpen(true);
-                            }}
-                        />
-                    </div>
-                </div>
-            </nav>
-
-            {/* 
-                Modal de autenticación (login/registro).
-                - isOpen={isAuthModalOpen}: controlado por estado local
-                - onClose={() => setIsAuthModalOpen(false)}: cierra el modal
-                - isLoginView y setIsLoginView: controlan qué formulario mostrar
-                - onSuccess={onLoginSuccess}: propaga user autenticado al padre
-                
-                NOTA: Renderizado siempre en el árbol de React, solo se muestra si isOpen=true.
-                Esto evita destruir/recrear el componente en cada open/close.
-            */}
-            <AuthModal
-                isOpen={isAuthModalOpen}
-                onClose={() => setIsAuthModalOpen(false)}
-                isLoginView={isLoginView}
-                setIsLoginView={setIsLoginView}
-                onSuccess={(userData) => {
-                    // Evita reaperturas por rebote justo despues de cerrar por login exitoso.
-                    preventReopenUntilRef.current = Date.now() + 700;
-                    setIsAuthModalOpen(false);
-                    onLoginSuccess?.(userData);
-                }}
-            />
-
-            {/* 
-                Modal de catálogo de cursos (especialidades).
-                - isOpen={isCourseInfoModalOpen}: controlado por estado local
-                - onClose={() => setIsCourseInfoModalOpen(false)}: cierra el modal
-                
-                NOTA: Independiente de AuthModal. Si user clickea "Registrarme" dentro,
-                CourseInfoModal se cierra pero AuthModal se abre, sin conflictos.
-            */}
-            <CourseInfoModal
-                isOpen={isCourseInfoModalOpen}
-                onClose={() => setIsCourseInfoModalOpen(false)}
-            />
-        </>
-    );
-};
-
-export default Navbar;
-
-================
 File: frontend/src/routes/pages/student/components/CourseCatalog.tsx
 ================
 import { Search, Loader2, Star, PlusCircle, CheckCircle2 } from 'lucide-react';
@@ -20073,6 +19986,8 @@ import GenericButton from '../../../../components/ui/genericButton/GenericButton
 import { useAuth } from '../../../../auth/useAuth';
 import type { EnrollmentInfo } from '../../../../services/courseTypes';
 
+// Importación del componente core Input unificado según la auditoría
+import Input from '../../../../components/ui/Input';
 
 interface CourseCatalogProps {
     enrolledList: EnrollmentInfo[];
@@ -20158,16 +20073,21 @@ export const CourseCatalog = ({
                     </h2>
                     <p className="text-xs text-slate-500 font-medium">Encuentra asignaturas de forma aproximada por título o categoría temática</p>
                 </div>
+
+                {/* 
+                   CONTENEDOR DE BÚSQUEDA ADOPTANDO COMPONENTE CORE [ADR-13]:
+                   Sustitución de la etiqueta input manual para heredar focus:ring-blue-500 unificado.
+                */}
                 <div className="relative w-full sm:w-72">
-                    <input
+                    <Input
                         type="text"
                         value={searchKeyword}
                         onChange={(e) => setSearchKeyword(e.target.value)}
                         placeholder="Buscar cursos..."
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 pl-3 pr-8 text-xs font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                        className="w-full py-1.5! pl-3! pr-8! text-xs font-medium text-slate-700 placeholder-slate-400"
                     />
                     {loadingCatalog && (
-                        <Loader2 size={14} className="animate-spin text-slate-400 absolute right-3 top-2.5" />
+                        <Loader2 size={14} className="animate-spin text-slate-400 absolute right-3 top-2.5 z-10" />
                     )}
                 </div>
             </div>
@@ -20216,7 +20136,7 @@ export const CourseCatalog = ({
                                                 variant="primary"
                                                 label="Matricularme"
                                                 icon={enrollingId === course.course_id ? <Loader2 size={12} className="animate-spin" /> : <PlusCircle size={12} />}
-                                                className="bg-blue-600! hover:bg-blue-700! text-white! text-[10px]! font-bold! py-1.5! px-3! rounded-lg! transition-colors! cursor-pointer! disabled:bg-slate-300! disabled:cursor-not-allowed! w-fit! gap-1!"
+                                                className="bg-blue-600! hover:bg-blue-700! text-white! text-[10px]! font-bold! py-1.5! px-3! rounded-lg! transition-colors! cursor-pointer! disabled:bg-slate-300!"
                                             />
                                         )}
                                     </div>
@@ -20817,6 +20737,9 @@ import GenericButton from '../../../components/ui/genericButton/GenericButton';
 import GenericCard from '../../../components/ui/genericCard/GenericCard';
 import ProfessorLayout from '../../layouts/DashboardLayout';
 
+// Importación del componente core unificado según [ADR-13]
+import GenericHeader from '../../../components/ui/genericHeader/GenericHeader';
+
 // IMPORTACIÓN CENTRALIZADA DE DOMINIOS [DRY]
 import type { TaughtCourse, TeacherMetric } from '../../../services/userDomains';
 
@@ -20835,11 +20758,23 @@ const ProfessorDashboard = () => {
 
     return (
         <ProfessorLayout>
-            {/* CABECERA EXCLUSIVA DEL PANEL LIMPIA */}
-            <div className="border-b border-slate-100 pb-4 mb-6">
-                <h1 className="text-xl font-bold text-slate-800">Panel de Control Docente</h1>
-                <p className="text-xs text-slate-400 mt-0.5">Gestiona el progreso de tus asignaturas asignadas y revisa las entregas</p>
-            </div>
+            {/* 
+               CABECERA PRINCIPAL UNIFICADA [ADR-13]:
+               Sustitución del bloque h1/p manual por el componente core GenericHeader.
+            */}
+            <GenericHeader
+                title="Panel de Control Docente"
+                titleSize="text-xl font-bold"
+                titleColor="text-slate-800"
+                textPadding="p-0"
+                containerClass="border-b border-slate-100 pb-4 mb-6"
+                align="left"
+                description={
+                    <p className="text-xs text-slate-400 mt-0.5">
+                        Gestiona el progreso de tus asignaturas asignadas y revisa las entregas
+                    </p>
+                }
+            />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
@@ -20853,8 +20788,6 @@ const ProfessorDashboard = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {myCourses.map((course) => {
-                            // Mapeo declarativo O(1) para inyectar la clase de Tailwind exacta según el progreso.
-                            // Esto elimina por completo el atributo 'style' del JSX, silenciando el linter.
                             const progressPct = course.averageProgress;
                             let tailwindWidthClass = 'w-0';
 
@@ -21262,6 +21195,10 @@ import GenericButton from '../../../components/ui/genericButton/GenericButton';
 import AdminLayout from '../../layouts/DashboardLayout';
 import { UserScrollList } from '../../../components/admin/UserScrollList';
 import type { UserEntity } from '../../../services/userDomains';
+import Input from '../../../components/ui/Input';
+
+// Importación del componente core unificado según [ADR-13]
+import GenericHeader from '../../../components/ui/genericHeader/GenericHeader';
 
 const AdminDashboard = () => {
     const [searchName, setSearchName] = useState<string>('');
@@ -21328,7 +21265,6 @@ const AdminDashboard = () => {
     const handleDeleteUser = async () => {
         if (!foundUser) return;
 
-        // Obtenemos el objeto del usuario desde la persistencia que maneja tu AuthProvider
         const storedAuth = localStorage.getItem('auth_user');
         let currentAdminUsername = '';
 
@@ -21341,7 +21277,6 @@ const AdminDashboard = () => {
             }
         }
 
-        // Validación preventiva en UI contra autoborrado
         if (foundUser.username.toLowerCase() === currentAdminUsername.toLowerCase()) {
             setError("Acción denegada: El sistema bloquea el autoborrado por seguridad.");
             return;
@@ -21355,20 +21290,17 @@ const AdminDashboard = () => {
         setError('');
 
         try {
-            // PETICIÓN HTTP: Invoca al controlador conmutador de estado
             const response = await apiClient.delete(`/api/auth/users/${foundUser.username}`);
 
             if (response.status === 200) {
                 alert(response.data.message);
-
-                // SINCRONIZACIÓN SEGURA: Actualizamos la tarjeta con el valor real devuelto por el servidor
                 setFoundUser({
                     ...foundUser,
-                    enabled: response.data.enabled // Sincroniza de forma atómica con el backend
+                    enabled: response.data.enabled
                 });
             }
         } catch (errHttp) {
-            console.error("Error en la petición de baja temporl:", errHttp);
+            console.error("Error en la petición de baja temporal:", errHttp);
             let message = "Error crítico: No se pudo modificar el estado del usuario.";
             if (axios.isAxiosError(errHttp) && errHttp.response?.data?.error) {
                 message = errHttp.response.data.error;
@@ -21379,7 +21311,6 @@ const AdminDashboard = () => {
         }
     };
 
-    // Auxiliar para obtener el nombre del admin actual directamente en la renderización
     const getAdminUsername = (): string => {
         const storedAuth = localStorage.getItem('auth_user');
         if (!storedAuth) return '';
@@ -21392,11 +21323,30 @@ const AdminDashboard = () => {
 
     return (
         <AdminLayout>
-            {/* CONTENEDOR GRID EN PARALELO: Una al lado de la otra en pantallas grandes (lg), una encima de otra en móviles */}
+            {/* 
+               CABECERA PRINCIPAL UNIFICADA CON BIENVENIDA INSTITUCIONAL [ADR-13]:
+               Inyección de datos dinámicos extraídos en tiempo de renderizado de forma fluida.
+            */}
+            <GenericHeader
+                title="Panel de Administración"
+                titleSize="text-2xl font-bold tracking-tight"
+                titleColor="text-slate-800"
+                textPadding="p-0"
+                containerClass="border-b border-slate-200 pb-4 mb-6"
+                align="left"
+                description={
+                    <p className="text-sm font-medium text-slate-600 mt-1.5">
+                        Consola del sistema: monitorización de persistencia y gestión de accesos corporativos.
+                    </p>
+                }
+            />
+
+            {/* CONTENEDOR GRID EN PARALELO */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start w-full">
+
                 {/* COLUMNA IZQUIERDA: TARJETA DEL BUSCADOR DE USUARIOS */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-lg px-5 py-15 w-full">
-                    {/* Encabezado */}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-lg px-5 py-6 w-full">
+                    {/* Encabezado de tarjeta interna */}
                     <div className="flex items-center gap-3 mb-5 border-b border-slate-100 pb-4">
                         <div className="p-2.5 bg-red-50 rounded-xl text-red-600">
                             <Users size={22} />
@@ -21409,15 +21359,15 @@ const AdminDashboard = () => {
                         </div>
                     </div>
 
-                    {/* Formulario de Búsqueda */}
-                    <form onSubmit={handleSearchUser} className="flex gap-2 mb-4">
-                        <input
+                    {/* Formulario de Búsqueda Purificado con Componente Core */}
+                    <form onSubmit={handleSearchUser} className="flex gap-2 mb-4 items-end">
+                        <Input
                             type="text"
                             placeholder="Introduce el nombre (ej. Laura)"
                             value={searchName}
                             onChange={(e) => setSearchName(e.target.value)}
                             required
-                            className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
+                            className="flex-1 text-sm font-medium text-slate-800 placeholder-slate-400"
                         />
                         <GenericButton
                             type="submit"
@@ -21425,7 +21375,7 @@ const AdminDashboard = () => {
                             variant="white"
                             ariaLabel="Buscar en base de datos"
                             icon={loading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
-                            className="p-2! bg-red-600! hover:bg-red-700! text-white! rounded-xl! shadow-md! border border-transparent!"
+                            className="p-2! bg-red-600! hover:bg-red-700! text-white! rounded-xl! shadow-md! border border-transparent! h-11.5 flex items-center justify-center"
                         />
                     </form>
 
@@ -21436,7 +21386,7 @@ const AdminDashboard = () => {
                         </div>
                     )}
 
-                    {/* RESULTADO DINÁMICO RECOLECTADO DE POSTGRESQL CON SELECTOR DE ROL */}
+                    {/* RESULTADO DINÁMICO CON SELECTOR DE ROL */}
                     {foundUser && (
                         <div className="mt-4 border-t border-slate-100 pt-4 animate-in fade-in zoom-in-95 duration-200">
                             <div className="bg-slate-50/50 p-3.5 rounded-xl border border-slate-100 flex flex-col gap-3">
@@ -21484,8 +21434,7 @@ const AdminDashboard = () => {
                                         )}
                                     </div>
                                 </div>
-
-                                {/* BOTÓN DE BORRADO DESTRUCTIVO BLINDADO */}
+                                {/* BOTÓN DE ACCIÓN ADMINISTRATIVA CORREGIDO */}
                                 <div className="mt-2 pt-3 border-t border-red-100">
                                     {foundUser.username.toLowerCase() === getAdminUsername().toLowerCase() ? (
                                         <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 p-2.5 rounded-xl text-center font-medium">
@@ -21496,7 +21445,7 @@ const AdminDashboard = () => {
                                             type="button"
                                             onClick={handleDeleteUser}
                                             disabled={deleting || updatingId !== null}
-                                            variant="success"
+                                            variant="white"
                                             label={deleting ? 'Reactivando...' : 'Reactivar y dar de alta usuario'}
                                             icon={deleting ? <Loader2 size={14} className="animate-spin" /> : undefined}
                                             className="w-full py-2! bg-emerald-50! border-2! border-emerald-200! text-emerald-600! rounded-xl! text-xs! font-bold! uppercase! tracking-wide! hover:bg-emerald-100! transition-all! justify-center! gap-2!"
@@ -21506,24 +21455,22 @@ const AdminDashboard = () => {
                                             type="button"
                                             onClick={handleDeleteUser}
                                             disabled={deleting || updatingId !== null}
-                                            variant="white"
-                                            label={deleting ? 'Procesando...' : 'Baja Temporal Usuario'}
+                                            variant="primary"
+                                            label={deleting ? 'Procesando...' : 'Dar de baja temporal usuario'}
                                             icon={deleting ? <Loader2 size={14} className="animate-spin" /> : undefined}
-                                            className="w-full py-2! bg-white! border-2! border-blue-200! text-blue-600! rounded-xl! text-xs! font-bold! uppercase! tracking-wide! hover:bg-blue-50! transition-all! justify-center! gap-2!"
+                                            className="w-full py-2! bg-red-50! border-2! border-red-200! text-red-600! rounded-xl! text-xs! font-bold! uppercase! tracking-wide! hover:bg-red-100! transition-all! justify-center! gap-2!"
                                         />
                                     )}
                                 </div>
-
                             </div>
                         </div>
                     )}
                 </div>
 
-                {/* COLUMNA DERECHA: CONSOLA DE USUARIOS CON SCROLL INFRAESTRUCTURA */}
-                <div className="w-full h-full">
+                {/* COLUMNA DERECHA: LISTA COMPLEMENTARIA */}
+                <div className="w-full">
                     <UserScrollList />
                 </div>
-
             </div>
         </AdminLayout>
     );
@@ -22365,6 +22312,9 @@ import { useState } from 'react';
 import { Sparkles, SlidersHorizontal, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import GenericButton from '../../../components/ui/genericButton/GenericButton';
 
+// Importación del componente core unificado según [ADR-13]
+import GenericHeader from '../../../components/ui/genericHeader/GenericHeader';
+
 // Importación del Layout unificado según [ADR-10]
 import DashboardLayout from '../../layouts/DashboardLayout';
 
@@ -22381,8 +22331,6 @@ import type { DBModelCourse } from '../../../services/courseTypes';
 import { DocumentManager } from './components/DocumentManager';
 import { EvaluationPanel } from './components/EvaluationPanel';
 import { StudentStatsPanel } from './components/StudentStatsPanel';
-
-
 
 const StudentDashboard = () => {
     // --- ESTADOS DE UI Y FEEDBACK ---
@@ -22429,26 +22377,41 @@ const StudentDashboard = () => {
         setSuccessMessage("¡Intereses guardados y actualizados correctamente!");
         setTimeout(() => setSuccessMessage(''), 5000);
     };
+
     // Evalúa dinámicamente el foco analítico dando prioridad a la selección del alumno [ADR-41]
     const activeCourseId = enrolledList && enrolledList.length > 0 ? enrolledList[0].course?.course_id : null;
 
     return (
         <DashboardLayout>
             <div className="p-6 max-w-7xl mx-auto space-y-6">
-                {/* Cabecera Principal */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b pb-5">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Intereses del Estudiante</h1>
-                        <p className="text-gray-500 mt-1">Configura tus intereses académicos para recibir sugerencias exclusivas y optimizar tu catálogo</p>
-                    </div>
-                    <GenericButton
-                        onClick={() => setIsModalOpen(true)}
-                        variant="primary"
-                        icon={<SlidersHorizontal className="h-4 w-4" />}
-                        label="Configurar Intereses"
-                        className="gap-2! px-4! py-2! text-sm! font-medium! rounded-lg! shadow-sm self-start md:self-auto"
-                    />
-                </div>
+
+                {/* 
+                   CABECERA PRINCIPAL UNIFICADA [ADR-13]:
+                   Sustitución del div cableado por el componente core GenericHeader utilizando
+                   composición limpia mediante la prop 'description' para inyectar la acción.
+                */}
+                <GenericHeader
+                    title="Intereses del Estudiante"
+                    titleSize="text-3xl font-bold tracking-tight"
+                    titleColor="text-gray-900"
+                    textPadding="p-0"
+                    containerClass="border-b pb-5"
+                    align="left"
+                    description={
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 w-full mt-1">
+                            <p className="text-gray-500">
+                                Configura tus intereses académicos para recibir sugerencias exclusivas y optimizar tu catálogo
+                            </p>
+                            <GenericButton
+                                onClick={() => setIsModalOpen(true)}
+                                variant="primary"
+                                icon={<SlidersHorizontal className="h-4 w-4" />}
+                                label="Configurar Intereses"
+                                className="gap-2! px-4! py-2! text-sm! font-medium! rounded-lg! shadow-sm self-start md:self-auto shrink-0"
+                            />
+                        </div>
+                    }
+                />
 
                 {/* Mensajes de Estado Operacionales */}
                 {(error || enrollmentError || recommendationsError) && (
@@ -22487,11 +22450,11 @@ const StudentDashboard = () => {
 
                 {/* 
                    GRID SINCRONIZADO ORIGINAL RESTAURADO AL 100% [ADR-19]:
-                   - Recuperamos tus bordes exteriores exactos y tu alineación superior perfecta.
+                   - Contenedores exteriores y alineación perfectamente intactos.
                 */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
 
-                    {/* COLUMNA 1 (IZQUIERDA): Tu contenedor máster intacto que funciona a la perfección */}
+                    {/* COLUMNA 1 (IZQUIERDA): Contenedor máster intacto */}
                     <div className="bg-white border rounded-2xl p-6 shadow-sm space-y-6">
                         <EnrolledCourses
                             enrolledList={enrolledList}
@@ -22505,7 +22468,7 @@ const StudentDashboard = () => {
                         <DocumentManager />
                     </div>
 
-                    {/* COLUMNA 2 Y 3 (DERECHA): Reordenamiento estratégico de componentes */}
+                    {/* COLUMNA 2 Y 3 (DERECHA): Distribución estratégica de componentes */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Tarjeta del Catálogo de Cursos Disponibles */}
                         <div className="bg-white border rounded-2xl p-6 shadow-sm">
@@ -22517,17 +22480,18 @@ const StudentDashboard = () => {
                                 onSetGlobalSuccess={setSuccessMessage}
                             />
                         </div>
-                        {/* 2. Tarjeta de la Evaluación Académica Dual (Sube al centro) */}
+                        {/* Tarjeta de la Evaluación Académica Dual */}
                         <div className="bg-white border rounded-2xl p-6 shadow-sm">
                             <EvaluationPanel />
                         </div>
 
-                        {/* 3. PANEL ANALÍTICO ESTADÍSTICO REACTIVO COMPENSADO [ADR-41] (Baja a la base) */}
+                        {/* PANEL ANALÍTICO ESTADÍSTICO REACTIVO COMPENSADO [ADR-41] */}
                         <div className="bg-white border rounded-2xl p-6 shadow-sm">
                             <StudentStatsPanel activeCourseId={activeCourseId} enrolledList={enrolledList} />
                         </div>
                     </div>
-                </div> {/* Cierre correcto del div grid principal */}
+                </div>
+
                 {/* Modal de Configuración de Intereses */}
                 <InterestsModal
                     isOpen={isModalOpen}
@@ -23525,6 +23489,34 @@ La vista de error por falta de privilegios (`AccessDenied.tsx`) utilizaba etique
 
 * **Positivas:** Reducción de líneas de código duplicadas y eliminación de estilos manuales en la capa de presentación privada.
 * **Positivas:** Alineación total con las directivas de Purificación UI **[ADR-13]** de cara a la evaluación del tribunal del TFG.
+
+---
+
+## ADR-47: Purificación Visual de Dashboards y Centralización de Componentes de Enrutamiento
+
+### Estado
+
+Aceptado (Julio 2026)
+
+### Contexto
+
+Tras la auditoría del frontend y la optimización de seguridad stateless basada en JWT [ADR-20], el sistema presentaba acoplamientos y redundancias arquitectónicas:
+
+1. Las cabeceras principales de entrada en los paneles principales (Dashboards de Alumno, Profesor y Administrador) utilizaban etiquetas HTML cableadas manualmente, desalineadas con las directrices de reutilización de la interfaz [ADR-13].
+2. Los filtros del buscador del catálogo de asignaturas y de usuarios administrativos utilizaban inputs nativos independientes en lugar de delegar en el componente genérico del sistema.
+3. Existían tres guardianes de ruta satélites redundantes (`StudentRoute.tsx`, `AdminRoute.tsx` y `ProfessorRoute.tsx`) que actuaban como simples envoltorios de una línea hacia el componente central de seguridad.
+
+### Decisiones
+
+1. **Unificación Visual de Dashboards [ADR-13]:** Se implementó de forma obligatoria el componente core reutilizable `<GenericHeader />` en la raíz de los tres paneles principales para proporcionar la bienvenida institucional, separándolo de las tarjetas internas con micro-encabezados ligeros.
+2. **Adopción de Componente Input Core:** Se sustituyeron todas las etiquetas `<input>` manuales en los buscadores por el componente corporativo `<Input />`, estandarizando de forma nativa el estilo `bg-gray-50` y el anillo de enfoque `focus:ring-blue-500`.
+3. **Eliminación Física de Guardianes Satélites:** Se borraron de manera definitiva del disco duro los archivos `StudentRoute.tsx`, `AdminRoute.tsx` y `ProfessorRoute.tsx`. Los roles se parametrizan directamente de forma centralizada en el archivo de rutas `index.tsx` mediante el atributo `allowedRoles` del componente unificado `ProtectedRoute.tsx`.
+4. **Blindaje de Punteros Nulos en Backend [ADR-19]:** Se refactorizó el stream de afinidad académica en `RecommendationService.java` para evaluar sobre una colección segura (`safeEnrollments`), eliminando riesgos de regresión `NullPointerException` en caliente.
+
+### Consecuencias
+
+* **Positivas:** Reducción drástica del acoplamiento en el árbol de componentes del frontend (*component hell*). Consistencia visual estricta en toda la experiencia de usuario. Estructura de directorios del repositorio 100% limpia de código inerte o de andamiaje.
+* **Negativas:** Ninguna. Las suites de pruebas automatizadas de Vitest (`test ok`) y de integración de Maven (`BUILD SUCCESS`) se mantienen al 100% en verde.
 
 ---
 

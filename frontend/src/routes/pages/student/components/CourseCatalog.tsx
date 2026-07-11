@@ -7,6 +7,8 @@ import GenericButton from '../../../../components/ui/genericButton/GenericButton
 import { useAuth } from '../../../../auth/useAuth';
 import type { EnrollmentInfo } from '../../../../services/courseTypes';
 
+// Importación del componente core Input unificado según la auditoría
+import Input from '../../../../components/ui/Input';
 
 interface CourseCatalogProps {
     enrolledList: EnrollmentInfo[];
@@ -92,16 +94,21 @@ export const CourseCatalog = ({
                     </h2>
                     <p className="text-xs text-slate-500 font-medium">Encuentra asignaturas de forma aproximada por título o categoría temática</p>
                 </div>
+
+                {/* 
+                   CONTENEDOR DE BÚSQUEDA ADOPTANDO COMPONENTE CORE [ADR-13]:
+                   Sustitución de la etiqueta input manual para heredar focus:ring-blue-500 unificado.
+                */}
                 <div className="relative w-full sm:w-72">
-                    <input
+                    <Input
                         type="text"
                         value={searchKeyword}
                         onChange={(e) => setSearchKeyword(e.target.value)}
                         placeholder="Buscar cursos..."
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 pl-3 pr-8 text-xs font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                        className="w-full py-1.5! pl-3! pr-8! text-xs font-medium text-slate-700 placeholder-slate-400"
                     />
                     {loadingCatalog && (
-                        <Loader2 size={14} className="animate-spin text-slate-400 absolute right-3 top-2.5" />
+                        <Loader2 size={14} className="animate-spin text-slate-400 absolute right-3 top-2.5 z-10" />
                     )}
                 </div>
             </div>
@@ -150,7 +157,7 @@ export const CourseCatalog = ({
                                                 variant="primary"
                                                 label="Matricularme"
                                                 icon={enrollingId === course.course_id ? <Loader2 size={12} className="animate-spin" /> : <PlusCircle size={12} />}
-                                                className="bg-blue-600! hover:bg-blue-700! text-white! text-[10px]! font-bold! py-1.5! px-3! rounded-lg! transition-colors! cursor-pointer! disabled:bg-slate-300! disabled:cursor-not-allowed! w-fit! gap-1!"
+                                                className="bg-blue-600! hover:bg-blue-700! text-white! text-[10px]! font-bold! py-1.5! px-3! rounded-lg! transition-colors! cursor-pointer! disabled:bg-slate-300!"
                                             />
                                         )}
                                     </div>

@@ -2,20 +2,23 @@ package com.cursosonline.backend.services;
 
 import com.cursosonline.backend.dto.RecommendationDTO;
 import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Interest;
+import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.InterestRepository;
+import com.cursosonline.backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,112 +26,108 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@DisplayName("Auditoría de Calidad: Pruebas del Motor de Recomendación Algorítmica")
 class RecommendationServiceTest {
 
-        @Mock
-        private CoursesRepository coursesRepository;
+    @Mock
+    private CoursesRepository coursesRepository;
 
-        @Mock
-        private InterestRepository interestRepository;
+    @Mock
+    private EnrollmentRepository enrollmentRepository;
 
-        @Mock
-        private EnrollmentRepository enrollmentRepository;
+    @Mock
+    private InterestRepository interestRepository;
 
-        @Spy // Usamos @Spy para que se ejecute la lógica real del normalizador semántico
-        private SemanticNormalizer semanticNormalizer;
+    @Mock
+    private UserRepository userRepository;
 
-        @InjectMocks
-        private RecommendationService recommendationService;
+    @InjectMocks
+    private RecommendationService recommendationService;
 
-        private Interest luisInterests;
-        private List<Courses> courseCatalog;
+    private Users mockUser;
+    private Courses course1;
+    private Courses course2;
+    private Interest userInterests;
 
-        @BeforeEach
-        void setUp() {
-                // Configurar los intereses en español del alumno Luis (Escenario Real)
-                luisInterests = new Interest();
-                luisInterests.setId(1L);
-                luisInterests.setCategory(new ArrayList<>(List.of("Ciencias Sociales")));
-                luisInterests.setCourse_type(new ArrayList<>(List.of("Principiante")));
-                luisInterests.setLanguage(new ArrayList<>(List.of("Español")));
-                luisInterests.setSubtitle_languages(new ArrayList<>(List.of("Español")));
-                luisInterests.setDuration(new ArrayList<>(List.of("Corto")));
+    @BeforeEach
+    void setUp() {
+        // 1. Configurar usuario de prueba
+        mockUser = new Users();
+        mockUser.setUser_id(1L);
+        mockUser.setUsername("luis");
 
-                // Configurar el catálogo de cursos simulado (Híbrido/Inglés)
-                courseCatalog = new ArrayList<>();
+        // 2. Configurar catálogo de cursos (Dataset de Coursera) [3]
+        course1 = new Courses();
+        course1.setCourse_id(101L);
+        course1.setTitle("Data Science Avanzado");
+        course1.setCategory("Ciencia de Datos");
+        course1.setInstructors("Profesor A");
 
-                // Curso A: Coincide semánticamente en categoría ("Social Sciences" = "Ciencias
-                // Sociales")
-                Courses socialScienceCourse = new Courses();
-                socialScienceCourse.setCourse_id(101L);
-                socialScienceCourse.setTitle("Introduction to Social Sciences");
-                socialScienceCourse.setCategory("Social Sciences"); // <── Variante en Inglés
-                socialScienceCourse.setCourseType("Beginner");
-                socialScienceCourse.setLanguage("English");
-                socialScienceCourse.setSubtitleLanguages("English, Spanish");
-                socialScienceCourse.setDuration(8.5f); // <── Corto (<10h)
-                socialScienceCourse.setRating(4.8f);
+        course2 = new Courses();
+        course2.setCourse_id(102L);
+        course2.setTitle("Introducción al Marketing");
+        course2.setCategory("Negocios");
+        course2.setInstructors("Profesor B");
 
-                // Curso B: Categoría diferente ("Business")
-                Courses businessCourse = new Courses();
-                businessCourse.setCourse_id(102L);
-                businessCourse.setTitle("Key Technologies for Business Specialization");
-                businessCourse.setCategory("Business");
-                businessCourse.setCourseType("Beginner");
-                businessCourse.setLanguage("English");
-                businessCourse.setSubtitleLanguages("English");
-                businessCourse.setDuration(12.0f); // <── Medio (10h-40h)
-                businessCourse.setRating(4.5f);
+        // 3. Configurar intereses del alumno [4, 5]
+        userInterests = new Interest();
+        userInterests.setUser(mockUser);
+        userInterests.setCategory(new ArrayList<>(Arrays.asList("Ciencia de Datos")));
+    }
 
-                courseCatalog.add(socialScienceCourse);
-                courseCatalog.add(businessCourse);
-        }
+    @Test
+    @DisplayName("Debe recomendar cursos basados en la categoría de interés")
+    void getRecommendations_Success() {
+        // Arrange
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>()); // Sin matrículas previas
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1, course2));
 
-        @Test
-        @DisplayName("Debería recomendar curso de Ciencias Sociales resolviendo la brecha multilingüe con tokens")
-        void shouldRecommendSocialSciencesCourseResolvingMultilingualGap() {
-                // Arrange (Configuración de comportamientos de los Mocks)
-                Long userId = 1L;
-                when(interestRepository.findById(userId)).thenReturn(Optional.of(luisInterests));
-                when(enrollmentRepository.findAllByUserIdWithCourses(userId)).thenReturn(new ArrayList<>()); // Sin
-                                                                                                             // matrículas
-                                                                                                             // previas
-                when(coursesRepository.findAll()).thenReturn(courseCatalog);
+        // Act
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
 
-                // Act (Ejecución del método del servicio bajo test)
-                List<RecommendationDTO> results = recommendationService.getRecommendationsForUser(userId);
+        // Assert
+        assertNotNull(results);
+        assertFalse(results.isEmpty());
+        assertEquals("Data Science Avanzado", results.get(0).title());
+        assertTrue(results.get(0).reason().contains("Ciencia de Datos"), "El motivo debe mencionar la categoría");
+        assertEquals(101L, results.get(0).id());
+    }
 
-                // Assert (Verificaciones estrictas del comportamiento esperado)
-                assertNotNull(results, "La lista de recomendaciones no debe ser nula");
-                assertFalse(results.isEmpty(), "La lista de recomendaciones debe contener elementos");
-                assertTrue(results.size() <= 6, "No debe superar el límite fijado de 6 elementos");
+    @Test
+    @DisplayName("Debe excluir estrictamente cursos donde el alumno ya está matriculado [ADR-32]")
+    void getRecommendations_ExcludesEnrolled() {
+        // Arrange
+        Enrollment existingEnrollment = new Enrollment();
+        existingEnrollment.setCourse(course1); // El alumno ya está en el curso 101
 
-                // El primer curso sugerido debe ser el de Ciencias Sociales gracias a los 30
-                // puntos adicionales de la categoría
-                RecommendationDTO topRecommendation = results.get(0);
-                assertEquals(101L, topRecommendation.id(),
-                                "El curso con mayor afinidad debe ser el de Ciencias Sociales");
-                assertEquals("Social Sciences", topRecommendation.category(),
-                                "La categoría devuelta debe coincidir con la de la entidad");
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(Arrays.asList(existingEnrollment));
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1, course2));
 
-                // Verificar que la cadena explicativa generada no esté vacía ni sea el fallback
-                // de seguridad genérico
-                assertNotNull(topRecommendation.reason());
-                assertTrue(topRecommendation.reason().contains("Coincide con tus categorías preferidas"),
-                                "El texto de explicabilidad debe reflejar el match exitoso de la categoría");
-                assertTrue(topRecommendation.reason().contains("Se ajusta a tu disponibilidad de tiempo"),
-                                "El texto debe reflejar que también se calculó la coincidencia de duración");
+        // Act
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
 
-                // El curso de Ciencias Sociales debe tener mayor puntuación que el de Negocios
-                if (results.size() > 1) {
-                        RecommendationDTO secondRecommendation = results.get(1);
-                        assertTrue(topRecommendation.score() > secondRecommendation.score(),
-                                        "El curso de la categoría de interés debe puntuar más alto que el catálogo general");
-                }
+        // Assert
+        // Solo debe quedar el curso 2 (Marketing), aunque no sea su interés principal, 
+        // porque el curso 1 (Data Science) debe ser excluido.
+        boolean containsEnrolled = results.stream().anyMatch(r -> r.id().equals(101L));
+        assertFalse(containsEnrolled, "No debe recomendar cursos ya matriculados");
+    }
 
-                // Verificar interacciones seguras con la persistencia
-                verify(interestRepository, times(1)).findById(userId);
-                verify(coursesRepository, times(1)).findAll();
-                verify(enrollmentRepository, times(1)).findAllByUserIdWithCourses(userId);
-        }
+    @Test
+    @DisplayName("Debe devolver lista vacía si el usuario no existe")
+    void getRecommendations_UserNotFound() {
+        // Arrange
+        when(userRepository.findByUsername("desconocido")).thenReturn(Optional.empty());
+
+        // Act
+        List<RecommendationDTO> results = recommendationService.getRecommendations("desconocido");
+
+        // Assert
+        assertTrue(results.isEmpty());
+        verify(coursesRepository, never()).findAll();
+    }
 }

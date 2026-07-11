@@ -4,6 +4,9 @@ import GenericButton from '../../../components/ui/genericButton/GenericButton';
 import GenericCard from '../../../components/ui/genericCard/GenericCard';
 import ProfessorLayout from '../../layouts/DashboardLayout';
 
+// Importación del componente core unificado según [ADR-13]
+import GenericHeader from '../../../components/ui/genericHeader/GenericHeader';
+
 // IMPORTACIÓN CENTRALIZADA DE DOMINIOS [DRY]
 import type { TaughtCourse, TeacherMetric } from '../../../services/userDomains';
 
@@ -22,11 +25,23 @@ const ProfessorDashboard = () => {
 
     return (
         <ProfessorLayout>
-            {/* CABECERA EXCLUSIVA DEL PANEL LIMPIA */}
-            <div className="border-b border-slate-100 pb-4 mb-6">
-                <h1 className="text-xl font-bold text-slate-800">Panel de Control Docente</h1>
-                <p className="text-xs text-slate-400 mt-0.5">Gestiona el progreso de tus asignaturas asignadas y revisa las entregas</p>
-            </div>
+            {/* 
+               CABECERA PRINCIPAL UNIFICADA [ADR-13]:
+               Sustitución del bloque h1/p manual por el componente core GenericHeader.
+            */}
+            <GenericHeader
+                title="Panel de Control Docente"
+                titleSize="text-xl font-bold"
+                titleColor="text-slate-800"
+                textPadding="p-0"
+                containerClass="border-b border-slate-100 pb-4 mb-6"
+                align="left"
+                description={
+                    <p className="text-xs text-slate-400 mt-0.5">
+                        Gestiona el progreso de tus asignaturas asignadas y revisa las entregas
+                    </p>
+                }
+            />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
@@ -40,8 +55,6 @@ const ProfessorDashboard = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {myCourses.map((course) => {
-                            // Mapeo declarativo O(1) para inyectar la clase de Tailwind exacta según el progreso.
-                            // Esto elimina por completo el atributo 'style' del JSX, silenciando el linter.
                             const progressPct = course.averageProgress;
                             let tailwindWidthClass = 'w-0';
 
