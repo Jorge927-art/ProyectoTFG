@@ -110,4 +110,47 @@ class UserControllerTest {
                                 .andExpect(jsonPath("$[0].course.title")
                                                 .value("Introduction to Data Science Specialization"));
         }
+
+        /**
+         * Prueba de integración que valida la recuperación exitosa de alertas
+         * académicas
+         * siguiendo la configuración de contexto nativa y limpia de la suite de
+         * pruebas.
+         */
+        @Test
+        void debeRecuperarAlertasDelEstudianteAutenticadoConExito() throws Exception {
+                // 1. Entrenamos el Mock de negocio simulando un escenario con las dos alertas
+                // requeridas
+                java.util.List<com.cursosonline.backend.dto.NotificationDTO> mockNotifications = List.of(
+                                new com.cursosonline.backend.dto.NotificationDTO(
+                                                "DOCUMENT_INBOX",
+                                                "Bandeja de Entrada",
+                                                "Tienes 1 documento(s) pendiente(s).",
+                                                "/student/documents"),
+                                new com.cursosonline.backend.dto.NotificationDTO(
+                                                "COURSE_PROGRESS",
+                                                "Asignatura por finalizar",
+                                                "Tu curso está al 92%.",
+                                                "/student/courses"));
+
+                // Simulamos el comportamiento del principal inyectado pasándole el nombre de
+                // Luis
+                org.mockito.Mockito.when(userService.getUserNotifications("Luis"))
+                                .thenReturn(mockNotifications);
+
+                // 2. Creamos un objeto Principal simulado para inyectarlo directamente en la
+                // petición HTTP
+                java.security.Principal mockPrincipal = () -> "Luis";
+
+                // 3. Ejecutamos la petición HTTP limpia de forma idéntica al resto de tests de
+                // la clase
+                mockMvc.perform(get("/api/auth/notifications")
+                                .principal(mockPrincipal) // Inyectamos la identidad de Luis directamente
+                                .contentType(org.springframework.http.MediaType.APPLICATION_JSON))
+                                // ✅ VALIDACIONES DE CONTRATO HTTP
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(2)))
+                                .andExpect(jsonPath("$[0].type").value("DOCUMENT_INBOX"))
+                                .andExpect(jsonPath("$[1].type").value("COURSE_PROGRESS"));
+        }
 }

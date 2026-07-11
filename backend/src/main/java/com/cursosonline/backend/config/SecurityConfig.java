@@ -83,6 +83,10 @@ public class SecurityConfig {
                         // autenticación)
                         .requestMatchers("/api/auth/me").authenticated()
 
+                        // Endpoint para obtener las notificaciones del usuario autenticado (requiere
+                        // autenticación)
+                        .requestMatchers("/api/auth/notifications").authenticated()
+
                         // Endpoint para obtener el perfil de un usuario específico (requiere
                         // autenticación)
                         .requestMatchers("/api/v1/profile/**").authenticated()

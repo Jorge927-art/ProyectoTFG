@@ -103,6 +103,20 @@ public class UserController {
     }
 
     /**
+     * Endpoint seguro para recuperar las alertas dinámicas del alumno en sesión.
+     * Extrae la identidad mediante las credenciales del token JWT activo.
+     */
+    @GetMapping("/notifications")
+    public ResponseEntity<List<com.cursosonline.backend.dto.NotificationDTO>> getNotifications(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+        List<com.cursosonline.backend.dto.NotificationDTO> notifications = userService
+                .getUserNotifications(principal.getName());
+        return ResponseEntity.ok(notifications);
+    }
+
+    /**
      * Endpoint especializado para la hidratación del bloque de asignaturas en
      * progreso.
      * Recibe el username de forma explícita para evitar fallos de inyección (HTTP

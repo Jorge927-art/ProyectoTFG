@@ -2,10 +2,12 @@ import { type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home, User, LogOut, GraduationCap, ShieldAlert, BookOpen } from 'lucide-react';
 import GenericButton from "../ui/genericButton/GenericButton";
-import { useAuth } from '@/auth';
+import { useAuth } from '../../auth';
 // Auditoría NotebookLM: Importación de la constante centralizada para mitigar hardcoding de roles.
-import { ROLES } from '@/auth/authTypes';
-import { resolveAvatarUrl } from '@/auth/avatarUrl';
+import { ROLES } from '../../auth/authTypes';
+import { resolveAvatarUrl } from '../../auth/avatarUrl';
+import NotificationBell from '../../routes/pages/student/components/NotificationBell';
+
 
 /**
  * Props del componente NavbarUser.
@@ -96,6 +98,7 @@ const NavbarUser = ({ username, userPhoto, onLogout }: NavbarUserProps) => {
 
             {/* 3. SECCIÓN DERECHA */}
             <div className="w-1/3 flex items-center justify-end gap-4">
+                {currentRole === ROLES.STUDENT && <NotificationBell />}
                 <GenericButton
                     onClick={handleProfileRedirect}
                     variant="white"

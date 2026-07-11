@@ -8,6 +8,7 @@ import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.dto.InterestDTO;
 import com.cursosonline.backend.repository.UserRepository;
 import com.cursosonline.backend.repository.CoursesRepository;
+import com.cursosonline.backend.repository.DocumentMetadataRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.InterestRepository;
 import com.cursosonline.backend.exception.ServicesException;
@@ -40,6 +41,7 @@ public class UserService {
     private final InterestRepository interestRepository;
     private final CoursesRepository coursesRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final DocumentMetadataRepository documentMetadataRepository;
     private Clock clock = Clock.systemUTC();
 
     /**
@@ -378,6 +380,49 @@ public class UserService {
                 row.get("instructorRating") != null ? ((Number) row.get("instructorRating")).doubleValue() : null,
                 (String) row.get("platform"),
                 (String) row.get("category"));
+    }
+
+    /**
+     * Calcula y centraliza de forma transaccional las alertas activas del
+     * estudiante.
+     * Evalúa la bandeja de entrada de documentos y el progreso de los cursos.
+     */
+    @Transactional(readOnly = true)
+    public List<com.cursosonline.backend.dto.NotificationDTO> getUserNotifications(String username) {
+        java.util.List<com.cursosonline.backend.dto.NotificationDTO> alerts = new java.util.ArrayList<>();
+
+        // 1. Regla de negocio: Documentos en bandeja de entrada
+        java.util.List<com.cursosonline.backend.entities.DocumentMetadata> receivedDocs = documentMetadataRepository
+                .findReceivedDocumentsByUsername(username);
+
+        if (receivedDocs != null && !receivedDocs.isEmpty()) {
+            alerts.add(new com.cursosonline.backend.dto.NotificationDTO(
+                    "DOCUMENT_INBOX",
+                    "Bandeja de Entrada",
+                    "Tienes " + receivedDocs.size() + " documento(s) pendiente(s) en tu bandeja.",
+                    "/student/documents"));
+        }
+
+        // 2. Regla de negocio: Cursos con progreso >= 90% y < 100%
+        Users user = userRepository.findByUsername(username).orElse(null);
+        if (user != null) {
+            java.util.List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(user.getUser_id());
+            if (enrollments != null) {
+                for (Enrollment enrollment : enrollments) {
+                    int progress = calculateCurrentProgress(enrollment);
+                    if (progress >= 90 && progress < 100) {
+                        alerts.add(new com.cursosonline.backend.dto.NotificationDTO(
+                                "COURSE_PROGRESS",
+                                "Asignatura por finalizar",
+                                "El curso '" + enrollment.getCourse().getTitle() + "' está al " + progress
+                                        + "%. ¡Ya casi lo tienes!",
+                                "/student/courses"));
+                    }
+                }
+            }
+        }
+
+        return alerts;
     }
 
 }
