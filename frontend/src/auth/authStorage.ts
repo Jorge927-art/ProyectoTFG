@@ -4,6 +4,33 @@ import type { AuthUser } from './authTypes';
 const USER_KEY = 'auth_user'; 
 const TOKEN_KEY = 'accessToken'; 
 
+const EMPTY_INTERESTS = {
+    categories: [] as string[],
+    levels: [] as string[],
+    durations: [] as string[],
+    languages: [] as string[],
+    subtitles: [] as string[],
+};
+
+function normalizeInterestArray(value: unknown): string[] {
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function normalizeInterests(interests: unknown) {
+    if (!interests || typeof interests !== 'object') {
+        return EMPTY_INTERESTS;
+    }
+
+    const source = interests as Record<string, unknown>;
+    return {
+        categories: normalizeInterestArray(source.categories),
+        levels: normalizeInterestArray(source.levels),
+        durations: normalizeInterestArray(source.durations),
+        languages: normalizeInterestArray(source.languages),
+        subtitles: normalizeInterestArray(source.subtitles),
+    };
+}
+
 
 function canUseBrowserStorage() {
     return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -60,6 +87,7 @@ export function readStoredAuthUser(): AuthUser | null {
         const normalizedUser = {
             ...parsedValue,
             username: parsedValue.username,
+            interests: normalizeInterests((parsedValue as Record<string, unknown>).interests),
         } as AuthUser;
 
         return normalizedUser;

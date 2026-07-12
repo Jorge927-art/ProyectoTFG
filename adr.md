@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD024 MD025 MD046 MD052 -->
+
 # Registro de Decisiones de Arquitectura (ADR) - TFG
 
 Este documento centraliza las decisiones técnicas críticas tomadas durante el desarrollo del sistema, justificando su contexto, las alternativas evaluadas y las consecuencias en el diseño de software.
@@ -1007,6 +1009,26 @@ Tras la auditoría del frontend y la optimización de seguridad stateless basada
 
 * **Positivas:** Reducción drástica del acoplamiento en el árbol de componentes del frontend (*component hell*). Consistencia visual estricta en toda la experiencia de usuario. Estructura de directorios del repositorio 100% limpia de código inerte o de andamiaje.
 * **Negativas:** Ninguna. Las suites de pruebas automatizadas de Vitest (`test ok`) y de integración de Maven (`BUILD SUCCESS`) se mantienen al 100% en verde.
+
+### Actualización de Cierre (Julio 2026)
+
+Se completa la limpieza final y el endurecimiento de seguridad asociado al cierre de ADR-47:
+
+1. **Hardening de Perfil y Rutas Auth:**
+
+* Se elimina el acceso público de la ruta dinámica `/api/auth/{username}` en `SecurityConfig.java`.
+* Se blinda `GET /api/auth/{username}` con autorización contextual (`self/admin`) en `UserController.java`.
+* Se incorpora el endpoint explícito `GET /api/auth/me` para hidratación de sesión JWT y coherencia de contrato.
+* Se evita la exposición del campo de contraseña en serialización JSON mediante `@JsonProperty(access = WRITE_ONLY)` en `Users.java`.
+
+1. **Erradicación de Código Inerte:**
+
+* Se elimina la clase `SemanticNormalizer.java` al no presentar consumidores reales en runtime.
+
+1. **Consolidación de CORS y Limpieza Operativa:**
+
+* Se retiran anotaciones `@CrossOrigin` redundantes en controladores (`UserController`, `CourseController`) para centralizar la política en `SecurityConfig.java`.
+* Se normaliza la exclusión de artefactos `repomix-output.*` en la raíz del monorepo para evitar ruido documental y residuos de herramientas.
 
 ---
 

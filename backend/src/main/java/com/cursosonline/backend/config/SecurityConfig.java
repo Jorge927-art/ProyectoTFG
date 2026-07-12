@@ -67,7 +67,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         // Endpoints de autenticación pública (login y registro)
-                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/{username}").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
 
                         // ✅ SEGURIDAD ESTRUCTURAL: Permitir ver imágenes de perfil públicamente (Solo
                         // lectura)

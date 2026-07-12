@@ -15,5 +15,7 @@ backend/.apt_generated_tests/
 backend/baseline-test.log
 backend/repomix-output.txt
 backend/package-lock.json
+repomix-output.txt
+repomix-output.md
 # Carpeta de subidas local para fotos y documentos
 /uploads/

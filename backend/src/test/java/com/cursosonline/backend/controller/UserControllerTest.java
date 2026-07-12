@@ -78,6 +78,70 @@ class UserControllerTest {
         }
 
         @Test
+        void loginDebeHidratarInteresesConListasVaciasSiServicioDevuelveNull() throws Exception {
+                Users user = new Users(1L, "Luis", "encoded", Role.STUDENT, "luis@example.com", true,
+                                new java.util.ArrayList<>());
+
+                when(userService.login("Luis", "secret123")).thenReturn(user);
+                when(enrollmentRepository.findEnrolledCourseIdsByUserId(1L)).thenReturn(List.of());
+                when(userService.getUserInterests("Luis")).thenReturn(null);
+                when(userProfileRepository.findById(1L)).thenReturn(Optional.empty());
+
+                when(jwtService.generateAccessToken(user, 1L, "luis@example.com")).thenReturn("jwt-token");
+                when(jwtService.extractExpiration("jwt-token")).thenReturn(Instant.now().plusSeconds(900));
+
+                mockMvc.perform(post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"username\":\"Luis\",\"password\":\"secret123\"}"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.interests").exists())
+                                .andExpect(jsonPath("$.interests.categories").isArray())
+                                .andExpect(jsonPath("$.interests.levels").isArray())
+                                .andExpect(jsonPath("$.interests.durations").isArray())
+                                .andExpect(jsonPath("$.interests.languages").isArray())
+                                .andExpect(jsonPath("$.interests.subtitles").isArray())
+                                .andExpect(jsonPath("$.interests.categories[0]").doesNotExist())
+                                .andExpect(jsonPath("$.interests.levels[0]").doesNotExist())
+                                .andExpect(jsonPath("$.interests.durations[0]").doesNotExist())
+                                .andExpect(jsonPath("$.interests.languages[0]").doesNotExist())
+                                .andExpect(jsonPath("$.interests.subtitles[0]").doesNotExist());
+        }
+
+        @Test
+        void loginDebeIncluirInteresesPobladosCuandoServicioDevuelvePreferencias() throws Exception {
+                Users user = new Users(1L, "Luis", "encoded", Role.STUDENT, "luis@example.com", true,
+                                new java.util.ArrayList<>());
+
+                com.cursosonline.backend.dto.InterestDTO interestDTO = new com.cursosonline.backend.dto.InterestDTO(
+                                List.of("Ciencia de Datos", "Negocios"),
+                                List.of("Principiante / Básico"),
+                                List.of("Medio (1 - 6 semanas)"),
+                                List.of("Español"),
+                                List.of("Subtítulos en Español"));
+
+                when(userService.login("Luis", "secret123")).thenReturn(user);
+                when(enrollmentRepository.findEnrolledCourseIdsByUserId(1L)).thenReturn(List.of(101L, 202L));
+                when(userService.getUserInterests("Luis")).thenReturn(interestDTO);
+                when(userProfileRepository.findById(1L)).thenReturn(Optional.empty());
+
+                when(jwtService.generateAccessToken(user, 1L, "luis@example.com")).thenReturn("jwt-token");
+                when(jwtService.extractExpiration("jwt-token")).thenReturn(Instant.now().plusSeconds(900));
+
+                mockMvc.perform(post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"username\":\"Luis\",\"password\":\"secret123\"}"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.interests.categories[0]").value("Ciencia de Datos"))
+                                .andExpect(jsonPath("$.interests.categories[1]").value("Negocios"))
+                                .andExpect(jsonPath("$.interests.levels[0]").value("Principiante / Básico"))
+                                .andExpect(jsonPath("$.interests.durations[0]").value("Medio (1 - 6 semanas)"))
+                                .andExpect(jsonPath("$.interests.languages[0]").value("Español"))
+                                .andExpect(jsonPath("$.interests.subtitles[0]").value("Subtítulos en Español"))
+                                .andExpect(jsonPath("$.enrolledCourseIds[0]").value(101))
+                                .andExpect(jsonPath("$.enrolledCourseIds[1]").value(202));
+        }
+
+        @Test
         void myActiveCoursesDebeDevolverLaMatrículaConElCurso() throws Exception {
                 // 1. ESCENARIO REAL CON LOS DATOS ORIGINALES DE LUIS
                 Users user = new Users(1L, "Luis", "encoded", Role.STUDENT, "luis@example.com", true,

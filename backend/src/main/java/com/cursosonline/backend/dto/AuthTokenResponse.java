@@ -16,6 +16,14 @@ public record AuthTokenResponse(
         List<Long> enrolledCourseIds,
         String avatarPath,
         InterestDTO interests) {
+
+    public AuthTokenResponse {
+        tokenType = (tokenType == null || tokenType.isBlank()) ? "Bearer" : tokenType;
+        enrolledCourseIds = enrolledCourseIds != null ? List.copyOf(enrolledCourseIds) : List.of();
+        avatarPath = avatarPath != null ? avatarPath : "";
+        interests = interests != null ? interests : InterestDTO.empty();
+    }
+
     /**
      * Método estático de factoría corregido.
      * Se añade 'List<Long> enrolledCourseIds' en los parámetros de entrada

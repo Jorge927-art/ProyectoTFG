@@ -26,7 +26,6 @@ import java.security.Principal;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
 public class UserController {
 
     private final UserService userService;
@@ -116,6 +115,26 @@ public class UserController {
         List<com.cursosonline.backend.dto.NotificationDTO> notifications = userService
                 .getUserNotifications(principal.getName());
         return ResponseEntity.ok(notifications);
+    }
+
+    /**
+     * Endpoint de identidad del usuario autenticado para hidratación de sesión.
+     */
+    @GetMapping("/me")
+    public ResponseEntity<?> me(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
+        Users user = userService.findByUsername(principal.getName())
+                .orElseThrow(() -> new ServicesException("Usuario autenticado no encontrado"));
+
+        return ResponseEntity.ok(Map.of(
+                "userId", user.getUser_id(),
+                "username", user.getUsername(),
+                "role", user.getRole(),
+                "email", user.getEmail(),
+                "enabled", user.isEnabled()));
     }
 
     /**
@@ -209,6 +228,7 @@ public class UserController {
      * [UBICADO AL FINAL DE LOS GET PARA EVITAR INTERCEPTAR LAS RUTAS ESTÁTICAS]
      */
     @GetMapping("/{username}")
+    @PreAuthorize("hasRole('ADMIN') or #username == authentication.name")
     public ResponseEntity<Users> getUserProfile(@PathVariable String username) {
         Users user = userService.findByUsername(username)
                 .orElseThrow(() -> new ServicesException("Perfil de usuario no encontrado"));

@@ -12,6 +12,33 @@ interface AuthProviderProps {
 // Constante de inactividad: 15 minutos en milisegundos (Exigencia de Auditoría)
 const INACTIVITY_LIFESPAN_MS = 15 * 60 * 1000;
 
+const EMPTY_INTERESTS = {
+    categories: [] as string[],
+    levels: [] as string[],
+    durations: [] as string[],
+    languages: [] as string[],
+    subtitles: [] as string[],
+};
+
+function normalizeInterestArray(value: unknown): string[] {
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function normalizeInterests(interests: unknown) {
+    if (!interests || typeof interests !== 'object') {
+        return EMPTY_INTERESTS;
+    }
+
+    const source = interests as Record<string, unknown>;
+    return {
+        categories: normalizeInterestArray(source.categories),
+        levels: normalizeInterestArray(source.levels),
+        durations: normalizeInterestArray(source.durations),
+        languages: normalizeInterestArray(source.languages),
+        subtitles: normalizeInterestArray(source.subtitles),
+    };
+}
+
 /**
  * Provider global de autenticación adaptado para JWT con Activity Tracker [ADR-34].
  * Convierte el estado de autenticación y el token en la fuente de verdad de la SPA.
@@ -78,13 +105,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             role: tokenData.role,
             email: tokenData.email,
             enrolledCourseIds: tokenData.enrolledCourseIds || [],
-            interests: tokenData.interests || {
-                categories: [],
-                levels: [],
-                durations: [],
-                languages: [],
-                subtitles: [],
-            },
+            interests: normalizeInterests(tokenData.interests),
             photo: resolveAvatarUrl(tokenData.avatarPath),
             token: tokenData.accessToken,
             expiresAt: expiresAt
