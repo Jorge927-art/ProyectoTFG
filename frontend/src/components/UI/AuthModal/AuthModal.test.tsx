@@ -32,7 +32,24 @@ describe('AuthModal', () => {
         // Simulación por defecto de éxito inmediato 200 OK
         vi.mocked(apiClient.post).mockResolvedValue({
             status: 200,
-            data: { username: 'testuser', role: 'STUDENT' },
+            data: {
+                accessToken: 'jwt_test_token',
+                tokenType: 'Bearer',
+                expiresIn: 900,
+                userId: 1,
+                username: 'testuser',
+                role: 'STUDENT',
+                email: 'testuser@tfg.com',
+                enrolledCourseIds: [],
+                avatarPath: '',
+                interests: {
+                    categories: [],
+                    levels: [],
+                    durations: [],
+                    languages: [],
+                    subtitles: [],
+                },
+            },
         });
     });
 
@@ -105,7 +122,27 @@ describe('AuthModal', () => {
         expect(submitButton).toBeDisabled();
 
         // Resolvemos la promesa de forma manual simulando la respuesta estructurada del backend
-        resolvePromise({ status: 200, data: { username: 'testuser', role: 'STUDENT' } });
+        resolvePromise({
+            status: 200,
+            data: {
+                accessToken: 'jwt_test_token',
+                tokenType: 'Bearer',
+                expiresIn: 900,
+                userId: 1,
+                username: 'testuser',
+                role: 'STUDENT',
+                email: 'testuser@tfg.com',
+                enrolledCourseIds: [],
+                avatarPath: '',
+                interests: {
+                    categories: [],
+                    levels: [],
+                    durations: [],
+                    languages: [],
+                    subtitles: [],
+                },
+            }
+        });
 
         // Esperamos a que concluyan los efectos colaterales de cierre
         await waitFor(() => expect(mockOnClose).toHaveBeenCalled());

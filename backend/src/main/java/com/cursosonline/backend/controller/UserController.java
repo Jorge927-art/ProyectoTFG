@@ -1,6 +1,7 @@
 package com.cursosonline.backend.controller;
 
 import com.cursosonline.backend.dto.AuthTokenResponse;
+import com.cursosonline.backend.dto.InterestDTO;
 import com.cursosonline.backend.dto.LoginRequest;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.entities.Role;
@@ -48,6 +49,7 @@ public class UserController {
     public ResponseEntity<AuthTokenResponse> login(@RequestBody LoginRequest loginRequest) {
         Users user = userService.login(loginRequest.username(), loginRequest.password());
         List<Long> enrolledCourseIds = enrollmentRepository.findEnrolledCourseIdsByUserId(user.getUser_id());
+        InterestDTO interests = userService.getUserInterests(user.getUsername());
         String avatarPath = userProfileRepository.findById(user.getUser_id())
                 .map(profile -> profile.getAvatarPath() != null ? profile.getAvatarPath() : "")
                 .orElse("");
@@ -63,7 +65,7 @@ public class UserController {
                 : 0;
 
         return ResponseEntity.ok(AuthTokenResponse.from(user, jwtToken, expiresInSeconds, enrolledCourseIds,
-                avatarPath));
+                avatarPath, interests));
     }
 
     /**

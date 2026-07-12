@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InterestsModal } from './InterestsModal';
 import { apiClient } from '../../../services/apiClient';
+import { AuthProvider } from '@/auth';
 
 // Mock de archivo completo alineado con tu cliente HTTP personalizado
 vi.mock('../../../services/apiClient', () => ({
@@ -37,13 +38,30 @@ describe('InterestsModal Component - Suite de Pruebas Unitarias Estrictas', () =
     beforeEach(() => {
         vi.clearAllMocks();
         localStorage.clear();
-        localStorage.setItem('token', 'mock_jwt_token_luis'); // <── INYECCIÓN DEFENSIVA REQUERIDA
-        // Inyección asíncrona real en el useEffect del componente
-        vi.mocked(apiClient.get).mockResolvedValue({ data: mockLuisInterests });
+        localStorage.setItem('accessToken', 'mock_jwt_token_luis');
+        localStorage.setItem('auth_user', JSON.stringify({
+            userId: 2,
+            username: 'luis_student',
+            role: 'STUDENT',
+            email: 'luis@tfg.com',
+            interests: mockLuisInterests,
+        }));
+    });
+
+    const renderWithAuthProvider = () => {
+        render(
+            <AuthProvider>
+                <InterestsModal {...defaultProps} />
+            </AuthProvider>
+        );
+    };
+
+    beforeEach(() => {
+        vi.mocked(apiClient.post).mockResolvedValue({ data: { success: true } });
     });
 
     it('debe renderizar simétricamente las cabeceras estructurales de las tarjetas [ADR-13]', async () => {
-        render(<InterestsModal {...defaultProps} />);
+        renderWithAuthProvider();
 
         // Validamos el rol de accesibilidad limpiando interferencias de los iconos anidados
         await waitFor(() => {
@@ -56,19 +74,15 @@ describe('InterestsModal Component - Suite de Pruebas Unitarias Estrictas', () =
     });
 
     it('debe cumplir con las directrices de accesibilidad de Microsoft Edge Tools', () => {
-        render(<InterestsModal {...defaultProps} />);
+        renderWithAuthProvider();
 
         const buttons = screen.getAllByRole('button');
         const closeButton = buttons[0]; // Captura el primer botón del modal (el de cierre)
         expect(closeButton).toBeInTheDocument();
     });
 
-    it('debe hidratar correctamente el estado inicial de los elementos haciendo el fetch asíncrono real', async () => {
-        render(<InterestsModal {...defaultProps} />);
-
-        await waitFor(() => {
-            expect(apiClient.get).toHaveBeenCalledWith('/api/auth/my-interests');
-        });
+    it('debe hidratar correctamente el estado inicial desde la sesión sincronizada', async () => {
+        renderWithAuthProvider();
 
         // 1. Buscamos los botones por su texto en lugar de buscar por Label de checkbox
         const espanolBtn = await screen.findByText('Español');
@@ -81,7 +95,7 @@ describe('InterestsModal Component - Suite de Pruebas Unitarias Estrictas', () =
     });
 
     it('debe permitir la mutación del formulario y evitar colisiones de texto duplicado en el DOM', async () => {
-        render(<InterestsModal {...defaultProps} />);
+        renderWithAuthProvider();
         // Buscamos el botón interactivo que contiene exactamente el texto "Inglés"
         const inglesLanguageCheckbox = (await screen.findByText('Inglés')).closest('button');
 
@@ -97,7 +111,7 @@ describe('InterestsModal Component - Suite de Pruebas Unitarias Estrictas', () =
     it('debe activar el estado loading y deshabilitar los controles al ejecutar la persistencia en Postgres', async () => {
         vi.mocked(apiClient.post).mockReturnValue(new Promise((resolve) => setTimeout(resolve, 50)));
 
-        render(<InterestsModal {...defaultProps} />);
+        renderWithAuthProvider();
 
         const closeButton = screen.getAllByRole('button')[0];
         fireEvent.click(closeButton);

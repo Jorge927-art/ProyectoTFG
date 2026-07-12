@@ -78,6 +78,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             role: tokenData.role,
             email: tokenData.email,
             enrolledCourseIds: tokenData.enrolledCourseIds || [],
+            interests: tokenData.interests || {
+                categories: [],
+                levels: [],
+                durations: [],
+                languages: [],
+                subtitles: [],
+            },
             photo: resolveAvatarUrl(tokenData.avatarPath),
             token: tokenData.accessToken,
             expiresAt: expiresAt

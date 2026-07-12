@@ -301,6 +301,76 @@ Files
 ================================================================
 
 ================
+File: backend/src/main/java/com/cursosonline/backend/entities/Courses.java
+================
+package com.cursosonline.backend.entities;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Entity
+@Table(name = "courses")
+@Data // Genera getters, setters, toString, etc. automáticamente
+@NoArgsConstructor // Constructor vacío para JPA
+@AllArgsConstructor // Constructor con todos los campos
+/**
+ * Entidad que representa a los cursos disponibles en la plataforma.
+ * Contiene campos para el ID, título, URL, introducción, categoría,
+ * subcategoría, tipo de curso, idioma, idiomas de subtítulos, habilidades,
+ * instructores, calificación, número de espectadores, duración y sitio web.
+ */
+
+public class Courses {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long course_id;
+
+    @Column(nullable = true)
+    private String title;
+
+    @Column(nullable = true, columnDefinition = "TEXT")
+    private String url;
+
+    @Column(name = "short_intro", nullable = true, columnDefinition = "TEXT")
+    private String shortIntro;
+
+    @Column(nullable = true)
+    private String category;
+
+    @Column(name = "sub-category", nullable = true)
+    private String subCategory;
+
+    @Column(name = "course_type", nullable = true)
+    private String courseType;
+
+    @Column(nullable = true)
+    private String language;
+
+    @Column(name = "subtitle_languages", nullable = true, columnDefinition = "TEXT")
+    private String subtitleLanguages;
+
+    @Column(nullable = true, columnDefinition = "TEXT")
+    private String skills;
+
+    @Column(nullable = true, columnDefinition = "TEXT")
+    private String instructors;
+
+    @Column(nullable = true)
+    private Float rating;
+
+    @Column(name = "num of viewers", nullable = true)
+    private Integer numOfViewers;
+
+    @Column(nullable = true)
+    private Float duration;
+
+    @Column(nullable = true)
+    private String site;
+}
+
+================
 File: backend/src/main/java/com/cursosonline/backend/entities/Role.java
 ================
 package com.cursosonline.backend.entities;
@@ -5046,76 +5116,6 @@ public class CourseGrade {
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/entities/Courses.java
-================
-package com.cursosonline.backend.entities;
-
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Entity
-@Table(name = "courses")
-@Data // Genera getters, setters, toString, etc. automáticamente
-@NoArgsConstructor // Constructor vacío para JPA
-@AllArgsConstructor // Constructor con todos los campos
-/**
- * Entidad que representa a los cursos disponibles en la plataforma.
- * Contiene campos para el ID, título, URL, introducción, categoría,
- * subcategoría, tipo de curso, idioma, idiomas de subtítulos, habilidades,
- * instructores, calificación, número de espectadores, duración y sitio web.
- */
-
-public class Courses {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long course_id;
-
-    @Column(nullable = true)
-    private String title;
-
-    @Column(nullable = true, columnDefinition = "TEXT")
-    private String url;
-
-    @Column(name = "short_intro", nullable = true, columnDefinition = "TEXT")
-    private String shortIntro;
-
-    @Column(nullable = true)
-    private String category;
-
-    @Column(name = "sub-category", nullable = true)
-    private String subCategory;
-
-    @Column(name = "course_type", nullable = true)
-    private String courseType;
-
-    @Column(nullable = true)
-    private String language;
-
-    @Column(name = "subtitle_languages", nullable = true, columnDefinition = "TEXT")
-    private String subtitleLanguages;
-
-    @Column(nullable = true, columnDefinition = "TEXT")
-    private String skills;
-
-    @Column(nullable = true, columnDefinition = "TEXT")
-    private String instructors;
-
-    @Column(nullable = true)
-    private Float rating;
-
-    @Column(name = "num of viewers", nullable = true)
-    private Integer numOfViewers;
-
-    @Column(nullable = true)
-    private Float duration;
-
-    @Column(nullable = true)
-    private String site;
-}
-
-================
 File: backend/src/main/java/com/cursosonline/backend/entities/FolderType.java
 ================
 package com.cursosonline.backend.entities;
@@ -6073,6 +6073,183 @@ export { default as NavbarUser } from './NavbarUser';
 
 /** Componente que elige entre Navbar o NavbarUser según estado de sesión. */
 export { default as MainNavbar } from './MainNavbar';
+
+================
+File: frontend/src/components/Features.tsx
+================
+import type { ReactNode } from "react";
+import { Lightbulb, BarChart3, BookOpen, BellRing } from "lucide-react";
+import GenericHeader from "./ui/genericHeader/GenericHeader";
+
+interface FeatureItem {
+    /** Título del beneficio mostrado. */
+    title: string;
+    /** Descripción del beneficio. */
+    description: string;
+    /** Icono representativo del beneficio. */
+    icon: ReactNode;
+    /** Clases Tailwind para el fondo del bloque. */
+    bgColor: string;
+    /** Clases Tailwind para el color del título. */
+    titleColor: string;
+    /** Clases Tailwind para el color de la descripción. */
+    descriptionColor: string;
+    /** Clases Tailwind para el tamaño del título. */
+    titleSize: string;
+    /** Clases Tailwind para el tamaño de la descripción. */
+    descriptionSize: string;
+    /** Clases Tailwind para el padding interno. */
+    textPadding: string;
+}
+
+const featuresData: FeatureItem[] = [
+    {
+        title: "Recomendaciones Personalizadas",
+        description: "Descubre cursos adaptados a tus intereses y necesidades, gracias a nuestro sistema de recomendaciones.",
+        icon: <Lightbulb size={32} className="text-green-600" />,
+        bgColor: "bg-green-50",
+        titleColor: "text-green-900",
+        descriptionColor: "text-black",
+        titleSize: "text-xl md:text-2xl",
+        descriptionSize: "text-base md:text-lg",
+        textPadding: "p-8"
+    },
+    {
+        title: "Dashboard de Progreso",
+        description: "Monitorea tu avance con estadísticas detalladas y visualizaciones claras para mantenerte motivado y enfocado en tus objetivos.",
+        icon: <BarChart3 size={32} className="text-blue-600" />,
+        bgColor: "bg-blue-100",
+        titleColor: "text-blue-900",
+        descriptionColor: "text-black",
+        titleSize: "text-xl md:text-2xl",
+        descriptionSize: "text-base md:text-lg",
+        textPadding: "p-8"
+    },
+    {
+        title: "Biblioteca de Cursos",
+        description: "Accede a una amplia variedad de cursos en diferentes categorías, desde tecnología hasta arte, todos diseñados para potenciar tu aprendizaje.",
+        icon: <BookOpen size={32} className="text-purple-600" />,
+        bgColor: "bg-purple-100",
+        titleColor: "text-purple-900",
+        descriptionColor: "text-black",
+        titleSize: "text-xl md:text-2xl",
+        descriptionSize: "text-base md:text-lg",
+        textPadding: "p-8"
+    },
+    {
+        title: "Notificaciones Inteligentes",
+        description: "Recibe alertas personalizadas sobre nuevos cursos, promociones y actualizaciones relevantes para ti, directamente en tu panel.",
+        icon: <BellRing size={32} className="text-red-600" />,
+        bgColor: "bg-red-100",
+        titleColor: "text-red-900",
+        descriptionColor: "text-black",
+        titleSize: "text-xl md:text-2xl",
+        descriptionSize: "text-base md:text-lg",
+        textPadding: "p-8"
+    }
+];
+
+/**
+ * Sección de funcionalidades de la plataforma.
+ * Renderiza un conjunto de cards con icono, título y descripción.
+ */
+const Features = () => {
+    return (
+        <section className="grid grid-cols-1 md:grid-cols-4 border-b border-gray-200 py-20 px-4 gap-8">
+            {featuresData.map((item) => (
+                <GenericHeader key={item.title} {...item} />
+            ))}
+        </section>
+    );
+};
+
+export default Features;
+
+================
+File: frontend/src/components/Testimonials.tsx
+================
+import GenericHeader from "./ui/genericHeader/GenericHeader";
+
+interface Testimony {
+    /** Nombre completo del usuario que aporta el testimonio. */
+    name: string;
+    /** Cargo o perfil profesional del usuario. */
+    role: string;
+    /** Texto del testimonio que describe la experiencia del usuario. */
+    testimony: string;
+    /** Ruta de la imagen asociada al usuario. */
+    image: string;
+    /** Texto alternativo para la imagen del usuario. */
+    imageAlt: string;
+}
+
+/**
+ * Testimonios de ejemplo renderizados de forma estática.
+ * La definición fuera del componente evita recrear el arreglo en cada render.
+ */
+const testimonials: Testimony[] = [
+    {
+        name: "María López",
+        role: "Estudiante de Diseño Gráfico",
+        testimony:
+            "Gracias a COLE, pude descubrir cursos que se adaptaban perfectamente a mis intereses. La plataforma me recomendó un curso de diseño UX que me ayudó a conseguir mi primer trabajo en una agencia de diseño.",
+        image: "/pexels-pavel-danilyuk-7675023.jpg",
+        imageAlt: "Foto de María López",
+    },
+    {
+        name: "Carlos Gómez",
+        role: "Ingeniero de Software",
+        testimony:
+            "Los cursos de COLE me han ayudado a mejorar mis habilidades técnicas y a mantenerme actualizado con las últimas tendencias en desarrollo de software.",
+        image: "/headway-5QgIuuBxKwM-unsplash.jpg",
+        imageAlt: "Foto de Carlos Gómez",
+    },
+    {
+        name: "Ana Martínez",
+        role: "Profesora de Educación Primaria",
+        testimony:
+            "Como docente, COLE me ha sido de gran ayuda para encontrar cursos que me permiten mejorar mis métodos de enseñanza y ofrecer una educación más innovadora a mis alumnos.",
+        image: "/pexels-cottonbro-4769486.png",
+        imageAlt: "Foto de Ana Martínez",
+    },
+];
+
+/**
+ * Sección de testimonios de usuarios.
+ * Renderiza tarjetas con texto e imagen para cada testimonio.
+ */
+const Testimonials = () => {
+    return (
+        <section className="py-20 flex flex-col gap-16 px-4">
+            <h2 className="text-3xl md:text-5xl font-bold text-center text-gray-800">
+                Lo que dicen nuestros usuarios
+            </h2>
+            {testimonials.map((testimony, index) => (
+                <GenericHeader
+                    key={testimony.name}
+                    title={testimony.name}
+                    subtitle={testimony.role}
+                    description={testimony.testimony}
+                    imageSrc={testimony.image}
+                    imageAlt={testimony.imageAlt}
+                    align={index % 2 === 0 ? "left" : "right"}
+                    // Alternamos la alineación para aportar variedad visual en la sección.
+                    bgColor="bg-white"
+                    titleColor="text-gray-900"
+                    subtitleColor="text-gray-700"
+                    descriptionColor="text-gray-600"
+                    titleSize="text-3xl md:text-4xl"
+                    descriptionSize="text-base md:text-lg"
+                    textPadding="p-10 md:p-24"
+                    imageMinHeight="min-h-[300px] md:min-h-[400px]"
+                    containerClass="border-b border-gray-200 rounded-xl shadow-sm overflow-hidden"
+                />
+            ))}
+        </section>
+    );
+};
+
+export default Testimonials;
 
 ================
 File: frontend/src/routes/guards/index.ts
@@ -7443,143 +7620,6 @@ class CourseStatsControllerTest {
                 .andExpect(status().isNotFound());
     }
 
-}
-
-================
-File: backend/src/test/java/com/cursosonline/backend/services/RecommendationServiceTest.java
-================
-package com.cursosonline.backend.services;
-
-import com.cursosonline.backend.dto.RecommendationDTO;
-import com.cursosonline.backend.entities.Courses;
-import com.cursosonline.backend.entities.Enrollment;
-import com.cursosonline.backend.entities.Interest;
-import com.cursosonline.backend.entities.Users;
-import com.cursosonline.backend.repository.CoursesRepository;
-import com.cursosonline.backend.repository.EnrollmentRepository;
-import com.cursosonline.backend.repository.InterestRepository;
-import com.cursosonline.backend.repository.UserRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
-
-@ExtendWith(MockitoExtension.class)
-@DisplayName("Auditoría de Calidad: Pruebas del Motor de Recomendación Algorítmica")
-class RecommendationServiceTest {
-
-    @Mock
-    private CoursesRepository coursesRepository;
-
-    @Mock
-    private EnrollmentRepository enrollmentRepository;
-
-    @Mock
-    private InterestRepository interestRepository;
-
-    @Mock
-    private UserRepository userRepository;
-
-    @InjectMocks
-    private RecommendationService recommendationService;
-
-    private Users mockUser;
-    private Courses course1;
-    private Courses course2;
-    private Interest userInterests;
-
-    @BeforeEach
-    void setUp() {
-        // 1. Configurar usuario de prueba
-        mockUser = new Users();
-        mockUser.setUser_id(1L);
-        mockUser.setUsername("luis");
-
-        // 2. Configurar catálogo de cursos (Dataset de Coursera) [3]
-        course1 = new Courses();
-        course1.setCourse_id(101L);
-        course1.setTitle("Data Science Avanzado");
-        course1.setCategory("Ciencia de Datos");
-        course1.setInstructors("Profesor A");
-
-        course2 = new Courses();
-        course2.setCourse_id(102L);
-        course2.setTitle("Introducción al Marketing");
-        course2.setCategory("Negocios");
-        course2.setInstructors("Profesor B");
-
-        // 3. Configurar intereses del alumno [4, 5]
-        userInterests = new Interest();
-        userInterests.setUser(mockUser);
-        userInterests.setCategory(new ArrayList<>(Arrays.asList("Ciencia de Datos")));
-    }
-
-    @Test
-    @DisplayName("Debe recomendar cursos basados en la categoría de interés")
-    void getRecommendations_Success() {
-        // Arrange
-        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
-        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
-        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>()); // Sin matrículas previas
-        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1, course2));
-
-        // Act
-        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
-
-        // Assert
-        assertNotNull(results);
-        assertFalse(results.isEmpty());
-        assertEquals("Data Science Avanzado", results.get(0).title());
-        assertTrue(results.get(0).reason().contains("Ciencia de Datos"), "El motivo debe mencionar la categoría");
-        assertEquals(101L, results.get(0).id());
-    }
-
-    @Test
-    @DisplayName("Debe excluir estrictamente cursos donde el alumno ya está matriculado [ADR-32]")
-    void getRecommendations_ExcludesEnrolled() {
-        // Arrange
-        Enrollment existingEnrollment = new Enrollment();
-        existingEnrollment.setCourse(course1); // El alumno ya está en el curso 101
-
-        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
-        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
-        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(Arrays.asList(existingEnrollment));
-        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1, course2));
-
-        // Act
-        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
-
-        // Assert
-        // Solo debe quedar el curso 2 (Marketing), aunque no sea su interés principal, 
-        // porque el curso 1 (Data Science) debe ser excluido.
-        boolean containsEnrolled = results.stream().anyMatch(r -> r.id().equals(101L));
-        assertFalse(containsEnrolled, "No debe recomendar cursos ya matriculados");
-    }
-
-    @Test
-    @DisplayName("Debe devolver lista vacía si el usuario no existe")
-    void getRecommendations_UserNotFound() {
-        // Arrange
-        when(userRepository.findByUsername("desconocido")).thenReturn(Optional.empty());
-
-        // Act
-        List<RecommendationDTO> results = recommendationService.getRecommendations("desconocido");
-
-        // Assert
-        assertTrue(results.isEmpty());
-        verify(coursesRepository, never()).findAll();
-    }
 }
 
 ================
@@ -14115,181 +14155,65 @@ describe('Auditoría de Calidad Frontend: Blindaje de Sesión y Activity Tracker
 });
 
 ================
-File: frontend/src/components/Features.tsx
+File: frontend/src/components/Hero.tsx
 ================
-import type { ReactNode } from "react";
-import { Lightbulb, BarChart3, BookOpen, BellRing } from "lucide-react";
 import GenericHeader from "./ui/genericHeader/GenericHeader";
 
-interface FeatureItem {
-    /** Título del beneficio mostrado. */
+interface HeroContent {
+    /** Título principal del hero. */
     title: string;
-    /** Descripción del beneficio. */
+    /** Subtítulo descriptivo de la plataforma. */
+    subtitle: string;
+    /** Texto principal que comunica el valor del servicio. */
     description: string;
-    /** Icono representativo del beneficio. */
-    icon: ReactNode;
-    /** Clases Tailwind para el fondo del bloque. */
-    bgColor: string;
-    /** Clases Tailwind para el color del título. */
-    titleColor: string;
-    /** Clases Tailwind para el color de la descripción. */
-    descriptionColor: string;
-    /** Clases Tailwind para el tamaño del título. */
-    titleSize: string;
-    /** Clases Tailwind para el tamaño de la descripción. */
-    descriptionSize: string;
-    /** Clases Tailwind para el padding interno. */
-    textPadding: string;
-}
-
-const featuresData: FeatureItem[] = [
-    {
-        title: "Recomendaciones Personalizadas",
-        description: "Descubre cursos adaptados a tus intereses y necesidades, gracias a nuestro sistema de recomendaciones.",
-        icon: <Lightbulb size={32} className="text-green-600" />,
-        bgColor: "bg-green-50",
-        titleColor: "text-green-900",
-        descriptionColor: "text-black",
-        titleSize: "text-xl md:text-2xl",
-        descriptionSize: "text-base md:text-lg",
-        textPadding: "p-8"
-    },
-    {
-        title: "Dashboard de Progreso",
-        description: "Monitorea tu avance con estadísticas detalladas y visualizaciones claras para mantenerte motivado y enfocado en tus objetivos.",
-        icon: <BarChart3 size={32} className="text-blue-600" />,
-        bgColor: "bg-blue-100",
-        titleColor: "text-blue-900",
-        descriptionColor: "text-black",
-        titleSize: "text-xl md:text-2xl",
-        descriptionSize: "text-base md:text-lg",
-        textPadding: "p-8"
-    },
-    {
-        title: "Biblioteca de Cursos",
-        description: "Accede a una amplia variedad de cursos en diferentes categorías, desde tecnología hasta arte, todos diseñados para potenciar tu aprendizaje.",
-        icon: <BookOpen size={32} className="text-purple-600" />,
-        bgColor: "bg-purple-100",
-        titleColor: "text-purple-900",
-        descriptionColor: "text-black",
-        titleSize: "text-xl md:text-2xl",
-        descriptionSize: "text-base md:text-lg",
-        textPadding: "p-8"
-    },
-    {
-        title: "Notificaciones Inteligentes",
-        description: "Recibe alertas personalizadas sobre nuevos cursos, promociones y actualizaciones relevantes para ti, directamente en tu panel.",
-        icon: <BellRing size={32} className="text-red-600" />,
-        bgColor: "bg-red-100",
-        titleColor: "text-red-900",
-        descriptionColor: "text-black",
-        titleSize: "text-xl md:text-2xl",
-        descriptionSize: "text-base md:text-lg",
-        textPadding: "p-8"
-    }
-];
-
-/**
- * Sección de funcionalidades de la plataforma.
- * Renderiza un conjunto de cards con icono, título y descripción.
- */
-const Features = () => {
-    return (
-        <section className="grid grid-cols-1 md:grid-cols-4 border-b border-gray-200 py-20 px-4 gap-8">
-            {featuresData.map((item) => (
-                <GenericHeader key={item.title} {...item} />
-            ))}
-        </section>
-    );
-};
-
-export default Features;
-
-================
-File: frontend/src/components/Testimonials.tsx
-================
-import GenericHeader from "./ui/genericHeader/GenericHeader";
-
-interface Testimony {
-    /** Nombre completo del usuario que aporta el testimonio. */
-    name: string;
-    /** Cargo o perfil profesional del usuario. */
-    role: string;
-    /** Texto del testimonio que describe la experiencia del usuario. */
-    testimony: string;
-    /** Ruta de la imagen asociada al usuario. */
-    image: string;
-    /** Texto alternativo para la imagen del usuario. */
+    /** Ruta de la imagen de cabecera. */
+    imageSrc: string;
+    /** Texto alternativo para la imagen. */
     imageAlt: string;
+    /** Clase Tailwind para el fondo del hero. */
+    bgColor: string;
+    /** Clase Tailwind para el color del título. */
+    titleColor: string;
+    /** Clase Tailwind para el color del subtítulo. */
+    subtitleColor: string;
+    /** Clase Tailwind para el color de la descripción. */
+    descriptionColor: string;
+    /** Clase Tailwind para el padding interno del contenido. */
+    textPadding: string;
+    /** Clase Tailwind para el tamaño del título. */
+    titleSize: string;
+    /** Clase Tailwind para el tamaño de la descripción. */
+    descriptionSize: string;
+    /** Clase Tailwind para la altura mínima de la imagen. */
+    imageMinHeight: string;
 }
 
-/**
- * Testimonios de ejemplo renderizados de forma estática.
- * La definición fuera del componente evita recrear el arreglo en cada render.
- */
-const testimonials: Testimony[] = [
-    {
-        name: "María López",
-        role: "Estudiante de Diseño Gráfico",
-        testimony:
-            "Gracias a COLE, pude descubrir cursos que se adaptaban perfectamente a mis intereses. La plataforma me recomendó un curso de diseño UX que me ayudó a conseguir mi primer trabajo en una agencia de diseño.",
-        image: "/pexels-pavel-danilyuk-7675023.jpg",
-        imageAlt: "Foto de María López",
-    },
-    {
-        name: "Carlos Gómez",
-        role: "Ingeniero de Software",
-        testimony:
-            "Los cursos de COLE me han ayudado a mejorar mis habilidades técnicas y a mantenerme actualizado con las últimas tendencias en desarrollo de software.",
-        image: "/headway-5QgIuuBxKwM-unsplash.jpg",
-        imageAlt: "Foto de Carlos Gómez",
-    },
-    {
-        name: "Ana Martínez",
-        role: "Profesora de Educación Primaria",
-        testimony:
-            "Como docente, COLE me ha sido de gran ayuda para encontrar cursos que me permiten mejorar mis métodos de enseñanza y ofrecer una educación más innovadora a mis alumnos.",
-        image: "/pexels-cottonbro-4769486.png",
-        imageAlt: "Foto de Ana Martínez",
-    },
-];
-
-/**
- * Sección de testimonios de usuarios.
- * Renderiza tarjetas con texto e imagen para cada testimonio.
- */
-const Testimonials = () => {
-    return (
-        <section className="py-20 flex flex-col gap-16 px-4">
-            <h2 className="text-3xl md:text-5xl font-bold text-center text-gray-800">
-                Lo que dicen nuestros usuarios
-            </h2>
-            {testimonials.map((testimony, index) => (
-                <GenericHeader
-                    key={testimony.name}
-                    title={testimony.name}
-                    subtitle={testimony.role}
-                    description={testimony.testimony}
-                    imageSrc={testimony.image}
-                    imageAlt={testimony.imageAlt}
-                    align={index % 2 === 0 ? "left" : "right"}
-                    // Alternamos la alineación para aportar variedad visual en la sección.
-                    bgColor="bg-white"
-                    titleColor="text-gray-900"
-                    subtitleColor="text-gray-700"
-                    descriptionColor="text-gray-600"
-                    titleSize="text-3xl md:text-4xl"
-                    descriptionSize="text-base md:text-lg"
-                    textPadding="p-10 md:p-24"
-                    imageMinHeight="min-h-[300px] md:min-h-[400px]"
-                    containerClass="border-b border-gray-200 rounded-xl shadow-sm overflow-hidden"
-                />
-            ))}
-        </section>
-    );
+const heroContent: HeroContent = {
+    title: "COLE",
+    subtitle: "Cursos OnLine Educativos",
+    description:
+        "Tu plataforma de aprendizaje personalizada, para descubrir cursos adaptados a tus intereses y necesidades.",
+    imageSrc: "/glasses-with-pile-books.png",
+    imageAlt: "Banner principal de COLE",
+    bgColor: "bg-blue-800",
+    titleColor: "text-blue-300",
+    subtitleColor: "text-white",
+    descriptionColor: "text-white",
+    textPadding: "p-8 md:p-16",
+    titleSize: "text-4xl md:text-7xl lg:text-8xl",
+    descriptionSize: "text-lg md:text-2xl",
+    imageMinHeight: "min-h-[300px] md:min-h-[450px]",
 };
 
-export default Testimonials;
+/**
+ * Hero principal de la página.
+ * Renderiza una cabecera de bienvenida con imagen y texto promocional.
+ */
+const Hero = () => {
+    return <GenericHeader {...heroContent} />;
+};
+
+export default Hero;
 
 ================
 File: frontend/src/routes/guards/ProtectedRoute.tsx
@@ -14772,6 +14696,17 @@ apiClient.interceptors.response.use(
         return Promise.reject(error);
     }
 );
+
+================
+File: frontend/src/App.tsx
+================
+import AppRoutes from "@/routes";
+
+function App() {
+  return <AppRoutes />;
+}
+
+export default App;
 
 ================
 File: frontend/src/main.tsx
@@ -15433,284 +15368,6 @@ public record AuthTokenResponse(
 }
 
 ================
-File: backend/src/main/java/com/cursosonline/backend/services/RecommendationService.java
-================
-package com.cursosonline.backend.services;
-
-import com.cursosonline.backend.dto.RecommendationDTO;
-import com.cursosonline.backend.entities.Courses;
-import com.cursosonline.backend.entities.Enrollment;
-import com.cursosonline.backend.entities.Interest;
-import com.cursosonline.backend.entities.Users;
-import com.cursosonline.backend.repository.CoursesRepository;
-import com.cursosonline.backend.repository.InterestRepository;
-import com.cursosonline.backend.repository.EnrollmentRepository;
-import com.cursosonline.backend.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.*;
-import java.util.stream.Collectors;
-
-@Service
-@RequiredArgsConstructor
-public class RecommendationService {
-
-    private final CoursesRepository coursesRepository;
-    private final InterestRepository interestRepository;
-    private final EnrollmentRepository enrollmentRepository;
-    private final UserRepository userRepository;
-
-    @Transactional(readOnly = true)
-    public List<RecommendationDTO> getRecommendations(String username) {
-        if (username == null || username.trim().isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        Users user = userRepository.findByUsername(username.trim()).orElse(null);
-        if (user == null || user.getUser_id() == null) {
-            return Collections.emptyList();
-        }
-
-        Interest interests = interestRepository.findByUser_Username(username.trim()).orElse(null);
-        List<Enrollment> myEnrollments = enrollmentRepository.findAllByUserIdWithCourses(user.getUser_id());
-        List<Courses> allCourses = coursesRepository.findAll();
-
-        return buildRecommendations(interests, myEnrollments, allCourses);
-    }
-
-    @Transactional(readOnly = true)
-    public List<RecommendationDTO> getRecommendationsForUser(Long userId) {
-        if (userId == null) {
-            return Collections.emptyList();
-        }
-
-        Interest interests = interestRepository.findById(userId).orElse(null);
-        List<Enrollment> myEnrollments = enrollmentRepository.findAllByUserIdWithCourses(userId);
-        List<Courses> allCourses = coursesRepository.findAll();
-
-        return buildRecommendations(interests, myEnrollments, allCourses);
-    }
-
-    private List<RecommendationDTO> buildRecommendations(
-            Interest interests,
-            List<Enrollment> myEnrollments,
-            List<Courses> allCourses) {
-
-        List<Enrollment> safeEnrollments = myEnrollments != null ? myEnrollments : Collections.emptyList();
-        List<Courses> safeCourses = allCourses != null ? allCourses : Collections.emptyList();
-
-        Set<Long> excludedIds = safeEnrollments.stream()
-                .filter(e -> e.getCourse() != null)
-                .map(e -> e.getCourse().getCourse_id())
-                .collect(Collectors.toSet());
-
-        // FASE DE TRADUCCIÓN: Extracción previa y unificación a Tokens nativos
-        // independientes
-        Set<String> userCategoryTokens = interests != null ? normalizeCollection(interests.getCategory())
-                : Collections.emptySet();
-        Set<String> userLevelTokens = interests != null ? normalizeCollection(interests.getCourse_type())
-                : Collections.emptySet();
-        Set<String> userLanguageTokens = interests != null ? normalizeCollection(interests.getLanguage())
-                : Collections.emptySet();
-        Set<String> userSubtitleTokens = interests != null
-                ? normalizeCollection(interests.getSubtitle_languages())
-                : Collections.emptySet();
-        List<String> rawDurations = interests != null ? interests.getDuration() : Collections.emptyList();
-
-        return safeCourses.stream()
-                .filter(course -> course != null && course.getCourse_id() != null)
-                .filter(course -> !excludedIds.contains(course.getCourse_id()))
-                .map(course -> calculateAffinityWithTokens(course, userCategoryTokens, userLevelTokens,
-                        userLanguageTokens, userSubtitleTokens, rawDurations, safeEnrollments))
-                .sorted((dto1, dto2) -> Integer.compare(dto2.score(), dto1.score()))
-                .limit(6)
-                .collect(Collectors.toList());
-    }
-
-    private RecommendationDTO calculateAffinityWithTokens(
-            Courses course,
-            Set<String> userCategoryTokens,
-            Set<String> userLevelTokens,
-            Set<String> userLanguageTokens,
-            Set<String> userSubtitleTokens,
-            List<String> rawDurations,
-            List<Enrollment> myEnrollments) {
-
-        double score = 0;
-        StringBuilder reason = new StringBuilder();
-
-        // 1. Evaluación de Precondiciones emparejando a nivel de Token Semántico local
-        String courseCategoryToken = normalizeSingle(course.getCategory());
-        boolean isCategoryMatch = userCategoryTokens.contains(courseCategoryToken);
-
-        String courseLevelToken = normalizeSingle(course.getCourseType());
-        boolean isLevelMatch = userLevelTokens.contains("ALL_LEVELS") || userLevelTokens.contains(courseLevelToken);
-
-        String courseLanguageToken = normalizeSingle(course.getLanguage());
-        boolean isLanguageMatch = userLanguageTokens.contains(courseLanguageToken);
-
-        // Subtítulos: Comprobamos inclusión lingüística nativa mediante tokens
-        // normalizados
-        boolean isSubtitleMatch = false;
-        if (course.getSubtitleLanguages() != null && !userSubtitleTokens.isEmpty()) {
-            String cleanSubs = course.getSubtitleLanguages().toLowerCase();
-            isSubtitleMatch = userSubtitleTokens.stream()
-                    .anyMatch(token -> {
-                        if (token.equals("spanish") && (cleanSubs.contains("esp") || cleanSubs.contains("spa")))
-                            return true;
-                        if (token.equals("english") && (cleanSubs.contains("ing") || cleanSubs.contains("eng")))
-                            return true;
-                        if (token.equals("portuguese") && (cleanSubs.contains("por") || cleanSubs.contains("pt")))
-                            return true;
-                        if (token.equals("japanese") && (cleanSubs.contains("jap") || cleanSubs.contains("jp")))
-                            return true;
-                        if (token.equals("french") && (cleanSubs.contains("fra") || cleanSubs.contains("fre")))
-                            return true;
-                        return cleanSubs.contains(token.toLowerCase());
-                    });
-        }
-        boolean isDurationMatch = checkDurationMatch(course.getDuration(), rawDurations);
-
-        // 2. MODELO POR ESCALONES CRECIENTES DEL HISTORIAL ACADÉMICO
-        int historyScore = 0;
-        int maxProgressInTemplate = 0;
-
-        if (myEnrollments != null && !myEnrollments.isEmpty() && course.getCategory() != null) {
-            for (Enrollment enrollment : myEnrollments) {
-                if (enrollment.getCourse() != null && enrollment.getCourse().getCategory() != null) {
-                    String enrollmentCatToken = normalizeSingle(enrollment.getCourse().getCategory());
-                    if (courseCategoryToken.equals(enrollmentCatToken)) {
-                        int currentProgress = enrollment.getProgress_percentage();
-                        if (currentProgress > maxProgressInTemplate) {
-                            maxProgressInTemplate = currentProgress;
-                        }
-                    }
-                }
-            }
-
-            if (maxProgressInTemplate >= 100)
-                historyScore = 25;
-            else if (maxProgressInTemplate >= 75)
-                historyScore = 15;
-            else if (maxProgressInTemplate >= 50)
-                historyScore = 8;
-        }
-
-        // 3. Acumulación Estricta de la Matriz de Pesos (Total 100 pts)
-        if (isCategoryMatch)
-            score += 30;
-        score += historyScore;
-        if (isLevelMatch)
-            score += 20;
-        if (isLanguageMatch)
-            score += 15;
-        if (isSubtitleMatch)
-            score += 10;
-        if (isDurationMatch)
-            score += 5;
-
-        // 4. GENERACIÓN DE EXPLICABILIDAD DINÁMICA
-        if (isCategoryMatch) {
-            reason.append("Coincide con tus categorías preferidas (").append(course.getCategory()).append("). ");
-        }
-
-        if (maxProgressInTemplate >= 100) {
-            reason.append("Premio por finalizar cursos de esta área al 100%. ");
-        } else if (maxProgressInTemplate >= 50) {
-            reason.append("Basado en tu progreso activo en asignaturas similares. ");
-        }
-
-        if (isLevelMatch) {
-            reason.append("Adecuado a tu nivel de experiencia. ");
-        }
-
-        if (isLanguageMatch) {
-            reason.append("Disponible en tu idioma nativo. ");
-        }
-
-        if (isSubtitleMatch) {
-            reason.append("Soporta subtítulos de traducción. ");
-        }
-
-        if (isDurationMatch) {
-            reason.append("Se ajusta a tu disponibilidad de tiempo.");
-        }
-
-        String finalReason = reason.toString().trim();
-        if (finalReason.isEmpty()) {
-            finalReason = "Sugerencia personalizada basada en tus intereses.";
-        }
-
-        return new RecommendationDTO(course, (int) score, finalReason);
-    }
-
-    private static boolean checkDurationMatch(Number courseHours, List<String> preferredDurations) {
-        if (courseHours == null || preferredDurations == null || preferredDurations.isEmpty())
-            return false;
-        int hours = courseHours.intValue();
-        return preferredDurations.stream().anyMatch(target -> {
-            if (target == null)
-                return false;
-            if (hours < 10 && target.contains("Corto"))
-                return true;
-            if (hours >= 10 && hours <= 40 && target.contains("Medio"))
-                return true;
-            return hours > 40 && target.contains("Largo");
-        });
-    }
-
-    /**
-     * ABSORCIÓN NATIVA DE SEMANTIC NORMALIZER:
-     * Convierte una cadena de texto libre en un token unificado e invariable.
-     */
-    private static String normalizeSingle(String input) {
-        if (input == null) {
-            return "";
-        }
-        return input.trim()
-                .toLowerCase()
-                .replace("á", "a")
-                .replace("é", "e")
-                .replace("í", "i")
-                .replace("ó", "o")
-                .replace("ú", "u")
-                .replaceAll("[^a-z0-8_\\s-]", "")
-                .replaceAll("\\s+", "_");
-    }
-
-    /**
-     * ABSORCIÓN NATIVA DE SEMANTIC NORMALIZER:
-     * Transforma colecciones o estructuras delimitadas por comas en colecciones de
-     * tokens semánticos únicos.
-     * Blindado con supresión de alertas de casteo y validación anticipada de nulos.
-     */
-    @SuppressWarnings("unchecked")
-    private static Set<String> normalizeCollection(Object input) {
-        if (input == null) {
-            return Collections.emptySet();
-        }
-
-        List<String> rawElements;
-        if (input instanceof List) {
-            rawElements = (List<String>) input;
-        } else if (input instanceof String) {
-            rawElements = Arrays.asList(((String) input).split(","));
-        } else {
-            return Collections.emptySet();
-        }
-
-        return rawElements.stream()
-                .filter(Objects::nonNull) // 1. Filtro preventivo de nulos en la cabecera del Stream
-                .map(s -> s.trim()) // 2. Ejecución segura para evitar alertas de puntero nulo
-                .filter(s -> !s.isEmpty())
-                .map(RecommendationService::normalizeSingle)
-                .collect(Collectors.toSet());
-    }
-}
-
-================
 File: backend/src/test/java/com/cursosonline/backend/controller/DocumentControllerTest.java
 ================
 package com.cursosonline.backend.controller;
@@ -16001,6 +15658,143 @@ public class DocumentControllerTest {
 }
 
 ================
+File: backend/src/test/java/com/cursosonline/backend/services/RecommendationServiceTest.java
+================
+package com.cursosonline.backend.services;
+
+import com.cursosonline.backend.dto.RecommendationDTO;
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.entities.Interest;
+import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.repository.CoursesRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.InterestRepository;
+import com.cursosonline.backend.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("Auditoría de Calidad: Pruebas del Motor de Recomendación Algorítmica")
+class RecommendationServiceTest {
+
+    @Mock
+    private CoursesRepository coursesRepository;
+
+    @Mock
+    private EnrollmentRepository enrollmentRepository;
+
+    @Mock
+    private InterestRepository interestRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @InjectMocks
+    private RecommendationService recommendationService;
+
+    private Users mockUser;
+    private Courses course1;
+    private Courses course2;
+    private Interest userInterests;
+
+    @BeforeEach
+    void setUp() {
+        // 1. Configurar usuario de prueba
+        mockUser = new Users();
+        mockUser.setUser_id(1L);
+        mockUser.setUsername("luis");
+
+        // 2. Configurar catálogo de cursos (Dataset de Coursera) [3]
+        course1 = new Courses();
+        course1.setCourse_id(101L);
+        course1.setTitle("Data Science Avanzado");
+        course1.setCategory("Ciencia de Datos");
+        course1.setInstructors("Profesor A");
+
+        course2 = new Courses();
+        course2.setCourse_id(102L);
+        course2.setTitle("Introducción al Marketing");
+        course2.setCategory("Negocios");
+        course2.setInstructors("Profesor B");
+
+        // 3. Configurar intereses del alumno [4, 5]
+        userInterests = new Interest();
+        userInterests.setUser(mockUser);
+        userInterests.setCategory(new ArrayList<>(Arrays.asList("Ciencia de Datos")));
+    }
+
+    @Test
+    @DisplayName("Debe recomendar cursos basados en la categoría de interés")
+    void getRecommendations_Success() {
+        // Arrange
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>()); // Sin matrículas previas
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1, course2));
+
+        // Act
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        // Assert
+        assertNotNull(results);
+        assertFalse(results.isEmpty());
+        assertEquals("Data Science Avanzado", results.get(0).title());
+        assertTrue(results.get(0).reason().contains("Ciencia de Datos"), "El motivo debe mencionar la categoría");
+        assertEquals(101L, results.get(0).id());
+    }
+
+    @Test
+    @DisplayName("Debe excluir estrictamente cursos donde el alumno ya está matriculado [ADR-32]")
+    void getRecommendations_ExcludesEnrolled() {
+        // Arrange
+        Enrollment existingEnrollment = new Enrollment();
+        existingEnrollment.setCourse(course1); // El alumno ya está en el curso 101
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(Arrays.asList(existingEnrollment));
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1, course2));
+
+        // Act
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        // Assert
+        // Solo debe quedar el curso 2 (Marketing), aunque no sea su interés principal, 
+        // porque el curso 1 (Data Science) debe ser excluido.
+        boolean containsEnrolled = results.stream().anyMatch(r -> r.id().equals(101L));
+        assertFalse(containsEnrolled, "No debe recomendar cursos ya matriculados");
+    }
+
+    @Test
+    @DisplayName("Debe devolver lista vacía si el usuario no existe")
+    void getRecommendations_UserNotFound() {
+        // Arrange
+        when(userRepository.findByUsername("desconocido")).thenReturn(Optional.empty());
+
+        // Act
+        List<RecommendationDTO> results = recommendationService.getRecommendations("desconocido");
+
+        // Assert
+        assertTrue(results.isEmpty());
+        verify(coursesRepository, never()).findAll();
+    }
+}
+
+================
 File: frontend/src/auth/index.ts
 ================
 export { AuthProvider } from './AuthProvider'; 
@@ -16084,67 +15878,6 @@ describe('Navbar Component', () => {
         expect(screen.queryByText(/Iniciar Sesión/i)).not.toBeInTheDocument();
     });
 });
-
-================
-File: frontend/src/components/Hero.tsx
-================
-import GenericHeader from "./ui/genericHeader/GenericHeader";
-
-interface HeroContent {
-    /** Título principal del hero. */
-    title: string;
-    /** Subtítulo descriptivo de la plataforma. */
-    subtitle: string;
-    /** Texto principal que comunica el valor del servicio. */
-    description: string;
-    /** Ruta de la imagen de cabecera. */
-    imageSrc: string;
-    /** Texto alternativo para la imagen. */
-    imageAlt: string;
-    /** Clase Tailwind para el fondo del hero. */
-    bgColor: string;
-    /** Clase Tailwind para el color del título. */
-    titleColor: string;
-    /** Clase Tailwind para el color del subtítulo. */
-    subtitleColor: string;
-    /** Clase Tailwind para el color de la descripción. */
-    descriptionColor: string;
-    /** Clase Tailwind para el padding interno del contenido. */
-    textPadding: string;
-    /** Clase Tailwind para el tamaño del título. */
-    titleSize: string;
-    /** Clase Tailwind para el tamaño de la descripción. */
-    descriptionSize: string;
-    /** Clase Tailwind para la altura mínima de la imagen. */
-    imageMinHeight: string;
-}
-
-const heroContent: HeroContent = {
-    title: "COLE",
-    subtitle: "Cursos OnLine Educativos",
-    description:
-        "Tu plataforma de aprendizaje personalizada, para descubrir cursos adaptados a tus intereses y necesidades.",
-    imageSrc: "/glasses-with-pile-books.png",
-    imageAlt: "Banner principal de COLE",
-    bgColor: "bg-blue-800",
-    titleColor: "text-blue-300",
-    subtitleColor: "text-white",
-    descriptionColor: "text-white",
-    textPadding: "p-8 md:p-16",
-    titleSize: "text-4xl md:text-7xl lg:text-8xl",
-    descriptionSize: "text-lg md:text-2xl",
-    imageMinHeight: "min-h-[300px] md:min-h-[450px]",
-};
-
-/**
- * Hero principal de la página.
- * Renderiza una cabecera de bienvenida con imagen y texto promocional.
- */
-const Hero = () => {
-    return <GenericHeader {...heroContent} />;
-};
-
-export default Hero;
 
 ================
 File: frontend/src/routes/pages/student/components/DocumentManager.test.tsx
@@ -17304,6 +17037,284 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 }
 
 ================
+File: backend/src/main/java/com/cursosonline/backend/services/RecommendationService.java
+================
+package com.cursosonline.backend.services;
+
+import com.cursosonline.backend.dto.RecommendationDTO;
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.entities.Interest;
+import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.repository.CoursesRepository;
+import com.cursosonline.backend.repository.InterestRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class RecommendationService {
+
+    private final CoursesRepository coursesRepository;
+    private final InterestRepository interestRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final UserRepository userRepository;
+
+    @Transactional(readOnly = true)
+    public List<RecommendationDTO> getRecommendations(String username) {
+        if (username == null || username.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Users user = userRepository.findByUsername(username.trim()).orElse(null);
+        if (user == null || user.getUser_id() == null) {
+            return Collections.emptyList();
+        }
+
+        Interest interests = interestRepository.findByUser_Username(username.trim()).orElse(null);
+        List<Enrollment> myEnrollments = enrollmentRepository.findAllByUserIdWithCourses(user.getUser_id());
+        List<Courses> allCourses = coursesRepository.findAll();
+
+        return buildRecommendations(interests, myEnrollments, allCourses);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RecommendationDTO> getRecommendationsForUser(Long userId) {
+        if (userId == null) {
+            return Collections.emptyList();
+        }
+
+        Interest interests = interestRepository.findById(userId).orElse(null);
+        List<Enrollment> myEnrollments = enrollmentRepository.findAllByUserIdWithCourses(userId);
+        List<Courses> allCourses = coursesRepository.findAll();
+
+        return buildRecommendations(interests, myEnrollments, allCourses);
+    }
+
+    private List<RecommendationDTO> buildRecommendations(
+            Interest interests,
+            List<Enrollment> myEnrollments,
+            List<Courses> allCourses) {
+
+        List<Enrollment> safeEnrollments = myEnrollments != null ? myEnrollments : Collections.emptyList();
+        List<Courses> safeCourses = allCourses != null ? allCourses : Collections.emptyList();
+
+        Set<Long> excludedIds = safeEnrollments.stream()
+                .filter(e -> e.getCourse() != null)
+                .map(e -> e.getCourse().getCourse_id())
+                .collect(Collectors.toSet());
+
+        // FASE DE TRADUCCIÓN: Extracción previa y unificación a Tokens nativos
+        // independientes
+        Set<String> userCategoryTokens = interests != null ? normalizeCollection(interests.getCategory())
+                : Collections.emptySet();
+        Set<String> userLevelTokens = interests != null ? normalizeCollection(interests.getCourse_type())
+                : Collections.emptySet();
+        Set<String> userLanguageTokens = interests != null ? normalizeCollection(interests.getLanguage())
+                : Collections.emptySet();
+        Set<String> userSubtitleTokens = interests != null
+                ? normalizeCollection(interests.getSubtitle_languages())
+                : Collections.emptySet();
+        List<String> rawDurations = interests != null ? interests.getDuration() : Collections.emptyList();
+
+        return safeCourses.stream()
+                .filter(course -> course != null && course.getCourse_id() != null)
+                .filter(course -> !excludedIds.contains(course.getCourse_id()))
+                .map(course -> calculateAffinityWithTokens(course, userCategoryTokens, userLevelTokens,
+                        userLanguageTokens, userSubtitleTokens, rawDurations, safeEnrollments))
+                .sorted((dto1, dto2) -> Integer.compare(dto2.score(), dto1.score()))
+                .limit(6)
+                .collect(Collectors.toList());
+    }
+
+    private RecommendationDTO calculateAffinityWithTokens(
+            Courses course,
+            Set<String> userCategoryTokens,
+            Set<String> userLevelTokens,
+            Set<String> userLanguageTokens,
+            Set<String> userSubtitleTokens,
+            List<String> rawDurations,
+            List<Enrollment> myEnrollments) {
+
+        double score = 0;
+        StringBuilder reason = new StringBuilder();
+
+        // 1. Evaluación de Precondiciones emparejando a nivel de Token Semántico local
+        String courseCategoryToken = normalizeSingle(course.getCategory());
+        boolean isCategoryMatch = userCategoryTokens.contains(courseCategoryToken);
+
+        String courseLevelToken = normalizeSingle(course.getCourseType());
+        boolean isLevelMatch = userLevelTokens.contains("ALL_LEVELS") || userLevelTokens.contains(courseLevelToken);
+
+        String courseLanguageToken = normalizeSingle(course.getLanguage());
+        boolean isLanguageMatch = userLanguageTokens.contains(courseLanguageToken);
+
+        // Subtítulos: Comprobamos inclusión lingüística nativa mediante tokens
+        // normalizados
+        boolean isSubtitleMatch = false;
+        if (course.getSubtitleLanguages() != null && !userSubtitleTokens.isEmpty()) {
+            String cleanSubs = course.getSubtitleLanguages().toLowerCase();
+            isSubtitleMatch = userSubtitleTokens.stream()
+                    .anyMatch(token -> {
+                        if (token.equals("spanish") && (cleanSubs.contains("esp") || cleanSubs.contains("spa")))
+                            return true;
+                        if (token.equals("english") && (cleanSubs.contains("ing") || cleanSubs.contains("eng")))
+                            return true;
+                        if (token.equals("portuguese") && (cleanSubs.contains("por") || cleanSubs.contains("pt")))
+                            return true;
+                        if (token.equals("japanese") && (cleanSubs.contains("jap") || cleanSubs.contains("jp")))
+                            return true;
+                        if (token.equals("french") && (cleanSubs.contains("fra") || cleanSubs.contains("fre")))
+                            return true;
+                        return cleanSubs.contains(token.toLowerCase());
+                    });
+        }
+        boolean isDurationMatch = checkDurationMatch(course.getDuration(), rawDurations);
+
+        // 2. MODELO POR ESCALONES CRECIENTES DEL HISTORIAL ACADÉMICO
+        int historyScore = 0;
+        int maxProgressInTemplate = 0;
+
+        if (myEnrollments != null && !myEnrollments.isEmpty() && course.getCategory() != null) {
+            for (Enrollment enrollment : myEnrollments) {
+                if (enrollment.getCourse() != null && enrollment.getCourse().getCategory() != null) {
+                    String enrollmentCatToken = normalizeSingle(enrollment.getCourse().getCategory());
+                    if (courseCategoryToken.equals(enrollmentCatToken)) {
+                        int currentProgress = enrollment.getProgress_percentage();
+                        if (currentProgress > maxProgressInTemplate) {
+                            maxProgressInTemplate = currentProgress;
+                        }
+                    }
+                }
+            }
+
+            if (maxProgressInTemplate >= 100)
+                historyScore = 25;
+            else if (maxProgressInTemplate >= 75)
+                historyScore = 15;
+            else if (maxProgressInTemplate >= 50)
+                historyScore = 8;
+        }
+
+        // 3. Acumulación Estricta de la Matriz de Pesos (Total 100 pts)
+        if (isCategoryMatch)
+            score += 30;
+        score += historyScore;
+        if (isLevelMatch)
+            score += 20;
+        if (isLanguageMatch)
+            score += 15;
+        if (isSubtitleMatch)
+            score += 10;
+        if (isDurationMatch)
+            score += 5;
+
+        // 4. GENERACIÓN DE EXPLICABILIDAD DINÁMICA
+        if (isCategoryMatch) {
+            reason.append("Coincide con tus categorías preferidas (").append(course.getCategory()).append("). ");
+        }
+
+        if (maxProgressInTemplate >= 100) {
+            reason.append("Premio por finalizar cursos de esta área al 100%. ");
+        } else if (maxProgressInTemplate >= 50) {
+            reason.append("Basado en tu progreso activo en asignaturas similares. ");
+        }
+
+        if (isLevelMatch) {
+            reason.append("Adecuado a tu nivel de experiencia. ");
+        }
+
+        if (isLanguageMatch) {
+            reason.append("Disponible en tu idioma nativo. ");
+        }
+
+        if (isSubtitleMatch) {
+            reason.append("Soporta subtítulos de traducción. ");
+        }
+
+        if (isDurationMatch) {
+            reason.append("Se ajusta a tu disponibilidad de tiempo.");
+        }
+
+        String finalReason = reason.toString().trim();
+        if (finalReason.isEmpty()) {
+            finalReason = "Sugerencia personalizada basada en tus intereses.";
+        }
+
+        return new RecommendationDTO(course, (int) score, finalReason);
+    }
+
+    private static boolean checkDurationMatch(Number courseHours, List<String> preferredDurations) {
+        if (courseHours == null || preferredDurations == null || preferredDurations.isEmpty())
+            return false;
+        int hours = courseHours.intValue();
+        return preferredDurations.stream().anyMatch(target -> {
+            if (target == null)
+                return false;
+            if (hours < 10 && target.contains("Corto"))
+                return true;
+            if (hours >= 10 && hours <= 40 && target.contains("Medio"))
+                return true;
+            return hours > 40 && target.contains("Largo");
+        });
+    }
+
+    /**
+     * ABSORCIÓN NATIVA DE SEMANTIC NORMALIZER:
+     * Convierte una cadena de texto libre en un token unificado e invariable.
+     */
+    private static String normalizeSingle(String input) {
+        if (input == null) {
+            return "";
+        }
+        return input.trim()
+                .toLowerCase()
+                .replace("á", "a")
+                .replace("é", "e")
+                .replace("í", "i")
+                .replace("ó", "o")
+                .replace("ú", "u")
+                .replaceAll("[^a-z0-8_\\s-]", "")
+                .replaceAll("\\s+", "_");
+    }
+
+    /**
+     * ABSORCIÓN NATIVA DE SEMANTIC NORMALIZER:
+     * Transforma colecciones o estructuras delimitadas por comas en colecciones de
+     * tokens semánticos únicos.
+     * Blindado con supresión de alertas de casteo y validación anticipada de nulos.
+     */
+    @SuppressWarnings("unchecked")
+    private static Set<String> normalizeCollection(Object input) {
+        if (input == null) {
+            return Collections.emptySet();
+        }
+
+        List<String> rawElements;
+        if (input instanceof List) {
+            rawElements = (List<String>) input;
+        } else if (input instanceof String) {
+            rawElements = Arrays.asList(((String) input).split(","));
+        } else {
+            return Collections.emptySet();
+        }
+
+        return rawElements.stream()
+                .filter(Objects::nonNull) // 1. Filtro preventivo de nulos en la cabecera del Stream
+                .map(s -> s.trim()) // 2. Ejecución segura para evitar alertas de puntero nulo
+                .filter(s -> !s.isEmpty())
+                .map(RecommendationService::normalizeSingle)
+                .collect(Collectors.toSet());
+    }
+}
+
+================
 File: backend/src/test/java/com/cursosonline/backend/controller/UserControllerTest.java
 ================
 package com.cursosonline.backend.controller;
@@ -17984,17 +17995,6 @@ export interface CourseStatsInfo {
     platform: string;
     category: string;
 }
-
-================
-File: frontend/src/App.tsx
-================
-import AppRoutes from "@/routes";
-
-function App() {
-  return <AppRoutes />;
-}
-
-export default App;
 
 ================
 File: backend/src/main/java/com/cursosonline/backend/repository/EnrollmentRepository.java
@@ -19657,6 +19657,60 @@ const AppRoutes = () => {
 export default AppRoutes;
 
 ================
+File: backend/src/main/java/com/cursosonline/backend/repository/CoursesRepository.java
+================
+package com.cursosonline.backend.repository;
+
+import com.cursosonline.backend.entities.Courses;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface CoursesRepository extends JpaRepository<Courses, Long> {
+
+        /**
+         * Búsqueda predictiva optimizada y corregida.
+         * Evalúa el título y la categoría en simetría estricta con el Service de Java.
+         */
+        @Query("SELECT c FROM Courses c WHERE " +
+                        "LOWER(c.title) LIKE LOWER(:formattedKeyword) OR " +
+                        "LOWER(c.category) LIKE LOWER(:formattedKeyword) " +
+                        "ORDER BY " +
+                        "CASE WHEN LOWER(c.title) LIKE LOWER(:startKeyword) THEN 1 " +
+                        "     WHEN LOWER(c.title) LIKE LOWER(:formattedKeyword) THEN 2 " +
+                        "     ELSE 3 END, c.title ASC")
+        org.springframework.data.domain.Page<Courses> searchCoursesPredictive(
+                        @Param("formattedKeyword") String formattedKeyword,
+                        @Param("startKeyword") String startKeyword,
+                        Pageable pageable);
+
+        /**
+         * Consulta analítica de agregación para el panel estadístico [ADR-41].
+         * Cruza el catálogo con las métricas locales de matrículas, notas y
+         * valoraciones.
+         * Sincronizado estrictamente con course_grades y academic_evaluations en
+         * PostgreSQL.
+         */
+        @Query(value = "SELECT c.course_id as courseId, " +
+                        "AVG(CASE WHEN cg.score IS NOT NULL AND cg.score <> '' THEN CAST(cg.score AS double precision) ELSE null END) as averageGrade, "
+                        +
+                        "COUNT(DISTINCT e.enrollmentid) as localEnrollments, " +
+                        "AVG(ae.course_score) as communityRating, " +
+                        "AVG(ae.instructor_score) as instructorRating, " +
+                        "c.site as platform, " +
+                        "c.category as category " +
+                        "FROM courses c " +
+                        "LEFT JOIN enrollment e ON e.course_id = c.course_id " +
+                        "LEFT JOIN course_grades cg ON cg.enrollment_id = e.enrollmentid " +
+                        "LEFT JOIN academic_evaluations ae ON ae.course_id = c.course_id " +
+                        "WHERE c.course_id = :courseId " +
+                        "GROUP BY c.course_id, c.site, c.category", nativeQuery = true)
+        java.util.Map<String, Object> getCourseAnalyticalStatsNative(@Param("courseId") Long courseId);
+
+}
+
+================
 File: backend/src/test/java/com/cursosonline/backend/UserServiceTest.java
 ================
 package com.cursosonline.backend;
@@ -19975,6 +20029,60 @@ export interface AuthContextType {
 }
 
 ================
+File: backend/src/main/resources/application.properties
+================
+spring.application.name=backend
+
+# Perfil activo por defecto para entorno local.
+spring.profiles.default=dev
+
+# Importa variables desde un archivo local opcional (formato .properties).
+spring.config.import=optional:file:.env.properties
+
+# Configuración de base de datos delegada por perfil (dev/prod).
+
+# Estrategia de creación de tablas (usa 'update' para no borrar datos o 'create' para limpiar)
+spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+
+# Mostrar el SQL generado por Hibernate en la consola
+spring.jpa.show-sql=${SPRING_JPA_SHOW_SQL:true}
+
+# Formatear el SQL para una mejor legibilidad 
+spring.jpa.properties.hibernate.format_sql=${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:true}
+
+# Desactivar open-in-view para evitar consultas durante el renderizado de vistas.
+spring.jpa.open-in-view=false
+
+# Configuración de logging para mostrar los parámetros de las consultas SQL
+logging.level.org.hibernate.orm.jdbc.bind=${LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_BIND:trace}
+
+# Evita que Hibernate convierta CamelCase a snake_case automáticamente
+spring.jpa.hibernate.naming.physical-strategy=org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+
+# Propiedades base para la infraestructura JWT. Pueden sobreescribirse con variables de entorno.
+app.jwt.secret=${APP_JWT_SECRET:change-me-in-local-and-tests-please}
+app.jwt.issuer=${APP_JWT_ISSUER:cursosonline-backend}
+app.jwt.access-token-expiration-minutes=${APP_JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:15}
+app.jwt.refresh-token-expiration-days=${APP_JWT_REFRESH_TOKEN_EXPIRATION_DAYS:30}
+app.jwt.clock-skew-seconds=${APP_JWT_CLOCK_SKEW_SECONDS:60}
+
+
+# Configuración de almacenamiento de archivos para fotos y documentos
+spring.servlet.multipart.location=../uploads
+
+# Opcional pero recomendado: Límites de tamaño para el archivo y la petición
+spring.servlet.multipart.max-file-size=5MB
+spring.servlet.multipart.max-request-size=5MB
+
+# Fuerza el log detallado de la seguridad y el procesamiento de peticiones
+logging.level.org.springframework.web=DEBUG
+logging.level.org.springframework.security=DEBUG
+logging.level.org.hibernate.SQL=DEBUG
+
+# Muestra los errores de serialización de Jackson en consola
+logging.level.org.springframework.http.converter.json=TRACE
+
+================
 File: frontend/src/routes/pages/student/components/CourseCatalog.tsx
 ================
 import { Search, Loader2, Star, PlusCircle, CheckCircle2 } from 'lucide-react';
@@ -20149,60 +20257,6 @@ export const CourseCatalog = ({
         </GenericCard>
     );
 };
-
-================
-File: backend/src/main/java/com/cursosonline/backend/repository/CoursesRepository.java
-================
-package com.cursosonline.backend.repository;
-
-import com.cursosonline.backend.entities.Courses;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
-public interface CoursesRepository extends JpaRepository<Courses, Long> {
-
-        /**
-         * Búsqueda predictiva optimizada y corregida.
-         * Evalúa el título y la categoría en simetría estricta con el Service de Java.
-         */
-        @Query("SELECT c FROM Courses c WHERE " +
-                        "LOWER(c.title) LIKE LOWER(:formattedKeyword) OR " +
-                        "LOWER(c.category) LIKE LOWER(:formattedKeyword) " +
-                        "ORDER BY " +
-                        "CASE WHEN LOWER(c.title) LIKE LOWER(:startKeyword) THEN 1 " +
-                        "     WHEN LOWER(c.title) LIKE LOWER(:formattedKeyword) THEN 2 " +
-                        "     ELSE 3 END, c.title ASC")
-        org.springframework.data.domain.Page<Courses> searchCoursesPredictive(
-                        @Param("formattedKeyword") String formattedKeyword,
-                        @Param("startKeyword") String startKeyword,
-                        Pageable pageable);
-
-        /**
-         * Consulta analítica de agregación para el panel estadístico [ADR-41].
-         * Cruza el catálogo con las métricas locales de matrículas, notas y
-         * valoraciones.
-         * Sincronizado estrictamente con course_grades y academic_evaluations en
-         * PostgreSQL.
-         */
-        @Query(value = "SELECT c.course_id as courseId, " +
-                        "AVG(CASE WHEN cg.score IS NOT NULL AND cg.score <> '' THEN CAST(cg.score AS double precision) ELSE null END) as averageGrade, "
-                        +
-                        "COUNT(DISTINCT e.enrollmentid) as localEnrollments, " +
-                        "AVG(ae.course_score) as communityRating, " +
-                        "AVG(ae.instructor_score) as instructorRating, " +
-                        "c.site as platform, " +
-                        "c.category as category " +
-                        "FROM courses c " +
-                        "LEFT JOIN enrollment e ON e.course_id = c.course_id " +
-                        "LEFT JOIN course_grades cg ON cg.enrollment_id = e.enrollmentid " +
-                        "LEFT JOIN academic_evaluations ae ON ae.course_id = c.course_id " +
-                        "WHERE c.course_id = :courseId " +
-                        "GROUP BY c.course_id, c.site, c.category", nativeQuery = true)
-        java.util.Map<String, Object> getCourseAnalyticalStatsNative(@Param("courseId") Long courseId);
-
-}
 
 ================
 File: frontend/src/routes/pages/student/InterestsModal.tsx
@@ -20476,60 +20530,6 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
 };
 
 ================
-File: backend/src/main/resources/application.properties
-================
-spring.application.name=backend
-
-# Perfil activo por defecto para entorno local.
-spring.profiles.default=dev
-
-# Importa variables desde un archivo local opcional (formato .properties).
-spring.config.import=optional:file:.env.properties
-
-# Configuración de base de datos delegada por perfil (dev/prod).
-
-# Estrategia de creación de tablas (usa 'update' para no borrar datos o 'create' para limpiar)
-spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
-
-# Mostrar el SQL generado por Hibernate en la consola
-spring.jpa.show-sql=${SPRING_JPA_SHOW_SQL:true}
-
-# Formatear el SQL para una mejor legibilidad 
-spring.jpa.properties.hibernate.format_sql=${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:true}
-
-# Desactivar open-in-view para evitar consultas durante el renderizado de vistas.
-spring.jpa.open-in-view=false
-
-# Configuración de logging para mostrar los parámetros de las consultas SQL
-logging.level.org.hibernate.orm.jdbc.bind=${LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_BIND:trace}
-
-# Evita que Hibernate convierta CamelCase a snake_case automáticamente
-spring.jpa.hibernate.naming.physical-strategy=org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
-
-# Propiedades base para la infraestructura JWT. Pueden sobreescribirse con variables de entorno.
-app.jwt.secret=${APP_JWT_SECRET:change-me-in-local-and-tests-please}
-app.jwt.issuer=${APP_JWT_ISSUER:cursosonline-backend}
-app.jwt.access-token-expiration-minutes=${APP_JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:15}
-app.jwt.refresh-token-expiration-days=${APP_JWT_REFRESH_TOKEN_EXPIRATION_DAYS:30}
-app.jwt.clock-skew-seconds=${APP_JWT_CLOCK_SKEW_SECONDS:60}
-
-
-# Configuración de almacenamiento de archivos para fotos y documentos
-spring.servlet.multipart.location=../uploads
-
-# Opcional pero recomendado: Límites de tamaño para el archivo y la petición
-spring.servlet.multipart.max-file-size=5MB
-spring.servlet.multipart.max-request-size=5MB
-
-# Fuerza el log detallado de la seguridad y el procesamiento de peticiones
-logging.level.org.springframework.web=DEBUG
-logging.level.org.springframework.security=DEBUG
-logging.level.org.hibernate.SQL=DEBUG
-
-# Muestra los errores de serialización de Jackson en consola
-logging.level.org.springframework.http.converter.json=TRACE
-
-================
 File: frontend/src/auth/AuthProvider.tsx
 ================
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
@@ -20729,160 +20729,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 };
 
 ================
-File: frontend/src/routes/pages/professor/ProfessorDashboard.tsx
-================
-import { useState } from 'react';
-import { BookOpen, ArrowRight, Activity } from 'lucide-react';
-import GenericButton from '../../../components/ui/genericButton/GenericButton';
-import GenericCard from '../../../components/ui/genericCard/GenericCard';
-import ProfessorLayout from '../../layouts/DashboardLayout';
-
-// Importación del componente core unificado según [ADR-13]
-import GenericHeader from '../../../components/ui/genericHeader/GenericHeader';
-
-// IMPORTACIÓN CENTRALIZADA DE DOMINIOS [DRY]
-import type { TaughtCourse, TeacherMetric } from '../../../services/userDomains';
-
-const ProfessorDashboard = () => {
-    // 1. ESTADO DE ASIGNATURAS IMPARTIDAS POR EL PROFESOR
-    const [myCourses] = useState<TaughtCourse[]>([
-        { id: 1, title: "Desarrollo Backend con Spring Boot y Java", studentsCount: 45, averageProgress: 75, category: "Programación" },
-        { id: 3, title: "Persistencia de Datos con PostgreSQL y Hibernate", studentsCount: 28, averageProgress: 60, category: "Bases de Datos" }
-    ]);
-
-    // 2. ESTADO DE MÉTRICAS Y CONTROL DE ALUMNOS
-    const [metrics] = useState<TeacherMetric[]>([
-        { id: 201, title: "Alumnos Activos esta semana", value: "68 / 73", description: "93% de participación en plataforma", type: "actividad" },
-        { id: 202, title: "Tareas pendientes de revisión", value: 12, description: "Proyectos finales del módulo Backend", type: "tareas" }
-    ]);
-
-    return (
-        <ProfessorLayout>
-            {/* 
-               CABECERA PRINCIPAL UNIFICADA [ADR-13]:
-               Sustitución del bloque h1/p manual por el componente core GenericHeader.
-            */}
-            <GenericHeader
-                title="Panel de Control Docente"
-                titleSize="text-xl font-bold"
-                titleColor="text-slate-800"
-                textPadding="p-0"
-                containerClass="border-b border-slate-100 pb-4 mb-6"
-                align="left"
-                description={
-                    <p className="text-xs text-slate-400 mt-0.5">
-                        Gestiona el progreso de tus asignaturas asignadas y revisa las entregas
-                    </p>
-                }
-            />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-                {/* COLUMNA IZQUIERDA: ASIGNATURAS QUE IMPARTE */}
-                <div className="lg:col-span-2">
-                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                        <BookOpen size={20} className="text-blue-600" />
-                        <span>Tus asignaturas asignadas</span>
-                        <span className="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-bold">{myCourses.length}</span>
-                    </h2>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {myCourses.map((course) => {
-                            const progressPct = course.averageProgress;
-                            let tailwindWidthClass = 'w-0';
-
-                            if (progressPct >= 100) tailwindWidthClass = 'w-full';
-                            else if (progressPct >= 90) tailwindWidthClass = 'w-11/12';
-                            else if (progressPct >= 80) tailwindWidthClass = 'w-4/5';
-                            else if (progressPct >= 75) tailwindWidthClass = 'w-3/4';
-                            else if (progressPct >= 70) tailwindWidthClass = 'w-8/12';
-                            else if (progressPct >= 60) tailwindWidthClass = 'w-3/5';
-                            else if (progressPct >= 50) tailwindWidthClass = 'w-1/2';
-                            else if (progressPct >= 40) tailwindWidthClass = 'w-2/5';
-                            else if (progressPct >= 30) tailwindWidthClass = 'w-3/12';
-                            else if (progressPct >= 25) tailwindWidthClass = 'w-1/4';
-                            else if (progressPct >= 20) tailwindWidthClass = 'w-2/12';
-                            else if (progressPct >= 10) tailwindWidthClass = 'w-1/12';
-
-                            return (
-                                <GenericCard key={course.id}>
-                                    <div className="mb-4">
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-slate-100 text-slate-600">
-                                            {course.category}
-                                        </span>
-                                        <h3 className="text-base font-bold text-slate-800 leading-tight mt-2">
-                                            {course.title}
-                                        </h3>
-                                        <p className="text-xs text-slate-400 mt-1">
-                                            Total: {course.studentsCount} alumnos matriculados
-                                        </p>
-                                    </div>
-
-                                    <div className="mt-4 pt-3 border-t border-slate-50">
-                                        <div className="flex justify-between text-xs text-slate-500 mb-1">
-                                            <span>Progreso medio del grupo</span>
-                                            <span className="font-bold text-blue-600">{course.averageProgress}%</span>
-                                        </div>
-                                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
-                                            <div className={`bg-blue-600 h-full transition-all duration-500 ${tailwindWidthClass}`} />
-                                        </div>
-                                        <GenericButton
-                                            variant="dark"
-                                            label="Gestionar Curso"
-                                            icon={<ArrowRight size={14} />}
-                                            className="w-full flex-row-reverse! gap-1! text-xs! font-bold! py-2! px-3! rounded-lg! justify-center"
-                                        />
-                                    </div>
-                                </GenericCard>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* COLUMNA DERECHA: RESUMEN DE MÉTRICAS */}
-                <div className="lg:col-span-1 bg-white p-5 rounded-xl border border-slate-100 shadow-sm h-fit">
-                    <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
-                        <Activity size={18} className="text-blue-600" />
-                        <span>Métricas de Docencia</span>
-                    </h2>
-
-                    <div className="flex flex-col gap-3">
-                        {metrics.map((metric) => (
-                            <GenericCard key={metric.id}>
-                                <div className="mb-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide ${metric.type === 'actividad' ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
-                                            }`}>
-                                            {metric.type === 'actividad' ? "Rendimiento" : "Correcciones"}
-                                        </span>
-                                        <div className="flex items-center gap-0.5 text-slate-800 text-base font-extrabold">
-                                            <span>{metric.value}</span>
-                                        </div>
-                                    </div>
-                                    <h3 className="text-base font-bold text-slate-800 leading-tight">
-                                        {metric.title}
-                                    </h3>
-                                    <p className="text-xs text-slate-400 mt-1">Estado actual</p>
-                                </div>
-
-                                <div className="mt-4 pt-3 border-t border-slate-50">
-                                    <p className="text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
-                                        📊 {metric.description}
-                                    </p>
-                                </div>
-                            </GenericCard>
-                        ))}
-                    </div>
-                </div>
-
-            </div>
-        </ProfessorLayout>
-    );
-};
-
-export default ProfessorDashboard;
-
-================
 File: frontend/src/routes/pages/student/components/EnrolledCourses.tsx
 ================
 import { useState } from 'react'; // Añadido useEffect para capturar la estampa de tiempo
@@ -21060,6 +20906,160 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh }:
 };
 
 ================
+File: frontend/src/routes/pages/professor/ProfessorDashboard.tsx
+================
+import { useState } from 'react';
+import { BookOpen, ArrowRight, Activity } from 'lucide-react';
+import GenericButton from '../../../components/ui/genericButton/GenericButton';
+import GenericCard from '../../../components/ui/genericCard/GenericCard';
+import ProfessorLayout from '../../layouts/DashboardLayout';
+
+// Importación del componente core unificado según [ADR-13]
+import GenericHeader from '../../../components/ui/genericHeader/GenericHeader';
+
+// IMPORTACIÓN CENTRALIZADA DE DOMINIOS [DRY]
+import type { TaughtCourse, TeacherMetric } from '../../../services/userDomains';
+
+const ProfessorDashboard = () => {
+    // 1. ESTADO DE ASIGNATURAS IMPARTIDAS POR EL PROFESOR
+    const [myCourses] = useState<TaughtCourse[]>([
+        { id: 1, title: "Desarrollo Backend con Spring Boot y Java", studentsCount: 45, averageProgress: 75, category: "Programación" },
+        { id: 3, title: "Persistencia de Datos con PostgreSQL y Hibernate", studentsCount: 28, averageProgress: 60, category: "Bases de Datos" }
+    ]);
+
+    // 2. ESTADO DE MÉTRICAS Y CONTROL DE ALUMNOS
+    const [metrics] = useState<TeacherMetric[]>([
+        { id: 201, title: "Alumnos Activos esta semana", value: "68 / 73", description: "93% de participación en plataforma", type: "actividad" },
+        { id: 202, title: "Tareas pendientes de revisión", value: 12, description: "Proyectos finales del módulo Backend", type: "tareas" }
+    ]);
+
+    return (
+        <ProfessorLayout>
+            {/* 
+               CABECERA PRINCIPAL UNIFICADA [ADR-13]:
+               Sustitución del bloque h1/p manual por el componente core GenericHeader.
+            */}
+            <GenericHeader
+                title="Panel de Control Docente"
+                titleSize="text-xl font-bold"
+                titleColor="text-slate-800"
+                textPadding="p-0"
+                containerClass="border-b border-slate-100 pb-4 mb-6"
+                align="left"
+                description={
+                    <p className="text-xs text-slate-400 mt-0.5">
+                        Gestiona el progreso de tus asignaturas asignadas y revisa las entregas
+                    </p>
+                }
+            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+                {/* COLUMNA IZQUIERDA: ASIGNATURAS QUE IMPARTE */}
+                <div className="lg:col-span-2">
+                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <BookOpen size={20} className="text-blue-600" />
+                        <span>Tus asignaturas asignadas</span>
+                        <span className="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-bold">{myCourses.length}</span>
+                    </h2>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {myCourses.map((course) => {
+                            const progressPct = course.averageProgress;
+                            let tailwindWidthClass = 'w-0';
+
+                            if (progressPct >= 100) tailwindWidthClass = 'w-full';
+                            else if (progressPct >= 90) tailwindWidthClass = 'w-11/12';
+                            else if (progressPct >= 80) tailwindWidthClass = 'w-4/5';
+                            else if (progressPct >= 75) tailwindWidthClass = 'w-3/4';
+                            else if (progressPct >= 70) tailwindWidthClass = 'w-8/12';
+                            else if (progressPct >= 60) tailwindWidthClass = 'w-3/5';
+                            else if (progressPct >= 50) tailwindWidthClass = 'w-1/2';
+                            else if (progressPct >= 40) tailwindWidthClass = 'w-2/5';
+                            else if (progressPct >= 30) tailwindWidthClass = 'w-3/12';
+                            else if (progressPct >= 25) tailwindWidthClass = 'w-1/4';
+                            else if (progressPct >= 20) tailwindWidthClass = 'w-2/12';
+                            else if (progressPct >= 10) tailwindWidthClass = 'w-1/12';
+
+                            return (
+                                <GenericCard key={course.id}>
+                                    <div className="mb-4">
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-slate-100 text-slate-600">
+                                            {course.category}
+                                        </span>
+                                        <h3 className="text-base font-bold text-slate-800 leading-tight mt-2">
+                                            {course.title}
+                                        </h3>
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            Total: {course.studentsCount} alumnos matriculados
+                                        </p>
+                                    </div>
+
+                                    <div className="mt-4 pt-3 border-t border-slate-50">
+                                        <div className="flex justify-between text-xs text-slate-500 mb-1">
+                                            <span>Progreso medio del grupo</span>
+                                            <span className="font-bold text-blue-600">{course.averageProgress}%</span>
+                                        </div>
+                                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
+                                            <div className={`bg-blue-600 h-full transition-all duration-500 ${tailwindWidthClass}`} />
+                                        </div>
+                                        <GenericButton
+                                            variant="dark"
+                                            label="Gestionar Curso"
+                                            icon={<ArrowRight size={14} />}
+                                            className="w-full flex-row-reverse! gap-1! text-xs! font-bold! py-2! px-3! rounded-lg! justify-center"
+                                        />
+                                    </div>
+                                </GenericCard>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* COLUMNA DERECHA: RESUMEN DE MÉTRICAS */}
+                <div className="lg:col-span-1 bg-white p-5 rounded-xl border border-slate-100 shadow-sm h-fit">
+                    <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <Activity size={18} className="text-blue-600" />
+                        <span>Métricas de Docencia</span>
+                    </h2>
+
+                    <div className="flex flex-col gap-3">
+                        {metrics.map((metric) => (
+                            <GenericCard key={metric.id}>
+                                <div className="mb-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide ${metric.type === 'actividad' ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
+                                            }`}>
+                                            {metric.type === 'actividad' ? "Rendimiento" : "Correcciones"}
+                                        </span>
+                                        <div className="flex items-center gap-0.5 text-slate-800 text-base font-extrabold">
+                                            <span>{metric.value}</span>
+                                        </div>
+                                    </div>
+                                    <h3 className="text-base font-bold text-slate-800 leading-tight">
+                                        {metric.title}
+                                    </h3>
+                                    <p className="text-xs text-slate-400 mt-1">Estado actual</p>
+                                </div>
+
+                                <div className="mt-4 pt-3 border-t border-slate-50">
+                                    <p className="text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
+                                        📊 {metric.description}
+                                    </p>
+                                </div>
+                            </GenericCard>
+                        ))}
+                    </div>
+                </div>
+
+            </div>
+        </ProfessorLayout>
+    );
+};
+
+export default ProfessorDashboard;
+
+================
 File: frontend/src/components/navbar/NavbarUser.tsx
 ================
 import { type ReactNode } from 'react';
@@ -21183,6 +21183,165 @@ const NavbarUser = ({ username, userPhoto, onLogout }: NavbarUserProps) => {
 };
 
 export default NavbarUser;
+
+================
+File: backend/src/main/java/com/cursosonline/backend/config/SecurityConfig.java
+================
+package com.cursosonline.backend.config;
+
+import com.cursosonline.backend.security.jwt.JwtAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.List;
+
+@Configuration
+@EnableWebSecurity
+/**
+ * Clase de configuración de seguridad para la aplicación.
+ * Configura la seguridad HTTP, CORS, CSRF, gestión de sesiones y filtros de
+ * autenticación.
+ */
+public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    // Sincronizado con application.properties usando la estructura estandar
+    // 'app.cors.allowed-origins'
+    @Value("${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}")
+    private List<String> allowedOrigins;
+
+    /**
+     * Constructor de la clase SecurityConfig.
+     * 
+     * @param jwtAuthenticationFilter Filtro interceptor del token JWT
+     */
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    }
+
+    /**
+     * Configura la cadena de filtros de seguridad para la aplicación.
+     * 
+     * @param http Componente inyectado de HttpSecurity
+     * @return La cadena de filtros configurada
+     * @throws Exception Si ocurre un error de configuración
+     */
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable())
+
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                .authorizeHttpRequests(auth -> auth
+
+                        // Permitir solicitudes OPTIONS para CORS preflight
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // Endpoints de autenticación pública (login y registro)
+                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/{username}").permitAll()
+
+                        // ✅ SEGURIDAD ESTRUCTURAL: Permitir ver imágenes de perfil públicamente (Solo
+                        // lectura)
+                        .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
+
+                        // 🚨 CONTROL DE ACCESO CRÍTICO: NUEVOS ENDPOINTS DE CURSOS Y MATRÍCULAS
+                        // Permitimos el acceso para que el buscador predictivo funcione en tiempo real
+                        .requestMatchers(HttpMethod.GET, "/api/courses/search").permitAll()
+                        // Protegemos la matrícula exigiendo obligatoriamente sesión activa (JWT)
+                        .requestMatchers(HttpMethod.POST, "/api/courses/enroll/**").authenticated()
+
+                        // Endpoint para obtener el perfil del usuario autenticado (requiere
+                        // autenticación)
+                        .requestMatchers("/api/auth/me").authenticated()
+
+                        // Endpoint para obtener las notificaciones del usuario autenticado (requiere
+                        // autenticación)
+                        .requestMatchers("/api/auth/notifications").authenticated()
+
+                        // Endpoint para obtener el perfil de un usuario específico (requiere
+                        // autenticación)
+                        .requestMatchers("/api/v1/profile/**").authenticated()
+
+                        // Exclusivo Administrador
+                        .requestMatchers("/api/auth/users/**").hasAuthority("ADMIN")
+                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
+                        .requestMatchers("/api/users/**").hasAuthority("ADMIN")
+
+                        // Exclusivo Profesor y Administrador
+                        .requestMatchers("/api/professor/**").hasAnyAuthority("PROFESSOR", "ADMIN")
+                        .requestMatchers("/api/student/**").hasAnyAuthority("STUDENT", "ADMIN")
+
+                        // Cualquier otra solicitud requiere autenticación
+                        .anyRequest().authenticated())
+                .formLogin(form -> form.disable())
+                .httpBasic(basic -> basic.disable());
+
+        // Agrega el filtro de autenticación JWT antes del filtro estándar de Spring
+        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    /**
+     * Configura la fuente de configuración CORS para la aplicación.
+     * 
+     * @return La fuente de configuración CORS configurada.
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        // Asignamos la lista inyectada directamente
+        config.setAllowedOrigins(allowedOrigins);
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+
+    /**
+     * Configura el codificador de contraseñas para la aplicación.
+     * 
+     * @return El codificador de contraseñas configurado.
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    /**
+     * Configura el administrador de autenticación para la aplicación.
+     * 
+     * @param configuration La configuración de autenticación.
+     * @return El administrador de autenticación configurado.
+     * @throws Exception si ocurre un error al obtener el administrador de
+     *                   autenticación.
+     */
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+        return configuration.getAuthenticationManager();
+    }
+}
 
 ================
 File: frontend/src/routes/pages/admin/AdminDashboard.tsx
@@ -21477,165 +21636,6 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
-
-================
-File: backend/src/main/java/com/cursosonline/backend/config/SecurityConfig.java
-================
-package com.cursosonline.backend.config;
-
-import com.cursosonline.backend.security.jwt.JwtAuthenticationFilter;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.Arrays;
-import java.util.List;
-
-@Configuration
-@EnableWebSecurity
-/**
- * Clase de configuración de seguridad para la aplicación.
- * Configura la seguridad HTTP, CORS, CSRF, gestión de sesiones y filtros de
- * autenticación.
- */
-public class SecurityConfig {
-
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-
-    // Sincronizado con application.properties usando la estructura estandar
-    // 'app.cors.allowed-origins'
-    @Value("${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}")
-    private List<String> allowedOrigins;
-
-    /**
-     * Constructor de la clase SecurityConfig.
-     * 
-     * @param jwtAuthenticationFilter Filtro interceptor del token JWT
-     */
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-    }
-
-    /**
-     * Configura la cadena de filtros de seguridad para la aplicación.
-     * 
-     * @param http Componente inyectado de HttpSecurity
-     * @return La cadena de filtros configurada
-     * @throws Exception Si ocurre un error de configuración
-     */
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
-
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                .authorizeHttpRequests(auth -> auth
-
-                        // Permitir solicitudes OPTIONS para CORS preflight
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
-                        // Endpoints de autenticación pública (login y registro)
-                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/{username}").permitAll()
-
-                        // ✅ SEGURIDAD ESTRUCTURAL: Permitir ver imágenes de perfil públicamente (Solo
-                        // lectura)
-                        .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
-
-                        // 🚨 CONTROL DE ACCESO CRÍTICO: NUEVOS ENDPOINTS DE CURSOS Y MATRÍCULAS
-                        // Permitimos el acceso para que el buscador predictivo funcione en tiempo real
-                        .requestMatchers(HttpMethod.GET, "/api/courses/search").permitAll()
-                        // Protegemos la matrícula exigiendo obligatoriamente sesión activa (JWT)
-                        .requestMatchers(HttpMethod.POST, "/api/courses/enroll/**").authenticated()
-
-                        // Endpoint para obtener el perfil del usuario autenticado (requiere
-                        // autenticación)
-                        .requestMatchers("/api/auth/me").authenticated()
-
-                        // Endpoint para obtener las notificaciones del usuario autenticado (requiere
-                        // autenticación)
-                        .requestMatchers("/api/auth/notifications").authenticated()
-
-                        // Endpoint para obtener el perfil de un usuario específico (requiere
-                        // autenticación)
-                        .requestMatchers("/api/v1/profile/**").authenticated()
-
-                        // Exclusivo Administrador
-                        .requestMatchers("/api/auth/users/**").hasAuthority("ADMIN")
-                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
-                        .requestMatchers("/api/users/**").hasAuthority("ADMIN")
-
-                        // Exclusivo Profesor y Administrador
-                        .requestMatchers("/api/professor/**").hasAnyAuthority("PROFESSOR", "ADMIN")
-                        .requestMatchers("/api/student/**").hasAnyAuthority("STUDENT", "ADMIN")
-
-                        // Cualquier otra solicitud requiere autenticación
-                        .anyRequest().authenticated())
-                .formLogin(form -> form.disable())
-                .httpBasic(basic -> basic.disable());
-
-        // Agrega el filtro de autenticación JWT antes del filtro estándar de Spring
-        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
-        return http.build();
-    }
-
-    /**
-     * Configura la fuente de configuración CORS para la aplicación.
-     * 
-     * @return La fuente de configuración CORS configurada.
-     */
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        // Asignamos la lista inyectada directamente
-        config.setAllowedOrigins(allowedOrigins);
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
-    }
-
-    /**
-     * Configura el codificador de contraseñas para la aplicación.
-     * 
-     * @return El codificador de contraseñas configurado.
-     */
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    /**
-     * Configura el administrador de autenticación para la aplicación.
-     * 
-     * @param configuration La configuración de autenticación.
-     * @return El administrador de autenticación configurado.
-     * @throws Exception si ocurre un error al obtener el administrador de
-     *                   autenticación.
-     */
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
-        return configuration.getAuthenticationManager();
-    }
-}
 
 ================
 File: backend/src/main/java/com/cursosonline/backend/services/UserService.java

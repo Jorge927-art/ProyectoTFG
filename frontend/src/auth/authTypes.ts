@@ -8,6 +8,14 @@ export const ROLES = {
     STUDENT: 'STUDENT' as UserRole,
 } as const;
 
+export interface InterestPreferences {
+    categories: string[];
+    levels: string[];
+    durations: string[];
+    languages: string[];
+    subtitles: string[];
+}
+
 /**
  * Forma estándar del usuario autenticado dentro del frontend.
  * Mantiene compatibilidad y permite extender metadatos visuales.
@@ -19,6 +27,7 @@ export interface AuthUser {
     userId?: number;
     email?: string;
     enrolledCourseIds?: number[]; // Fuente de verdad reactiva en memoria del cliente
+    interests?: InterestPreferences;
     [key: string]: unknown;
 }
 
@@ -36,6 +45,7 @@ export interface AuthTokenResponse {
     email: string;
     enrolledCourseIds: number[]; // Coincidencia exacta con la hidratación de Spring Boot
     avatarPath?: string | null;
+    interests?: InterestPreferences;
 }
 
 /**

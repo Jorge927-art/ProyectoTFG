@@ -3,6 +3,7 @@ import { User, Phone, MapPin, Upload, RefreshCw, CheckCircle, ArrowLeft } from '
 import { useNavigate } from 'react-router-dom';
 import GenericCard from '../genericCard/GenericCard';
 import GenericButton from '../genericButton/GenericButton';
+import Input from '../Input';
 import { useAuth } from '@/auth';
 import { resolveAvatarUrl } from '@/auth/avatarUrl';
 
@@ -154,7 +155,7 @@ export default function ProfileSettings() {
                             <label className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
                                 <Upload size={14} />
                                 <span>{updatingAvatar ? 'Subiendo...' : 'Cambiar Foto'}</span>
-                                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} disabled={updatingAvatar} />
+                                <Input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} disabled={updatingAvatar} />
                             </label>
                         </div>
                     </GenericCard>
@@ -167,7 +168,7 @@ export default function ProfileSettings() {
 
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-600">Correo Electrónico</label>
-                                <input type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full border border-slate-200 rounded-lg py-1.5 px-3 text-sm focus:outline-none focus:border-blue-600 text-slate-700 bg-slate-50/50" placeholder="tu-correo@ejemplo.com" />
+                                <Input type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full border border-slate-200 rounded-lg py-1.5 px-3 text-sm focus:outline-none focus:border-blue-600 text-slate-700 bg-slate-50/50" placeholder="tu-correo@ejemplo.com" />
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -176,14 +177,14 @@ export default function ProfileSettings() {
                                         <Phone size={12} className="text-slate-400" />
                                         <span>Teléfono</span>
                                     </label>
-                                    <input type="text" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} className="w-full border border-slate-200 rounded-lg py-1.5 px-3 text-sm focus:outline-none focus:border-blue-600 text-slate-700" placeholder="Ej: +34 600 000 000" />
+                                    <Input type="text" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} className="w-full border border-slate-200 rounded-lg py-1.5 px-3 text-sm focus:outline-none focus:border-blue-600 text-slate-700" placeholder="Ej: +34 600 000 000" />
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
                                         <MapPin size={12} className="text-slate-400" />
                                         <span>Dirección</span>
                                     </label>
-                                    <input type="text" name="homeAddress" value={formData.homeAddress} onChange={handleInputChange} className="w-full border border-slate-200 rounded-lg py-1.5 px-3 text-sm focus:outline-none focus:border-blue-600 text-slate-700" placeholder="Ej: Calle Mayor 12, Madrid" />
+                                    <Input type="text" name="homeAddress" value={formData.homeAddress} onChange={handleInputChange} className="w-full border border-slate-200 rounded-lg py-1.5 px-3 text-sm focus:outline-none focus:border-blue-600 text-slate-700" placeholder="Ej: Calle Mayor 12, Madrid" />
                                 </div>
                             </div>
 

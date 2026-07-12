@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Layers, BarChart, Clock, Globe, Subtitles, Check, Loader2 } from 'lucide-react';
 import { apiClient } from '@/services/apiClient';
+import { useAuth } from '@/auth';
 import GenericButton from "../../../components/ui/genericButton/GenericButton";
 
 
@@ -19,6 +20,7 @@ interface InterestsModalProps {
 }
 
 export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps) => {
+    const { user, updateUser } = useAuth();
     // 1. LISTAS DE DATOS ORIGINALES (Sincronizadas con el catálogo) [3]
     const availableCategories = ['Ciencia de Datos', 'Negocios', 'Tecnología de la Información', 'Ciencias de la Computación', 'Artes y Humanidades', 'Aprendizaje de Idiomas', 'Desarrollo Personal', 'Salud', 'Ciencias Sociales', 'Ciencias Físicas e Ingeniería', 'Matemáticas y Lógica'];
     const availableLevels = ['Principiante / Básico', 'Medio / Intermedio', 'Avanzado / Experto', 'Todos los niveles'];
@@ -36,29 +38,17 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
     // Estado de carga para feedback visual y evitar doble post
     const [loading, setLoading] = useState(false);
 
-    // 3. HIDRATACIÓN DE PREFERENCIAS CON DOBLE CORTOCIRCUITO DEFENSIVO
+    // 3. HIDRATACIÓN SÍNCRONA DESDE EL CONTRATO INICIAL DE SESIÓN (ADR-28)
     useEffect(() => {
-        const token = localStorage.getItem('token');
-
-        if (isOpen && token) {
-            const fetchCurrentInterests = async () => {
-                try {
-                    const response = await apiClient.get('/api/auth/my-interests');
-                    if (response.data) {
-                        // Mapeo desde los nombres del InterestDTO [5]
-                        setSelectedCategories(response.data.categories || []);
-                        setSelectedLevels(response.data.levels || []);
-                        setSelectedDurations(response.data.durations || []);
-                        setSelectedLanguages(response.data.languages || []);
-                        setSelectedSubtitles(response.data.subtitles || []);
-                    }
-                } catch (err) {
-                    console.error("Error al hidratar intereses:", err);
-                }
-            };
-            fetchCurrentInterests();
+        if (isOpen) {
+            const sessionInterests = user?.interests;
+            setSelectedCategories(sessionInterests?.categories || []);
+            setSelectedLevels(sessionInterests?.levels || []);
+            setSelectedDurations(sessionInterests?.durations || []);
+            setSelectedLanguages(sessionInterests?.languages || []);
+            setSelectedSubtitles(sessionInterests?.subtitles || []);
         }
-    }, [isOpen]);
+    }, [isOpen, user?.interests]);
 
     // 4. LÓGICA DE SELECCIÓN (Toggle)
     const toggleSelection = (item: string, currentList: string[], setList: (val: string[]) => void) => {
@@ -82,6 +72,7 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
             };
 
             await apiClient.post('/api/auth/my-interests', payload);
+            updateUser({ interests: payload });
             onSave(payload);
             onClose();
         } catch (error) {
