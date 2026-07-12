@@ -1,5 +1,7 @@
 # React + TypeScript + Vite
 
+[![CI Monorepo](https://github.com/Jorge927-art/ProyectoTFG/actions/workflows/ci.yml/badge.svg)](https://github.com/Jorge927-art/ProyectoTFG/actions/workflows/ci.yml)
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
