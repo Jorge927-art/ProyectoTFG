@@ -109,7 +109,7 @@ describe('InterestsModal Component - Suite de Pruebas Unitarias Estrictas', () =
     });
 
     it('debe activar el estado loading y deshabilitar los controles al ejecutar la persistencia en Postgres', async () => {
-        vi.mocked(apiClient.post).mockReturnValue(new Promise((resolve) => setTimeout(resolve, 50)));
+        vi.mocked(apiClient.post).mockResolvedValue({ data: { success: true } });
 
         renderWithAuthProvider();
 

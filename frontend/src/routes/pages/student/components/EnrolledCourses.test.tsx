@@ -2,6 +2,13 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EnrolledCourses } from './EnrolledCourses';
 import type { EnrollmentInfo } from '../../../../services/courseTypes';
+import { apiClient } from '../../../../services/apiClient';
+
+vi.mock('../../../../services/apiClient', () => ({
+    apiClient: {
+        post: vi.fn().mockResolvedValue({ status: 200 }),
+    },
+}));
 
 describe('Auditoría UI: Aislamiento de Estados en EnrolledCourses', () => {
     const mockOnRefresh = vi.fn();
@@ -71,7 +78,7 @@ describe('Auditoría UI: Aislamiento de Estados en EnrolledCourses', () => {
         const startButton = screen.getByRole('button', { name: /iniciar curso/i });
         fireEvent.click(startButton);
 
-        // Este paso auditará si el componente confunde los identificadores al disparar la acción
-        expect(startButton).toBeInTheDocument();
+        // Verificamos que la mutación use el identificador de la matrícula y no el del curso.
+        expect(vi.mocked(apiClient.post)).toHaveBeenCalledWith('/api/auth/enrollment/101/start');
     });
 });

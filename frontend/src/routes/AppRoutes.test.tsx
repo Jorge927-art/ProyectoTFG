@@ -1,112 +1,149 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
-import AppRoutes from "./guards/ProtectedRoute";
-import { AuthContext } from "@/auth/AuthContext";
-import type { AuthContextValue } from "@/auth/AuthContext";
-import type { AuthUser } from "@/auth";
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import AppRoutes from './index';
 
-// Intercepción exacta de la ruta relativa de la pasarela de red
-vi.mock("../services/apiClient", () => ({
-    apiClient: {
-        get: vi.fn(() => Promise.resolve({ data: [] })),
-        post: vi.fn(() => Promise.resolve({ data: {} })),
-        interceptors: {
-            request: { use: vi.fn(), eject: vi.fn() },
-            response: { use: vi.fn(), eject: vi.fn() }
-        }
-    }
+const mockUseAuth = vi.fn();
+
+vi.mock('../auth', () => ({
+    useAuth: () => mockUseAuth(),
 }));
 
-const buildAuthValue = (user: AuthUser | null): AuthContextValue => ({
-    user,
-    isAuthenticated: Boolean(user),
-    isLoading: false,
-    login: vi.fn(),
-    updateUser: vi.fn(),
-    logout: vi.fn(),
-});
+vi.mock('../components/navbar/MainNavbar', () => ({
+    default: () => <nav>Mock Navbar</nav>,
+}));
 
-const renderWithRouteAndAuth = (route: string, user: AuthUser | null) => {
+vi.mock('./pages/public/LandingPage', () => ({
+    default: () => <div>Mock Landing</div>,
+}));
+
+vi.mock('./pages/public/AccessDenied', () => ({
+    default: () => <div>Mock Access Denied</div>,
+}));
+
+vi.mock('./pages/student/StudentDashboard', () => ({
+    default: () => <div>Mock Student Dashboard</div>,
+}));
+
+vi.mock('./pages/admin/AdminDashboard', () => ({
+    default: () => <div>Mock Admin Dashboard</div>,
+}));
+
+vi.mock('./pages/professor/ProfessorDashboard', () => ({
+    default: () => <div>Mock Professor Dashboard</div>,
+}));
+
+vi.mock('./pages/student/StudentProfilePage', () => ({
+    default: () => <div>Mock Student Profile</div>,
+}));
+
+vi.mock('./pages/admin/AdminProfilePage', () => ({
+    default: () => <div>Mock Admin Profile</div>,
+}));
+
+vi.mock('./pages/professor/ProfessorProfilePage', () => ({
+    default: () => <div>Mock Professor Profile</div>,
+}));
+
+const renderWithRoute = (route: string) => {
     return render(
-        <AuthContext.Provider value={buildAuthValue(user)}>
-            <MemoryRouter initialEntries={[route]}>
-                <AppRoutes />
-            </MemoryRouter>
-        </AuthContext.Provider>
+        <MemoryRouter initialEntries={[route]}>
+            <AppRoutes />
+        </MemoryRouter>
     );
 };
 
-describe("AppRoutes - autorizacion por rol", () => {
-    it("redirecciona a landing cuando el usuario no esta autenticado e intenta /student", () => {
-        renderWithRouteAndAuth("/student", null);
+beforeEach(() => {
+    mockUseAuth.mockReturnValue({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+    });
+});
 
-        const buttons = screen.getAllByRole("button", { name: /Entrar \/ Registro/i });
-        expect(buttons.length).toBeGreaterThan(0);
-        expect(screen.queryByText(/Panel del estudiante/i)).not.toBeInTheDocument();
+describe('AppRoutes - autorizacion por rol', () => {
+    it('redirecciona a landing cuando el usuario no esta autenticado e intenta /student', () => {
+        renderWithRoute('/student');
+
+        expect(screen.getByText('Mock Landing')).toBeInTheDocument();
+        expect(screen.queryByText('Mock Student Dashboard')).not.toBeInTheDocument();
     });
 
-    it("permite acceso a /student cuando el rol es STUDENT", () => {
-        renderWithRouteAndAuth("/student", {
-            username: "student_user",
-            role: "STUDENT",
+    it('permite acceso a /student cuando el rol es STUDENT', () => {
+        mockUseAuth.mockReturnValue({
+            user: { username: 'student_user', role: 'STUDENT' },
+            isAuthenticated: true,
+            isLoading: false,
         });
 
-        expect(screen.getByText(/Intereses del estudiante/i)).toBeInTheDocument();
+        renderWithRoute('/student');
+
+        expect(screen.getByText('Mock Student Dashboard')).toBeInTheDocument();
     });
 
-    it("bloquea acceso a /admin para rol STUDENT y muestra acceso denegado", () => {
-        renderWithRouteAndAuth("/admin", {
-            username: "student_user",
-            role: "STUDENT",
+    it('bloquea acceso a /admin para rol STUDENT y muestra acceso denegado', () => {
+        mockUseAuth.mockReturnValue({
+            user: { username: 'student_user', role: 'STUDENT' },
+            isAuthenticated: true,
+            isLoading: false,
         });
 
-        expect(screen.getByText(/Acceso denegado/i)).toBeInTheDocument();
+        renderWithRoute('/admin');
+
+        expect(screen.getByText('Mock Access Denied')).toBeInTheDocument();
     });
 
-    it("permite acceso a /admin cuando el rol es ADMIN", () => {
-        renderWithRouteAndAuth("/admin", {
-            username: "admin_user",
-            role: "ADMIN",
+    it('permite acceso a /admin cuando el rol es ADMIN', () => {
+        mockUseAuth.mockReturnValue({
+            user: { username: 'admin_user', role: 'ADMIN' },
+            isAuthenticated: true,
+            isLoading: false,
         });
 
-        // Corregido: Tolera múltiples elementos de navegación duplicados en tu layout estructurado
-        const navs = screen.getAllByRole("navigation");
-        expect(navs.length).toBeGreaterThan(0);
+        renderWithRoute('/admin');
+
+        expect(screen.getByText('Mock Admin Dashboard')).toBeInTheDocument();
     });
 
-    it("permite acceso a /professor cuando el rol es PROFESSOR", () => {
-        renderWithRouteAndAuth("/professor", {
-            username: "prof_user",
-            role: "PROFESSOR",
+    it('permite acceso a /professor cuando el rol es PROFESSOR', () => {
+        mockUseAuth.mockReturnValue({
+            user: { username: 'prof_user', role: 'PROFESSOR' },
+            isAuthenticated: true,
+            isLoading: false,
         });
 
-        // Corregido: Tolera múltiples elementos de navegación duplicados en tu layout estructurado
-        const navs = screen.getAllByRole("navigation");
-        expect(navs.length).toBeGreaterThan(0);
+        renderWithRoute('/professor');
+
+        expect(screen.getByText('Mock Professor Dashboard')).toBeInTheDocument();
     });
 
-    it("bloquea /student cuando el usuario autenticado no tiene rol", () => {
-        renderWithRouteAndAuth("/student", {
-            username: "sin_rol",
+    it('bloquea /student cuando el usuario autenticado no tiene rol', () => {
+        mockUseAuth.mockReturnValue({
+            user: { username: 'sin_rol' },
+            isAuthenticated: true,
+            isLoading: false,
         });
 
-        expect(screen.getByText(/Acceso denegado/i)).toBeInTheDocument();
+        renderWithRoute('/student');
+
+        expect(screen.getByText('Mock Access Denied')).toBeInTheDocument();
     });
 
-    it("permite /student aunque el rol venga en minusculas", () => {
-        renderWithRouteAndAuth("/student", {
-            username: "student_lowercase",
-            role: "student" as AuthUser["role"],
+    it('permite /student aunque el rol venga en minusculas', () => {
+        mockUseAuth.mockReturnValue({
+            user: { username: 'student_lowercase', role: 'student' },
+            isAuthenticated: true,
+            isLoading: false,
         });
 
-        expect(screen.getByText(/Intereses del estudiante/i)).toBeInTheDocument();
+        renderWithRoute('/student');
+
+        expect(screen.getByText('Mock Student Dashboard')).toBeInTheDocument();
     });
 
-    it("redirecciona a landing cuando la ruta no existe", () => {
-        renderWithRouteAndAuth("/ruta-inexistente", null);
+    it('redirecciona a landing cuando la ruta no existe', () => {
+        renderWithRoute('/ruta-inexistente');
 
-        const buttons = screen.getAllByRole("button", { name: /Entrar \/ Registro/i });
-        expect(buttons.length).toBeGreaterThan(0);
+        expect(screen.getByText('Mock Landing')).toBeInTheDocument();
     });
 });

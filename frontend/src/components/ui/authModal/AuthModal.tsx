@@ -1,5 +1,6 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ChangeEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Input from '../Input';
 import GenericButton from '../genericButton/GenericButton';
 import axios from 'axios';
@@ -25,6 +26,7 @@ const initialFormState: AuthFormState = { username: '', password: '' };
 
 const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: AuthModalProps) => {
     const { login } = useAuth();
+    const navigate = useNavigate();
     const [formData, setFormData] = useState<AuthFormState>(initialFormState);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -90,11 +92,11 @@ const AuthModal = ({ isOpen, onClose, isLoginView, setIsLoginView, onSuccess }: 
                     // 3. Forzamos la redirección nativa según el rol asignado
                     const userRole = String(tokenData.role).toUpperCase().trim();
                     if (userRole === 'ADMIN') {
-                        window.location.href = '/admin';
+                        navigate('/admin', { replace: true });
                     } else if (userRole === 'PROFESSOR') {
-                        window.location.href = '/professor';
+                        navigate('/professor', { replace: true });
                     } else {
-                        window.location.href = '/student';
+                        navigate('/student', { replace: true });
                     }
                 } else {
                     handleClose();

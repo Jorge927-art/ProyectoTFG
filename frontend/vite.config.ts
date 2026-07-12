@@ -16,6 +16,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    pool: 'threads',
+    isolate: false,
+    maxWorkers: 2,
     setupFiles: './src/setupTests.tsx',
   },
 })

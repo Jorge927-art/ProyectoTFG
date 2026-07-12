@@ -24,6 +24,8 @@ describe('Auditoría de Calidad Frontend: Blindaje de Sesión y Activity Tracker
     });
 
     afterEach(() => {
+        vi.runOnlyPendingTimers();
+        vi.clearAllTimers();
         vi.useRealTimers();
         vi.restoreAllMocks();
     });

@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ReactElement } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import AuthModal from './AuthModal';
 import { AuthProvider } from '@/auth';
 import { apiClient } from '@/services/apiClient';
@@ -17,7 +18,11 @@ vi.mock('@/services/apiClient', () => ({
 }));
 
 const renderWithAuthProvider = (ui: ReactElement) => {
-    return render(<AuthProvider>{ui}</AuthProvider>);
+    return render(
+        <MemoryRouter>
+            <AuthProvider>{ui}</AuthProvider>
+        </MemoryRouter>
+    );
 };
 
 /**
@@ -54,10 +59,8 @@ describe('AuthModal', () => {
     });
 
     it('no debe renderizar nada si isOpen es false', () => {
-        const { container } = render(
-            <AuthProvider>
-                <AuthModal isOpen={false} onClose={mockOnClose} isLoginView={true} setIsLoginView={mockSetIsLoginView} />
-            </AuthProvider>
+        const { container } = renderWithAuthProvider(
+            <AuthModal isOpen={false} onClose={mockOnClose} isLoginView={true} setIsLoginView={mockSetIsLoginView} />
         );
         expect(container.firstChild).toBeNull();
     });
