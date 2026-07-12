@@ -82,7 +82,7 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npm test -- --run --poolOptions.forks.singleFork --no-isolate
+        run: npm test -- --run --pool=forks --maxWorkers=1 --no-isolate
 
       - name: Lint
         run: npm run lint
