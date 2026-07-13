@@ -41,7 +41,7 @@ public class Users implements UserDetails {
     private String email;
 
     @Column(nullable = false)
-    private boolean enabled = true;
+    private Boolean enabled = true;
 
     /**
      * Relación bidireccional con el historial de matrículas.

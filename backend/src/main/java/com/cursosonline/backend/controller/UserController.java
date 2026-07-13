@@ -37,8 +37,15 @@ public class UserController {
      * Endpoint para el registro de nuevos usuarios.
      */
     @PostMapping("/register")
-    public ResponseEntity<Users> register(@RequestBody Users user) {
-        return ResponseEntity.ok(userService.registerUser(user));
+    public ResponseEntity<?> register(@RequestBody Users user) {
+        // 1. Guarda el usuario (aquí tu UserService ya le asigna el rol STUDENT)
+        Users savedUser = userService.registerUser(user);
+
+        // 2. Devuelve los datos mínimos reales del usuario recién creado
+        return ResponseEntity.ok(Map.of(
+                "userId", savedUser.getUser_id(),
+                "username", savedUser.getUsername(),
+                "role", "STUDENT"));
     }
 
     /**

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sparkles, SlidersHorizontal, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import GenericButton from '../../../components/ui/genericButton/GenericButton';
 
@@ -21,6 +21,7 @@ import type { DBModelCourse } from '../../../services/courseTypes';
 import { DocumentManager } from './components/DocumentManager';
 import { EvaluationPanel } from './components/EvaluationPanel';
 import { StudentStatsPanel } from './components/StudentStatsPanel';
+import { useActiveEvaluations } from './components/useActiveEvaluations';
 
 const StudentDashboard = () => {
     // --- ESTADOS DE UI Y FEEDBACK ---
@@ -33,6 +34,12 @@ const StudentDashboard = () => {
      * Gestiona de forma autónoma la carga desde el backend.
      */
     const { enrolledList, loadingEnrollments, enrollmentError, fetchStudentEnrollments } = useEnrolledCourses(successMessage);
+    const { refreshPending } = useActiveEvaluations();
+    useEffect(() => {
+        if (refreshPending) {
+            refreshPending();
+        }
+    }, [enrolledList?.length, refreshPending]);
 
     /** 
      * HOOK DE RECOMENDACIONES ALGORÍTMICAS:

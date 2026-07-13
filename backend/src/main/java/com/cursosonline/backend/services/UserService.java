@@ -65,6 +65,7 @@ public class UserService {
         String encodedPassword = passwordEncoder.encode(user.getPassword());
         user.setPassword(encodedPassword);
         user.setRole(Role.STUDENT);
+        user.setEnabled(true);
         return userRepository.save(user);
     }
 
@@ -109,7 +110,7 @@ public class UserService {
 
     /**
      * Realiza el borrado lógico de un usuario desactivando su acceso.
-     * Auditoría NotebookLM: Lanzamiento de ResourceNotFoundException (HTTP 404) en
+     * Lanzamiento de ResourceNotFoundException (HTTP 404) en
      * lugar de RuntimeException.
      */
     @Transactional
