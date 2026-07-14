@@ -83,7 +83,7 @@ export const DocumentManager = () => {
                     onClick={() => setActiveTab('RECEIVED')}
                     variant="white"
                     icon={<Inbox size={14} />}
-                    label="Recibidos"
+                    label="Recibido"
                     className={`flex-1 justify-center gap-2 py-1.5! text-xs! font-bold! rounded-lg! transition-all! cursor-pointer ${activeTab === 'RECEIVED'
                         ? 'bg-white text-blue-600 shadow-sm'
                         : 'text-slate-500 hover:text-slate-800'
@@ -94,7 +94,7 @@ export const DocumentManager = () => {
                     onClick={() => setActiveTab('SENT')}
                     variant="white"
                     icon={<Send size={14} />}
-                    label="Enviados"
+                    label="Enviar"
                     className={`flex-1 justify-center gap-2 py-1.5! text-xs! font-bold! rounded-lg! transition-all! cursor-pointer ${activeTab === 'SENT'
                         ? 'bg-white text-blue-600 shadow-sm'
                         : 'text-slate-500 hover:text-slate-800'
@@ -118,7 +118,7 @@ export const DocumentManager = () => {
                         <UserCheck size={14} className="text-slate-400 shrink-0" />
                         <select
                             value={selectedReceiverId}
-                            aria-label="Seleccionar destinatario obligatorio"
+                            aria-label="Seleccionar destinatario"
                             onChange={(e) => {
                                 setSelectedReceiverId(e.target.value ? Number(e.target.value) : '');
                                 setDocumentError('');
@@ -126,7 +126,7 @@ export const DocumentManager = () => {
                             disabled={isUploading || loadingDirectory}
                             className="w-full text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-blue-400 transition-colors disabled:opacity-60"
                         >
-                            <option value="">-- Seleccionar Destinatario Obligatorio --</option>
+                            <option value="">-- Seleccionar Destinatario --</option>
                             {loadingDirectory ? (
                                 <option disabled>Cargando directorio legítimo...</option>
                             ) : (

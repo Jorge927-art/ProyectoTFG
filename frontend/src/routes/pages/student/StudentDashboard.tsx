@@ -22,6 +22,8 @@ import { DocumentManager } from './components/DocumentManager';
 import { EvaluationPanel } from './components/EvaluationPanel';
 import { StudentStatsPanel } from './components/StudentStatsPanel';
 import { useActiveEvaluations } from './components/useActiveEvaluations';
+import { CourseAssignmentPanel } from './components/CourseAssignmentPanel';
+
 
 const StudentDashboard = () => {
     // --- ESTADOS DE UI Y FEEDBACK ---
@@ -177,6 +179,15 @@ const StudentDashboard = () => {
                                 onSetGlobalSuccess={setSuccessMessage}
                             />
                         </div>
+
+                        {/* Tarjeta del Panel de Seguimiento de Asignatura [ADR-47] */}
+                        <div className="bg-white border rounded-2xl p-6 shadow-sm">
+                            <CourseAssignmentPanel
+                                activeCourseId={activeCourseId}
+                                enrolledList={enrolledList}
+                            />
+                        </div>
+
                         {/* Tarjeta de la Evaluación Académica Dual */}
                         <div className="bg-white border rounded-2xl p-6 shadow-sm">
                             <EvaluationPanel />

@@ -23,6 +23,13 @@ export interface EvaluationInput {
     instructor_comment: string; // Comentario del profesor (Opcional)
 }
 
+// INTERFAZ NUEVA: Contrato de tipos para las calificaciones físicas del alumno
+export interface CourseGradeDTO {
+    gradeId: number;
+    title: string; // "Trabajo Académico Escrito" o "Examen Final"
+    score: string; // Nota Ej: "8.5"
+}
+
 /**
  * [SERVICIO FILTRADO DOCENTE]: Recupera la lista de asignaturas y nombres de instructores 
  * activos en las matrículas del estudiante autenticado que aún no han sido evaluados.
@@ -38,5 +45,14 @@ export const getPendingEvaluations = async (): Promise<PendingEvaluationDTO[]> =
  */
 export const submitAcademicEvaluation = async (data: EvaluationInput): Promise<{ message: string }> => {
     const response = await apiClient.post<{ message: string }>('/api/v1/evaluations/submit', data);
+    return response.data;
+};
+
+/**
+ * [SERVICIO CONSULTA CALIFICACIONES ASIGNATURA]: Recupera de forma específica las notas 
+ * de trabajos y exámenes asociadas a una matrícula determinada [CABLEADO ADR-47].
+ */
+export const getStudentCourseGrades = async (enrollmentId: number): Promise<CourseGradeDTO[]> => {
+    const response = await apiClient.get<CourseGradeDTO[]>(`/api/v1/users/my-courses/${enrollmentId}/grades`);
     return response.data;
 };

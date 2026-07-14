@@ -47,7 +47,7 @@ export const EvaluationPanel = () => {
         /* ALINEACIÓN GEOMÉTRICA: h-92 para nivelar con Asignaturas + Documentos */
         <GenericCard className="h-90 flex flex-col shadow-sm border-slate-200">
             <div className="flex items-center gap-2 mb-6">
-                <div className="bg-amber-50 p-2 rounded-lg">
+                <div className="bg-indigo-50 p-2 rounded-lg">
                     <Star className="text-amber-500 fill-amber-500" size={20} />
                 </div>
                 <div>

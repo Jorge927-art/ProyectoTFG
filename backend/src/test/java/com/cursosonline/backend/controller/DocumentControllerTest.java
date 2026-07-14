@@ -111,12 +111,25 @@ public class DocumentControllerTest {
         @Test
         @DisplayName("Debe retornar el listado ordenado de metadatos cuando existen registros recibidos en la base de datos")
         void debeRetornarMetadatosDeDocumentos() {
-                DocumentMetadata doc1 = new DocumentMetadata(1L, "documents/uuid1_t1.pdf", "Tema1.pdf",
-                                LocalDateTime.now(),
-                                mockSender, mockReceiver, null, FolderType.RECEIVED);
-                DocumentMetadata doc2 = new DocumentMetadata(2L, "documents/uuid2_e1.docx", "Ensayo.docx",
-                                LocalDateTime.now(),
-                                mockSender, mockReceiver, null, FolderType.RECEIVED);
+                DocumentMetadata doc1 = new DocumentMetadata();
+                doc1.setDocumentid(1L);
+                doc1.setFilename("documents/uuid1_t1.pdf");
+                doc1.setOriginalname("Tema1.pdf");
+                doc1.setUpload_date(LocalDateTime.now());
+                doc1.setSender(mockSender);
+                doc1.setReceiver(mockReceiver);
+                doc1.setCourse(null);
+                doc1.setFolder_type(FolderType.RECEIVED);
+
+                DocumentMetadata doc2 = new DocumentMetadata();
+                doc2.setDocumentid(2L);
+                doc2.setFilename("documents/uuid2_e1.docx");
+                doc2.setOriginalname("Ensayo.docx");
+                doc2.setUpload_date(LocalDateTime.now());
+                doc2.setSender(mockSender);
+                doc2.setReceiver(mockReceiver);
+                doc2.setCourse(null);
+                doc2.setFolder_type(FolderType.RECEIVED);
 
                 Mockito.when(documentMetadataRepository.findReceivedDocumentsByUsername("luis_student"))
                                 .thenReturn(Arrays.asList(doc1, doc2));

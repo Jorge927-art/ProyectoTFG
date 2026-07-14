@@ -27,6 +27,9 @@ public class DocumentMetadata {
     @Column(nullable = false)
     private LocalDateTime upload_date = LocalDateTime.now();
 
+    @Column(name = "evaluation_type")
+    private String evaluation_type; // Guardará valores literales: "TRABAJO", "EXAMEN" o null para documentos
+                                    // generales
     // --- NUEVOS CAMPOS PARA INTERCAMBIO BIDIRECCIONAL ---
 
     @JsonIgnore
@@ -47,5 +50,4 @@ public class DocumentMetadata {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private FolderType folder_type; // SENT o RECEIVED para mapear las pestañas frontend
-
 }
