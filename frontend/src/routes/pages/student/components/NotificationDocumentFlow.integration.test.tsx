@@ -82,8 +82,8 @@ describe('Integracion campana + gestor de documentos', () => {
             expect(bellButton.className).toContain('bg-red-50!');
         });
 
-        const documentLabel = await screen.findByText(/Feedback_Algebra\.pdf/i, { selector: 'p' });
-        const rowContainer = documentLabel.closest('div.flex.justify-between.items-center');
+        const senderLabel = await screen.findByText(/De:\s*profesor_juan/i);
+        const rowContainer = senderLabel.closest('div.flex.justify-between.items-center');
         const downloadButton = rowContainer?.querySelector('button');
 
         expect(downloadButton).toBeDefined();
