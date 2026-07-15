@@ -1,40 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useDocuments } from './useDocuments';
-import {
-    getAdminsDirectory,
-    getClassmatesDirectory,
-    getSentDocuments,
-    getTeachersDirectory,
-    getUserDocuments,
-} from '../../../../services/documentService';
-
-vi.mock('../../../../services/documentService', () => ({
-    getUserDocuments: vi.fn(),
-    getSentDocuments: vi.fn(),
-    uploadStudentDocument: vi.fn(),
-    getTeachersDirectory: vi.fn(),
-    getClassmatesDirectory: vi.fn(),
-    getAdminsDirectory: vi.fn(),
-    downloadDocumentSecure: vi.fn(),
-}));
+import * as documentService from '../../../../services/documentService';
 
 describe('useDocuments', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(getUserDocuments).mockResolvedValue([]);
-        vi.mocked(getSentDocuments).mockResolvedValue([]);
-        vi.mocked(getTeachersDirectory).mockResolvedValue([]);
-        vi.mocked(getClassmatesDirectory).mockResolvedValue([]);
-        vi.mocked(getAdminsDirectory).mockResolvedValue([]);
+        vi.spyOn(documentService, 'getUserDocuments').mockResolvedValue([]);
+        vi.spyOn(documentService, 'getSentDocuments').mockResolvedValue([]);
+        vi.spyOn(documentService, 'getTeachersDirectory').mockResolvedValue([]);
+        vi.spyOn(documentService, 'getClassmatesDirectory').mockResolvedValue([]);
+        vi.spyOn(documentService, 'getAdminsDirectory').mockResolvedValue([]);
     });
 
     it('mantiene compañeros disponibles aunque falle otro subdirectorio', async () => {
-        vi.mocked(getTeachersDirectory).mockRejectedValue(new Error('teachers unavailable'));
-        vi.mocked(getClassmatesDirectory).mockResolvedValue([
+        vi.spyOn(documentService, 'getTeachersDirectory').mockRejectedValue(new Error('teachers unavailable'));
+        vi.spyOn(documentService, 'getClassmatesDirectory').mockResolvedValue([
             { userId: 7, username: 'ana_student', email: 'ana@tfg.com', role: 'STUDENT' },
         ]);
-        vi.mocked(getAdminsDirectory).mockResolvedValue([
+        vi.spyOn(documentService, 'getAdminsDirectory').mockResolvedValue([
             { userId: 1, username: 'admin_root', email: 'admin@tfg.com', role: 'ADMIN' },
         ]);
 
