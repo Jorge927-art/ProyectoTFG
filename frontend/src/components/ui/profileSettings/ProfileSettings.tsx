@@ -100,6 +100,7 @@ export default function ProfileSettings() {
     const avatarUrl = resolveAvatarUrl(profile?.avatarPath)
         ?? resolveAvatarUrl(user?.photo)
         ?? `data:image/svg+xml;utf8,<svg xmlns="http://w3.org" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%23cbd5e1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+
     return (
         <div className="max-w-4xl mx-auto space-y-6">
             <header className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

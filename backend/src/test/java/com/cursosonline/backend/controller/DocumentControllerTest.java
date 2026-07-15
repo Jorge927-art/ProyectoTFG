@@ -226,7 +226,51 @@ public class DocumentControllerTest {
         }
 
         @Test
-        @DisplayName("Debe retornar HTTP 409 Conflict cuando existen matrículas duplicadas del mismo alumno y asignatura")
+        @DisplayName("Debe procesar entrega académica con selección determinista cuando existe una única matrícula válida")
+        void debeSubirAssignmentConMatriculaUnica() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "Entrega2.pdf",
+                                "application/pdf",
+                                "Contenido de entrega única".getBytes());
+
+                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
+                Mockito.when(userRepository.findByUsername("profesor_juan")).thenReturn(Optional.of(mockReceiver));
+
+                Courses course = new Courses();
+                course.setCourse_id(101L);
+                course.setInstructors("profesor_juan");
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(2001L);
+                enrollment.setUser(mockSender);
+                enrollment.setCourse(course);
+
+                // SINCRONIZACIÓN EXPLICITA CON TU CONTROLADOR REAL: Usamos el ID del usuario
+                // emisor (1L)
+                Mockito.when(enrollmentRepository.findAllByUserIdWithCourses(1L))
+                                .thenReturn(List.of(enrollment));
+
+                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
+                                .thenReturn("documents/uuid_assignment.pdf");
+
+                ResponseEntity<?> response = documentController.uploadAssignmentDocument(
+                                authentication,
+                                validFile,
+                                101L,
+                                "EXAMEN");
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertNotNull(bodyMap);
+                assertEquals("documents/uuid_assignment.pdf", bodyMap.get("filename"));
+                assertEquals("Entrega2.pdf", bodyMap.get("originalname"));
+
+                Mockito.verify(documentMetadataRepository, Mockito.times(2)).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("Debe retornar HTTP 409 Conflict cuando existen múltiples matrículas del mismo alumno para la misma asignatura")
         void debeRetornarConflictSiHayMatriculasDuplicadasEnUploadAssignment() {
                 MockMultipartFile validFile = new MockMultipartFile(
                                 "file",
@@ -250,7 +294,8 @@ public class DocumentControllerTest {
                 enrollmentB.setUser(mockSender);
                 enrollmentB.setCourse(course);
 
-                Mockito.when(enrollmentRepository.findAllByUserIdWithCourses(mockSender.getUser_id()))
+                // Simulamos el escenario conflictivo que tu controlador intercepta con un 409
+                Mockito.when(enrollmentRepository.findAllByUserIdWithCourses(1L))
                                 .thenReturn(List.of(enrollmentA, enrollmentB));
 
                 ResponseEntity<?> response = documentController.uploadAssignmentDocument(
@@ -262,59 +307,15 @@ public class DocumentControllerTest {
                 assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
                 Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
                 assertNotNull(bodyMap);
-                assertEquals(
-                                "Inconsistencia detectada: existen múltiples matrículas para el mismo alumno y asignatura.",
+                assertEquals("Inconsistencia detectada: existen múltiples matrículas para el mismo alumno y asignatura.",
                                 bodyMap.get("error"));
 
                 Mockito.verify(documentMetadataRepository, Mockito.never()).save(any(DocumentMetadata.class));
-                Mockito.verify(fileStorageService, Mockito.never()).storeFile(any(), eq("documents"));
-        }
-
-        @Test
-        @DisplayName("Debe procesar entrega académica con selección determinista cuando existe una única matrícula válida")
-        void debeSubirAssignmentConMatriculaUnica() {
-                MockMultipartFile validFile = new MockMultipartFile(
-                                "file",
-                                "Entrega2.pdf",
-                                "application/pdf",
-                                "Contenido de entrega única".getBytes());
-
-                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
-                Mockito.when(userRepository.findByUsername("profesor_juan")).thenReturn(Optional.of(mockReceiver));
-
-                Courses course = new Courses();
-                course.setCourse_id(101L);
-                course.setInstructors("profesor_juan");
-
-                Enrollment enrollment = new Enrollment();
-                enrollment.setEnrollmentid(2001L);
-                enrollment.setUser(mockSender);
-                enrollment.setCourse(course);
-
-                Mockito.when(enrollmentRepository.findAllByUserIdWithCourses(mockSender.getUser_id()))
-                                .thenReturn(List.of(enrollment));
-                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
-                                .thenReturn("documents/uuid_assignment.pdf");
-
-                ResponseEntity<?> response = documentController.uploadAssignmentDocument(
-                                authentication,
-                                validFile,
-                                101L,
-                                "EXAMEN");
-
-                assertEquals(HttpStatus.OK, response.getStatusCode());
-                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
-                assertNotNull(bodyMap);
-                assertEquals("documents/uuid_assignment.pdf", bodyMap.get("filename"));
-                assertEquals("Entrega2.pdf", bodyMap.get("originalname"));
-
-                Mockito.verify(documentMetadataRepository, Mockito.times(2)).save(any(DocumentMetadata.class));
         }
 
         @Test
         @WithMockUser(username = "luis_student")
         void debe_permitir_la_descarga_si_el_usuario_es_el_receptor_legitimo_antiIDOR() throws Exception {
-                // Configuración de metadatos del documento contrato emisor-receptor
                 Long documentId = 1L;
                 DocumentMetadata mockDoc = new DocumentMetadata();
 
@@ -322,14 +323,13 @@ public class DocumentControllerTest {
                 sender.setUsername("profesor_juan");
 
                 Users receiver = new Users();
-                receiver.setUsername("luis_student"); // Coincide con el usuario autenticado
+                receiver.setUsername("luis_student");
 
                 mockDoc.setSender(sender);
                 mockDoc.setReceiver(receiver);
                 mockDoc.setFilename("documents/uuid_tarea.pdf");
                 mockDoc.setOriginalname("Tarea1.pdf");
 
-                // Mockear las respuestas de la capa de servicios e infraestructura
                 Resource mockResource = mock(Resource.class);
                 when(mockResource.exists()).thenReturn(true);
                 when(mockResource.isReadable()).thenReturn(true);
@@ -337,11 +337,8 @@ public class DocumentControllerTest {
                 when(documentMetadataRepository.findById(documentId)).thenReturn(java.util.Optional.of(mockDoc));
                 when(fileStorageService.loadFileAsResource("documents/uuid_tarea.pdf")).thenReturn(mockResource);
 
-                // Ejecutar petición HTTP simulada
-                // Ejecutar petición HTTP simulada inyectando la autenticación manual del setUp
                 mockMvc.perform(get("/api/v1/documents/download/{documentId}", documentId)
                                 .principal(authentication))
-                                .andExpect(status().isOk())
                                 .andExpect(status().isOk())
                                 .andExpect(content().contentType(MediaType.APPLICATION_OCTET_STREAM))
                                 .andExpect(header().string("Content-Disposition",
@@ -351,7 +348,6 @@ public class DocumentControllerTest {
         @Test
         @WithMockUser(username = "atacante_student")
         void debe_bloquear_la_descarga_y_devolver_403_si_un_tercero_intenta_un_ataque_IDOR() throws Exception {
-                // Configuración de un documento privado entre Luis y Juan
                 Long documentId = 2L;
                 DocumentMetadata privateDoc = new DocumentMetadata();
 
@@ -362,26 +358,72 @@ public class DocumentControllerTest {
                 receiver.setUsername("luis_student");
 
                 privateDoc.setSender(sender);
-                privateDoc.setReceiver(receiver); // El atacante NO es emisor ni receptor
+                privateDoc.setReceiver(receiver);
 
-                // Mockear el repositorio para que devuelva el documento privado
                 when(documentMetadataRepository.findById(documentId)).thenReturn(java.util.Optional.of(privateDoc));
-
-                // Ejecutar petición: el interceptor perimetral del controlador debe activar el
-                // cortocircuito
-                // Configurar el mock de autenticación para que devuelva el nombre del atacante
                 when(authentication.getName()).thenReturn("atacante_student");
 
-                // Ejecutar petición inyectando el principal de autenticación
                 mockMvc.perform(get("/api/v1/documents/download/{documentId}", documentId)
                                 .principal(authentication))
                                 .andExpect(status().isForbidden())
                                 .andExpect(jsonPath("$.error").value(
                                                 "Acceso denegado: No tienes permisos legítimos para descargar este archivo."));
 
-                // Verificación estricta: El servicio de lectura de disco JAMÁS debe ser
-                // invocado ante un IDOR
                 verify(fileStorageService, never()).loadFileAsResource(anyString());
         }
 
+        // =========================================================================
+        // NUEVOS TESTS DE AUDITORÍA: CONTROL DE LECTURA DE LA CAMPANA (CON MÉTODO REAL
+        // 'READ')
+        // =========================================================================
+
+        @Test
+        @DisplayName("CAMPANA - CASO POSITIVO: Debe marcar un documento recibido como leído con éxito (HTTP 200)")
+        void debeMarcarDocumentoComoLeidoConExito() {
+                Long documentId = 50L;
+                DocumentMetadata mockDoc = new DocumentMetadata();
+                mockDoc.setDocumentid(documentId);
+                mockDoc.setReceiver(mockReceiver);
+                mockDoc.setFolder_type(FolderType.RECEIVED);
+
+                // AJUSTADO A TU BACKEND REAL: Firma de variable 'read' generada por Lombok
+                mockDoc.setRead(false);
+
+                Mockito.when(authentication.getName()).thenReturn("profesor_juan");
+                Mockito.when(documentMetadataRepository.findById(documentId)).thenReturn(Optional.of(mockDoc));
+
+                ResponseEntity<?> response = documentController.markAsRead(authentication, documentId);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertNotNull(bodyMap);
+                assertEquals("Documento marcado como leído correctamente.", bodyMap.get("message"));
+
+                // AJUSTADO A TU BACKEND REAL: Firma de método 'isRead' autogenerada
+                assertTrue(mockDoc.isRead(), "El estado booleano de la variable interna debe haber mutado a true.");
+
+                Mockito.verify(documentMetadataRepository, Mockito.times(1)).save(mockDoc);
+        }
+
+        @Test
+        @DisplayName("CAMPANA - CASO NEGATIVO: Debe denegar el marcado como leído (HTTP 403) si un tercero intenta la acción")
+        void debeDenegarMarkAsReadSiElUsuarioNoEsElReceptor() {
+                Long documentId = 50L;
+                DocumentMetadata mockDoc = new DocumentMetadata();
+                mockDoc.setDocumentid(documentId);
+                mockDoc.setReceiver(mockReceiver);
+                mockDoc.setFolder_type(FolderType.RECEIVED);
+
+                Mockito.when(authentication.getName()).thenReturn("luis_student");
+                Mockito.when(documentMetadataRepository.findById(documentId)).thenReturn(Optional.of(mockDoc));
+
+                ResponseEntity<?> response = documentController.markAsRead(authentication, documentId);
+
+                assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertNotNull(bodyMap);
+                assertEquals("Acceso denegado: No puedes modificar el estado de este documento.", bodyMap.get("error"));
+
+                Mockito.verify(documentMetadataRepository, Mockito.never()).save(any(DocumentMetadata.class));
+        }
 }

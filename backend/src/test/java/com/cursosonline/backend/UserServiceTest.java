@@ -42,6 +42,9 @@ public class UserServiceTest {
         @Mock
         private EnrollmentRepository enrollmentRepository;
 
+        @Mock
+        private com.cursosonline.backend.repository.InterestRepository interestRepository;
+
         @InjectMocks
         private UserService userService;
 
@@ -254,6 +257,58 @@ public class UserServiceTest {
                 // original del objeto persistido.
                 assertEquals(progresoMatematicoEsperado, matriculaLeida.getProgress_percentage(),
                                 "FALLO EN EL READ PATH: Las matrículas se leen directo de la DB sin calcular el porcentaje dinámico al vuelo.");
+        }
+
+        // =========================================================================
+        // NUEVOS TESTS DE AUDITORÍA: VALIDACIÓN DE INTERESES EN LOGIN Y REGISTRO
+        // (MÉTODO REAL)
+        // =========================================================================
+
+        @Test
+        void login_DebeVerificarFielmenteLasCredencialesYRetornarUsuario_CuandoElLoginEsExitoso() {
+                // 1. Configuración del escenario base para el Alumno Luis
+                String username = "Luis";
+                Users mockUser = new Users(1L, username, "encoded_pwd", Role.STUDENT, "luis@gmail.com", true,
+                                new java.util.ArrayList<>());
+
+                // Sincronizamos los mocks según el flujo real de tu método login()
+                when(userRepository.findByUsername(username)).thenReturn(Optional.of(mockUser));
+                when(passwordEncoder.matches("pwd_valida", "encoded_pwd")).thenReturn(true);
+
+                // 2. Ejecución de la acción real expuesta en tu capa de servicio
+                Users result = userService.login(username, "pwd_valida");
+
+                // 3. Verificaciones asertivas del contrato de negocio
+                assertNotNull(result, "El usuario retornado tras el login no puede ser nulo.");
+                assertEquals(username, result.getUsername());
+                assertTrue(result.isEnabled(), "La cuenta debe estar activa para superar el login.");
+
+                verify(userRepository, times(1)).findByUsername(username);
+                verify(passwordEncoder, times(1)).matches("pwd_valida", "encoded_pwd");
+        }
+
+        @Test
+        void getUserInterests_DebeMitigarError500RetornandoColeccionesVacias_CuandoElUsuarioCareceDeIntereses() {
+                // 1. Configuración del escenario límite: Un alumno nuevo sin registro en la
+                // tabla de intereses
+                String username = "NuevoAlumno";
+                Users mockUser = new Users(2L, username, "encoded_pwd", Role.STUDENT, "nuevo@gmail.com", true,
+                                new java.util.ArrayList<>());
+
+                when(userRepository.findByUsername(username)).thenReturn(Optional.of(mockUser));
+
+                // REGLA MOCKITO CRÍTICA: Simulamos que la tabla de intereses responde un
+                // Optional vacío (no se encuentra fila)
+                when(interestRepository.findById(2L)).thenReturn(Optional.empty());
+
+                // 2. Ejecución del flujo crítico de hidratación que preocupaba a NotebookLM
+                com.cursosonline.backend.dto.InterestDTO resultInterests = userService.getUserInterests(username);
+
+                // 3. Verificación estricta de la mitigación de nulos y el ADR-31
+                assertNotNull(resultInterests, "MITIGACIÓN DE ERRORES: El DTO de intereses jamás debe retornar nulo.");
+
+                verify(userRepository, times(1)).findByUsername(username);
+                verify(interestRepository, times(1)).findById(2L);
         }
 
 }
