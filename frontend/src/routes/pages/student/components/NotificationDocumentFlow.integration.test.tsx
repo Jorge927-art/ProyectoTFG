@@ -82,12 +82,8 @@ describe('Integracion campana + gestor de documentos', () => {
             expect(bellButton.className).toContain('bg-red-50!');
         });
 
-        const senderLabel = await screen.findByText(/De:\s*profesor_juan/i);
-        const rowContainer = senderLabel.closest('div.flex.justify-between.items-center');
-        const downloadButton = rowContainer?.querySelector('button');
-
-        expect(downloadButton).toBeDefined();
-        fireEvent.click(downloadButton as HTMLButtonElement);
+        const downloadButton = await screen.findByRole('button', { name: /Descargar documento 11/i });
+        fireEvent.click(downloadButton);
 
         await waitFor(() => {
             expect(markAsReadSpy).toHaveBeenCalledWith(11);

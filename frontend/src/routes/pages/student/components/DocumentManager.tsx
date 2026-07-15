@@ -230,6 +230,7 @@ export const DocumentManager = () => {
 
                                 <GenericButton
                                     type="button"
+                                    ariaLabel={`Descargar documento ${doc.documentid}`}
                                     onClick={() => handleDownload(doc.documentid, doc.originalname)}
                                     disabled={downloadingId !== null}
                                     variant="white"
