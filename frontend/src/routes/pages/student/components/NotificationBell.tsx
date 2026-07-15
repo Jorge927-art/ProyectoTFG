@@ -4,7 +4,8 @@ import { useNotifications } from './useNotifications';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton'; // Asegura la ruta a tu botón core
 
 export default function NotificationBell() {
-    const { alerts, hasAlerts } = useNotifications();
+    // RECOMENDACIÓN NOTEBOOKLM: Extraemos 'hasUnread' para condicionar la estética de la campana
+    const { alerts, hasAlerts, hasUnread } = useNotifications();
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -21,25 +22,26 @@ export default function NotificationBell() {
 
     return (
         <div className="relative" ref={dropdownRef}>
-            {/* Botón de la Campana usando el componente core variant="search" para que sea circular */}
+            {/* RECOMENDACIÓN NOTEBOOKLM: El fondo cambia según si hay documentos sin leer (hasUnread) */}
             <GenericButton
                 variant="search"
                 onClick={() => setIsOpen(!isOpen)}
-                className={`relative p-2.5! transition-all ${hasAlerts
-                        ? 'bg-red-50! border-red-200! hover:bg-red-100!'
-                        : 'bg-white hover:bg-slate-100'
+                className={`relative p-2.5! transition-all ${hasUnread
+                    ? 'bg-red-50! border-red-200! hover:bg-red-100!'
+                    : 'bg-white hover:bg-slate-100'
                     }`}
                 icon={
+                    /* RECOMENDACIÓN NOTEBOOKLM: Color rojo y parpadeo condicionado estrictamente a 'hasUnread' */
                     <Bell
                         size={20}
-                        className={hasAlerts ? 'text-red-500 animate-pulse' : 'text-slate-500'}
+                        className={hasUnread ? 'text-red-500 animate-pulse' : 'text-slate-505 text-slate-500'}
                     />
                 }
                 ariaLabel="Campana de notificaciones"
             />
 
-            {/* Punto rojo flotante indicador sobre la campana si hay alertas activas */}
-            {hasAlerts && (
+            {/* RECOMENDACIÓN NOTEBOOKLM: El punto flotante se renderiza si quedan elementos sin leer */}
+            {hasUnread && (
                 <span className="absolute top-1 right-1 flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>

@@ -30,6 +30,13 @@ public class DocumentMetadata {
     @Column(name = "evaluation_type")
     private String evaluation_type; // Guardará valores literales: "TRABAJO", "EXAMEN" o null para documentos
                                     // generales
+
+    /**
+     * Estado de lectura del documento
+     */
+    @Column(name = "is_read", nullable = false)
+    private boolean read = false;
+
     // --- NUEVOS CAMPOS PARA INTERCAMBIO BIDIRECCIONAL ---
 
     @JsonIgnore

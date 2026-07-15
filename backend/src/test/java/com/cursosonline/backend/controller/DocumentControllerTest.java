@@ -1,7 +1,9 @@
 package com.cursosonline.backend.controller;
 
 import com.cursosonline.backend.entities.DocumentMetadata;
+import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.FolderType;
+import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.repository.DocumentMetadataRepository;
@@ -140,8 +142,8 @@ public class DocumentControllerTest {
                 List<?> bodyList = (List<?>) response.getBody();
                 assertEquals(2, bodyList.size());
 
-                DocumentMetadata firstResult = (DocumentMetadata) bodyList.get(0);
-                assertEquals("Tema1.pdf", firstResult.getOriginalname());
+                Map<?, ?> firstResult = (Map<?, ?>) bodyList.get(0);
+                assertEquals("Tema1.pdf", firstResult.get("originalname"));
         }
 
         @Test
@@ -221,6 +223,92 @@ public class DocumentControllerTest {
                 // debido al cortocircuito defensivo
                 Mockito.verify(userRepository, Mockito.never()).findById(anyLong());
                 Mockito.verify(documentMetadataRepository, Mockito.never()).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("Debe retornar HTTP 409 Conflict cuando existen matrículas duplicadas del mismo alumno y asignatura")
+        void debeRetornarConflictSiHayMatriculasDuplicadasEnUploadAssignment() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "Entrega1.pdf",
+                                "application/pdf",
+                                "Contenido de entrega".getBytes());
+
+                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
+
+                Courses course = new Courses();
+                course.setCourse_id(101L);
+                course.setInstructors("profesor_juan");
+
+                Enrollment enrollmentA = new Enrollment();
+                enrollmentA.setEnrollmentid(1001L);
+                enrollmentA.setUser(mockSender);
+                enrollmentA.setCourse(course);
+
+                Enrollment enrollmentB = new Enrollment();
+                enrollmentB.setEnrollmentid(1002L);
+                enrollmentB.setUser(mockSender);
+                enrollmentB.setCourse(course);
+
+                Mockito.when(enrollmentRepository.findAllByUserIdWithCourses(mockSender.getUser_id()))
+                                .thenReturn(List.of(enrollmentA, enrollmentB));
+
+                ResponseEntity<?> response = documentController.uploadAssignmentDocument(
+                                authentication,
+                                validFile,
+                                101L,
+                                "TRABAJO");
+
+                assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertNotNull(bodyMap);
+                assertEquals(
+                                "Inconsistencia detectada: existen múltiples matrículas para el mismo alumno y asignatura.",
+                                bodyMap.get("error"));
+
+                Mockito.verify(documentMetadataRepository, Mockito.never()).save(any(DocumentMetadata.class));
+                Mockito.verify(fileStorageService, Mockito.never()).storeFile(any(), eq("documents"));
+        }
+
+        @Test
+        @DisplayName("Debe procesar entrega académica con selección determinista cuando existe una única matrícula válida")
+        void debeSubirAssignmentConMatriculaUnica() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "Entrega2.pdf",
+                                "application/pdf",
+                                "Contenido de entrega única".getBytes());
+
+                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
+                Mockito.when(userRepository.findByUsername("profesor_juan")).thenReturn(Optional.of(mockReceiver));
+
+                Courses course = new Courses();
+                course.setCourse_id(101L);
+                course.setInstructors("profesor_juan");
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(2001L);
+                enrollment.setUser(mockSender);
+                enrollment.setCourse(course);
+
+                Mockito.when(enrollmentRepository.findAllByUserIdWithCourses(mockSender.getUser_id()))
+                                .thenReturn(List.of(enrollment));
+                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
+                                .thenReturn("documents/uuid_assignment.pdf");
+
+                ResponseEntity<?> response = documentController.uploadAssignmentDocument(
+                                authentication,
+                                validFile,
+                                101L,
+                                "EXAMEN");
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertNotNull(bodyMap);
+                assertEquals("documents/uuid_assignment.pdf", bodyMap.get("filename"));
+                assertEquals("Entrega2.pdf", bodyMap.get("originalname"));
+
+                Mockito.verify(documentMetadataRepository, Mockito.times(2)).save(any(DocumentMetadata.class));
         }
 
         @Test

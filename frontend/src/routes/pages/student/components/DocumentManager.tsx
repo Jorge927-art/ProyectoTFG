@@ -3,6 +3,8 @@ import { Upload, FileText, Download, Loader2, AlertCircle, FileUp, Inbox, Send, 
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import { useDocuments } from './useDocuments';
+import { useNotifications } from './useNotifications'; // <-- RECOMENDACIÓN NOTEBOOKLM: Importación del Hook
+import { markDocumentAsRead } from '../../../../services/documentService'; // <-- RECOMENDACIÓN NOTEBOOKLM: Importación del Servicio
 
 export const DocumentManager = () => {
     const {
@@ -20,6 +22,9 @@ export const DocumentManager = () => {
         handleUpload,
         handleSecureDownload
     } = useDocuments();
+
+    // RECOMENDACIÓN NOTEBOOKLM: Extraemos el refresco para actualizar el estado global de la campana
+    const { refreshNotifications } = useNotifications();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
@@ -47,21 +52,30 @@ export const DocumentManager = () => {
         }
     };
 
+    // RECOMENDACIÓN NOTEBOOKLM: Modificada para sincronizar la lectura con el backend tras la descarga
     const handleDownload = async (documentId: number, originalName: string) => {
         if (downloadingId !== null) return;
         try {
             setDownloadingId(documentId);
             setDocumentError('');
+
+            // 1. Iniciar el stream de bytes seguro
             await handleSecureDownload(documentId, originalName);
+
+            // 2. Si es un documento recibido, disparamos el marcado como leído en PostgreSQL
+            if (activeTab === 'RECEIVED') {
+                await markDocumentAsRead(documentId);
+
+                // 3. Forzar al canal de alarmas a re-evaluar el estado rojo/gris de la campana
+                refreshNotifications();
+            }
         } catch (error) {
-            console.error("Error en la descarga segura:", error);
-            setDocumentError("No tienes autorización legítima para descargar este documento.");
+            console.error("Error en la descarga segura o actualización:", error);
+            setDocumentError("No tienes autorización legítima para procesar este documento.");
         } finally {
             setDownloadingId(null);
         }
     };
-
-
     return (
         /* ALINEACIÓN GEOMÉTRICA CONSOLIDADA: Mantiene simetría exacta con tus otras tarjetas en h-109 */
         <GenericCard className="flex flex-col h-109">
@@ -109,6 +123,7 @@ export const DocumentManager = () => {
                     <p className="truncate">{documentError}</p>
                 </div>
             )}
+
             {/* CONTENEDOR FLEX PRINCIPAL */}
             <div className="flex-1 flex flex-col space-y-3 min-h-0">
 
@@ -178,7 +193,6 @@ export const DocumentManager = () => {
                         </label>
                     </div>
                 </div>
-
                 {/* ZONA DE LISTADO CON SCROLL GEOMÉTRICO CONTROLADO [ADR-19] */}
                 <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2 min-h-30">
                     {loadingDocuments ? (
@@ -202,27 +216,29 @@ export const DocumentManager = () => {
                                 className="flex justify-between items-center p-2.5 bg-white border border-slate-100 hover:border-slate-200 rounded-lg shadow-sm transition-all"
                             >
                                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                    <FileText size={16} className="text-slate-400 shrink-0" />
+                                    {/* DETALLE VISUAL EXTRA: Opacidad atenuada si el archivo ya fue leído */}
+                                    <FileText size={16} className={`shrink-0 ${doc.isRead ? 'text-slate-300' : 'text-slate-500'}`} />
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-xs font-bold text-slate-700 truncate" title={doc.originalname}>
+                                        <p className={`text-xs font-bold truncate ${doc.isRead ? 'text-slate-400 font-medium' : 'text-slate-700'}`}>
                                             {doc.originalname}
                                         </p>
-                                        <p className="text-[10px] text-slate-400 font-medium">
-                                            {activeTab === 'RECEIVED'
-                                                ? `De: ${doc.sender?.username || 'Sistema'}`
-                                                : `Para: ${doc.receiver?.username || 'Desconocido'}`
-                                            }
+                                        <p className="text-[10px] text-slate-400 font-medium truncate">
+                                            {activeTab === 'RECEIVED' ? `De: ${doc.sender.username}` : `Para: ${doc.receiver.username}`}
                                         </p>
                                     </div>
                                 </div>
+
                                 <GenericButton
                                     type="button"
                                     onClick={() => handleDownload(doc.documentid, doc.originalname)}
                                     disabled={downloadingId !== null}
-                                    variant="text"
-                                    ariaLabel="Descargar documento seguro"
-                                    icon={downloadingId === doc.documentid ? <Loader2 size={14} className="animate-spin text-blue-600" /> : <Download size={14} />}
-                                    className="p-1.5! text-slate-500! hover:text-blue-600! hover:bg-blue-50! rounded-md! transition-colors! cursor-pointer! ml-2! shrink-0! disabled:opacity-50! disabled:cursor-not-allowed! bg-transparent! shadow-none!"
+                                    variant="white"
+                                    icon={downloadingId === doc.documentid ? (
+                                        <Loader2 size={14} className="animate-spin text-blue-600" />
+                                    ) : (
+                                        <Download size={14} className={doc.isRead ? 'text-slate-400' : 'text-blue-600'} />
+                                    )}
+                                    className="p-1.5! bg-slate-50 hover:bg-slate-100! border border-slate-200 rounded-lg! transition-colors cursor-pointer"
                                 />
                             </div>
                         ))

@@ -22,6 +22,7 @@ import java.util.Map;
 import java.time.Instant;
 import java.util.List;
 import java.security.Principal;
+import java.util.LinkedHashMap;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -176,8 +177,8 @@ public class UserController {
      */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<Users>> listAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsers());
+    public ResponseEntity<List<Map<String, Object>>> listAllUsers() {
+        return ResponseEntity.ok(userService.getAllUsers().stream().map(this::toAdminUserResponse).toList());
     }
 
     /**
@@ -217,6 +218,10 @@ public class UserController {
     @DeleteMapping("/users/{username}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteUserByAdmin(@PathVariable String username, Principal principal) {
+        if (principal == null || principal.getName() == null || principal.getName().trim().isEmpty()) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
         if (principal.getName().equalsIgnoreCase(username)) {
             return ResponseEntity.badRequest().body(Map.of(
                     "error", "Acción denegada: No puedes modificar tu propia cuenta de administrador."));
@@ -242,6 +247,16 @@ public class UserController {
         return ResponseEntity.ok(user);
     }
 
+    private Map<String, Object> toAdminUserResponse(Users user) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("userId", user.getUser_id());
+        payload.put("username", user.getUsername());
+        payload.put("email", user.getEmail());
+        payload.put("role", user.getRole() != null ? user.getRole().name() : null);
+        payload.put("enabled", user.isEnabled());
+        return payload;
+    }
+
     /**
      * Endpoint blindado para iniciar el contador de tiempo de un curso [ADR-34].
      * Valida la identidad física del alumno antes de alterar el estado en
@@ -249,6 +264,10 @@ public class UserController {
      */
     @PostMapping("/enrollment/{id}/start")
     public ResponseEntity<?> startCourse(@PathVariable Long id, Principal principal) {
+        if (principal == null || principal.getName() == null || principal.getName().trim().isEmpty()) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
         // 1. Recuperamos el nombre de usuario (email/username) del token JWT activo
         String authenticatedUsername = principal.getName();
 

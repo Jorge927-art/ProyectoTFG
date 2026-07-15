@@ -34,7 +34,7 @@ public class SecurityConfig {
 
     // Sincronizado con application.properties usando la estructura estandar
     // 'app.cors.allowed-origins'
-    @Value("${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}")
+    @Value("#{'${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}'.split(',')}")
     private List<String> allowedOrigins;
 
     /**
@@ -68,6 +68,9 @@ public class SecurityConfig {
 
                         // Endpoints de autenticación pública (login y registro)
                         .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+
+                        // Healthcheck público para diagnóstico local y monitorización básica
+                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
 
                         // ✅ SEGURIDAD ESTRUCTURAL: Permitir ver imágenes de perfil públicamente (Solo
                         // lectura)

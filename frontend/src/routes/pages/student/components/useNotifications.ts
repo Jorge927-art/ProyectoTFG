@@ -60,8 +60,8 @@ export const useNotifications = () => {
         window.dispatchEvent(new Event(NOTIFICATIONS_REFRESH_EVENT));
     }, []);
 
-    // RECOMENDACIÓN NOTEBOOKLM: Evalúa si hay documentos recibidos no leídos (isread === false)
-    const hasUnread = documents.some(doc => !doc.isread);
+    // RECOMENDACIÓN NOTEBOOKLM: Evalúa si hay documentos recibidos no leídos (isRead === false)
+    const hasUnread = documents.some(doc => !doc.isRead);
 
     return { 
         alerts, 

@@ -148,13 +148,13 @@ const StudentDashboard = () => {
                 </div>
 
                 {/* 
-                   GRID SINCRONIZADO ORIGINAL RESTAURADO AL 100% [ADR-19]:
-                   - Contenedores exteriores y alineación perfectamente intactos.
-                */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+   GRID SINCRONIZADO MODIFICADO:
+   - Se cambia 'items-start' por 'items-stretch' para igualar alturas de columnas
+          */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
 
-                    {/* COLUMNA 1 (IZQUIERDA): Contenedor máster intacto */}
-                    <div className="bg-white border rounded-2xl p-6 shadow-sm space-y-6">
+                    {/* COLUMNA 1 (IZQUIERDA): Se añade 'flex flex-col' para poder controlar el estiramiento interno */}
+                    <div className="bg-white border rounded-2xl p-6 shadow-sm space-y-6 h-full flex flex-col">
                         <EnrolledCourses
                             enrolledList={enrolledList}
                             loadingEnrollments={loadingEnrollments}
@@ -165,6 +165,11 @@ const StudentDashboard = () => {
                             }}
                         />
                         <DocumentManager />
+
+                        {/* Tarjeta de la Evaluación Académica Dual: Se añade 'flex-1 flex flex-col' para que se estire al máximo */}
+                        <div className="pt-4 flex-1 flex flex-col">
+                            <EvaluationPanel />
+                        </div>
                     </div>
 
                     {/* COLUMNA 2 Y 3 (DERECHA): Distribución estratégica de componentes */}
@@ -186,11 +191,6 @@ const StudentDashboard = () => {
                                 activeCourseId={activeCourseId}
                                 enrolledList={enrolledList}
                             />
-                        </div>
-
-                        {/* Tarjeta de la Evaluación Académica Dual */}
-                        <div className="bg-white border rounded-2xl p-6 shadow-sm">
-                            <EvaluationPanel />
                         </div>
 
                         {/* PANEL ANALÍTICO ESTADÍSTICO REACTIVO COMPENSADO [ADR-41] */}

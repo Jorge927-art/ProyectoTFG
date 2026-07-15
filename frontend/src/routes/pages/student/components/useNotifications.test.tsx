@@ -6,15 +6,15 @@ import * as documentService from '../../../../services/documentService';
 import type { DocumentMetadata } from '../../../../services/documentService';
 import type { NotificationDTO } from './useNotifications';
 
-const buildDoc = (isread: boolean): DocumentMetadata => ({
+const buildDoc = (isRead: boolean): DocumentMetadata => ({
     documentid: 1,
     filename: 'doc-1.pdf',
     originalname: 'doc-1.pdf',
     upload_date: '2026-07-15T00:00:00.000Z',
-    sender: { user_id: 2, username: 'profesor', email: 'prof@tfg.com', role: 'PROFESSOR' },
-    receiver: { user_id: 1, username: 'alumno', email: 'alumno@tfg.com', role: 'STUDENT' },
+    sender: { userId: 2, username: 'profesor', email: 'prof@tfg.com', role: 'PROFESSOR' },
+    receiver: { userId: 1, username: 'alumno', email: 'alumno@tfg.com', role: 'STUDENT' },
     folder_type: 'RECEIVED',
-    isread,
+    isRead,
 });
 
 describe('useNotifications', () => {

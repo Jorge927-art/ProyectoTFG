@@ -11,6 +11,18 @@ import {
     type UserDirectoryDTO 
 } from '../../../../services/documentService';
 
+const mergeDirectoryEntries = (groups: UserDirectoryDTO[][]): UserDirectoryDTO[] => {
+    const uniqueUsers = new Map<number, UserDirectoryDTO>();
+
+    for (const group of groups) {
+        for (const user of group) {
+            uniqueUsers.set(user.userId, user);
+        }
+    }
+
+    return Array.from(uniqueUsers.values());
+};
+
 export const useDocuments = (successTrigger?: string) => {
     // Listas independientes para evitar el "efecto fantasma" visual [ADR-19]
     const [receivedList, setReceivedList] = useState<DocumentMetadata[]>([]);
@@ -55,16 +67,26 @@ export const useDocuments = (successTrigger?: string) => {
     const fetchDirectory = useCallback(async () => {
         setLoadingDirectory(true);
         try {
-            const [teachers, classmates, admins] = await Promise.all([
+            const [teachersResult, classmatesResult, adminsResult] = await Promise.allSettled([
                 getTeachersDirectory(),
                 getClassmatesDirectory(),
                 getAdminsDirectory()
             ]);
-            // Consolidamos en una única lista limpia para el selector
-            setDirectory([...teachers, ...classmates, ...admins]);
+
+            const successfulGroups = [teachersResult, classmatesResult, adminsResult]
+                .filter((result): result is PromiseFulfilledResult<UserDirectoryDTO[]> => result.status === 'fulfilled')
+                .map((result) => result.value);
+
+            if (successfulGroups.length === 0) {
+                throw new Error('No se pudo recuperar ningún destinatario válido.');
+            }
+
+            setDirectory(mergeDirectoryEntries(successfulGroups));
+            setDocumentError('');
         } catch (err: unknown) {
             console.error("Error al recuperar el directorio de contactos:", err);
             setDocumentError("Error al cargar la lista de destinatarios válidos.");
+            setDirectory([]);
         } finally {
             setLoadingDirectory(false);
         }

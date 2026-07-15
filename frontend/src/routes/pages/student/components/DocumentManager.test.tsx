@@ -76,9 +76,10 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
                 filename: 'doc1.pdf',
                 originalname: 'Tarea_Algebra.pdf',
                 upload_date: '2026-07-06T10:00:00.000Z',
-                sender: { user_id: 2, username: 'profesor_juan', email: 'juan@tfg.com', role: 'PROFESSOR' },
-                receiver: { user_id: 1, username: 'luis_student', email: 'luis@tfg.com', role: 'STUDENT' },
-                folder_type: 'RECEIVED' as const
+                sender: { userId: 2, username: 'profesor_juan', email: 'juan@tfg.com', role: 'PROFESSOR' },
+                receiver: { userId: 1, username: 'luis_student', email: 'luis@tfg.com', role: 'STUDENT' },
+                folder_type: 'RECEIVED' as const,
+                isRead: false
             }
         ];
 

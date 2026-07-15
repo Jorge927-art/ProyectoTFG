@@ -12,10 +12,10 @@ const unreadDocument: DocumentMetadata = {
     filename: 'feedback.pdf',
     originalname: 'Feedback_Algebra.pdf',
     upload_date: '2026-07-15T10:00:00.000Z',
-    sender: { user_id: 2, username: 'profesor_juan', email: 'juan@tfg.com', role: 'PROFESSOR' },
-    receiver: { user_id: 1, username: 'luis_student', email: 'luis@tfg.com', role: 'STUDENT' },
+    sender: { userId: 2, username: 'profesor_juan', email: 'juan@tfg.com', role: 'PROFESSOR' },
+    receiver: { userId: 1, username: 'luis_student', email: 'luis@tfg.com', role: 'STUDENT' },
     folder_type: 'RECEIVED',
-    isread: false,
+    isRead: false,
 };
 
 describe('Integracion campana + gestor de documentos', () => {
@@ -41,13 +41,13 @@ describe('Integracion campana + gestor de documentos', () => {
 
         const markAsReadSpy = vi.spyOn(documentService, 'markDocumentAsRead').mockImplementation(async (documentId: number) => {
             currentDocs = currentDocs.map((doc) =>
-                doc.documentid === documentId ? { ...doc, isread: true } : doc
+                doc.documentid === documentId ? { ...doc, isRead: true } : doc
             );
 
             return {
                 message: 'Documento marcado como leido',
                 documentId,
-                isread: true,
+                isRead: true,
             };
         });
 
