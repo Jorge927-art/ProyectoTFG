@@ -1,12 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { DocumentManager } from './DocumentManager';
-import { useDocuments } from './useDocuments';
-
-// 1. Mockear el hook para aislar el componente visual de las llamadas reales de Axios
-vi.mock('./useDocuments', () => ({
-    useDocuments: vi.fn()
-}));
+import * as useDocumentsHook from './useDocuments';
 
 describe('DocumentManager Component [TFG Test Suite]', () => {
     // Definimos variables de mock que satisfacen estrictamente la interfaz del hook
@@ -15,12 +10,14 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
     const mockSetDocumentError = vi.fn();
     const mockSetActiveTab = vi.fn();
     const mockSetSelectedReceiverId = vi.fn();
+    let useDocumentsSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
         vi.clearAllMocks();
+        useDocumentsSpy = vi.spyOn(useDocumentsHook, 'useDocuments');
 
         // AUDITORÍA DE CONTRATO: Configuración inicial que refleja fielmente las nuevas propiedades del hook
-        vi.mocked(useDocuments).mockReturnValue({
+        useDocumentsSpy.mockReturnValue({
             documentList: [],
             activeTab: 'RECEIVED',
             setActiveTab: mockSetActiveTab,
@@ -39,6 +36,10 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
             handleSecureDownload: mockHandleSecureDownload
         });
     });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
     it('debe renderizar el estado vacío contextualizado en la bandeja de entrada por defecto', () => {
         render(<DocumentManager />);
 
@@ -48,7 +49,7 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
 
     it('debe renderizar el estado vacío contextualizado en la bandeja de enviados al conmutar la pestaña', () => {
         // Forzamos al hook a simular que la pestaña activa actual es la de enviados
-        vi.mocked(useDocuments).mockReturnValue({
+        useDocumentsSpy.mockReturnValue({
             documentList: [],
             activeTab: 'SENT',
             setActiveTab: mockSetActiveTab,
@@ -83,7 +84,7 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
             }
         ];
 
-        vi.mocked(useDocuments).mockReturnValue({
+        useDocumentsSpy.mockReturnValue({
             documentList: mockDocuments,
             activeTab: 'RECEIVED',
             setActiveTab: mockSetActiveTab,
@@ -107,7 +108,7 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
     });
 
     it('debe mostrar el indicador de carga asíncrona mientras sincroniza con el backend', () => {
-        vi.mocked(useDocuments).mockReturnValue({
+        useDocumentsSpy.mockReturnValue({
             documentList: [],
             activeTab: 'RECEIVED',
             setActiveTab: mockSetActiveTab,
@@ -140,7 +141,7 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
 
     it('debe interceptar y detener la subida en el cliente si el archivo supera el umbral de 5MB con destinatario seleccionado', async () => {
         // Forzamos al hook a simular que el alumno SÍ ha seleccionado previamente un destinatario válido (ID 2)
-        vi.mocked(useDocuments).mockReturnValue({
+        useDocumentsSpy.mockReturnValue({
             documentList: [],
             activeTab: 'RECEIVED',
             setActiveTab: mockSetActiveTab,

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import NotificationBell from './NotificationBell';
 import { DocumentManager } from './DocumentManager';
@@ -21,6 +21,10 @@ const unreadDocument: DocumentMetadata = {
 describe('Integracion campana + gestor de documentos', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     it('pasa de rojo a gris tras descargar y marcar como leido', async () => {
@@ -82,7 +86,7 @@ describe('Integracion campana + gestor de documentos', () => {
             expect(bellButton.className).toContain('bg-red-50!');
         });
 
-        const downloadButton = await screen.findByRole('button', { name: /Descargar documento 11/i });
+        const downloadButton = await screen.findByTestId('download-document-11');
         fireEvent.click(downloadButton);
 
         await waitFor(() => {

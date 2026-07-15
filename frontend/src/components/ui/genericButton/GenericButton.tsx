@@ -13,6 +13,7 @@ interface GenericButtonProps {
     label?: string;
     ariaLabel?: string;
     title?: string;
+    testId?: string;
     icon?: ReactNode;
     onClick?: MouseEventHandler<HTMLButtonElement>;
     variant?: ButtonVariant;
@@ -40,6 +41,7 @@ const GenericButton = ({
     label,
     ariaLabel,
     title,
+    testId,
     icon,
     onClick,
     variant = 'white',
@@ -96,6 +98,7 @@ const GenericButton = ({
             disabled={disabled}
             aria-label={ariaLabel || label}
             title={title}
+            data-testid={testId}
         >
             {/* Renderizado dinámico del icono respetando la alineación flex */}
             {icon && <span className="flex items-center shrink-0">{icon}</span>}
