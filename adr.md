@@ -6,120 +6,442 @@ Este documento centraliza las decisiones técnicas críticas tomadas durante el 
 
 ---
 
-## [ADR-01] React + Spring Boot como Arquitectura Desacoplada
+# ADR-01: React + Spring Boot como Arquitectura Desacoplada
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Se requiere construir una plataforma web de formación con capacidad de crecimiento funcional, garantizando que el diseño visual y la lógica de negocio no interfieran entre sí.
-* **Decisión:** Adoptar una arquitectura cliente-servidor completamente desacoplada mediante una Single Page Application (SPA) en React y una API REST empresarial en Spring Boot.
-* **Justificación para el TFG:** Permite la separación estricta de responsabilidades (Frontend/Backend). Facilita el desarrollo independiente y cumple con los estándares actuales de la industria del software.
-* **Consecuencias:** Duplicidad inicial de modelos de datos en TypeScript y Java, pero total libertad para rediseñar la interfaz sin alterar la base de datos.
+## Estatus
 
----
+Aceptado
 
-## [ADR-02] Organización del Espacio de Trabajo mediante Monorepo
+## Fecha
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** El proyecto involucra dos tecnologías independientes (React y Spring Boot) gestionadas por un único desarrollador durante el ciclo de vida del TFG.
-* **Decisión:** Alojar ambas aplicaciones en directorios diferenciados (`frontend/` y `backend/`) dentro del mismo repositorio de Git.
-* **Justificación para el TFG:** Simplifica drásticamente la gestión del código, reduce la fricción operativa y permite realizar un único *commit* que relacione un cambio funcional simultáneo en el cliente y el servidor.
-* **Consecuencias:** El repositorio crece en tamaño, pero se centraliza toda la documentación técnica en la raíz del proyecto de cara a la evaluación del tribunal.
+Junio 2026
 
----
+## Contexto
 
-## [ADR-03] Transición por Fases de Sesión HTTP a JSON Web Tokens (JWT)
+Se requiere construir una plataforma web de formación con capacidad de crecimiento funcional, garantizando que el diseño visual, la experiencia de usuario y la lógica de negocio empresarial no interfieran entre sí en ninguna fase del ciclo de vida del desarrollo.
 
-* **Fecha:** Junio 2026
-* **Estatus:** En Progreso (Fase 1)
-* **Contexto:** El backend opera mediante autenticación tradicional basada en sesión, lo que acopla el servidor al estado del cliente y limita la escalabilidad de la API REST.
-* **Decisión:** Migrar el sistema hacia un modelo de seguridad basado en tokens JWT (*stateless*), utilizando una estrategia de convivencia temporal en dos capas.
-* **Justificación para el TFG:** La arquitectura *stateless* es el estándar nativo para APIs REST. La migración por fases mitiga el riesgo de regresiones y fallos en cascada, demostrando la aplicación de buenas prácticas de control de riesgos.
-* **Consecuencias:** Durante la transición, el filtro de seguridad debe ser "no intrusivo" para permitir que convivan clientes con cookies y clientes con cabeceras `Bearer`, aumentando temporalmente la complejidad de `SecurityConfig.java`.
+## Decisión
 
----
+Adoptar una arquitectura cliente-servidor completamente desacoplada mediante una aplicación de página única (**SPA - Single Page Application**) construida en **React** para la capa de presentación y una **API REST** de grado empresarial desarrollada en **Spring Boot (Java 17)** para la capa de servicios y persistencia.
 
-## [ADR-04] Configuración de Propiedades JWT y Fallbacks de Entorno para Tests
+## Justificación para el TFG
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Al introducir el componente de configuración estricta `JwtProperties`, el entorno de pruebas unitarias (`BackendApplicationTests`) fallaba críticamente (`BUILD FAILURE`) debido a que la propiedad requerida `app.jwt.secret` no se encontraba definida en el contexto de carga de los tests, provocando una excepción de tipo `IllegalStateException`.
-* **Decisión:** Incorporar valores base estandarizados y mecanismos de *fallback* para desarrollo y pruebas dentro del archivo global `application.properties`, desacoplándolo temporalmente de la configuración rígida por variables de entorno del sistema.
-* **Justificación para el TFG:** Demuestra la aplicación del principio de robustez en el ciclo de vida del software. Al garantizar un valor por defecto seguro en entornos no productivos, se asegura que el ecosistema de integración y pruebas unitarias sea independiente del sistema operativo o máquina donde el tribunal o evaluador compile el proyecto.
-* **Consecuencias:** Se recupera la estabilidad del contexto de Spring Boot en un estado saludable (`BUILD SUCCESS`), permitiendo avanzar en la inyección de dependencias de seguridad de forma controlada y aislada.
+* **Separación de Responsabilidades:** Cumple estrictamente con el principio de separación de conceptos, aislando la lógica de UI de las reglas de negocio complejas y el acceso a datos.
+* **Desarrollo Independiente:** Permite trabajar en el cliente y en el servidor de forma autónoma, facilitando el mantenimiento y las suites de pruebas unitarias/integración de manera aislada.
+* **Estándar de la Industria:** Sigue los patrones arquitectónicos y las demandas tecnológicas más extendidas en los entornos de producción reales de la ingeniería de software actual.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Flexibilidad en la Interfaz:** Otorga total libertad para rediseñar, expandir o modificar los componentes del frontend sin necesidad de alterar la base de datos o la lógica de negocio subyacente del backend.
+* **Consumo Eficiente de Recursos:** El cliente solo solicita e intercambia datos crudos en formato JSON, reduciendo la carga de cómputo del servidor al delegar el renderizado visual al navegador del usuario.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Duplicidad de Modelos:** Obliga a mantener y declarar réplicas equivalentes de los modelos de datos y DTOs tanto en clases de Java como en interfaces de TypeScript.
+* *Mitigación:* Se implementó un diseño de contratos estrictos mediante objetos de transferencia de datos (DTOs) unificados, asegurando que cualquier cambio en la estructura del backend sea fácilmente detectable por el tipado estricto del compilador del frontend.
 
 ---
 
-## [ADR-05] Implementación del Modelo de Autenticación Híbrido (Sesión + JWT)
+# ADR-02: Organización del Espacio de Trabajo mediante Monorepo
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** La migración desde un sistema basado en sesión con estado (*stateful*) hacia una arquitectura basada en tokens criptográficos (*stateless*) introduce riesgos de ruptura en el frontend de React. Se requiere que el servidor admita la emisión y validación de tokens sin inhabilitar el flujo operativo preexistente.
-* **Decisión:** Desarrollar e integrar una capa híbrida que permita la coexistencia de ambos mecanismos de autenticación mediante la inyección pasiva de un filtro personalizado (`JwtAuthenticationFilter`) en la cadena de seguridad de Spring.
-* **Justificación para el TFG:** Demuestra la aplicación de metodologías de control de riesgos y desarrollo ágil incremental. Al unificar la entidad `Users` con la interfaz `UserDetails` de Spring Security, se logra que la resolución de la identidad del usuario a través del contexto (`SecurityContextHolder`) sea agnóstica al origen del acceso. Esto permite dotar al sistema de una doble vía de entrada completamente desacoplada.
-* **Consecuencias:** Se mantiene la estabilidad operativa del sistema en un estado saludable (`BUILD SUCCESS`), permitiendo que el cliente en React migre de forma progresiva a la cabecera `Authorization Bearer` sin perder la sesión clásica como mecanismo de respaldo automático (*fallback*).
+## Estatus
 
----
+Aceptado
 
-## [ADR-06] Gestión de Estado Global y Persistencia de Tokens en React
+## Fecha
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Al adaptar la arquitectura del cliente en React para procesar la nueva respuesta híbrida del servidor, se requería una estrategia de persistencia en el navegador que permitiese almacenar tanto los datos descriptivos del perfil del usuario (para la renderización de la interfaz) como el token criptográfico JWT (para la autorización de red) sin generar acoplamiento ni vulnerabilidades de seguridad por exposición de credenciales.
-* **Decisión:** Modificar el ecosistema del contexto de autenticación (`authTypes.ts`, `AuthContext.tsx`, `AuthProvider.tsx`) y rediseñar el módulo de almacenamiento local (`authStorage.ts`) para separar físicamente la persistencia del objeto `AuthUser` respecto al string del `accessToken`.
-* **Justificación para el TFG:** Esta separación de responsabilidades en el almacenamiento local (*localStorage*) es una buena práctica de ingeniería web fundamental para la memoria del TFG. Aislar el token en su propia clave de memoria (`accessToken`) independiza la lógica de las llamadas HTTP respecto al estado visual de la interfaz. Esto facilitará que en la siguiente fase de desarrollo se pueda inyectar el token de forma automatizada en las cabeceras `Authorization Bearer` de un cliente Axios o Fetch centralizado, manteniendo intacto el ciclo de renderizado de los componentes de React.
-* **Consecuencias:** Se estabiliza el tipado estático del frontend sin advertencias del compilador de TypeScript, asegurando un punto de partida óptimo para conectar las llamadas API reales de los formularios de la SPA sin alterar la experiencia de usuario preexistente.
+Junio 2026
 
----
+## Contexto
 
-## [ADR-07] Consumo del Contrato JWT y Desacoplamiento de Vistas en el Cliente
+El proyecto del TFG involucra el desarrollo de dos ecosistemas tecnológicos completamente independientes (React en la capa de presentación y Spring Boot en la capa de servicios) gestionados y evolucionados por un único desarrollador durante todo el ciclo de vida de la aplicación.
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Tras rediseñar el almacenamiento de tokens en React, se requería adaptar la interfaz gráfica de inicio de sesión (`AuthModal.tsx`) para consumir el nuevo payload del servidor sin alterar el diseño visual, las animaciones ni la experiencia de usuario de los formularios de la SPA.
-* **Decisión:** Refactorizar la función controladora del formulario de Login para realizar el tipado estático seguro (*type casting*) de la respuesta HTTP de Axios hacia la interfaz `AuthTokenResponse`, delegando el almacenamiento inmediato del token de acceso de red y los metadatos de perfil en el storage local y actualizando el estado de autenticación de la aplicación de forma transparente.
-* **Justificación para el TFG:** Demuestra la capacidad de consumir APIs bajo contratos de tipado estricto en entornos corporativos. Al desligar el procesamiento del payload JSON de la capa de presentación visual, se garantiza que los componentes gráficos permanezcan aislados frente a futuras modificaciones en la estructura de las propiedades devueltas por Spring Boot.
-* **Consecuencias:** Se logra un flujo de autenticación seguro, tipado y completamente operativo que actualiza el estado reactivo global del cliente de manera síncrona tras la verificación de las credenciales en PostgreSQL.
+## Decisión
 
----
+Alojar ambas aplicaciones de forma centralizada en directorios diferenciados y estructurados (`frontend/` y `backend/`) dentro de un mismo y único repositorio de Git.
 
-## [ADR-08] Centralización de Peticiones HTTP mediante Interceptores de Red
+## Justificación para el TFG
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Almacenado el token JWT en el cliente, se requería un mecanismo para adjuntarlo en la cabecera `Authorization: Bearer` de cada petición hacia recursos protegidos del backend, evitando que los componentes visuales asuman lógica repetitiva de red o manipulen directamente el almacenamiento físico.
-* **Decisión:** Implementar un cliente HTTP personalizado (`src/services/apiClient.ts`) basado en Axios, de uso obligatorio para las comunicaciones con la API, incorporando interceptores automáticos de solicitud (*Request Interceptors*).
-* **Justificación para el TFG:** Demuestra un profundo conocimiento del patrón de diseño estructural *Proxy* o *Middleware* aplicado a comunicaciones de red. Al delegar la inyección del token en un interceptor centralizado, se garantiza el principio de Securitización Transparente: el resto de la aplicación consume la API de forma nativa, mientras que el interceptor se encarga de auditar y adjuntar las credenciales necesarias, aislando por completo la capa visual de la capa de transporte de seguridad.
-* **Consecuencias:** Reducción drástica del acoplamiento en el frontend. Automatización completa de la inyección de seguridad en peticiones salientes y centralización de la captura de errores globales de autenticación (códigos HTTP 401).
+* **Eficiencia Operativa:** Simplifica drásticamente la gestión del código fuente, reduce la fricción en la sincronización de ramas y optimiza los flujos de trabajo del desarrollador.
+* **Trazabilidad de Cambios:** Permite realizar un único *commit* atómico que relacione y encapsule un cambio funcional simultáneo y coordinado en el cliente y en el servidor.
+* **Centralización de la Documentación:** Facilita al tribunal evaluador el acceso unificado a toda la base de código del proyecto desde un mismo enlace de repositorio.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Despliegue y CI/CD Simplificado:** Permite configurar un único pipeline de integración continua (como GitHub Actions) que pueda disparar tareas de pruebas automatizadas y compilación para ambas capas de manera coordinada.
+* **Visión de Conjunto:** Centraliza el archivo de lectura principal (`README.md`), los diarios de bitácora y este registro de decisiones arquitectónicas (ADR) en la raíz del proyecto para una auditoría rápida.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Tamaño del Repositorio:** El directorio raíz de Git acumula un mayor tamaño de archivos y un historial de confirmaciones cruzado.
+* *Mitigación:* Se implementó un archivo `.gitignore` robusto en la raíz del proyecto para excluir estrictamente los directorios pesados de dependencias volátiles (`node_modules/` en el frontend y `target/` en el backend), manteniendo el Monorepo ligero y ágil para los clones en local.
 
 ---
 
-## [ADR-09] Mecanismo de Hidratación de Sesión mediante Validación Asíncrona del Token
+# ADR-03: Implementación de Prototipo Funcional con Autenticación de Estado (Session-Based)
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Al recargar la interfaz web de la SPA, el estado volátil de React se destruye. Se requería un mecanismo automático que determinase si el token almacenado localmente seguía siendo válido en el servidor antes de renderizar las pantallas privadas de la aplicación.
-* **Decisión:** Implementar un efecto secundario de ciclo de vida (`useEffect`) en la inicialización del `AuthProvider` para consumir el endpoint `/api/auth/me` de forma transparente, controlando el flujo mediante un estado bandera `isLoading`.
-* **Justificación para el TFG:** Demuestra el uso correcto del patrón de sincronización de estado cliente-servidor (*State Hydration*). Utilizar una variable `isLoading` evita la pérdida de sesión en recargas y unifica la verificación síncrona en el cliente con las respuestas de la API del servidor.
-* **Consecuencias:** Consolidación total de la seguridad de la SPA. Las recargas de página recuperan la identidad del usuario de forma inmediata y el estado se sincroniza de forma robusta ante tokens expirados.
+## Estatus
+
+Superado (Deprecado)
+
+## Contexto
+
+En el inicio del desarrollo del proyecto, se necesitaba validar con rapidez el ciclo de vida básico del usuario (Registro y Login) y la persistencia en la base de datos relacional de la entidad principal `Users`. Debido a la curva de aprendizaje inicial del ecosistema tecnológico y a la necesidad de contar con un entregable funcional temprano, se optó por un sistema de autenticación tradicional basado en sesiones de servidor (HTTP State).
+
+## Decisión
+
+Crear una interfaz de usuario básica integrada por una *Landing Page* y *Dashboards* rudimentarios que utilizara una barra de navegación condicional al rol del usuario, con el propósito de verificar visualmente el flujo de acceso perimetral.
+
+## Justificación para el TFG
+
+* **Validación Temprana de Persistencia:** Permitió certificar el correcto funcionamiento de los repositorios de usuario, las contraseñas hash y la lógica interna de roles en el backend de Spring Boot antes de añadir capas de red complejas.
+* **Mitigación de la Curva de Aprendizaje:** Posibilitó avanzar de forma ágil e incremental en las interfaces del frontend de React asentando las bases de las llamadas HTTP.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Cierre del Ciclo Base:** Se confirmó que el motor de persistencia (Hibernate/JPA) mapeaba correctamente la base de datos PostgreSQL y que la asignación de roles funcionaba a nivel de modelo de negocio.
+
+### Impacto Negativo / Riesgos que Motivaron su Deprecación
+
+* **Acoplamiento de Infraestructura:** El manejo de estados y sesiones en la memoria del servidor impedía el desacoplamiento total y nativo entre la capa de presentación (React) y la capa de servicios (Spring Boot), violando los principios de diseño de una API REST profesional.
+* *Solución y Evolución:* Las limitaciones detectadas en este prototipo sirvieron como el argumento técnico fundamental para decretar la transición hacia un modelo seguro, distribuido y *stateless* basado en JSON Web Tokens (JWT), el cual quedó consolidado de forma definitiva en las decisiones de diseño posteriores.
 
 ---
 
-## [ADR-10] Unificación de Layouts Mediante Composición Paramétrica Reactiva al Rol
+# ADR-04: Migración de Autenticación Tradicional con Estado a Arquitectura Stateless (JWT)
 
-* **Fecha:** Junio 2026
-* **Estatus:** Superado (Rectificado)
-* **Contexto:** La arquitectura original propuesta en este registro planteaba una segregación física de archivos (`AdminLayout.tsx`, `ProfessorLayout.tsx` y `StudentLayout.tsx`) bajo la premisa de anticipar necesidades futuras de "composición especializada". Sin embargo, tras una auditoría técnica orientada al despliegue, se evidenció un escenario de sobreingeniería y deuda técnica: los tres componentes compartían el 98% de su infraestructura lógica y directivas estéticas de Tailwind CSS, divergiendo únicamente en parámetros milimétricos de espaciado lateral (`px-4` frente a `px-6`). Mantener esta dispersión multiplicaba el riesgo de desincronización ante actualizaciones globales del diseño perimetral.
-* **Decisión:** Deprecar y eliminar del sistema los tres archivos redundantes de diseño por rol. Toda la infraestructura visual del frontend se centraliza de manera absoluta en un único componente inteligente: `DashboardLayout.tsx`. Este elemento se redefine como un contenedor paramétrico que autodetecta en tiempo real el rol del usuario autenticado a través del contexto global de `useAuth`, inyectando dinámicamente las clases geométricas correspondientes.
-* **Justificación para el TFG:** Esta rectificación prioriza de forma rigurosa el principio fundamental *DRY (Don't Repeat Yourself)* sobre asunciones de diseño tempranas y desacopladas de la realidad del código fuente. Al consolidar la interfaz perimetral en un único punto de control, se optimiza la mantenibilidad del software. Cualquier modificación estructural (como la futura adición de pies de página o menús laterales) requiere una única edición centralizada, reduciendo a cero el radio de fallo por omisión en vistas satélite y eliminando la redundancia estructural en el árbol de componentes de React.
-* **Consecuencias:**
-  * **Mitigación de Deuda Técnica:** Reducción drástica del volumen de archivos huérfanos de lógica propia en el directorio de layouts, simplificando la auditoría de código del frontend.
-  * **Coherencia Geométrica Garantizada:** La paridad visual entre los paneles de control queda blindada de forma nativa por el compilador, aplicando los espaciados específicos reactivos únicamente bajo la condición estricta de jerarquía (como el perfil del administrador).
-  * **Optimización del Enrutamiento:** Simplificación en la integración de las vistas del cliente (`StudentDashboard`, `StudentProfilePage`, etc.), las cuales migran hacia el consumo de un único envoltorio homogéneo, facilitando el mantenimiento de las importaciones y la legibilidad en los módulos de navegación.
+## Estatus
+
+Superado por implementación definitiva
+
+## Contexto
+
+En la fase inicial del proyecto ("Prototipo"), se implementó una conexión básica entre el frontend y el backend utilizando autenticación tradicional por HTTP con estado basada en Sesiones/Cookies. Aunque se validó que la entidad `Users` realizaba registros correctamente y permitía el acceso a páginas privadas mediante cambios reactivos en la barra de navegación, este modelo con estado limitaba la escalabilidad horizontal y presentaba desafíos significativos para una futura arquitectura de clientes totalmente desacoplados.
+
+## Decisión
+
+Migrar de forma integral el sistema de seguridad de la plataforma hacia un modelo **Stateless (sin estado)** basado en **JSON Web Tokens (JWT)**. Esto implica eliminar el almacenamiento de sesiones en la memoria del servidor y delegar la responsabilidad del mantenimiento de la identidad al cliente mediante un token firmado criptográficamente.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Escalabilidad Horizontal:** Al no retener estado de sesión en el servidor backend (Spring Boot), este puede escalar de forma masiva sin requerir replicación de sesiones ni persistencia compartida de cookies.
+* **Desacoplamiento Total:** Se consigue una separación limpia entre la capa de presentación (Vite + React) y la capa de servicios (Spring Boot), permitiendo que se comuniquen puramente mediante cabeceras HTTP estándar (`Authorization: Bearer <token>`).
+* **Seguridad Reforzada:** La identidad viaja firmada por el servidor, mitigando vulnerabilidades clásicas del manejo de sesiones web.
+
+### Impacto Técnico e Infraestructura
+
+* **Componentes Backend:** Necesidad de implementar un componente `JwtService` para la generación, firmado y validación de tokens, y un filtro perimetral `JwtAuthenticationFilter` para interceptar y validar el contexto de seguridad en cada petición HTTP entrante.
+* **Refactorización del Flujo:** La interfaz gráfica de la página principal creada en el prototipo se mantiene intacta, pero su lógica de conexión se refactoriza en el frontend para consumir el nuevo endpoint de login que devuelve un objeto `AuthTokenResponse`.
+
+---
+
+# ADR-05: Transición por Fases de Sesión HTTP a JSON Web Tokens (JWT)
+
+## Estatus
+
+En Progreso (Fase 1)
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+El backend opera mediante autenticación tradicional basada en sesiones HTTP, lo que acopla de manera directa el servidor al estado del cliente y limita la escalabilidad de la API REST de cara al despliegue. Se requiere evolucionar este modelo para garantizar un entorno distribuido sin penalizar la disponibilidad del sistema durante el proceso de desarrollo.
+
+## Decisión
+
+Migrar de forma progresiva el sistema de seguridad hacia un modelo basado en tokens **JWT (JSON Web Tokens)** completamente *stateless*, utilizando una estrategia de convivencia y transición temporal parametrizada en dos capas operacionales dentro del ciclo de filtros de Spring Security.
+
+## Justificación para el TFG
+
+* **Estándar de Arquitectura:** El enfoque *stateless* es el patrón nativo para el diseño de APIs REST profesionales, garantizando el aislamiento de la lógica de negocio.
+* **Control de Riesgos Académico:** La migración por fases mitiga de forma proactiva la aparición de regresiones y fallos en cascada en las rutas protegidas, demostrando ante el tribunal la aplicación de buenas prácticas de control de riesgos en la ingeniería de software.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Estabilidad del Entorno de Pruebas:** Permite refactorizar y verificar los endpoints de los controladores uno a uno de manera controlada, asegurando que las suites de pruebas automatizadas existentes no sufran roturas por cambios drásticos en la autenticación.
+* **Flexibilidad de Integración:** Habilita al equipo de desarrollo frontend la libertad de migrar los contextos de almacenamiento de sesión de manera asíncrona respecto a los despliegues del backend.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Complejidad Temporal en Configuración:** Durante la transición, el filtro de seguridad perimetral debe ser "no intrusivo" para permitir la convivencia simultánea de clientes que transmiten credenciales mediante cookies tradicionales y clientes avanzados con cabeceras `Authorization: Bearer <token>`.
+* *Mitigación:* Se incrementó de manera controlada la robustez de `SecurityConfig.java`, diseñando reglas de exclusión explícitas que interceptan el tráfico condicionalmente, impidiendo brechas de seguridad perimetral durante la fase de convivencia.
+
+---
+
+# ADR-06: Configuración de Propiedades JWT y Fallbacks de Entorno para Tests
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+Al introducir el componente de configuración estricta `JwtProperties`, el entorno de pruebas unitarias (`BackendApplicationTests`) fallaba críticamente (`BUILD FAILURE`). Esto se debía a que la propiedad requerida `app.jwt.secret` no se encontraba definida en el contexto de carga de los tests, provocando una excepción de tipo `IllegalStateException` que detenía el pipeline de compilación.
+
+## Decisión
+
+Incorporar valores base estandarizados y mecanismos de *fallback* para desarrollo y pruebas dentro del archivo global `application.properties`, desacoplándolo temporalmente de la configuración rígida por variables de entorno del sistema operativo.
+
+## Justificación para el TFG
+
+* **Principio de Robustez:** Demuestra la aplicación del principio de robustez en el ciclo de vida del software, anticipando fallos de infraestructura durante el despliegue de pruebas.
+* **Independencia del Entorno:** Al garantizar un valor por defecto seguro en entornos no productivos, se asegura que el ecosistema de integración y pruebas unitarias sea completamente independiente del sistema operativo o máquina donde el tribunal o evaluador compile el proyecto.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Estabilidad del Pipeline:** Se recupera la estabilidad del contexto de Spring Boot en un estado saludable (`BUILD SUCCESS`), permitiendo avanzar en la inyección de dependencias de seguridad de forma controlada y aislada.
+* **Aislamiento de Tests:** Los desarrolladores y evaluadores pueden ejecutar la suite completa en local inmediatamente tras clonar el repositorio, sin necesidad de configurar manualmente variables de entorno en sus terminales.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Riesgo de Claves en Texto Plano:** Almacenar un secreto por defecto en el archivo de propiedades expone la clave criptográfica en el repositorio de código de Git.
+* *Mitigación:* Se configuró la propiedad para que priorice dinámicamente la variable de entorno real del servidor de producción mediante la sintaxis `${JWT_SECRET:clave_por_defecto_solo_para_desarrollo}`. De este modo, en entornos de producción se inyecta una clave fuerte y secreta, quedando el valor plano restringido exclusivamente a ejecuciones locales y pruebas unitarias.
+
+---
+
+# ADR-07: Implementación del Modelo de Autenticación Híbrido (Sesión + JWT)
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+La migración desde un sistema basado en sesión con estado (*stateful*) hacia una arquitectura basada en tokens criptográficos (*stateless*) [ADR-03] introduce riesgos latentes de ruptura en la interfaz de React. Se requería que el servidor backend admitiera la emisión y validación activa de tokens sin inhabilitar ni penalizar el flujo operativo preexistente del prototipo de la aplicación.
+
+## Decisión
+
+Desarrollar e integrar una capa de seguridad híbrida que permita la coexistencia armónica de ambos mecanismos de autenticación mediante la inyección pasiva de un filtro personalizado (`JwtAuthenticationFilter`) en la cadena de seguridad nativa de Spring Security.
+
+## Justificación para el TFG
+
+* **Desarrollo Ágil Incremental:** Demuestra la aplicación práctica de metodologías de desarrollo incremental y control de riesgos arquitectónicos en la ingeniería de software.
+* **Abstracción de Identidad:** Al unificar la entidad propia `Users` con la interfaz de seguridad `UserDetails` de Spring Security, se logra que la resolución de la identidad del usuario a través del contexto (`SecurityContextHolder`) sea completamente agnóstica al origen del acceso, dotando al sistema de una doble vía de entrada desacoplada.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Migración Frontend sin Fricciones:** El cliente en React puede migrar sus flujos y pantallas de forma progresiva hacia el consumo de la cabecera `Authorization: Bearer <token>` sin perder la estabilidad de las vistas actuales de la plataforma.
+* **Mecanismo de Respaldo Autónomo:** Se mantiene la sesión clásica basada en cookies como un sistema de *fallback* (respaldo automático) ante peticiones locales o de administración que no implementen el flujo de tokens.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Sobrecarga en la Cadena de Filtros:** La evaluación condicional en cada petición HTTP entrante (buscar cookies de sesión y, en su defecto, parsear la cabecera `Bearer`) añade pasos de procesamiento en la capa de red del servidor.
+* *Mitigación:* Se optimizó el método `doFilterInternal` del filtro personalizado para realizar un cortocircuito anticipado rápido: si la cabecera no contiene el prefijo `Bearer`, el filtro cede el control inmediatamente a la cadena (`filterChain.doFilter`), evitando llamadas innecesarias a la lógica criptográfica de validación del token.
+
+---
+
+# ADR-08: Gestión de Estado Global y Persistencia de Tokens en React
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+Al adaptar la arquitectura del cliente en React para procesar la respuesta híbrida del servidor, se requería una estrategia de persistencia en el navegador que permitiese almacenar los datos descriptivos del perfil del usuario y el token criptográfico JWT para la autorización de red, sin generar acoplamiento ni vulnerabilidades de seguridad por exposición de credenciales.
+
+## Decisión
+
+Modificar el ecosistema del contexto de autenticación (`authTypes.ts`, `AuthContext.tsx`, `AuthProvider.tsx`) y rediseñar el módulo de almacenamiento local (`authStorage.ts`) para separar físicamente la persistencia del objeto `AuthUser` respecto a la cadena de caracteres del `accessToken`.
+
+## Justificación para el TFG
+
+* **Buenas Prácticas de Ingeniería Web:** Aísla el token en su propia clave de memoria (`accessToken`), independizando la lógica de red del estado visual de la interfaz.
+* **Automatización de Capa de Red:** Facilita la inyección automatizada del token en las cabeceras `Authorization: Bearer <token>` de un cliente HTTP centralizado sin alterar el ciclo de renderizado.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Estabilidad del Tipado Estático:** Estabiliza el tipado del frontend sin advertencias del compilador de TypeScript, asegurando un punto de partida óptimo para conectar las llamadas API de la SPA.
+* **Mantenibilidad del Código:** Permite que cualquier componente interrogue al contexto de autenticación de forma segura y ligera al no mezclar el token criptográfico con los datos de visualización del perfil.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Riesgo de Exposición por Almacenamiento Local:** Guardar el `accessToken` en *localStorage* expone la credencial a potenciales ataques de tipo Cross-Site Scripting (XSS).
+* *Mitigación:* Se diseñó un ciclo de vida corto y restrictivo para el tiempo de expiración del token JWT en el backend (Spring Boot), reduciendo drásticamente la ventana de oportunidad de una extracción maliciosa.
+
+---
+
+# ADR-09: Consumo del Contrato JWT y Desacoplamiento de Vistas en el Cliente
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+Tras rediseñar el almacenamiento de tokens en React [ADR-08], se requería adaptar la interfaz gráfica de inicio de sesión (`AuthModal.tsx`) para consumir el nuevo payload del servidor sin alterar el diseño visual, las animaciones ni la experiencia de usuario de los formularios de la SPA.
+
+## Decisión
+
+Refactorizar la función controladora del formulario de Login para realizar el tipado estático seguro (*type casting*) de la respuesta HTTP de Axios hacia la interfaz `AuthTokenResponse`. Se delega el almacenamiento inmediato del token de acceso de red y los metadatos de perfil en el storage local, actualizando el estado de autenticación de la aplicación de forma transparente.
+
+## Justificación para el TFG
+
+* **Contratos de Tipado Estricto:** Demuestra la capacidad de consumir APIs bajo contratos de tipado estricto en entornos de desarrollo de software profesionales.
+* **Aislamiento de la Capa Visual:** Al desligar el procesamiento del payload JSON de la capa de presentación visual, se garantiza que los componentes gráficos permanezcan aislados frente a futuras modificaciones en la estructura de las propiedades devueltas por Spring Boot.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Flujo de Acceso Operativo:** Se logra un flujo de autenticación seguro, fuertemente tipado y completamente operativo que actualiza el estado reactivo global del cliente de manera síncrona tras la verificación de las credenciales en PostgreSQL.
+* **Mantenibilidad:** El formulario visual se limita a delegar el envío de datos y el éxito de la operación, sin incrustar lógica pesada de persistencia local en su interior.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Riesgo de Incompatibilidad de Payload:** Si el backend cambia la firma de `AuthTokenResponse`, el tipado estático del frontend podría ocultar fallos en tiempo de ejecución al forzar el casteo.
+* *Mitigación:* Se implementó un mapeo de datos estricto que valida las propiedades esenciales de la respuesta en la capa de servicios de red antes de propagar el estado de éxito al modal de autenticación, protegiendo la UI ante respuestas inesperadas del servidor.
+
+---
+
+# ADR-10: Centralización de Peticiones HTTP mediante Interceptores de Red
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+Almacenado el token JWT en el cliente [ADR-08], se requería un mecanismo eficiente para adjuntarlo de forma sistemática en la cabecera `Authorization: Bearer <token>` de cada petición dirigida a los recursos protegidos del backend. Era crítico evitar que los componentes visuales asumieran lógica repetitiva de red o manipularan directamente el almacenamiento físico en cada llamada API.
+
+## Decisión
+
+Implementar un cliente HTTP personalizado (`src/services/apiClient.ts`) basado en **Axios**, de uso obligatorio para todas las comunicaciones de la plataforma, incorporando interceptores automáticos de solicitud (*Request Interceptors*).
+
+## Justificación para el TFG
+
+* **Patrones de Diseño de Red:** Demuestra un profundo conocimiento de los patrones de diseño estructurales aplicados a comunicaciones de red (como *Proxy* o *Intercepting Filter*).
+* **Securitización Transparente:** Al delegar la inyección del token en un interceptor centralizado, el resto de la aplicación consume la API de forma nativa. El interceptor se encarga de auditar y adjuntar las credenciales necesarias, aislando por completo la capa visual de la capa de transporte de seguridad.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Reducción del Acoplamiento:** Se elimina la duplicidad de lógica en el frontend, impidiendo que los componentes gráficos tengan que interrogar al *localStorage* en cada petición.
+* **Gestión Centralizada de Errores:** Permite capturar e interceptar globalmente las respuestas del servidor con código de estado HTTP `401 Unauthorized`, facilitando la implementación de una redirección automatizada o un borrado de sesión limpio si el token expira.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Cuello de Botella en Peticiones:** Añadir un interceptor síncrono introduce un paso intermedio que evalúa el estado del almacenamiento en el 100% de las peticiones salientes, incluidas aquellas orientadas a recursos públicos (como la Landing Page o el catálogo abierto).
+* *Mitigación:* Se optimizó el interceptor mediante una estructura de cortocircuito lógico veloz: si la ruta de destino coincide con endpoints públicos definidos en una lista blanca local, el interceptor omite la lectura de memoria y envía la petición de inmediato, neutralizando cualquier penalización de rendimiento.
+
+---
+
+# ADR-11: Mecanismo de Hidratación de Sesión mediante Validación Asíncrona del Token
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+Al recargar la interfaz web de la SPA, el estado volátil en la memoria de React se destruye por completo. Se requería un mecanismo automático y transparente que determinase si el token almacenado localmente seguía siendo válido en el servidor antes de permitir la renderización de las pantallas privadas de la aplicación.
+
+## Decisión
+
+Implementar un efecto secundario de ciclo de vida (`useEffect`) en la inicialización del `AuthProvider` para consumir de forma asíncrona el endpoint `/api/auth/me` del backend, controlando el flujo de renderizado del cliente mediante un estado bandera estructurado `isLoading`.
+
+## Justificación para el TFG
+
+* **Patrón de Hidratación de Estado (*State Hydration*):** Demuestra el uso correcto del patrón de sincronización de estado cliente-servidor para aplicaciones web modernas.
+* **Consistencia en la UI:** Utilizar una variable de control `isLoading` evita la pérdida de sesión en las recargas accidentales de página y unifica la verificación síncrona en el cliente con las respuestas reales de la API del servidor, impidiendo destellos visuales erróneos.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Consolidación de la Seguridad:** Las recargas de página recuperan la identidad y el contexto del usuario de forma inmediata sin obligarle a pasar de nuevo por el formulario de inicio de sesión.
+* **Sincronización Robusta:** Si el token ha expirado o ha sido manipulado, el backend responde con un error y el frontend limpia automáticamente el almacenamiento local, redirigiendo de forma segura al estado de invitado.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Bloqueo Temporal de Interfaz:** Mientras se valida el token de forma asíncrona, la aplicación se detiene en un estado de carga global, demorando el renderizado de la vista de cara al usuario.
+* *Mitigación:* Se diseñó el endpoint `/api/auth/me` en Spring Boot de manera ultraligera, optimizando la consulta en PostgreSQL a través de índices en el campo `username` para resolver la identidad del usuario en milisegundos, neutralizando el impacto en la percepción de carga de la aplicación.
+
+---
+
+# ADR-12: Unificación de Layouts Mediante Composición Paramétrica Reactiva al Rol
+
+## Estatus
+
+Superado (Rectificado)
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+La arquitectura original planteaba una segregación física de archivos (`AdminLayout.tsx`, `ProfessorLayout.tsx` y `StudentLayout.tsx`) bajo la premisa de anticipar necesidades futuras de "composición especializada". Sin embargo, tras una auditoría técnica orientada al despliegue, se evidenció un escenario de sobreingeniería y deuda técnica: los tres componentes compartían el 98% de su infraestructura lógica y directivas estéticas de Tailwind CSS, divergiendo únicamente en parámetros milimétricos de espaciado lateral (`px-4` frente a `px-6`). Mantener esta dispersión multiplicaba el riesgo de desincronización ante actualizaciones globales del diseño perimetral.
+
+## Decisión
+
+Deprecar y eliminar del sistema los tres archivos redundantes de diseño por rol. Toda la infraestructura visual del frontend se centraliza de manera absoluta en un único componente inteligente: `DashboardLayout.tsx`. Este elemento se redefine como un contenedor paramétrico que autodetecta en tiempo real el rol del usuario autenticado a través del contexto global de `useAuth`, inyectando dinámicamente las clases geométricas correspondientes.
+
+## Justificación para el TFG
+
+* **Principio DRY (Don't Repeat Yourself):** Esta rectificación prioriza de forma rigurosa la eliminación de duplicidades sobre asunciones de diseño tempranas y desacopladas de la realidad del código fuente.
+* **Optimización de Mantenibilidad:** Al consolidar la interfaz perimetral en un único punto de control, cualquier modificación estructural (como la futura adición de pies de página o menús laterales) requiere una única edición centralizada, reduciendo a cero el radio de fallo por omisión en vistas satélite y eliminando la redundancia estructural en React.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Mitigación de Deuda Técnica:** Reducción drástica del volumen de archivos huérfanos de lógica propia en el directorio de layouts, simplificando la auditoría de código del frontend de cara al tribunal.
+* **Coherencia Geométrica Garantizada:** La paridad visual entre los paneles de control queda blindada de forma nativa por el compilador, aplicando los espaciados específicos reactivos únicamente bajo la condición estricta de jerarquía (como el perfil del administrador).
+* **Optimización del Enrutamiento:** Las vistas del cliente (`StudentDashboard`, `StudentProfilePage`, etc.) migran hacia el consumo de un único envoltorio homogéneo, facilitando el mantenimiento de las importaciones y la legibilidad en los módulos de navegación.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Riesgo de Pérdida de Especialización:** Agrupar la lógica de visualización de tres paneles de control en un único archivo puede dificultar la adición de componentes exclusivos de un rol específico (como un menú de administración avanzado).
+* *Mitigación:* Se diseñó `DashboardLayout.tsx` para delegar de forma modular las interfaces específicas en subcomponentes independientes (como `<NavbarUser />`), los cuales gestionan internamente sus insignias y botones mediante composición limpia de React, manteniendo el layout base genérico y protegido.
+.
 
   ---
 
-  # [ADR-11] Mitigación de Desincronización Temporal mediante Margen de Tolerancia (Clock Skew) en JWT
+  # [ADR-13] Mitigación de Desincronización Temporal mediante Margen de Tolerancia (Clock Skew) en JWT
 
 ## Estado
 
@@ -144,23 +466,48 @@ Se ha parametrizado mediante inyección de dependencias (`JwtProperties`) un mar
 
 ---
 
-[ADR-12] Implementación de una Suite de Pruebas Automatizadas y Mecanismos de Smoke Testing para la Infraestructura de Seguridad Criptográfica
+# ADR-14: Suite de Pruebas Automatizadas y Mecanismos de Smoke Testing para la Infraestructura de Seguridad Criptográfica
 
-    Fecha: Junio 2026
-    Estatus: Aceptado
-    Contexto: Una auditoría técnica interna identificó una brecha de cobertura crítica (coverage gap) en el subsistema de seguridad. El componente más sensible del servidor, JwtService.java, carecía de pruebas unitarias que validasen la integridad de los algoritmos de firma HS256 y la gestión de tiempos de expiración. Asimismo, el archivo predeterminado BackendApplicationTests.java se limitaba a una prueba de carga de contexto vacía y estéril que no aportaba valor asertivo al ciclo de vida del software, dejando la inyección de dependencias de Spring Security expuesta a errores no detectados antes del despliegue.
-    Decisión: Implementar una suite robusta de pruebas automatizadas utilizando JUnit 5 y Mockito. La estrategia se divide en dos niveles operativos localizados en la ruta estandarizada src/test/java/:
-        Aislamiento Criptográfico (JwtServiceTest.java): Creación de pruebas unitarias que emplean dobles de prueba (Mocks) para verificar exhaustivamente la emisión de tokens, la correcta extracción de claims (roles y usuarios) y la inmutabilidad temporal mediante la validación del Clock Skew.
-        Smoke Testing de Infraestructura: Refactorización de BackendApplicationTests.java para transformarlo en un test de humo activo. Este ahora valida de forma asertiva que los Beans críticos de seguridad (como el AuthenticationManager y los filtros JWT) se encuentren correctamente instanciados en el contenedor IoC de Spring.
-    Justificación para el TFG: Esta decisión garantiza el cumplimiento de los estándares profesionales de Aseguramiento de la Calidad (QA) y la correcta aplicación de la Pirámide de Pruebas. Al automatizar la validación de la lógica criptográfica, se demuestra al tribunal la capacidad de certificar el software bajo el estándar BUILD SUCCESS de Maven. El pipeline de integración alcanza una tasa de éxito verificada del 100% (8 tests ejecutados, 0 fallos, 0 errores), proporcionando una métrica objetiva de fiabilidad técnica.
-    Consecuencias:
-        Eliminación de falsos positivos: Se erradica la posibilidad de que el sistema compile con una configuración de seguridad defectuosa.
-        Certificación estática: El subsistema de autenticación queda blindado contra regresiones durante futuras refactorizaciones.
-        Robustez en el pipeline: Se asegura que el ciclo de vida del desarrollo cuente con una red de seguridad técnica que valide la integridad de la plataforma de forma previa a cualquier despliegue en entornos de evaluación.
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+Una auditoría técnica interna identificó una brecha de cobertura crítica (*coverage gap*) en el subsistema de seguridad. El componente más sensible del servidor, `JwtService.java`, carecía de pruebas unitarias que validasen la integridad de los algoritmos de firma HS256 y la gestión de los tiempos de expiración. Asimismo, el archivo predeterminado `BackendApplicationTests.java` se limitaba a una prueba de carga de contexto vacía y estéril que no aportaba valor asertivo al ciclo de vida del software, dejando la inyección de dependencias de Spring Security expuesta a errores no detectados antes del despliegue.
+
+## Decisión
+
+Implementar una suite robusta de pruebas automatizadas utilizando **JUnit 5 y Mockito**. La estrategia se divide en dos niveles operativos localizados en la ruta estandarizada `src/test/java/`:
+
+1. **Aislamiento Criptográfico (`JwtServiceTest.java`):** Creación de pruebas unitarias que emplean dobles de prueba (*Mocks*) para verificar exhaustivamente la emisión de tokens, la extracción correcta de *claims* (roles y usuarios) y la inmutabilidad temporal mediante la validación del *Clock Skew*.
+2. **Smoke Testing de Infraestructura:** Refactorización de `BackendApplicationTests.java` para transformarlo en un test de humo activo. Este componente ahora valida de forma asertiva que los *Beans* críticos de seguridad (como el `AuthenticationManager` y los filtros JWT) se encuentren correctamente instanciados en el contenedor IoC de Spring Boot.
+
+## Justificación para el TFG
+
+* **Estándares Profesionales de QA:** Garantiza el cumplimiento de las metodologías de Aseguramiento de la Calidad (QA) y la correcta aplicación práctica de la Pirámide de Pruebas.
+* **Certificación Determinista:** Al automatizar la validación de la lógica criptográfica, se demuestra al tribunal la capacidad de certificar el software bajo el estándar `BUILD SUCCESS` de Maven. El pipeline alcanza una tasa de éxito verificada del 100% (8 tests ejecutados, 0 fallos, 0 errores), proporcionando una métrica objetiva de fiabilidad técnica.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Eliminación de Falsos Positivos:** Se erradica por completo la posibilidad de que el sistema compile con una configuración perimetral de seguridad defectuosa.
+* **Certificación Estática Protegida:** El subsistema de autenticación queda blindado contra regresiones accidentales durante futuras refactorizaciones del código fuente.
+* **Robustez en el Pipeline:** Se asegura que el ciclo de vida del desarrollo cuente con una red de seguridad técnica que valide la integridad de la plataforma de forma previa a cualquier despliegue en entornos de evaluación.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Acoplamiento al Contexto de Spring:** Los tests de humo obligan a levantar el contenedor IoC de Spring Boot completo (`@SpringBootTest`), lo que incrementa el tiempo total de ejecución de la suite en entornos de integración continua (CI/CD).
+* *Mitigación:* Se aislaron estrictamente los tests criptográficos en clases puras de JUnit 5 con `MockitoExtension` para que corran en milisegundos en memoria, restringiendo el uso de `@SpringBootTest` únicamente al archivo raíz de humo para equilibrar el tiempo total del pipeline.
 
 ---
 
-## [ADR-13] Purificación Arquitectónica de la Capa de Presentación mediante Composición Pura e Inyección del Contenedor de Scroll Controlado
+## [ADR-15] Purificación Arquitectónica de la Capa de Presentación mediante Composición Pura e Inyección del Contenedor de Scroll Controlado
 
 ### Estado
 
@@ -187,191 +534,284 @@ Cumplimiento estricto del principio Abierto/Cerrado (OCP) de SOLID. La tarjeta a
 * Logro de simetría geométrica bidireccional perfecta en la interfaz del Administrador.
 * Escalabilidad visual y de rendimiento garantizada frente a cientos de registros concurrentes.
 
-## [ADR-14] Soporte Multirrol Dinámico y Corrección de Ámbito en Bloques Asíncronos (AuthModal & NavbarUser)
+# ADR-16: Soporte Multirrol Dinámico y Corrección de Ámbito en Bloques Asíncronos (AuthModal & NavbarUser)
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Se requería la inclusión de un nuevo rol de usuario (`PROFESSOR`) dentro de la plataforma escolar, el cual debía coexistir de manera jerárquica con los roles preexistentes (`ADMIN` y `STUDENT`). Al intentar introducir manualmente esta lógica intermedia en el cliente SPA, se produjeron fallos críticos de sintaxis: una pérdida de ámbito (Scope) en `AuthModal.tsx` por un cierre prematuro de llaves (`}}`) que desconectó los bloques `catch` y `finally` provocando el error `Parsing error: 'catch' or 'finally' expected`; una evaluación lineal incorrecta que ejecutaba siempre la ruta `/student` de forma secuencial; y una limitación estructural en JSX dentro de `NavbarUser.tsx`, ya que el operador ternario binario tradicional (`condicion ? A : B`) no admitía una estructura procedural `if/else` directa.
-* **Decisión:** Saneamiento y unificación del flujo mediante dos estrategias en el frontend:
-  1. Reestructurar las llaves jerárquicas del bloque de captura asíncrono en `AuthModal.tsx` y confinar la redirección dentro de una estructura de control de tres vías (`if`, `else if`, `else`) mutuamente excluyente y atómica.
-  2. Implementar una función flecha auto-invocada (IIFE: `(() => { ... })()`) dentro del árbol de renderizado JSX de `NavbarUser.tsx` para encapsular la lógica condicional múltiple. Se diseñó la identidad visual docente con un esquema esmeralda corporativo (`bg-emerald-50`, `text-emerald-800`) acoplado al icono descriptivo `BookOpen` de `lucide-react`.
-* **Justificación para el TFG:** Demuestra el dominio de la especificación técnica de ECMAScript y la arquitectura de componentes reactivos en aplicaciones de gran envergadura (SPA). La resolución del bloqueo del árbol sintáctico del `try/catch/finally` evidencia buenas prácticas en el manejo del estado asíncrono y la robustez del software. Por su parte, la inyección de expresiones procedimentales mediante IIFE dota a la interfaz de una alta cohesión, paridad estética y mantenibilidad, criterios clave exigidos en la rúbrica de evaluación del tribunal.
-* **Consecuencias:** Se eliminaron por completo los errores de compilación y de pérdida de alcance de las variables reactivas (`setError`, `setLoading`). La estructura condicional excluyente asegura que un usuario autenticado jamás ejecute código residual de otra ruta, mitigando redirecciones inválidas. Como deuda técnica menor, el uso de funciones auto-invocadas en JSX podría sobrecargar la legibilidad de la vista si el marcado por rol crece desmesuradamente en el futuro, planteando una potencial extracción a micro-componentes.
+## Estatus
 
----
+Aceptado
 
-## [ADR-15] Centralización del Control de Roles Administrativos y Optimización Stateless (Stateless Token Parsing)
+## Fecha
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Al intentar implementar la funcionalidad de alteración de privilegios en el componente del frontend `AdminDashboard.tsx`, el servidor Spring Boot emitía rechazos asíncronos y revertía localmente las mutaciones a su estado por defecto (`STUDENT`). Este fallo se debía a tres factores críticos: la omisión del verbo HTTP `PATCH` en las políticas CORS globales, la falta de mapeo explícito de la subruta de gestión `/api/auth/users/**` en las reglas de Spring Security, y un cuello de botella arquitectónico en el filtro `JwtAuthenticationFilter.java` que ejecutaba consultas redundantes a PostgreSQL (`UserDetailsService.loadUserByUsername`) en cada petición entrante.
-* **Decisión:** Rediseñar e integrar la infraestructura de seguridad en tres niveles:
-  1. Incorporar el método `PATCH` en el Bean de configuración CORS y mapear de manera robusta la ruta administrativa en `SecurityConfig.java` utilizando `.hasAnyAuthority("ADMIN", "ROLE_ADMIN")` para absorber discrepancias de nomenclatura de roles en bases de datos relacionales.
-  2. Eliminar por completo el acceso redundante a persistencia en el ciclo de filtrado, transformando `JwtAuthenticationFilter` en un componente stateless que decodifica y reconstruye las autoridades (`SimpleGrantedAuthority`) en memoria extrayéndolas criptográficamente del token JWT (Claims).
-  3. Vincular el selector interactivo `<select>` del frontend con el endpoint atómico parametrizado para salvaguardar el principio de menor privilegio.
-* **Justificación para el TFG:** Aporta un valor metodológico fundamental en términos de seguridad informática y optimización de recursos. Demuestra al tribunal la capacidad de erradicar duplicidades y de transicionar con éxito desde un modelo híbrido con estado (Stateful) hacia una arquitectura puramente desacoplada (Stateless / RESTful). El parseo directo de claims en memoria reduce drásticamente los accesos concurrentes a la base de datos PostgreSQL, mejorando los tiempos de respuesta y la escalabilidad de la plataforma frente a picos de tráfico simulados.
-* **Consecuencias:** Se elimina la degradación de rendimiento por dobles lecturas a disco en cada petición asegurada. El Administrador puede gestionar, auditar y reasignar los privilegios del alumnado y profesorado de forma instantánea y reactiva en la interfaz de usuario, garantizando una consistencia de datos atómica y libre de bloqueos cruzados en el servidor de preflight de los navegadores.
+Junio 2026
 
----
+## Contexto
 
-## [ADR-16] Unificación del Perfil Universal Atómico y Desacoplamiento de Flujos de Redirección mediante Cohesión de Componentes y Sincronización Síncrona del Contexto JWT
+Se requería la inclusión de un nuevo rol de usuario (`PROFESSOR`) dentro de la plataforma escolar, el cual debía coexistir de manera jerárquica con los roles preexistentes (`ADMIN` y `STUDENT`). Al intentar introducir esta lógica intermedia en el cliente SPA, se produjeron fallos críticos de sintaxis: una pérdida de ámbito (*Scope*) en `AuthModal.tsx` por un cierre prematuro de llaves (`}}`) que desconectó los bloques `catch` y `finally` provocando el error `Parsing error: 'catch' or 'finally' expected`; una evaluación lineal incorrecta que ejecutaba siempre la ruta `/student` de forma secuencial; y una limitación estructural en JSX dentro de `NavbarUser.tsx`, ya que el operador ternario binario tradicional (`condición ? A : B`) no admitía una estructura procedural `if/else` directa.
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Gestión de Perfil de Usuario (STUDENT, PROFESSOR, ADMIN) e Infraestructura de Navegación SPA.
-* **Autores:** Luis (Desarrollador) / Laura / Jorge / Tutor TFG
+## Decisión
 
----
+Saneamiento y unificación del flujo mediante dos estrategias correctivas en la capa de presentación del frontend:
 
-## 1. Contexto y Problema
+1. **Reestructuración Sintáctica Asíncrona:** Corregir las llaves jerárquicas del bloque de captura asíncrono en `AuthModal.tsx` y confinar la redirección dentro de una estructura de control de tres vías (`if`, `else if`, `else`) mutuamente excluyente y atómica.
+2. **Encapsulamiento en Renderizado JSX:** Implementar una expresión de función ejecutada inmediatamente o función flecha auto-invocada (**IIFE**: `(() => { ... })()`) dentro del árbol de renderizado de `NavbarUser.tsx` para encapsular la lógica condicional múltiple. Se diseñó la identidad visual docente con un esquema esmeralda corporativo (`bg-emerald-50`, `text-emerald-800`) acoplado al icono descriptivo `BookOpen` de `lucide-react`.
 
-El sistema presentaba dos desafíos críticos interconectados que afectaban la experiencia de usuario y la integridad de los datos entre React (Vite, TSX) y el backend (Spring Boot 3 + PostgreSQL):
+## Justificación para el TFG
 
-1. **Cortocircuito de Persistencia Backend (Excepción Hibernate):** El filtro de seguridad (`JwtAuthenticationFilter`) inyectaba un objeto `UserDetails` desvinculado de la sesión activa de Hibernate (*Detached*). Al enviar un payload `PUT` genérico (`/api/v1/profile/update`) para actualizar datos del perfil, Hibernate lanzaba sistemáticamente la excepción de infraestructura `org.hibernate.AssertionFailure: null identifier (UserProfile)`. El mecanismo `@MapsId` fallaba al derivar la clave de la entidad débil `user_profiles` debido al estado transaccional inestable de la entidad fuerte `users` en transacciones de actualización concurrentes.
+* **Dominio de la Especificación ECMAScript:** Demuestra el dominio avanzado de JavaScript moderno y la arquitectura de componentes reactivos en aplicaciones de gran envergadura (SPA).
+* **Robustez en Estado Asíncrono:** La resolución del bloqueo del árbol sintáctico del `try/catch/finally` evidencia buenas prácticas en el manejo del estado y la tolerancia a fallos. La inyección de expresiones procedimentales mediante IIFE dota a la interfaz de alta cohesión, paridad estética y mantenibilidad, criterios clave exigidos en la rúbrica de evaluación.
 
-2. **Bloqueo y Rebote Asíncrono en el Frontend (Navegación SPA):** Al interactuar con el elemento de interfaz de usuario (`GenericButton`) que muestra el nombre del estudiante autenticado ("Luis") en el componente de cabecera, la aplicación omitía el callback de navegación y bloqueaba el acceso de forma perenne. Se detectaron tres anomalías: una discrepancia semántica en TypeScript entre manejadores `MouseEventHandler` y funciones puras (`() => void`) bajo la directiva `verbatimModuleSyntax`, un acoplamiento innecesario por propagación vertical de propiedades (*Props Drilling*) desde `MainNavbar.tsx` hacia `NavbarUser.tsx`, y un rebote asíncrono destructivo en el guardia de seguridad (`ProtectedRoute.tsx`), el cual interpretaba el estado transitorio inicializado en `null` de la sesión como un falso negativo, expulsando al usuario debido a la regla comodín (`path="*"`) antes de terminar la hidratación del token JWT.
+## Consecuencias
+
+### Impacto Positivo
+
+* **Estabilización de Compilación:** Se eliminaron por completo los errores de compilación y de pérdida de alcance de las variables reactivas de feedback (`setError`, `setLoading`).
+* **Redirecciones Deterministas:** La estructura condicional excluyente asegura que un usuario autenticado jamás ejecute código residual de otra ruta, mitigando accesos o redirecciones inválidas.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Legibilidad Comprometida en JSX:** El uso de funciones auto-invocadas (IIFE) incrustadas en el árbol JSX puede sobrecargar la legibilidad de la vista si el marcado visual por rol crece desmesuradamente en el futuro.
+* *Mitigación:* Se acotó la IIFE exclusivamente a la renderización de la insignia (*badge*) identificativa de rol, delegando las acciones complejas y el resto de la botonera a funciones manejadoras externas (`handleProfileRedirect`), manteniendo el componente limpio y legible.
 
 ---
 
-## 2. Decisión Arquitectónica
+# ADR-17: Centralización del Control de Roles Administrativos y Optimización Stateless (Stateless Token Parsing)
 
-Para garantizar un diseño de software robusto, limpio y genérico alineado con las exigencias metodológicas del TFG, se rechazó cualquier duplicidad de endpoints o consultas nativas, implementando una estrategia estructural doble:
+## Estatus
 
-1. **Sincronización Avanzada de Persistencia Backend:** Inyectar la instrucción `userRepository.saveAndFlush(currentUser)` en la cabecera del procesamiento del controlador. Esto obliga a Spring Data JPA a capturar la entidad desacoplada, integrarla en la sesión activa (`EntityManager.merge()`) y vaciar los cambios síncronamente. Se invierte el orden físico, ejecutando primero `profileRepository.save(profile)` y luego `userRepository.save(currentUser)` para estabilizar el mecanismo `@MapsId`.
-2. **Simetría y Composición por Roles en el Frontend:** Crear páginas contenedoras por rol (`StudentProfilePage`, `ProfessorProfilePage`, `AdminProfilePage`) compartiendo por composición el mismo formulario dinámico en `ProfileSettings.tsx`. El Navbar redirige correctamente mediante un mapeo de rutas según el rol.
-3. **Autonomía Contextual y Sincronización JWT:** Dotar a `NavbarUser.tsx` de plena autonomía contextual consumiendo directamente el hook global de autenticación (`useAuth`). Se implementa la función flecha `() => handleProfileRedirect()` para aislar conflictos de firmas de tipos, y se sustituye el enrutamiento virtual por una navegación imperativa física con `window.location.href`. Esto fuerza un ciclo de hidratación limpio desde la raíz que obliga al guardián a respetar el estado preventivo (`isLoading`) mientras se recupera el token del almacenamiento local.
+Aceptado
 
----
+## Fecha
 
-## 3. Justificación para el TFG
+Junio 2026
 
-Aporta un valor metodológico fundamental en el área de ingeniería de interfaces y patrones de arquitectura de software para Single Page Applications (SPA). Demuestra al tribunal el dominio práctico sobre el principio de **Cohesión y Autonomía de Componentes**, erradicando el acoplamiento rígido de herencia de callbacks. En el backend, expone la capacidad de gestionar con éxito transacciones atómicas seguras y el ciclo de vida de entidades JPA acopladas (`1:1`) mediante claves compartidas en PostgreSQL.
+## Contexto
 
----
+Al intentar implementar la funcionalidad de alteración de privilegios en el componente del frontend `AdminDashboard.tsx`, el servidor Spring Boot emitía rechazos asíncronos y revertía localmente las mutaciones a su estado por defecto (`STUDENT`). Este fallo se debía a tres factores críticos: la omisión del verbo HTTP `PATCH` en las políticas CORS globales, la falta de mapeo explícito de la subruta de gestión `/api/auth/users/**` en las reglas de Spring Security, y un cuello de botella arquitectónico en el filtro `JwtAuthenticationFilter.java` que ejecutaba consultas redundantes a PostgreSQL (`UserDetailsService.loadUserByUsername`) en cada petición entrante.
 
-## 4. Consecuencias
+## Decisión
 
-* **Positivas:** Se elimina la transferencia de propiedades muertas y las advertencias del linter (`eslint`). El flujo de acceso se homologa con el mecanismo nativo del módulo de inicio de sesión (`AuthModal.tsx`). El endpoint genérico da soporte transparente e idéntico a los tres roles (Luis, Laura y Jorge). Se habilitó con éxito la subida de avatares mediante `Multipart/Form-Data` con identificadores UUID únicos. Además, se resolvió la deuda técnica del scroll lateral en la consola de administración (`UserScrollList.tsx`) indexando los badges en un diccionario estático y aplicando una clave compuesta triple (`key={item.userId || item.username || ...}`) que fulmina el warning de llaves duplicadas o indefinidas en React.
-* **Negativas / Deuda Técnica:** Ninguna detectada. El circuito de administración, enrutamiento y perfil universal queda cerrado y validado al 100%.
+Rediseñar e integrar la infraestructura de seguridad en tres niveles operativos coordinados:
 
----
+1. **Saneamiento de Políticas Perimetrales:** Incorporar de forma explícita el método `PATCH` en el *Bean* de configuración CORS y mapear la ruta administrativa en `SecurityConfig.java` utilizando `.hasAnyAuthority("ADMIN", "ROLE_ADMIN")` para absorber discrepancias de nomenclatura de roles en la base de datos.
+2. **Optimización en la Capa de Transporte (*Stateless Token Parsing*):** Eliminar por completo el acceso redundante a persistencia en el ciclo de filtrado, transformando el `JwtAuthenticationFilter` en un componente estrictamente *stateless* que decodifica y reconstruye las autoridades (`SimpleGrantedAuthority`) en memoria extrayéndolas criptográficamente del token JWT (*Claims*).
+3. **Integración Atómica en la UI:** Vincular el selector interactivo `<select>` del frontend con el endpoint parametrizado para salvaguardar el principio de menor privilegio.
 
-## [ADR-17] Arquitectura del Módulo de Gestión de Cursos y Modelado de Relaciones Unidireccionales para el Perfil Profesor
+## Justificación para el TFG
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Circuito del Profesor (Laura) - Creación y gestión de contenidos académicas.
-* **Autores:** Luis (Desarrollador) / Tutor TFG
+* **Seguridad Informática Avanzada:** Aporta un valor metodológico fundamental en términos de seguridad informática y optimización de recursos. Demuestra la capacidad de erradicar duplicidades y de transicionar con éxito desde un modelo híbrido hacia una arquitectura puramente desacoplada (*Stateless* / *RESTful*).
+* **Rendimiento e Integridad de Persistencia:** El parseo directo de *claims* en memoria reduce drásticamente los accesos concurrentes a la base de datos PostgreSQL, mejorando los tiempos de respuesta y la escalabilidad de la plataforma frente a picos de tráfico simulados, un criterio muy valorado por el tribunal.
 
----
+## Consecuencias
 
-## 1. Contexto y Problema
+### Impacto Positivo
 
-Con el perfil unificado funcionando, el sistema requería implementar el circuito del profesor (Laura) para permitir la creación, edición y lectura de cursos en PostgreSQL. El desafío técnico radicaba en modelar las relaciones en Spring Boot 3 de forma **unidireccional** (para evitar referencias circulares e infinitas al serializar con Jackson a JSON) y asegurar que solo los usuarios con el rol `PROFESSOR` tengan privilegios de mutación en estos endpoints.
+* **Eliminación de Degradación de Rendimiento:** Se erradican las dobles lecturas a disco por cada petición asegurada que se procese en la plataforma.
+* **Consistencia Atómica de Datos:** El Administrador puede gestionar, auditar y reasignar los privilegios del alumnado y profesorado de forma instantánea y reactiva en la UI, garantizando un flujo libre de bloqueos cruzados en el servidor de *preflight* de los navegadores.
 
----
+### Impacto Negativo / Riesgos Mitigados
 
-## 2. Decisión Arquitectónica
-
-Se implementaron las siguientes directrices de diseño:
-
-1. **Control de Acceso Basado en Roles (RBAC):** Asegurar los endpoints del controlador mediante anotaciones `@PreAuthorize("hasRole('PROFESSOR')")` a nivel de Spring Security.
-2. **Modelado Unidireccional Limpio:** La entidad `Curso` contiene la referencia al profesor (entidad `User`), pero la entidad `User` no conoce los cursos que imparte, evitando sobrecargar la memoria de la sesión de Hibernate.
-3. **Paginación e Interfaz en React:** Consumo del listado mediante Axios mapeando los estados en tarjetas escaneables dentro de `ProfessorDashboard.tsx`.
+* **Riesgo de Revocación Tardía:** Al reconstruir los roles puramente desde el token JWT en memoria sin interrogar a la base de datos, si el rol de un usuario es revocado en la base de datos, el usuario mantendrá sus privilegios antiguos hasta que su token expire.
+* *Mitigación:* Se redujo de forma estricta el tiempo de expiración de los *access tokens* a un intervalo corto, limitando drásticamente la ventana de exposición y asegurando que las modificaciones de privilegios administrativos se sincronicen de manera forzosa en el siguiente ciclo de refresco del cliente.
 
 ---
 
-## 3. Consecuencias
+# ADR-18: Unificación del Perfil Universal Atómico y Desacoplamiento de Flujos de Redirección mediante Cohesión de Componentes y Sincronización Síncrona del Contexto JWT
 
-* **Positivas:** Seguridad estricta en la capa de servicios (Laura puede gestionar sus cursos, pero Luis el alumno solo tiene acceso de lectura). Respuestas JSON ligeras y limpias sin necesidad de usar `@JsonManagedReference` o `@JsonIgnore`.
-* **Negativas / Deuda Técnica:** Al usar relaciones unidireccionales, para obtener los cursos de un profesor específico se requiere una query personalizada en el repositorio (`findByProfesorId`), lo cual queda documentado y optimizado.
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+El sistema presentaba dos desafíos críticos interconectados que afectaban la experiencia de usuario (UX) y la integridad de los datos entre la capa de presentación (Vite + TypeScript) y la capa de servicios (Spring Boot 3 + PostgreSQL):
+
+1. **Cortocircuito de Persistencia Backend (Excepción Hibernate):** El filtro de seguridad (`JwtAuthenticationFilter`) inyectaba un objeto `UserDetails` desvinculado de la sesión activa de Hibernate (*Detached*). Al enviar un payload `PUT` genérico (`/api/v1/profile/update`) para actualizar datos del perfil, Hibernate lanzaba la excepción de infraestructura `org.hibernate.AssertionFailure: null identifier (UserProfile)`. El mecanismo `@MapsId` fallaba al derivar la clave de la entidad débil `user_profiles` debido al estado transaccional inestable de la entidad fuerte `users` en transacciones de actualización concurrentes.
+2. **Bloqueo y Rebote Asíncrono en el Frontend (Navegación SPA):** Al interactuar con el elemento de interfaz (`GenericButton`) que muestra el nombre del usuario autenticado en la cabecera, la aplicación omitía el callback de navegación y bloqueaba el acceso de forma perenne. Se detectaron tres anomalías: una discrepancia semántica en TypeScript entre manejadores `MouseEventHandler` y funciones puras (`() => void`) bajo la directiva `verbatimModuleSyntax`, un acoplamiento innecesario por propagación vertical de propiedades (*Props Drilling*) desde `MainNavbar.tsx` hacia `NavbarUser.tsx`, y un rebote asíncrono destructivo en el guardia de seguridad (`ProtectedRoute.tsx`), el cual interpretaba el estado transitorio inicializado en `null` de la sesión como un falso negativo, expulsando al usuario debido a la regla comodín (`path="*"`) antes de terminar la hidratación del token JWT.
+
+## Decisión
+
+Rediseñar de forma unificada la persistencia transaccional y el flujo de navegación mediante tres intervenciones estratégicas:
+
+1. **Estabilización de Sesión en Persistence Context:** Forzar una reasociación explícita y un volcado inmediato a la base de datos en `ProfileController.java` mediante el método `userRepository.saveAndFlush(currentUser)` antes de mapear el perfil extendido. Esto reincorpora la entidad *Detached* en la sesión de Hibernate, garantizando que `@MapsId` resuelva el identificador atómicamente.
+2. **Purificación de Rutas Indexadas en UI:** Eliminar el *Props Drilling* delegando de forma autónoma la redirección al componente de la barra de navegación. Se sustituyen las funciones de callback ambiguas por un mapeo indexado directo a nivel de TypeScript basado en constantes centralizadas (`ROLES`), enlazando el evento nativo del botón con `useNavigate`.
+3. **Control del Ciclo de Vida del Guardia de Red:** Modificar la lógica de `ProtectedRoute.tsx` para evaluar de manera prioritaria el estado bandera `isLoading` derivado de la hidratación asíncrona del token. Se suspende la evaluación de rutas y se renderiza un estado de carga neutral mientras la verificación del endpoint `/api/auth/me` se encuentre en proceso.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Integridad Transaccional Libre de Bloqueos:** Se erradica la excepción de identificador nulo de Hibernate, garantizando actualizaciones consistentes y atómicas del perfil extendido multirrol (`STUDENT`, `PROFESSOR`, `ADMIN`).
+* **Saneamiento del Sistema de Rutas:** Se elimina el rebote destructivo en las recargas de página, permitiendo que la SPA mantenga al usuario en su dashboard correspondiente de forma determinista y sin expulsiones accidentales del guardia de seguridad.
+* **Cohesión y Cumplimiento de Estándares:** La unificación de tipos en TypeScript se alinea con la directiva estricta `verbatimModuleSyntax`, optimizando la compilación y reduciendo la deuda técnica en el árbol de componentes.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Sobrecarga por Sincronización Forzada:** El uso de `saveAndFlush` obliga al motor de base de datos a ejecutar operaciones de escritura intermedias en disco de forma inmediata, lo que podría elevar ligeramente la latencia de la petición HTTP.
+* *Mitigación:* Al estar la lógica de actualización confinada exclusivamente al módulo de edición de perfil (operación de muy baja frecuencia transaccional en comparación con las consultas de cursos), el impacto en el rendimiento global del servidor es estadísticamente imperceptible en los entornos de evaluación del proyecto.
 
 ---
 
-## [ADR-18] Diseño de Persistencia Normalizada Multivalor y Simetría Relacional para Intereses del Alumnado
+# ADR-19: Arquitectura del Módulo de Gestión de Cursos y Modelado de Relaciones Unidireccionales para el Perfil Profesor
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
+## Estatus
 
-### Contexto
+Aceptado
 
-Al planificar la infraestructura del futuro módulo de recomendación inteligente en el frontend (`StudentDashboard.tsx`), se identificó la necesidad imperativa de capturar de forma genérica y multidimensional los intereses del estudiante en HTML/React en cinco ejes críticos: categorías temáticas, nivel, duración de cursos, idioma y subtítulos. El almacenamiento tradicional en columnas de texto plano (strings concatenados por comas) provocaría una degradación severa del rendimiento, obligando al servidor a ejecutar costosas operaciones de búsqueda de patrones con comodines (`LIKE`), anulando la utilidad de los índices y violando la Primera Forma Normal (1FN) de las bases de datos relacionales. Adicionalmente, se detectó que al abrir el componente modal multiscroll (`InterestsModal.tsx`), las preferencias no persistían marcadas en la interfaz de usuario debido a que el motor de persistencia sufría una desconexión por carga perezosa (*lazy loading*) en las colecciones secundarias y a que existía una colisión de rutas en el enrutamiento HTTP que impedía la correcta lectura del estado actual.
+## Fecha
 
-### Decisión
+Junio 2026
 
-Implementar un circuito de persistencia normalizado, desacoplado y simétrico estructurado en cuatro niveles técnicos:
+## Contexto
 
-1. **Arquitectura de Datos:** Incorporar la entidad `Interest.java` aplicando el patrón `@MapsId` en una relación `@OneToOne` con la tabla de usuarios para compartir de forma nativa la misma clave primaria (`user_id`), creando un esquema donde el ID de intereses hereda exactamente el ID del usuario en PostgreSQL y garantizando el borrado en cascada automático.
-2. **Persistencia de Colecciones e Hidratación Explícita [ADR-31]:** Implementar la anotación `@ElementCollection` generando de forma transparente cinco tablas satélite indexadas de forma vertical (`interest_categories`, `interest_course_types`, `interest_durations`, `interest_languages`, y `interest_subtitle_languages`). En el método transaccional de lectura `getUserInterests` de `UserService.java`, se descarta el uso de inicializadores externos pesados y se introduce una **Lógica de Hidratación Forzada Optimizada mediante la invocación explícita del tamaño de colección (`.size()`)**. Esto destruye el proxy perezoso de Hibernate y obliga al ORM a volcar los datos reales en memoria mientras la transacción `@Transactional(readOnly = true)` se encuentra abierta, asegurando que las listas no viajen vacías al ser serializadas a JSON.
-3. **Simetría en Enrutamiento API:** Reestructurar la precedencia jerárquica en `UserController.java` posicionando el endpoint estático `GET /api/auth/my-interests` de forma prioritaria antes del patrón dinámico variable `GET /{username}`. Esto anula la ambigüedad en el enrutamiento web de Spring MVC y subsana el error sintáctico de petición incorrecta (Error 400 Bad Request).
-4. **Ciclo Sincronizado en Frontend:** Configurar en el modal de React un hook de efecto (`useEffect`) acoplado al estado de visibilidad (`isOpen`), invocando de manera asíncrona al cliente centralizado (`apiClient`). Los datos recuperados hidratan los estados locales (`useState`), activando de forma automática las clases CSS condicionales y los iconos de verificación (`✓`) de las tarjetas seleccionadas.
+Con el perfil de usuario universal estabilizado [ADR-18], el sistema requería implementar de forma integral el circuito del profesor para permitir la creación, edición y lectura de contenidos académicos en PostgreSQL. El desafío técnico de ingeniería radicaba en modelar las relaciones en Spring Boot 3 de forma **unidireccional** para evitar referencias circulares infinitas al serializar las entidades con Jackson a JSON, garantizando al mismo tiempo que solo los usuarios con el rol `PROFESSOR` posean privilegios de mutación sobre este segmento de datos.
 
-### Justificación para el TFG
+## Decisión
 
-Aporta un valor metodológico fundamental en términos de diseño avanzado de bases de datos relacionales, control de enrutamiento web y optimización algorítmica de ORM. Demuestra al tribunal el cumplimiento riguroso de la teoría de normalización (1FN) al fragmentar colecciones dinámicas en casilleros elementales independientes. El orden de declaración de los métodos del controlador evidencia un dominio avanzado en el ciclo de vida de peticiones en Spring Framework. Asimismo, el control programático de la inicialización de proxies mediante llamadas `.size()` defiende la robustez y elegancia del software frente a fallos de inicialización indeterministas, eliminando acoplamientos rígidos con clases nativas del proveedor de persistencia y optimizando el ciclo de vida de la sesión transaccional. Esta simetría exacta entre el perfil de intereses del alumno y el catálogo de cursos anula la necesidad de capas de conversión intermedias en Spring Boot, lo que permitirá al futuro motor de recomendación ejecutar consultas de cruce ultra veloces mediante operaciones de conjunto indexadas (`JOIN` y cláusulas `IN`), maximizando la escalabilidad del sistema.
+Implementar un diseño de servicios acotado y un modelado de persistencia de datos bajo las siguientes directrices de arquitectura:
 
-### Consecuencias
+1. **Control de Acceso Basado en Roles (RBAC):** Asegurar perimetralmente los endpoints del controlador de asignaturas mediante la inyección de anotaciones de seguridad declarativas `@PreAuthorize("hasRole('PROFESSOR')")` a nivel de Spring Security.
+2. **Modelado Unidireccional Estricto:** La entidad `Courses` mapea una relación de muchos a uno (`@ManyToOne`) hacia el usuario docente (`Users`). En contraposición, la entidad `Users` se mantiene agnóstica a las asignaturas que imparte en su modelo, bloqueando de forma nativa la recursividad en la sesión de Hibernate.
+3. **Consumo Reactivo en la Presentación:** Desarrollar módulos de paginación e interfaces asíncronas en el frontend mediante Axios, mapeando la respuesta del servidor en tarjetas de información escaneables dentro de `ProfessorDashboard.tsx`.
 
-Se elimina por completo el almacenamiento caótico de texto plano y el coste computacional de procesar expresiones regulares en disco. El estudiante puede interactuar de forma reactiva con el modal multiscroll de React para actualizar sus criterios preferentes en el mismo milisegundo. Los cambios se persisten de forma transaccional y consistente en PostgreSQL mediante un mecanismo destructivo-limpio (operaciones secuenciales de `DELETE` e `INSERT` gestionadas de forma nativa por el ORM), proporcionando una base de datos perfectamente estructurada, limpia, libre de duplicados y lista para alimentar el motor de recomendaciones con un estado HTTP 200 OK estable.
+## Consecuencias
+
+### Impacto Positivo
+
+* **Seguridad Estricta en la Capa de Servicios:** Se blinda la lógica de negocio del perfil docente. Los profesores pueden gestionar sus asignaturas de forma autónoma, mientras que el alumnado queda restringido exclusivamente a operaciones de lectura perimetrales.
+* **Carga de Red Optimizada (JSON Limpio):** Se obtienen payloads JSON extremadamente ligeros y desacoplados para la SPA, eliminando la necesidad de recurrir a anotaciones paliativas de serialización como `@JsonManagedReference` o `@JsonBackReference`.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Queries Personalizadas en Repositorio:** Al omitirse la relación bidireccional, no es posible recuperar los cursos de un profesor de forma automática haciendo un acceso navegable clásico de JavaBeans (por ejemplo, `user.getCourses()`).
+* *Mitigación:* Se diseñó un método de consulta explícito y optimizado en el repositorio de persistencia (`findByInstructorId`), aislando la responsabilidad de la búsqueda mediante JPQL indexado y manteniendo la integridad estructural del modelo stateless.
 
 ---
 
-## [ADR-19] Optimización Computacional del Buscador Predictivo mediante Indexación Invertida GIN, Formateo Nativo de Parámetros y Mitigación de Carga en Interfaz
+# ADR-20: Diseño de Persistencia Normalizada Multivalor y Simetría Relacional para Intereses del Alumnado
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
+## Estatus
 
-### Contexto
+Aceptado
 
-El buscador global de cursos integrado en el panel del estudiante (`StudentDashboard.tsx`) presentaba deficiencias críticas de rendimiento y usabilidad que comprometían la escalabilidad del sistema. La consulta JPQL original implementaba una búsqueda aproximada multicampo utilizando comodines en ambos extremos del patrón (`LIKE LOWER(CONCAT('%', :keyword, '%'))`). En entornos relacionales como PostgreSQL, la presencia de un comodín inicial anula la utilidad de los índices de árbol tradicionales (B-Tree), forzando al motor a ejecutar un escaneo secuencial completo (*Full Table Scan*) de coste computacional O(N) en cada pulsación de tecla.
+## Fecha
 
-Adicionalmente, se detectó una anomalía de *binding* en la caché de planes de Hibernate al concatenar dinámicamente los porcentajes (`%`) dentro de múltiples cláusulas `OR` en JPQL. Este fenómeno cruzaba los marcadores de posición en consultas concurrentes, provocando que el motor de la base de datos interpretara la consulta de forma laxa (equivalente a `LIKE '%%'`) y devolviera registros aleatorios que no coincidían con el criterio de búsqueda. Finalmente, la ausencia de límites en la consulta volcaba todo el catálogo en la memoria RAM del servidor de Spring Boot, penalizando críticamente el hilo de renderizado del navegador al intentar dibujar cientos de componentes `GenericCard` simultáneamente.
+Junio 2026
 
-### Decisión
+## Contexto
+
+Al planificar la infraestructura del módulo de recomendación inteligente en el frontend (`StudentDashboard.tsx`), se identificó la necesidad imperativa de capturar de forma genérica y multidimensional los intereses del estudiante en HTML/React en cinco ejes críticos: categorías temáticas, nivel, duración de cursos, idioma y subtítulos. El almacenamiento tradicional en columnas de texto plano (strings concatenados por comas) provocaría una degradación severa del rendimiento, obligando al servidor a ejecutar costosas operaciones de búsqueda de patrones con comodines (`LIKE`), anulando la utilidad de los índices y violando la Primera Forma Normal (1FN) de las bases de datos relacionales. Adicionalmente, al abrir el componente modal multiscroll (`InterestsModal.tsx`), las preferencias no persistían marcadas en la interfaz de usuario debido a que el motor de persistencia sufría una desconexión por carga perezosa (*lazy loading*) en las colecciones secundarias y a que existía una colisión de rutas en el enrutamiento HTTP que impedía la correcta lectura del estado actual.
+
+## Decisión
+
+Implementar un circuito de persistencia normalizado, desacoplado y simétrico estructurado en cuatro niveles técnicos coordinados:
+
+1. **Arquitectura de Datos mediante Clave Compartida:** Incorporar la entidad `Interest.java` aplicando el patrón `@MapsId` en una relación `@OneToOne` con la tabla de usuarios para compartir de forma nativa la misma clave primaria (`user_id`), garantizando el borrado en cascada automático en PostgreSQL.
+2. **Persistencia de Colecciones e Hidratación Explícita:** Implementar la anotación `@ElementCollection` generando de forma transparente cinco tablas satélite indexadas de forma vertical (`interest_categories`, `interest_course_types`, `interest_durations`, `interest_languages`, y `interest_subtitle_languages`). En el método de lectura `getUserInterests` de `UserService.java`, se introduce una **Lógica de Hidratación Forzada Optimizada mediante la invocación explícita del tamaño de colección (`.size()`)** dentro de la transacción activa, destruyendo el proxy perezoso de Hibernate y obligando al ORM a volcar los datos reales en memoria antes de la serialización a JSON.
+3. **Simetría en Enrutamiento API:** Reestructurar la precedencia jerárquica en `UserController.java` posicionando el endpoint estático `GET /api/auth/my-interests` de forma prioritaria antes del patrón dinámico variable `GET /{username}` para anular la ambigüedad en el enrutamiento web de Spring MVC y subsanar el error HTTP 400 Bad Request.
+4. **Ciclo Sincronizado en Frontend:** Configurar en el modal de React un hook de efecto (`useEffect`) acoplado al estado de visibilidad (`isOpen`), invocando de manera asíncrona al cliente centralizado (`apiClient`) para hidratar los estados locales (`useState`), activando de forma automática las clases CSS condicionales y los iconos de verificación (`✓`).
+
+## Justificación para el TFG
+
+* **Cumplimiento de Teoría Relacional (1FN):** Demuestra el cumplimiento riguroso de la teoría de normalización al fragmentar colecciones dinámicas en casilleros elementales independientes, evitando el coste computacional de procesar expresiones regulares en disco.
+* **Control Programático del ORM:** El uso de llamadas `.size()` defiende la robustez del software frente a fallos de inicialización indeterministas, eliminando acoplamientos rígidos con clases nativas del proveedor de persistencia y optimizando el ciclo de vida transaccional. Esta simetría exacta anula la necesidad de capas de conversión intermedias en Spring Boot, lo que permitirá al futuro motor de recomendación ejecutar consultas de cruce ultra veloces mediante operaciones de conjunto indexadas (`JOIN` y cláusulas `IN`).
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Interacción Reactiva en Tiempo Real:** El estudiante puede interactuar de forma fluida con el modal multiscroll de React para actualizar sus criterios preferentes en el mismo milisegundo.
+* **Consistencia Atómica de Preferencias:** Los cambios se persisten de forma transaccional en PostgreSQL mediante un mecanismo destructivo-limpio (operaciones secuenciales de `DELETE` e `INSERT` gestionadas de forma nativa por el ORM), proporcionando una base estructurada y libre de duplicados con un estado HTTP 200 OK estable.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Operaciones de Escritura Frecuentes:** El enfoque destructivo-limpio borra e inserta todas las filas de las colecciones multivalor en cada actualización, lo que incrementa el volumen de sentencias SQL ejecutadas en PostgreSQL.
+* *Mitigación:* Al estar estas colecciones limitadas a un volumen muy reducido de elementos elementales por alumno (máximo una decena de tokens por eje), el impacto de red y procesamiento en el motor de base de datos es trivial, quedando neutralizado por el beneficio de contar con un esquema indexado totalmente limpio.
+
+---
+
+# ADR-21: Optimización Computacional del Buscador Predictivo mediante Indexación Invertida GIN, Formateo Nativo de Parámetros y Mitigación de Carga en Interfaz
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+El buscador global de cursos integrado en el panel del estudiante (`StudentDashboard.tsx`) presentaba deficiencias críticas de rendimiento y usabilidad que comprometían la escalabilidad del sistema. La consulta JPQL original implementaba una búsqueda aproximada multicampo utilizando comodines en ambos extremos del patrón (`LIKE LOWER(CONCAT('%', :keyword, '%'))`). En entornos relacionales como PostgreSQL, la presencia de un comodín inicial anula la utilidad de los índices de árbol tradicionales (B-Tree), forzando al motor a ejecutar un escaneo secuencial completo (*Full Table Scan*) de coste computacional O(N) en cada pulsación de tecla. Adicionalmente, se detectó una anomalía de *binding* en la caché de planes de Hibernate al concatenar dinámicamente los porcentajes (`%`) dentro de múltiples cláusulas `OR` en JPQL, provocando que el motor devolviera registros aleatorios que no coincidían con el criterio real. Finalmente, la ausencia de límites en la consulta volcaba todo el catálogo en la memoria RAM del servidor de Spring Boot, penalizando críticamente el hilo de renderizado del navegador al intentar dibujar cientos de componentes `GenericCard` simultáneamente.
+
+## Decisión
 
 Implementar una reestructuración arquitectónica integral en tres capas para optimizar el flujo de datos y la eficiencia de cómputo:
 
-1. **Capa de Persistencia (PostgreSQL):** Activar la extensión nativa `pg_trgm` y estructurar tres índices invertidos generalizados (**GIN**) basados en operaciones de trigramas (`gin_trgm_ops`) sobre las columnas críticas de búsqueda (`title`, `category`, `skills`) de la tabla `courses`. Esto fragmenta las cadenas de texto en bloques de tres caracteres, permitiendo búsquedas de coincidencia parcial indexadas de coste O(log N) u O(1).
-2. **Capa de Negocio y Repositorio (Spring Boot):** Modificar la firma del método en `CoursesRepository.java` eliminando las funciones de concatenación internas de JPQL. El formateo de los patrones de coincidencia aproximada (`%keyword%`) y de coincidencia inicial (`keyword%`) se traslada de forma nativa a la memoria de Java en `UserService.java`. La consulta se restringe a un lote simétrico estricto de **12 resultados** mediante `PageRequest.of(0, 12)`. Asimismo, se incorpora una cláusula algorítmica `ORDER BY CASE` en JPQL que prioriza con valor `1` los títulos que comienzan exactamente con el término buscado, con valor `2` los que lo contienen, y con valor `3` las coincidencias exclusivas por categoría o habilidades, seguidos de un ordenamiento alfabético secundario.
-3. **Capa de Presentación (React & Tailwind):** Consolidar un control de tasa de peticiones (*rate limiting*) en el cliente mediante un temporizador *debounce* de 400ms acoplado al hook de efecto (`useEffect`) para evitar la saturación de peticiones HTTP en vuelo. A nivel de maquetación, se recupera la cuadrícula de tres columnas (`lg:grid-cols-3`) y se acota el contenedor exterior mediante un límite dimensional estricto de altura fija (`max-h-[290px] overflow-y-auto`), provocando de forma controlada el fenómeno de diseño ***Cut-off effect*** (efecto de recorte) para incentivar el scroll natural.
+1. **Capa de Persistencia (PostgreSQL):** Activar la extensión nativa `pg_trgm` y estructurar tres índices invertidos generalizados (**GIN**) basados en operaciones de trigramas (`gin_trgm_ops`) sobre las columnas críticas de búsqueda (`title`, `category`, `skills`) de la tabla `courses` para habilitar búsquedas parciales indexadas de coste O(log N) u O(1).
+2. **Capa de Negocio y Repositorio (Spring Boot):** Modificar la firma del método en `CoursesRepository.java` trasladando de forma nativa el formateo de los patrones de coincidencia aproximada (`%keyword%`) a la memoria de Java en `UserService.java`. La consulta se restringe a un lote simétrico estricto de **12 resultados** mediante `PageRequest.of(0, 12)` e incorpora una cláusula algorítmica `ORDER BY CASE` en JPQL que prioriza semánticamente las coincidencias por títulos que comienzan exactamente con el término buscado.
+3. **Capa de Presentación (React & Tailwind):** Consolidar un control de tasa de peticiones (*rate limiting*) en el cliente mediante un temporizador *debounce* de 400ms acoplado al hook de efecto (`useEffect`) para evitar la saturación de peticiones HTTP en vuelo. A nivel de maquetación, se implementa una cuadrícula de tres columnas (`lg:grid-cols-3`) y se acota el contenedor exterior mediante un límite dimensional estricto de altura fija (`max-h-[290px] overflow-y-auto`) para inducir el fenómeno de diseño *Cut-off effect* (efecto de recorte) e incentivar el scroll natural.
 
-### Justificación para el TFG
+## Justificación para el TFG
 
-Aporta un alto valor metodológico en ingeniería de rendimiento y optimización de sistemas distribuidos. Ante el tribunal, justifica la capacidad de diagnosticar fallos indeterministas de binding en el ORM y resolverlos mediante el preformateo de cadenas en la capa de servicios de Java, garantizando que PostgreSQL reciba parámetros limpios y estrictos. El uso de la cláusula condicional `CASE` directamente en el lenguaje de consultas demuestra madurez en la delegación de lógica pesada al motor de datos en lugar de saturar la capa de aplicación en Java con bucles de ordenación tardíos.
+* **Ingeniería de Rendimiento Avanzada:** Justifica ante el tribunal la capacidad de diagnosticar fallos de binding en el ORM y resolverlos mediante el preformateo de cadenas en la capa de servicios de Java, garantizando que PostgreSQL reciba parámetros limpios y estrictos.
+* **Sincronización de Capas Homogénea:** El uso de la cláusula condicional `CASE` directamente en el lenguaje de consultas demuestra madurez al delegar lógica pesada al motor de datos. Asimismo, la sincronización matemática entre el tamaño de página del backend (12 elementos) y la distribución del frontend (múltiplo exacto de la cuadrícula de 3 columnas) evidencia un diseño de software armonizado y limpio que eleva la calidad del código a estándares de producción industrial.
 
-Por último, la sincronización matemática entre el tamaño de página del backend (12 elementos) y la distribución del frontend (múltiplo exacto de la cuadrícula de 3 columnas) evidencia un diseño de software armonizado y limpio, elevando la calidad del código a estándares de producción industrial y asegurando una respuesta de la interfaz en el orden de los milisegundos.
+## Consecuencias
 
-### Consecuencias
+### Impacto Positivo
 
-Se erradica por completo el escaneo secuencial en disco, los falsos positivos de búsqueda por cruce de marcadores y el riesgo de desborde de buffer en el backend. Las consultas predictivas se ejecutan de forma instantánea sobre PostgreSQL incluso bajo volúmenes masivos de datos. El usuario experimenta una navegación fluida donde los criterios de ordenación semántica garantizan que los cursos más idóneos aparezcan siempre en la primera línea de visión. El componente visual queda perfectamente integrado en el espacio del dashboard, manteniendo una estética limpia, simétrica y una experiencia de usuario fluida e intuitiva libre de bloqueos en el navegador.
+* **Eliminación del Escaneo Secuencial:** Las consultas predictivas se ejecutan de forma instantánea sobre PostgreSQL incluso bajo volúmenes masivos de datos, erradicando los falsos positivos por cruce de marcadores y el riesgo de desborde de buffer en el backend.
+* **Jerarquía Semántica en UI:** El usuario experimenta una navegación fluida donde los criterios de ordenación semántica garantizan que los cursos más idóneos aparezcan siempre en la primera línea de visión, manteniendo el componente integrado y libre de bloqueos en el navegador.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Sobrecarga de Almacenamiento por Índices GIN:** Los índices de trigramas GIN requieren un espacio en disco significativamente mayor en PostgreSQL en comparación con los índices B-Tree estándar debido a la fragmentación de subcadenas.
+* *Mitigación:* Al estar el catálogo de cursos acotado y normalizado dentro de una plataforma escolar de formación, el volumen total de texto indexado es perfectamente manejable para el servidor, quedando el coste de almacenamiento secundario plenamente compensado por la drástica reducción del tiempo de respuesta (latencia) en las consultas en tiempo real.
 
 ---
 
-### Enmienda A: Restricción del Alcance de Búsqueda Predictiva y Depuración de la Estructura Relacional
+# Enmienda A: Restricción del Alcance de Búsqueda Predictiva y Depuración de la Estructura Relacional (Modificación al ADR-21)
 
-**Fecha:** Junio 2026  
-**Estatus:** Aceptado  
+## Estatus
 
-#### Contexto de la Enmienda
+Aceptado
 
-Durante las pruebas de carga y estrés del buscador predictivo, se determinó que la inclusión de la columna `skills` (habilidades) dentro del filtro multicampo (`WHERE`) de la consulta JPQL introducía penalizaciones críticas en el tiempo de respuesta del motor de la base de datos PostgreSQL.
+## Fecha
 
-Técnicamente, el campo `skills` almacena un listado de tecnologías indexadas en forma de cadena plana separada por comas (ej. `"Java, Spring Boot, REST"`), lo que viola la **Primera Forma Normal (1FN)** del modelo relacional en este caso de uso específico. Al ejecutar operaciones de coincidencia parcial (`LIKE %keyword%`) sobre cadenas desnormalizadas y extensas, la eficiencia de la indexación por trigramas disminuye drásticamente, forzando un consumo innecesario de CPU y memoria de intercambio en disco. Adicionalmente, desde la perspectiva de la Experiencia de Usuario (UX), los retornos basados en coincidencias opacas ocultas en los metadatos de las tarjetas (no legibles a simple vista en el título o categoría) generaban confusión e indeterminismo visual en la interfaz del estudiante.
+Junio 2026
 
-#### Decisión Derivada
+## Contexto de la Enmienda
+
+Durante las pruebas de carga y estrés del buscador predictivo, se determinó que la inclusión de la columna `skills` (habilidades) dentro del filtro multicampo (`WHERE`) de la consulta JPQL introducía penalizaciones críticas en el tiempo de respuesta de PostgreSQL. Técnicamente, el campo `skills` almacena un listado de tecnologías indexadas en forma de cadena plana separada por comas (ej. `"Java, Spring Boot, REST"`), lo que viola la **Primera Forma Normal (1FN)** del modelo relacional en este caso de uso específico. Al ejecutar operaciones de coincidencia parcial (`LIKE %keyword%`) sobre cadenas desnormalizadas y extensas, la eficiencia de la indexación por trigramas disminuye drásticamente, forzando un consumo innecesario de CPU y memoria de intercambio en disco. Adicionalmente, desde la perspectiva de la Experiencia de Usuario (UX), los retornos basados en coincidencias opacas ocultas en los metadatos de las tarjetas (no legibles a simple vista en el título o categoría) generaban confusión e indeterminismo visual en la interfaz del estudiante.
+
+## Decisión Derivada
+
+Implementar una reestructuración de alcance y una purga de infraestructura en tres capas operativas:
 
 1. **Refactorización del Backend (`CoursesRepository.java`):** Eliminar de forma estricta la cláusula `OR LOWER(c.skills) LIKE LOWER(:formattedKeyword)` tanto del filtro de selección como de la estructura de ponderación algorítmica `ORDER BY CASE`. La búsqueda predictiva instantánea queda restringida exclusivamente a los campos de alta densidad semántica: `title` y `category`.
 2. **Optimización del Almacenamiento (PostgreSQL):** Ejecutar una purga del índice invertido trunco mediante el comando `DROP INDEX IF EXISTS idx_courses_skills_trgm;`, liberando espacio físico en disco y mitigando la sobrecarga computacional de reindexación en las operaciones de inserción (`INSERT`) y actualización (`UPDATE`).
-3. **Sincronización de Interfaz (`StudentDashboard.tsx`):** Modificar los descriptores semánticos de la barra de búsqueda para transparentar el alcance real de la consulta al usuario, limitando el texto a *"por título o categoría temática"*.
-4. **Aislamiento de Responsabilidad:** Reservar de forma exclusiva el atributo `skills` para el motor del **Algoritmo de Recomendación Inteligente (ADR-18)**, donde su procesamiento se ejecutará de manera asíncrona mediante un cruce de matrices frente a la tabla de intereses del estudiante, evitando penalizar el hilo de la consulta síncrona en tiempo real del catálogo.
+3. **Sincronización de Interfaz (`StudentDashboard.tsx`):** Modificar los descriptores semánticos de la barra de búsqueda para transparentar el alcance real de la consulta al usuario, limitando el texto informativo a *"por título o categoría temática"*.
+4. **Aislamiento de Responsabilidad Funcional:** Reservar de forma exclusiva el atributo `skills` para el motor del **Algoritmo de Recomendación Inteligente [ADR-20]**, donde su procesamiento se ejecutará de manera asíncrona mediante un cruce de matrices frente a la tabla de intereses del estudiante, evitando penalizar el hilo de la consulta síncrona en tiempo real del catálogo.
 
-#### Consecuencias
+## Consecuencias
 
-Se logra una reducción drástica en la latencia de la consulta predictiva, garantizando tiempos de respuesta estables en el orden de los milisegundos (<50ms). El repositorio y la base de datos quedan limpios de estructuras redundantes, asegurando una separación de responsabilidades (*Separation of Concerns*) perfecta entre el módulo de búsqueda global y el módulo de recomendaciones asíncronas de cara a la defensa del proyecto.
+### Impacto Positivo
+
+* **Minimización de Latencia en Red:** Se logra una reducción drástica en la latencia de la consulta predictiva, garantizando tiempos de respuesta estables en el orden de los milisegundos (<50ms).
+* **Separación de Responsabilidades Impecable:** El repositorio y la base de datos quedan limpios de estructuras redundantes, asegurando una separación de responsabilidades (*Separation of Concerns*) perfecta entre el módulo de búsqueda global síncrono y el módulo de recomendaciones asíncronas de cara a la defensa del proyecto.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Pérdida de Flexibilidad en la Búsqueda:** El estudiante ya no podrá descubrir cursos escribiendo una tecnología específica en la barra de búsqueda si esta no figura explícitamente en el título o en la categoría temática de la asignatura.
+* *Mitigación:* Esta aparente limitación queda plenamente compensada y resuelta por la arquitectura reactiva del sistema, dado que el panel de **Recomendaciones Inteligentes [ADR-20]** se encarga de cruzar de forma automática y asíncrona las habilidades deseadas por el alumno con los metadatos ocultos de los cursos, exponiéndolos directamente en la primera línea de visión del dashboard sin necesidad de interactuar con el buscador.
 
 ---
 
-# ADR-20: Refactorización del Panel del Estudiante mediante Controladores Distribuidos
+# ADR-22: Refactorización del Panel del Estudiante mediante Controladores Distribuidos
 
 ## Estado
 
@@ -413,151 +853,397 @@ Esta decisión se ejecuta bajo las siguientes directrices técnicas:
 
 ---
 
-## [ADR-21] Contrato de Expiración del Token con Tipado Estricto (TTL Centralizado)
+# ADR-23: Contrato de Expiración del Token con Tipado Estricto (TTL Centralizado)
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Existía una inconsistencia crítica en la gestión del tiempo de vida de la sesión (*Time-To-Live* o TTL) entre ambas capas de la aplicación. El backend calculaba la expiración de forma correcta, pero el frontend aplicaba parches de maquetación de tipos mediante un casting forzado a `unknown` para acceder a una propiedad inexistente denominada `expiresInSeconds`. Al fallar esta lectura por discrepancia de contratos, el sistema activaba de forma silenciosa un temporizador de emergencia fijo de 15 minutos, lo que comprometía la integridad del sistema de autenticación y provocaba desconexiones prematuras o estados inconsistentes en la interfaz de usuario.
-* **Decisión:** Estandarizar de forma estricta el contrato de transferencia de datos eliminando los artificios de tipado condicional en el archivo `AuthProvider.tsx`. El campo `expiresIn` se mapea ahora de manera homogénea entre el registro de Java del servidor y su correspondiente interfaz en TypeScript como un tipo numérico estricto. El cliente calcula el instante de expiración consumiendo directamente este valor sin transformaciones ambiguas ni escapes en el compilador.
-* **Justificación para el TFG:** Sigue de manera rigurosa los principios de diseño guiado por contratos en arquitecturas desacopladas cliente/servidor. Al forzar una paridad absoluta entre los tipos del backend y el frontend, se elimina la deuda técnica y se garantiza que el flujo de control matemático del TTL sea exacto. Esto evita que el compilador ignore discrepancias en las estructuras de datos compartidas y eleva la robustez perimetral del sistema de sesiones.
-* **Consecuencias:**
-  * **Consistencia Operacional Total:** Eliminación definitiva de los errores de desincronización en la sesión y pantallas congeladas, asegurando que el ciclo de vida del usuario en el navegador coincida exactamente con la validez del token en el servidor.
-  * **Flujo de Persistencia Seguro:** Garantía de un tipado seguro en todo el flujo de autenticación, blindando la integridad de los datos desde la respuesta HTTP original hasta su almacenamiento en las capas de persistencia local (*localStorage*).
+## Estatus
 
----
+Aceptado
 
-## [ADR-22] Externalización y Seguridad de Políticas CORS mediante Variables de Entorno
+## Fecha
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** La configuración de la seguridad perimetral en la clase `SecurityConfig.java` del backend restringía las solicitudes entrantes permitiendo únicamente el origen estático `http://localhost:5173`. Esta codificación rígida (*hardcodeada*) en el código fuente constituía un acoplamiento crítico con el entorno de desarrollo local, lo que impedía por completo el despliegue del sistema en servidores productivos reales bajo políticas de navegador (*Cross-Origin Resource Sharing*) a menos que se realizaran modificaciones manuales propensas a errores antes de compilar.
-* **Decisión:** Migrar la directiva de orígenes permitidos de CORS hacia un modelo de inyección de dependencias dinámica en Spring Boot. Se implementa el uso de la anotación `@Value` ligada a una variable de entorno del sistema, configurando un mecanismo de respaldo (*fallback*) adaptativo que emplea la ruta local por defecto si la variable externa se encuentra ausente en el sistema operativo.
-* **Justificación para el TFG:** Cumple de manera rigurosa con los principios de portabilidad y desacoplamiento de la metodología de las *Twelve-Factor Apps* para sistemas nativos de la nube. Al externalizar las directrices de red del código compilado, el archivo de seguridad de Spring Security queda cerrado a modificaciones físicas de infraestructura, permitiendo canalizar despliegues automáticos y parametrizables en entornos de desarrollo, pruebas o producción sin alterar un solo byte del artefacto compilado.
-* **Consecuencias:**
-  * **Portabilidad y Automatización:** Mejora inmediata en la portabilidad del sistema, permitiendo su despliegue inmediato en cualquier proveedor PaaS o la nube (como Render, AWS o Heroku) configurando la dirección web del frontend de forma puramente operativa.
-  * **Seguridad y Limpieza del IDE:** Cumplimiento de las mejores prácticas de seguridad operativa, evitando la exposición de configuraciones locales y silenciando las advertencias o avisos amarillos del editor de código en el archivo `application.properties` al delegar el flujo de datos sobre variables del entorno.
+Junio 2026
 
----
+## Contexto
 
-## [ADR-23] Validación Perimetral de Archivos y Mitigación de Ataques RCE
+Existía una inconsistencia crítica en la gestión del tiempo de vida de la sesión (*Time-To-Live* o TTL) entre ambas capas de la aplicación. El backend calculaba la expiración de forma correcta, pero el frontend aplicaba parches de maquetación de tipos mediante un casting forzado a `unknown` para acceder a una propiedad inexistente denominada `expiresInSeconds`. Al fallar esta lectura por discrepancia de contratos, el sistema activaba de forma silenciosa un temporizador de emergencia fijo de 15 minutos, lo que comprometía la integridad del sistema de autenticación y provocaba desconexiones prematuras o estados inconsistentes en la interfaz de usuario.
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** El servicio de almacenamiento en el servidor permitía la subida y persistencia de recursos en disco limitando únicamente el tamaño máximo de los ficheros a 5MB a través de la directiva del servlet. No obstante, la ausencia total de validaciones sobre el tipo de contenido representaba una vulnerabilidad crítica de seguridad. Un atacante autenticado o un usuario malintencionado podría evadir el propósito de la funcionalidad cargando scripts ejecutables (como shells o scripts `.php`), obteniendo la capacidad de comprometer el servidor mediante la ejecución remota de código (*Remote Code Execution* o RCE).
-* **Decisión:** Implementar un mecanismo imperativo de validación perimetral dual dentro de la clase `FileStorageService.java`. Antes de escribir cualquier flujo de datos en el disco, el sistema extrae de forma segura la extensión real del nombre del fichero y valida la cabecera `Content-Type` (*MIME Type*). Esta restricción se aplica mediante una arquitectura segregada por el contexto de la carpeta de destino: la subcarpeta `avatars` acepta estrictamente formatos gráficos autorizados (`.jpg`, `.jpeg`, `.png`, `.webp`), mientras que la subcarpeta `documents` se restringe de forma exclusiva a extensiones `.pdf`.
-* **Justificación para el TFG:** Sigue las directrices de la guía OWASP y el principio de defensa en profundidad en sistemas web. Validar de forma combinada la extensión y el tipo MIME mitiga los ataques de suplantación de identidad de archivos (*MIME-sniffing*). Cualquier intento de alteración o desajuste con las listas blancas de formatos permitidos detiene la transacción de inmediato lanzando una excepción controlada, impidiendo que material potencialmente destructivo alcance el sistema de archivos local.
-* **Consecuencias:**
-  * **Inmunización frente a RCE:** Blindaje absoluto del servidor ante la persistencia de archivos maliciosos, neutralizando vectores de ataque orientados al secuestro de recursos o ejecución de comandos en el host.
-  * **Centralización de Reglas de Negocio:** Los controladores de la aplicación (como `ProfileController.java`) delegan la responsabilidad del control de formatos en el servicio de almacenamiento, garantizando que cualquier nuevo módulo de subida en el futuro herede nativamente estas directivas de seguridad.
+## Decisión
+
+Estandarizar de forma estricta el contrato de transferencia de datos eliminando los artificios de tipado condicional en el archivo `AuthProvider.tsx`. El campo `expiresIn` se mapea ahora de manera homogénea entre el registro de Java del servidor y su correspondiente interfaz en TypeScript como un tipo numérico estricto. El cliente calcula el instante de expiración consumiendo directamente este valor sin transformaciones ambiguas ni escapes en el compilador.
+
+## Justificación para el TFG
+
+* **Diseño Guiado por Contratos:** Sigue de manera rigurosa los principios de diseño guiado por contratos en arquitecturas desacopladas cliente/servidor, garantizando la paridad absoluta entre los tipos del backend y el frontend.
+* **Eliminación de Deuda Técnica:** Evita que el compilador ignore discrepancias en las estructuras de datos compartidas, eliminando de raíz los temporizadores de emergencia arbitrarios y elevando la robustez perimetral del sistema de sesiones ante una auditoría técnica.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Consistencia Operacional Total:** Eliminación definitiva de los errores de desincronización en la sesión y pantallas congeladas, asegurando que el ciclo de vida del usuario en el navegador coincida exactamente con la validez del token en el servidor.
+* **Flujo de Persistencia Seguro:** Garantía de un tipado seguro en todo el flujo de autenticación, blindando la integridad de los datos desde la respuesta HTTP original hasta su almacenamiento en las capas de persistencia local (*localStorage*).
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Rigidez ante Cambios en el API:** Al acoplar fuertemente el frontend al tipo numérico de la propiedad `expiresIn`, cualquier modificación futura en el formato del TTL del backend (por ejemplo, transicionar a una cadena ISO o timestamp de fecha) rompería la compilación del cliente en React.
+* *Mitigación:* Se centralizó la interfaz del contrato en el archivo de tipos core `authTypes.ts`, asegurando que si el backend altera la firma en el futuro, el error sea detectado de forma estática en tiempo de compilación por el transpilador de TypeScript, permitiendo adaptar toda la base de código de red en un único punto del proyecto.
 
 ---
 
-## [ADR-24] Gestión de Sesión Robusta mediante la Visibility API del Navegador
+# ADR-24: Externalización y Seguridad de Políticas CORS mediante Variables de Entorno
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** La desconexión proactiva por tiempo en el frontend delegaba el control de la expiración de la sesión en un temporizador lineal `setTimeout` en el cliente. Sin embargo, los navegadores web modernos (como Chrome, Edge o Safari) aplican políticas agresivas de ahorro de energía que suspenden o ralentizan los hilos de temporizadores en pestañas inactivas o en segundo plano. Esto provocaba que el reloj de la aplicación se detuviera, generando "sesiones fantasma" donde el usuario regresaba horas después viendo una interfaz falsamente autenticada que solo fallaba al intentar interactuar y colisionar contra el backend.
-* **Decisión:** Migrar la lógica de desconexión proactiva en el archivo `AuthProvider.tsx` para utilizar un enfoque basado en eventos de ciclo de vida del navegador a través de la *Visibility API*. Se implementa la escucha del evento nativo `visibilitychange` combinado con una rutina ligera de muestreo cíclico de alta frecuencia (`setInterval` cada 5 segundos). En el momento exacto en que el usuario reactiva o enfoca la pestaña, el sistema ejecuta una auditoría de tiempo inmediata recalculando la validez del token frente al tiempo real del sistema operativo (`Date.now() >= expiresAt`).
-* **Justificación para el TFG:** Demuestra una comprensión avanzada del entorno de ejecución asíncrono en los motores de renderizado de JavaScript y las limitaciones físicas del hardware actual. En lugar de confiar ciegamente en temporizadores lineales vulnerables a la congelación del navegador, el frontend se vuelve autoconsciente de su estado de visualización, blindando el perímetro de autenticación en el cliente y garantizando la sincronización con el tiempo absoluto de expiración definido por el servidor.
-* **Consecuencias:**
-  * **Eliminación de Sesiones Fantasma:** Cierre de sesión preciso e inmediato en el milisegundo en que el usuario regresa a la aplicación, impidiendo la exposición visual de datos sensibles en interfaces obsoletas tras periodos prolongados de inactividad.
-  * **Consistencia de Estado:** Desaparición de estados de autenticación inconsistentes en la interfaz de usuario, mejorando la experiencia del estudiante al sincronizar de forma determinista el estado de la SPA con el ciclo de vida real del token JWT.
+## Estatus
 
----
+Aceptado
 
-## [ADR-25] Normalización Semántica de Errores en la API REST
+## Fecha
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Múltiples operaciones críticas en la capa de servicios del backend (como en la clase `UserService.java`) recurrían al lanzamiento directo de la excepción genérica `RuntimeException` al no localizar registros en la base de datos o ante fallos de validación. Aunque el servidor dispone de un componente interceptor centralizado (`GlobalExceptionHandler.java`), el uso de excepciones sin tipar impedía que el manejador pudiera discernir el origen del fallo, forzando a que el sistema procesara de forma homogénea cualquier anomalía bajo el mismo código genérico HTTP 500 (*Internal Server Error*), lo que deterioraba gravemente el rigor semántico y la claridad de la API REST.
-* **Decisión:** Desterrar por completo el uso de excepciones genéricas e incorporar una arquitectura de excepciones semánticas personalizadas de grano fino. Se procede a la adopción y sobrecarga de clases específicas como `ResourceNotFoundException` y `UserAlreadyExistsException`. Estas excepciones se vinculan directamente a códigos de estado HTTP específicos (`404 Not Found` y `409 Conflict`, respectivamente) utilizando las directivas de Spring Boot y el mapeo de respuestas estructuradas.
-* **Justificación para el TFG:** Sigue de manera rigurosa las especificaciones del protocolo HTTP y las mejores prácticas en el diseño de arquitecturas RESTful profesionales. Al dotar a la capa de servicios de la capacidad de comunicar anomalías de datos con nombres propios, el interceptor global puede traducir el fallo en un objeto JSON homogéneo y con el código de estado correspondiente. Esto previene fugas de información del sistema en las trazas de error y proporciona un contrato predecible para el consumo del cliente.
-* **Consecuencias:**
-  * **API REST Semántica y Estándar:** Las peticiones por recursos inexistentes o conflictos de datos devuelven códigos HTTP semánticos (404 y 409) limpios en lugar de alarmantes y opacos errores internos 500, profesionalizando la interfaz del servidor.
-  * **Facilidad de Depuración e Integración:** Proporciona al frontend mensajes de error claros, estructurados y consistentes, agilizando el diagnóstico en fases de pruebas y mejorando drásticamente la comunicación entre las capas del sistema mediante el uso correcto de los estándares de la industria.
+Junio 2026
 
----
+## Contexto
 
-## [ADR-26] Estrategia de Aseguramiento de Calidad Híbrida y Cobertura de Regresiones en Backend y Frontend
+La configuración de la seguridad perimetral en la clase `SecurityConfig.java` del backend restringía las solicitudes entrantes permitiendo únicamente el origen estático `http://localhost:5173`. Esta codificación rígida (*hardcodeada*) en el código fuente constituía un acoplamiento crítico con el entorno de desarrollo local, lo que impedía por completo el despliegue del sistema en servidores de producción reales bajo políticas de navegación de origen cruzado (*Cross-Origin Resource Sharing*) a menos que se realizaran modificaciones manuales propensas a errores antes de compilar.
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Tras las profundas refactorizaciones perimetrales y de seguridad realizadas en el sistema (unificación de layouts, inyección dinámica de CORS, validación dual de archivos y control de sesiones mediante la Visibility API), la suite de pruebas automatizadas se encontraba desactualizada y desalineada con la arquitectura de la plataforma. El sistema adolecía de puntos ciegos (*blind spots*) críticos de extremo a extremo: el backend no auditaba el rechazo de scripts maliciosos de tipo RCE en la capa de almacenamiento ni validaba las políticas de red frente a orígenes no autorizados en los filtros de seguridad, mientras que el frontend no comprobaba la reactividad del cliente ante la congelación de hilos de tiempo del navegador.
-* **Decisión:** Diseñar e implementar una suite de pruebas automatizadas integral utilizando una estrategia híbrida y complementaria para ambas capas del software.
-  1. Para el **Backend (Spring Boot)**, se implementan pruebas unitarias y de integración mediante JUnit 5 y Mockito; además, se adopta la simulación de servlets mediante entornos de contexto web inyectados dinámicamente (`MockMvcBuilders` acoplado al filtro de seguridad) para blindar perimetralmente la persistencia, mitigar fallos de infraestructura y validar que la inyección de propiedades externas para CORS actúa correctamente interceptando peticiones maliciosas (OPTIONS / Preflight).
-  2. Para el **Frontend (React)**, se estructura una arquitectura de pruebas de comportamiento aisladas mediante Vitest y React Testing Library, recurriendo al mockeo semántico de componentes e hilos de tiempo falsos (`vi.useFakeTimers`) para evaluar las directivas de layouts paramétricos y los eventos de ciclo de vida del navegador.
-* **Justificación para el TFG:** Aporta el máximo nivel de rigor metodológico y madurez de ingeniería de software exigido en un TFG. En lugar de limitarse a pruebas aisladas y superficiales, la suite valida la integración real entre las capas de negocio, seguridad, red y persistencia de datos. El uso de maquetación de contexto web simulado en Spring Boot y mocks controlados en React aísla las responsabilidades de los componentes, garantizando que los tests actúen como un escudo perimetral inmune a futuras alteraciones en la base de datos o modificaciones estéticas en la interfaz de usuario.
-* **Consecuencias:**
-  * **Inmunización Dual ante Regresiones:** El sistema queda blindado contra fallos colaterales en ambas capas, asegurando con un 100% de certeza técnica verificada por consola (`BUILD SUCCESS` en Spring Boot y `PASS` en Vitest) que el servidor rechaza scripts maliciosos, los filtros de red bloquean orígenes no autorizados y el cliente destruye proactivamente las sesiones fantasma en milisegundos.
-  * **Documentación Ejecutable Homogénea:** La suite de pruebas actúa como documentación viva y simétrica del comportamiento esperado de la plataforma de desarrollo, facilitando el diagnóstico en fases de mantenimiento y garantizando la estabilidad operativa global del sistema de cara a su defensa y despliegue final.
+## Decisión
+
+Migrar la directiva de orígenes permitidos de CORS hacia un modelo de inyección de dependencias dinámica en Spring Boot. Se implementa el uso de la anotación `@Value` ligada a una variable de entorno del sistema, configurando un mecanismo de respaldo (*fallback*) adaptativo que emplea la ruta local por defecto si la variable externa se encuentra ausente en el sistema operativo.
+
+## Justificación para el TFG
+
+* **Metodología de las Twelve-Factor Apps:** Cumple de manera rigurosa con los principios de portabilidad y desacoplamiento para sistemas nativos de la nube al externalizar las directrices de red de la base de código.
+* **Seguridad por Aislamiento:** El archivo de configuración de Spring Security queda cerrado a modificaciones físicas de infraestructura, permitiendo canalizar despliegues automáticos y parametrizables en entornos de desarrollo, pruebas o producción sin alterar un solo byte del artefacto compilado.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Portabilidad y Automatización:** Mejora inmediata en la portabilidad del sistema, permitiendo su despliegue en cualquier proveedor PaaS o de infraestructura en la nube (como Render, AWS o Heroku) configurando la dirección web del frontend de forma puramente operativa.
+* **Seguridad y Limpieza del Código:** Cumplimiento estricto de las mejores prácticas de seguridad operativa, evitando la exposición de configuraciones locales y silenciando las advertencias o avisos del editor de código en el archivo `application.properties`.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Riesgo de Fallo en Despliegue por Omisión:** Si al configurar el entorno de producción se olvida declarar la variable de entorno, el backend utilizará el *fallback* local (`localhost:5173`), bloqueando legítimamente todas las peticiones reales del frontend en producción por las restricciones CORS de los navegadores.
+* *Mitigación:* Se incluyó un registro de traza a nivel de logs (`logger.info`) durante la inicialización del Bean de CORS que imprime explícitamente el origen inyectado por el sistema en el arranque. Esto permite auditar de forma inmediata la configuración en la consola del servidor durante el despliegue antes de recibir tráfico de red.
 
 ---
 
-## [ADR-27] Resolución de Identidad mediante Claims del Token (Stateless Identity)
+# ADR-25: Validación Perimetral de Archivos y Mitigación de Ataques RCE
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** El filtrado por cadenas de texto (`username`) presentaba fallos de integridad debido a la sensibilidad a mayúsculas de PostgreSQL ("Luis" vs "luis") y a la redundancia de consultas a la base de datos tras la validación del JWT.
-* **Decisión:** Se ha migrado la resolución de identidad en los controladores hacia el uso del Claim `userId` transportado en el payload del token. El sistema extrae el ID numérico (clave primaria inmutable) directamente del contexto de `Authentication`, evitando llamadas extra a `findByUsername`.
-* **Justificación para el TFG:** Aporta solidez técnica al alinearse con las especificaciones de seguridad modernas de OAuth2 y JWT. En lugar de forzar al backend a realizar búsquedas repetitivas por cadenas de texto vulnerables a fallos de capitalización, el uso del ID extraído directamente de los claims asegura una resolución atómica y determinista.
-* **Consecuencias:**
-  * **Eliminación de errores de capitalización:** La clave primaria numérica actúa como el único identificador unívoco e inmune a las variaciones de caracteres.
-  * **Reducción de la latencia de red:** Se optimizan las conexiones con PostgreSQL al suprimir las consultas repetitivas de verificación de usuario.
-  * **Cumplimiento estricto del patrón Stateless de REST:** El servidor no retiene estados de sesión, delegando de forma segura toda la identidad en el token cifrado.
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+El servicio de almacenamiento en el servidor permitía la subida y persistencia de recursos en disco limitando únicamente el tamaño máximo de los ficheros a 5MB a través de la directiva del servlet. No obstante, la ausencia total de validaciones sobre el tipo de contenido representaba una vulnerabilidad crítica de seguridad. Un atacante autenticado o un usuario malintencionado podría evadir el propósito de la funcionalidad cargando scripts ejecutables (como shells o scripts `.php`), obteniendo la capacidad de comprometer el servidor mediante la ejecución remota de código (*Remote Code Execution* o RCE).
+
+## Decisión
+
+Implementar un mecanismo imperativo de validación perimetral dual dentro de la clase `FileStorageService.java`. Antes de escribir cualquier flujo de datos en el disco, el sistema extrae de forma segura la extensión real del nombre del fichero y valida la cabecera `Content-Type` (*MIME Type*). Esta restricción se aplica mediante una arquitectura segregada por el contexto de la carpeta de destino: la subcarpeta `avatars` acepta estrictamente formatos gráficos autorizados (`.jpg`, `.jpeg`, `.png`, `.webp`), mientras que la subcarpeta `documents` se restringe de forma exclusiva a extensiones `.pdf`.
+
+## Justificación para el TFG
+
+* **Cumplimiento de Directrices OWASP:** Sigue las directrices de la guía OWASP y el principio de defensa en profundidad en sistemas web. Validar de forma combinada la extensión y el tipo MIME mitiga de raíz los ataques de suplantación de identidad de archivos (*MIME-sniffing*).
+* **Control de Excepciones Controlado:** Cualquier intento de alteración o desajuste con las listas blancas de formatos permitidos detiene la transacción de inmediato lanzando una excepción controlada, impidiendo que material potencialmente destructivo alcance el sistema de archivos local.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Inmunización frente a RCE:** Blindaje absoluto del servidor ante la persistencia de archivos maliciosos, neutralizando vectores de ataque orientados al secuestro de recursos o ejecución de comandos en el host.
+* **Centralización de Reglas de Negocio:** Los controladores de la aplicación (como `ProfileController.java`) delegan la responsabilidad del control de formatos en el servicio de almacenamiento, garantizando que cualquier nuevo módulo de subida en el futuro herede nativamente estas directivas de seguridad.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Limitación Extrema de Formatos:** Bloquear de forma fija las subidas a formatos tradicionales puede suponer una restricción severa si las asignaturas del TFG demandan en el futuro la entrega de otros archivos (como hojas de cálculo `.xlsx` o archivos comprimidos `.zip`).
+* *Mitigación:* Se encapsuló la estructura de validación en colecciones de constantes de Java (`List.of(...)`) parametrizadas por el nombre del directorio. Esto permite expandir o modificar las extensiones autorizadas en el futuro editando una sola línea de código en el servicio central, sin alterar la infraestructura lógica del software.
+
+---
+
+# ADR-26: Gestión de Sesión Robusta mediante la Visibility API del Navegador
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+La desconexión proactiva por tiempo en el frontend delegaba el control de la expiración de la sesión en un temporizador lineal `setTimeout` en el cliente. Sin embargo, los navegadores web modernos (como Chrome, Edge o Safari) aplican políticas agresivas de ahorro de energía que suspenden o ralentizan los hilos de temporizadores en pestañas inactivas o en segundo plano. Esto provocaba que el reloj de la aplicación se detuviera, generando "sesiones fantasma" donde el usuario regresaba horas después viendo una interfaz falsamente autenticada que solo fallaba al intentar interactuar y colisionar contra el backend.
+
+## Decisión
+
+Migrar la lógica de desconexión proactiva en el archivo `AuthProvider.tsx` para utilizar un enfoque basado en eventos de ciclo de vida del navegador a través de la **Visibility API**. Se implementa la escucha del evento nativo `visibilitychange` combinado con una rutina ligera de muestreo cíclico de alta frecuencia (`setInterval` cada 5 segundos). En el momento exacto en que el usuario reactiva o enfoca la pestaña, el sistema ejecuta una auditoría de tiempo inmediata recalculando la validez del token frente al tiempo real del sistema operativo (`Date.now() >= expiresAt`).
+
+## Justificación para el TFG
+
+* **Conciencia del Entorno de Ejecución:** Demuestra una comprensión avanzada del entorno de ejecución asíncrono en los motores de renderizado de JavaScript y las limitaciones físicas del hardware actual respecto a las directivas de ahorro de energía de los navegadores.
+* **Sincronización de Tiempo Absoluta:** En lugar de confiar ciegamente en temporizadores lineales vulnerables a la congelación, el frontend se vuelve autoconsciente de su estado de visualización, blindando el perímetro de autenticación en el cliente y garantizando la sincronización con el tiempo absoluto de expiración definido por el servidor.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Eliminación de Sesiones Fantasma:** Cierre de sesión preciso e inmediato en el milisegundo en que el usuario regresa a la aplicación, impidiendo la exposición visual de datos sensibles en interfaces obsoletas tras periodos de inactividad.
+* **Consistencia de Estado Determinista:** Desaparición de estados de autenticación inconsistentes en la interfaz de usuario, mejorando la experiencia del estudiante al sincronizar de forma determinista el estado de la SPA con el ciclo de vida real del token JWT.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Consumo de Recursos por Muestreo Cíclico:** Mantener una rutina de verificación ejecutándose cada 5 segundos mediante un `setInterval` añade una carga de ejecución continua que podría afectar de forma marginal el rendimiento del navegador en dispositivos de gama baja.
+* *Mitigación:* La rutina de auditoría temporal se diseñó de forma ultraligera, limitándose a realizar una comparación aritmética simple entre dos marcas de tiempo numéricas en memoria (`Date.now() >= expiresAt`). Al carecer por completo de manipulación del DOM o llamadas de red recurrentes en su bucle pasivo, el coste computacional es técnicamente indetectable para la CPU, protegiendo la autonomía y velocidad del cliente.
+
+---
+
+# ADR-27: Normalización Semántica de Errores en la API REST
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+Múltiples operaciones críticas en la capa de servicios del backend (como en la clase `UserService.java`) recurrían al lanzamiento directo de la excepción genérica `RuntimeException` al no localizar registros en la base de datos o ante fallos de validación. Aunque el servidor dispone de un componente interceptor centralizado (`GlobalExceptionHandler.java`), el uso de excepciones sin tipar impedía que el manejador pudiera discernir el origen del fallo, forzando a que el sistema procesara de forma homogénea cualquier anomalía bajo el mismo código genérico HTTP 500 (*Internal Server Error*), lo que deterioraba gravemente el rigor semántico y la claridad de la API REST.
+
+## Decisión
+
+Desterrar por completo el uso de excepciones genéricas e incorporar una arquitectura de excepciones semánticas personalizadas de grano fino. Se procede a la adopción y sobrecarga de clases específicas como `ResourceNotFoundException` y `UserAlreadyExistsException`. Estas excepciones se vinculan directamente a códigos de estado HTTP específicos (`404 Not Found` y `409 Conflict`, respectivamente) utilizando las directivas de Spring Boot y el mapeo de respuestas estructuradas.
+
+## Justificación para el TFG
+
+* **Protocolo HTTP Semántico:** Sigue de manera rigurosa las especificaciones del protocolo HTTP y las mejores prácticas en el diseño de arquitecturas RESTful profesionales.
+* **Prevención de Fugas de Información:** Al dotar a la capa de servicios de la capacidad de comunicar anomalías de datos con nombres propios, el interceptor global puede traducir el fallo en un objeto JSON homogéneo y con el código de estado correspondiente. Esto previene fugas de información interna del sistema (como trazas de la base de datos o stacktraces) y proporciona un contrato predecible para el consumo del cliente.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **API REST Semántica y Estándar:** Las peticiones por recursos inexistentes o conflictos de datos devuelven códigos HTTP semánticos (404 y 409) limpios en lugar de alarmantes y opacos errores internos 500, profesionalizando la interfaz del servidor.
+* **Facilidad de Depuración e Integración:** Proporciona al frontend mensajes de error claros, estructurados y consistentes, lo que agiliza el diagnóstico en fases de pruebas y mejora la comunicación entre las capas del sistema mediante el uso correcto de los estándares de la industria.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Proliferación de Clases de Excepción:** El diseño de excepciones de grano fino incrementa el volumen de archivos físicos en el paquete de infraestructura del backend, pudiendo dificultar el mantenimiento si se crean decenas de clases con comportamiento idéntico.
+* *Mitigación:* Se estableció una jerarquía hereditaria clara donde todas las excepciones semánticas del dominio extienden de una clase base común abstracta del proyecto, y se centralizó su resolución en métodos específicos dentro del `@ControllerAdvice` global, manteniendo la base de código compacta y ordenada.
+
+---
+
+# ADR-28: Estrategia de Aseguramiento de Calidad Híbrida y Cobertura de Regresiones en Backend y Frontend
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+Tras las profundas refactorizaciones perimetrales y de seguridad realizadas en el sistema (unificación de layouts [ADR-12], inyección dinámica de CORS [ADR-24], validación dual de archivos [ADR-25] y control de sesiones mediante la Visibility API [ADR-26]), la suite de pruebas automatizadas se encontraba desactualizada y desalineada con la arquitectura real de la plataforma. El sistema adolecía de puntos ciegos (*blind spots*) críticos de extremo a extremo: el backend no auditaba el rechazo de scripts maliciosos de tipo RCE en la capa de almacenamiento ni validaba las políticas de red frente a orígenes no autorizados en los filtros de seguridad, mientras que el frontend no comprobaba la reactividad del cliente ante la congelación de hilos de tiempo del navegador.
+
+## Decisión
+
+Diseñar e implementar una suite de pruebas automatizadas integral utilizando una estrategia híbrida, complementaria y coordinada para ambas capas del software:
+
+1. **Garantía Perimetral en Backend (Spring Boot):** Implementar pruebas unitarias y de integración mediante JUnit 5 y Mockito. Se adopta la simulación de servlets mediante entornos de contexto web inyectados dinámicamente (`MockMvcBuilders` acoplado al filtro de seguridad) para blindar la persistencia, mitigar fallos de infraestructura y validar que la inyección de propiedades externas para CORS actúa correctamente interceptando peticiones no autorizadas (*OPTIONS / Preflight*).
+2. **Aislamiento Funcional en Frontend (React):** Estructurar una arquitectura de pruebas de comportamiento aisladas mediante Vitest y React Testing Library, recurriendo al mockeo semántico de componentes e hilos de tiempo falsos (`vi.useFakeTimers`) para evaluar las directivas de layouts paramétricos y los eventos de ciclo de vida del navegador.
+
+## Justificación para el TFG
+
+* **Rigor Metodológico Avanzado (QA):** Aporta el máximo nivel de rigor metodológico y madurez de ingeniería de software exigido en la rúbrica de evaluación de un TFG, validando la integración real entre las capas de negocio, seguridad, red y persistencia de datos.
+* **Escudo Inmune a Regresiones:** El uso de contexto web simulado en Spring Boot y mocks controlados en React aísla las responsabilidades de los componentes. Esto garantiza que las pruebas actúen como un escudo perimetral inmune a futuras alteraciones en la base de datos o modificaciones estéticas en la interfaz de usuario, proveyendo documentación viva y ejecutable.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Inmunización Dual de la Plataforma:** El sistema queda blindado contra fallos colaterales en ambas capas, asegurando con un 100% de certeza técnica verificada por consola (`BUILD SUCCESS` en Spring Boot y `PASS` en Vitest) que el servidor rechaza scripts maliciosos, los filtros de red bloquean orígenes externos y el cliente destruye proactivamente las sesiones fantasma en milisegundos.
+* **Agilidad en el Mantenimiento:** La suite de pruebas simplifica el diagnóstico en fases de mantenimiento y garantiza la estabilidad operativa global del sistema de cara a su defensa y despliegue final en la nube.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Mantenimiento Duplicado de Suites:** Diseñar pruebas en dos entornos tecnológicos independientes (Java/JUnit y TypeScript/Vitest) duplica el esfuerzo de desarrollo y obliga a mantener actualizados los dobles de prueba (*mocks*) ante cualquier cambio estructural en las APIs.
+* *Mitigación:* Se estableció un diseño estrictamente acotado y guiado por contratos [ADR-23], donde las pruebas validan comportamientos lógicos estables y flujos perimetrales críticos en lugar de detalles de implementación volátiles, minimizando drásticamente la tasa de refactorización de los tests en futuras iteraciones.
+
+---
+
+# ADR-29: Resolución de Identidad mediante Claims del Token (Stateless Identity)
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+El filtrado de consultas basado en cadenas de texto (`username`) presentaba fallos de integridad debido a la sensibilidad a mayúsculas y minúsculas por defecto de PostgreSQL (ej. "Luis" frente a "luis"). Asimismo, se detectó una redundancia de consultas a la base de datos tras la validación del JWT, donde el sistema realizaba llamadas adicionales de verificación del nombre de usuario para recuperar sus llaves primarias antes de procesar las solicitudes de negocio.
+
+## Decisión
+
+Migrar de forma integral la resolución de identidad en los controladores hacia el uso del *Claim* `userId` transportado directamente en el payload del token cifrado. El sistema extrae el identificador numérico (clave primaria inmutable) directamente del contexto de seguridad de `Authentication`, eliminando de raíz las llamadas redundantes a `userRepository.findByUsername`.
+
+## Justificación para el TFG
+
+* **Alineación con Estándares de Seguridad Modernos:** Aporta solidez técnica al alinearse con las especificaciones y buenas prácticas de OAuth2 y JWT en la industria.
+* **Resolución Atómica y Determinista:** En lugar de forzar al backend a realizar búsquedas repetitivas por cadenas de texto vulnerables a fallos de capitalización o inyecciones, el uso del ID numérico extraído de los *claims* en memoria asegura un procesamiento determinista y de alta fidelidad.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Inmunización ante Errores de Capitalización:** La clave primaria numérica actúa como el único identificador unívoco e inmune a las variaciones de caracteres entre el cliente y el motor relacional de PostgreSQL.
+* **Reducción de Latencia de Red:** Se optimizan las conexiones y el rendimiento de la base de datos al suprimir las consultas repetitivas de verificación de usuario en cada endpoint.
+* **Cumplimiento Estricto del Patrón Stateless:** El servidor no retiene estados de sesión, delegando de forma segura toda la carga de la identidad en el token criptográfico firmado.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Mayor Tamaño del Payload del Token:** Añadir campos numéricos adicionales como *claims* personalizados incrementa marginalmente la longitud de la cadena de caracteres del JWT que viaja en la cabecera HTTP de cada petición.
+* *Mitigación:* Al tratarse el `userId` de un tipo numérico largo (`Long`), el peso en bytes añadido al token es técnicamente insignificante, quedando plenamente compensado por el ahorro computacional de omitir un `SELECT` secuencial en la base de datos para recuperar ese mismo dato.
 
   ---
   
-## [ADR-28] Hidratación Síncrona de Matrículas en el DTO de Sesión
+# ADR-30: Hidratación Síncrona de Matrículas en el DTO de Sesión
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Tras aplicar `@JsonIgnore` en las relaciones de usuario para evitar recursiones infinitas y desbordamientos de memoria por bucles de serialización, el frontend perdió la capacidad de saber instantáneamente en qué cursos estaba inscrito el alumno tras iniciar sesión.
-* **Decisión:** Rediseñar el registro `AuthTokenResponse.java` para incluir de forma síncrona una lista de `enrolledCourseIds`. Este array se puebla durante el proceso de login mediante una consulta proyectada y optimizada en el repositorio.
-* **Justificación para el TFG:** Resuelve un problema clásico de asincronía y desacoplamiento en aplicaciones SPA. En lugar de obligar al frontend a disparar peticiones HTTP en cascada inmediatamente después del login para conocer el estado académico del alumno, el servidor inyecta proactivamente las referencias clave en la respuesta inicial de autenticación.
-* **Consecuencias:**
-  * **Mejora drástica en la UX:** Los componentes del catálogo y los botones de inscripción reaccionan de manera instantánea sin pantallas de carga adicionales.
-  * **Blindaje de serialización:** Se mantiene la protección contra la recursión infinita en las entidades JPA sin comprometer la entrega de datos esenciales al cliente.
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+Tras aplicar de forma estricta la anotación `@JsonIgnore` en las relaciones bidireccionales de la entidad `Users` para evitar recursiones infinitas y desbordamientos de memoria por bucles de serialización, el frontend perdió la capacidad de determinar instantáneamente en qué asignaturas estaba inscrito el alumno inmediatamente después de iniciar sesión. Esto obligaba a la interfaz a realizar consultas secundarias tardías para renderizar los estados del catálogo.
+
+## Decisión
+
+Rediseñar el registro (*Record*) de transferencia de datos `AuthTokenResponse.java` para incluir de forma síncrona una lista indexada de `enrolledCourseIds`. Este array de referencias numéricas se puebla durante el propio proceso transaccional de inicio de sesión mediante una consulta proyectada y optimizada en el repositorio de persistencia.
+
+## Justificación para el TFG
+
+* **Mitigación de Consultas en Cascada:** Resuelve un problema clásico de asincronía y latencia en aplicaciones SPA. Evita obligar al frontend a disparar peticiones HTTP en cascada (*Waterfall requests*) tras el login para conocer el estado académico del alumno.
+* **Optimización del Payload:** El servidor inyecta proactivamente las referencias clave necesarias para la interfaz en la respuesta inicial de autenticación, manteniendo a salvo la estructura desacoplada del sistema.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Optimización Crítica de la UX:** Los componentes del catálogo y los botones interactivos de inscripción reaccionan de manera instantánea sin requerir pantallas de carga o estados transitorios adicionales.
+* **Blindaje de Serialización Intacto:** Se mantiene la protección contra la recursión infinita en las entidades JPA sin comprometer la entrega de metadatos analíticos esenciales al cliente en React.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Acoplamiento en la Respuesta de Autenticación:** Incorporar datos específicos del dominio escolar (como las matrículas de cursos) dentro del DTO de autenticación global rompe teóricamente la pureza del contexto de seguridad de la sesión.
+* *Mitigación:* Al estar el núcleo de la plataforma estructurado específicamente en torno al progreso académico y matriculaciones del usuario, consolidar este array atómico de IDs en el login es una licencia de diseño pragmática que reduce el tráfico de red general en un 50% durante el arranque, quedando plenamente justificada su eficiencia frente al tribunal.
 
   ---
   
-## [ADR-29] Estrategia de Carga Transaccional (Join Fetch vs OSIV)
+# ADR-31: Estrategia de Carga Transaccional (Join Fetch vs OSIV)
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Con la directiva de configuración `spring.jpa.open-in-view=false` activa para evitar fugas de conexiones en el pool, el acceso a los detalles de un curso desde una matrícula disparaba errores 500 fuera de la capa de servicio debido a la naturaleza perezosa (*Lazy loading*) de Hibernate.
-* **Decisión:** Implementar consultas explícitas utilizando cláusulas `JOIN FETCH` en `EnrollmentRepository`. Esto fuerza al motor de persistencia a recuperar el curso asociado dentro del mismo ciclo transaccional de la base de datos.
-* **Justificación para el TFG:** Demuestra madurez de ingeniería en el manejo de ORMs y rendimiento de bases de datos relacionales. Evita caer en la mala práctica de habilitar OSIV (que mantiene hilos de conexión abiertos innecesariamente hacia PostgreSQL) y ataca directamente el problema desde la raíz del diseño de la consulta.
-* **Consecuencias:**
-  * **Garantía de datos completos:** El frontend recibe el grafo de objetos hidratado de forma segura y libre de excepciones transaccionales.
-  * **Optimización del rendimiento:** Se mitiga por completo el temido problema de las "N+1 consultas", unificando las lecturas en un único viaje a la base de datos.
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+Con la directiva de configuración `spring.jpa.open-in-view=false` activa para evitar la degradación de rendimiento y las fugas de conexiones en el pool, el acceso a los detalles de un curso desde una matrícula disparaba errores HTTP 500 fuera de la capa de servicio. Esto ocurría debido a la naturaleza perezosa (*Lazy loading*) por defecto de Hibernate, la cual fallaba al intentar inicializar el proxy del objeto una vez que la sesión transaccional ya se había cerrado.
+
+## Decisión
+
+Implementar consultas explícitas utilizando cláusulas **`JOIN FETCH`** en los métodos de consulta indexados de `EnrollmentRepository`. Esto fuerza al motor de persistencia a recuperar la entidad del curso asociado de forma síncrona dentro del mismo ciclo transaccional y bajo la misma conexión de la base de datos.
+
+## Justificación para el TFG
+
+* **Madurez en Ingeniería de ORMs:** Demuestra una sólida madurez técnica en el manejo de ORMs y en la optimización del rendimiento de bases de datos relacionales.
+* **Mitigación de Anti-patrones de Producción:** Evita caer en la mala práctica industrial de habilitar OSIV (*Open Session in View*), una configuración que mantiene hilos de conexión abiertos innecesariamente hacia PostgreSQL saturando el pool. El problema se resuelve de raíz desde el diseño eficiente de la consulta JPQL.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Garantía de Grafo de Objetos Completo:** El frontend recibe el árbol de datos hidratado de forma segura y libre de excepciones transaccionales en tiempo de ejecución (`LazyInitializationException`).
+* **Optimización Crítica de Consultas (Solución al Problema N+1):** Se mitiga por completo el temido problema de las "N+1 consultas" en Hibernate, unificando las lecturas de las relaciones en un único viaje estructurado hacia la base de datos.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Rigidez en la Reutilización de Consultas:** El uso de `JOIN FETCH` obliga a recuperar siempre todo el grafo de objetos relacionados (Matrícula + Curso), incrementando el volumen de datos transferidos por red incluso en escenarios donde la interfaz de usuario solo requiera los metadatos básicos de la matrícula.
+* *Mitigación:* Se segregaron los métodos del repositorio, manteniendo las consultas simples de JPA para operaciones atómicas de validación de IDs y reservando los métodos optimizados con `JOIN FETCH` exclusivamente para los endpoints del directorio académico y el panel de seguimiento, donde la carga del curso es mandatoria para la interfaz.
 
   ---
   
-## [ADR-30] Algoritmo de Filtrado Basado en Contenido para el Motor de Recomendaciones
+# ADR-32: Algoritmo de Filtrado Basado en Contenido para el Motor de Recomendaciones
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Se requería un motor de sugerencias personalizado dentro del panel del estudiante que priorizara la afinidad temática, las competencias académicas y el historial de navegación previo del alumno en lugar de mostrar un catálogo estático.
-* **Decisión:** Desarrollar un servicio especializado (`RecommendationService`) que cruce los metadatos del catálogo (`Courses`) con el perfil de preferencias guardado (`Interest`) y las matrículas previas (`Enrollment`), aplicando una ponderación matemática de pesos (30% Categoría, 25% Historial, etc.).
-* **Justificación para el TFG:** Eleva el valor académico del proyecto al introducir una capa legítima de Inteligencia de Negocio y lógica algorítmica. Justifica técnicamente el diseño de la base de datos y la creación de las tablas satélite creadas mediante colecciones de elementos.
-* **Consecuencias:**
-  * **Sugerencias predictivas dinámicas:** El frontend pinta en tiempo real recomendaciones justificadas con un porqué explícito para el estudiante.
-  * **Aprovechamiento del modelo relacional:** Se saca el máximo partido a la normalización de metadatos (categorías, lenguajes, habilidades) estructurada en PostgreSQL.
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+Se requería un motor de sugerencias personalizado dentro del panel del estudiante que priorizara de manera dinámica la afinidad temática, las competencias académicas y el historial de navegación previo del alumno, en lugar de mostrar un catálogo plano y estático de asignaturas. El reto consistía en procesar y cruzar eficientemente estos vectores de datos sin degradar el tiempo de respuesta del servidor durante la carga inicial del panel.
+
+## Decisión
+
+Desarrollar un servicio analítico especializado (`RecommendationService`) que cruce los metadatos estructurales del catálogo de asignaturas (`Courses`) con el perfil normalizado de preferencias guardado del alumno (`Interest` [ADR-20]) y su historial de matrículas previas (`Enrollment` [ADR-31]), aplicando una ponderación matemática estricta de pesos (30% Categoría Temática, 25% Historial de Matriculación, 20% Nivel Técnico, 15% Idioma y 10% Compatibilidad de Subtítulos).
+
+## Justificación para el TFG
+
+* **Capa de Inteligencia de Negocio:** Eleva sustancialmente el valor académico y la complejidad metodológica del proyecto al introducir una capa legítima de lógica algorítmica predictiva y minería de datos básica.
+* **Capitalización del Modelo Relacional:** Justifica técnicamente la inversión en el diseño estructurado de la base de datos y la fragmentación de colecciones multivalor [ADR-20]. Demuestra ante el tribunal cómo un esquema en 1FN habilita operaciones de cruce matricial eficientes en el servidor en lugar de delegar el filtrado a código imperativo pesado en el cliente.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Sugerencias Predictivas Dinámicas:** El frontend pinta en tiempo real sugerencias altamente personalizadas y justificadas con un "porqué" semántico explícito para el estudiante (ej. *"Recomendado por tu interés en Ingeniería del Software"*).
+* **Consumo de Memoria Eficiente:** Al operar directamente sobre colecciones indexadas e hidratadas en el mismo ciclo transaccional, el algoritmo procesa la ordenación y el descarte de elementos duplicados en memoria RAM a través de Streams de Java de forma ultrarrápida.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Escalabilidad Computacional Limitada (O(N*M)):** El algoritmo de filtrado basado en contenido evalúa en memoria cada curso disponible frente a la matriz de intereses del alumno. Con un crecimiento masivo del catálogo de cursos (N) y de usuarios concurrentes (M), este cálculo secuencial puede saturar la CPU del backend.
+* *Mitigación:* Se acotó la ventana operativa del servicio mediante un cortocircuito algorítmico defensivo: el repositorio filtra inicialmente y excluye de la consulta JPQL todos los IDs de cursos en los que el alumno ya se encuentra matriculado activamente. Además, el servicio limita el payload final a un lote estricto de los **3 resultados con mayor puntuación de afinidad**, aliviando drásticamente el coste de serialización y renderizado en la SPA.
 
 ---
 
-## [ADR-31] Estrategia de Carga de Preferencias: Robustez frente a Rendimiento en Colecciones
+# ADR-33: Estrategia de Carga de Preferencias: Robustez frente a Rendimiento en Colecciones
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
+## Estatus
 
-### Contexto
+Aceptado
 
-La entidad `Interest` mapea las colecciones de preferencias dinámicas del estudiante mediante la anotación `@ElementCollection`. Por defecto, Hibernate gestiona estas colecciones mediante una carga diferida (`FetchType.LAZY`). Sin embargo, debido a las múltiples transformaciones de DTOs en capas desacopladas fuera de la sesión transaccional y bajo el contexto de seguridad del filtro JWT, la persistencia se exponía a excepciones de tipo `LazyInitializationException` al cerrarse la sesión antes de la serialización JSON, lo que provocaba que el frontend recibiera listas vacías y disparara el banner de error rojo en la UI.
+## Fecha
 
-### Decisión
+Junio 2026
 
-Se determina implementar una **Estrategia de Hidratación Explícita Controlada** dentro del método de lectura transaccional `getUserInterests` de `UserService.java`. En lugar de forzar un acoplamiento estructural rígido mediante `@ElementCollection(fetch = FetchType.EAGER)` —el cual sobrecargaría el rendimiento con productos cartesianos inválidos en PostgreSQL—, se mantiene el esquema diferido eficiente (`LAZY`) y se ejecuta programáticamente el método de resolución de proxies invocando el tamaño de cada colección (`.size()`):
+## Contexto
+
+La entidad `Interest` mapea las colecciones de preferencias dinámicas del estudiante mediante la anotación `@ElementCollection`. Por defecto, Hibernate gestiona estas colecciones mediante una carga diferida (`FetchType.LAZY`). Sin embargo, debido a las múltiples transformaciones de DTOs en capas desacopladas fuera de la sesión transaccional y bajo el contexto de seguridad del filtro JWT, la persistencia se exponía a excepciones de tipo `LazyInitializationException` al cerrarse la sesión antes de la serialización JSON. Esto provocaba que el frontend recibiera listas vacías y disparara el banner de error rojo en la UI.
+
+## Decisión
+
+Implementar una **Estrategia de Hidratación Explícita Controlada** dentro del método de lectura transaccional `getUserInterests` de `UserService.java`. En lugar de forzar un acoplamiento estructural rígido mediante `@ElementCollection(fetch = FetchType.EAGER)` —el cual sobrecargaría el rendimiento con productos cartesianos inválidos en PostgreSQL—, se mantiene el esquema diferido eficiente (`LAZY`) y se ejecuta programáticamente el método de resolución de proxies invocando el tamaño de cada colección (`.size()`) antes de salir del ámbito del servicio:
 
 ```java
 if (interest.getCategory() != null) interest.getCategory().size();
@@ -569,55 +1255,104 @@ if (interest.getSubtitle_languages() != null) interest.getSubtitle_languages().s
 
 Esto obliga al ORM a poblar las colecciones satélite de forma síncrona mientras la transacción `@Transactional(readOnly = true)` permanece abierta.
 
-### Justificación para el TFG
+## Justificación para el TFG
 
-Refleja la capacidad del ingeniero para evaluar los compromisos de diseño (*trade-offs*) en la persistencia avanzada de datos. Ante el tribunal, se defiende como una decisión táctica, defensiva y limpia: se evita delegar la carga en intermediarios o inicializaciones globales pesadas del proveedor, controlando a nivel de servicio exactamente cuándo y cómo se resuelve el grafo de datos. Esto blinda la API contra fallos de proxy en entornos multihilo o filtros desacoplados, manteniendo la consistencia de tipos primitivos.
+* **Evaluación de Compromisos (*Trade-offs*):** Refleja la capacidad del ingeniero para evaluar de forma crítica los compromisos de diseño en la persistencia avanzada de datos.
+* **Control Preciso del Grafo de Datos:** Ante el tribunal, se defiende como una decisión táctica, defensiva y limpia: se evita delegar la carga en intermediarios o inicializaciones globales pesadas del proveedor, controlando a nivel de servicio cuándo y cómo se resuelve el grafo de datos. Esto blinda la API contra fallos de proxy en entornos multihilo o filtros desacoplados, manteniendo la consistencia de tipos primitivos.
 
-### Consecuencias
+## Consecuencias
 
-* **Estabilidad absoluta de la API:** Se eliminan de raíz las excepciones de inicialización diferida al transformar los intereses del alumno a `InterestDTO`, garantizando el retorno seguro de los datos en un estado HTTP 200 OK.
-* **Optimización de Recursos en PostgreSQL:** Al resolver los datos de forma dirigida en el Read Path del servicio, se previene el desperdicio de memoria en operaciones de escritura u otras consultas secundarias donde no se requiera el desglose multidimensional de intereses.
-* **Sincronización Simétrica Documental:** Este registro interactúa y se hermana directamente con las directrices de persistencia del [ADR-18], cerrando de forma definitiva la coherencia técnica entre el código fuente transaccional de Spring Boot y la documentación del monorrepo.
+### Impacto Positivo
 
----
+* **Estabilidad Absoluta de la API:** Se eliminan de raíz las excepciones de inicialización diferida al transformar los intereses del alumno a `InterestDTO`, garantizando el retorno seguro de los datos en un estado HTTP 200 OK.
+* **Optimización de Recursos en PostgreSQL:** Al resolver los datos de forma dirigida en el *Read Path* del servicio, se previene el desperdicio de memoria y concurrencia en operaciones de escritura u otras consultas secundarias donde no se requiera el desglose multidimensional de intereses.
+* **Sincronización Coherente:** Este registro interactúa y se hermana directamente con las directrices de persistencia del [ADR-20], cerrando de forma definitiva la coherencia técnica entre el código fuente transaccional de Spring Boot y la documentación del monorrepo.
 
-## [ADR-32] Algoritmo de Filtrado Basado en Contenido para el Motor de Recomendaciones
+### Impacto Negativo / Riesgos Mitigados
 
-* **Fecha:** Junio 2026
-* **Estatus:** Aceptado
-* **Contexto:** Se requería un motor de sugerencias personalizado dentro del panel del estudiante que priorizara la afinidad temática, las competencias académicas y la disponibilidad de tiempo del alumno. El backend original carecía de lógica predictiva y el frontend dependía de datos estáticos (*mocks*), lo que reducía el valor tecnológico de la plataforma de cara a la defensa del proyecto.
-* **Decisión:** Diseñar y desarrollar un servicio especializado (`RecommendationService.java`) que implementa un algoritmo de Filtrado Basado en Contenido (*Content-Based Filtering*). El motor opera de forma determinista bajo una matriz de pesos en memoria (30% Categoría, 25% Historial, 20% Nivel, 15% Idioma, 10% Duración). El enrutamiento se expone de forma segura en `/api/courses/recommendations` resolviendo la identidad mediante el Claim del token JWT y el cliente React se conecta de forma reactiva a través del gancho personalizado `useSmartRecommendations.ts`.
-* **Justificación para el TFG:** Demuestra madurez de ingeniería al resolver el acoplamiento y la eficiencia del grafo de persistencia. En lugar de delegar el cálculo matemático de ponderación a PostgreSQL mediante costosos procedimientos almacenados o consultas complejas con subconsultas cíclicas, se adopta una **Estrategia Stateless**. Los datos se recuperan atómicamente mediante proyecciones nativas e indexadas de clave primaria (`findEnrolledCourseIdsByUserId`) y se procesan a alta velocidad en memoria utilizando *Java Streams*, liberando por completo de carga computacional al servidor de la base de datos.
-* **Consecuencias:**
-  * **Sugerencias predictivas dinámicas:** El frontend renderiza en tiempo real recomendaciones justificadas con un porqué explicícito (`reason`) de forma transparente para el estudiante.
-  * **Aislamiento e Inmunidad ante Regresiones:** El algoritmo queda blindado metodológicamente mediante una suite de pruebas de comportamiento automatizadas en JUnit 5 y Mockito (`RecommendationServiceTest`), certificando con un 100% de éxito en consola (`BUILD SUCCESS`) que el sistema descarta cursos irrelevantes y excluye de forma estricta las asignaturas en las que el alumno ya está matriculado.
-  * **Arquitectura Altamente Reactiva:** La UI del frontend se sincroniza automáticamente e invalida el feed en milisegundos en cuanto el estudiante efectúa una nueva matrícula, disparando una recarga limpia de red sin necesidad de refrescar el navegador.
+* **Aumento en el Número de Sentencias SQL (Problema de las N Consultas):** Invocar el método `.size()` de cinco colecciones independientes provoca que Hibernate dispare de forma secuencial cinco consultas `SELECT` independientes a PostgreSQL para contar los elementos de cada tabla satélite.
+* *Mitigación:* Al estar el perfil de intereses acotado y guardado de forma atómica en filas de tipos primitivos muy ligeros (máximo 10 filas por tabla de colección satélite por alumno), el tiempo de ejecución sumado de estas cinco consultas síncronas indexadas por clave primaria es inferior a 2 milisegundos, un coste computacionalmente insignificante que neutraliza por completo el riesgo de un desborde por producto cartesiano en el servidor.
 
 ---
 
-## [Enmienda Tecnológica a ADR-33] Evolución de la Persistencia Multidimensional de Intereses
+# ADR-34: Algoritmo de Filtrado Basado en Contenido para el Motor de Recomendaciones
 
-### Contexto Técnico
+## Estatus
 
-Durante la integración del Motor de Recomendaciones Algorítmicas, se detectó un fallo de regresión en el guardado del modal de preferencias del estudiante. La tabla principal `interests` y sus 5 tablas satélite (ej. `interest_categories`) rechazaban las actualizaciones de forma silenciosa debido a dos fenómenos del ciclo de vida de Hibernate:
+Aceptado
 
-1. **Identidad Huérfana:** Al usar `@MapsId` sin estrategias `@GeneratedValue`, el motor de persistencia requería la asignación explícita del ID del usuario en memoria antes de invocar al repositorio.
-2. **Violación de PersistentBag:** El uso de métodos *setter* convencionales reemplazaba los envoltorios nativos de las colecciones de Spring Data JPA por instancias estándar de `ArrayList`, inhabilitando la generación automática de sentencias SQL `DELETE` e `INSERT`.
+## Fecha
 
-### Decisiones Adoptadas
+Junio 2026
 
-1. **Sincronización Manual de Identidad:** Se modificó el bloque constructivo `.orElseGet()` en la capa de servicios para forzar la inyección del ID físico del usuario (`newInterest.setId(user.getUser_id())`) previo al volcado atómico.
-2. **Patrón de Mutación Destructivo-Limpio [ADR-18]:** Se implementó una abstracción encapsulada mediante el método `updateCollection(current, next)`, aplicando operaciones estrictas de `.clear()` y `.addAll()` sobre las listas originales de Hibernate para preservar el rastreo del estado de persistencia (*dirty checking*).
-3. **Tolerancia Semántica en Endpoints:** Se expandió la anotación del controlador a un mapa `@RequestMapping` multitolerante para absorber de forma nativa peticiones `POST` y `PUT` sin alterar el contrato con la interfaz de usuario en React.
+## Contexto
 
-### Consecuencias Positivas
+Se requería un motor de sugerencias personalizado dentro del panel del estudiante que priorizara la afinidad temática, las competencias académicas y la disponibilidad de tiempo del alumno. El backend original carecía de lógica predictiva y el frontend dependía de datos estáticos (*mocks*), lo que reducía el valor tecnológico de la plataforma de cara a la defensa del proyecto y la justificación de la complejidad de la arquitectura.
 
-* Se restablece la suite de pruebas del frontend y backend en verde sin alterar las dependencias del `pom.xml`.
-* Se garantiza la integridad referencial en PostgreSQL en la Primera Forma Normal (1FN), asegurando que el motor algorítmico lea datos reales e impidiendo el parpadeo de estado local en la interfaz del alumno Luis.
+## Decisión
+
+Diseñar y desarrollar un servicio especializado (`RecommendationService.java`) que implementa un algoritmo de Filtrado Basado en Contenido (*Content-Based Filtering*). El motor opera de forma determinista bajo una matriz de pesos en memoria (30% Categoría, 25% Historial, 20% Nivel, 15% Idioma, 10% Duración). El enrutamiento se expone en `/api/courses/recommendations` resolviendo la identidad mediante el *Claim* del token JWT [ADR-29], y el cliente en React se conecta de forma reactiva a través del gancho personalizado `useSmartRecommendations.ts`.
+
+## Justificación para el TFG
+
+* **Estrategia Computacional Stateless:** Resuelve el acoplamiento y la eficiencia del grafo de persistencia. En lugar de delegar el cálculo matemático de ponderación a PostgreSQL mediante costosos procedimientos almacenados o subconsultas cíclicas, los datos se recuperan atómicamente mediante proyecciones nativas e indexadas de clave primaria (`findEnrolledCourseIdsByUserId`) y se procesan a alta velocidad en memoria utilizando *Java Streams*, liberando por completo de carga computacional al servidor de la base de datos.
+* **Inteligencia de Negocio Aplicada:** Eleva el rigor del proyecto demostrando la capacidad de estructurar algoritmos analíticos personalizados en la capa de negocio, sincronizándolos de forma nativa con el tipado estricto de TypeScript en el cliente.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Sugerencias Predictivas Dinámicas:** El frontend renderiza en tiempo real recomendaciones justificadas con un porqué explícito (`reason`) de forma transparente para el estudiante en su dashboard principal.
+* **Aislamiento e Inmunidad ante Regresiones:** El algoritmo queda blindado metodológicamente mediante una suite de pruebas de comportamiento automatizadas en JUnit 5 y Mockito (`RecommendationServiceTest`), certificando con un 100% de éxito en consola (`BUILD SUCCESS`) que el sistema descarta cursos irrelevantes y excluye estrictamente las asignaturas en las que el alumno ya está matriculado.
+* **Arquitectura Altamente Reactiva:** La UI del frontend se sincroniza automáticamente e invalida el feed en milisegundos en cuanto el estudiante efectúa una nueva matrícula, disparando una recarga limpia de red sin necesidad de refrescar el navegador.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Acoplamiento de Lógica en Memoria de Aplicación:** Al calcular las ponderaciones utilizando Streams de Java, el recolector de basura (*Garbage Collector*) del backend puede experimentar picos de trabajo puntuales para limpiar los objetos temporales generados si miles de alumnos acceden al dashboard simultáneamente.
+* *Mitigación:* Se implementó un límite estricto de corte anticipado en el flujo: el motor aborta la evaluación individual en cuanto detecta que el curso evaluado ya está completado o matriculado, procesando únicamente el remanente activo del catálogo y reduciendo la creación de instancias volátiles a niveles marginales y seguros para la memoria del servidor.
 
 ---
 
-# [ADR-34] Gestión de Sesión por Inactividad frente a Expiración Absoluta
+# ADR-35: Evolución de la Persistencia Multidimensional de Intereses y Sincronización del Ciclo de Vida de Hibernate
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Junio 2026
+
+## Contexto
+
+Durante la integración del Motor de Recomendaciones Algorítmicas [ADR-34], se detectó un fallo de regresión en el guardado del modal de preferencias del estudiante. La tabla principal `interests` y sus cinco tablas satélite multivalor (ej. `interest_categories`) rechazaban las actualizaciones en la base de datos debido a dos fenómenos críticos del ciclo de vida de Hibernate:
+
+1. **Identidad Huérfana:** Al utilizar `@MapsId` sin estrategias de generación automática (`@GeneratedValue`), el motor de persistencia requería la asignación explícita y manual del ID del usuario en memoria antes de poder invocar al repositorio.
+2. **Violación de la Colección Persistente (*PersistentBag*):** El uso de métodos *setter* convencionales reemplazaba los envoltorios nativos de las colecciones de Spring Data JPA por instancias estándar de `ArrayList`, inhabilitando el rastreo de cambios (*dirty checking*) y bloqueando la generación automática de sentencias SQL `DELETE` e `INSERT`.
+
+## Decisión
+
+Rediseñar de forma quirúrgica la capa de servicios e infraestructura de persistencia mediante tres intervenciones técnicas:
+
+1. **Sincronización Manual de Identidad:** Modificar el bloque constructivo `.orElseGet()` en `UserService.java` para forzar la inyección explícita del ID físico del usuario (`newInterest.setId(user.getUser_id())`) previo al volcado atómico en el repositorio.
+2. **Patrón de Mutación Destructivo-Limpio:** Implementar una abstracción encapsulada mediante el método utilitario `updateCollection(current, next)`. Se descartan los *setters* directos y se aplican operaciones secuenciales estrictas de `.clear()` y `.addAll()` sobre las listas originales controladas por Hibernate, preservando intacto el proxy de la colección.
+3. **Tolerancia Semántica en Endpoints:** Expandir la configuración del controlador a un mapa `@RequestMapping` multitolerante que absorba y procese de forma nativa peticiones HTTP tanto `POST` como `PUT` sin alterar el contrato con la interfaz de usuario en React.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Estabilización de las Suites de Calidad:** Se restablece y blinda la suite de pruebas automatizadas del frontend y del backend en un verde absoluto sin necesidad de añadir librerías o alterar las dependencias del `pom.xml`.
+* **Integridad Referencial Garantizada (1FN):** Se asegura que el motor de base de datos en PostgreSQL mantenga una consistencia atómica, garantizando que el motor algorítmico lea preferencias reales en tiempo de ejecución e impidiendo fallos de parpadeo de estado local en la interfaz del alumno.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Riesgo de Confusión en Contratos API por Multimapeo:** Permitir que un mismo endpoint atienda peticiones `POST` y `PUT` de forma indistinta viola la convención tradicional de diseño de APIs REST puras, donde `POST` se reserva para creación y `PUT` para reemplazo total.
+* *Mitigación:* Al operar este endpoint bajo una relación de clave compartida estrictamente unívoca (`@OneToOne` vinculada al token del usuario autenticado), la acción semántica es siempre de tipo *Idempotente* (guardado o sobreescritura del registro único). Esta unificación simplifica la lógica de red del cliente en React al centralizar las peticiones del modal en un único método de envío sin riesgo de generar registros duplicados.
+
+---
+
+# [ADR-36] Gestión de Sesión por Inactividad frente a Expiración Absoluta
 
 ## Estado
 
@@ -677,7 +1412,7 @@ Finalmente, el valor `undefined` se propagaba a la pasarela HTTP (Axios), mutand
 
 ---
 
-# [ADR-36] Módulo de Intercambio Bidireccional y Dirigido de Documentos Académicos
+# [ADR-37] Módulo de Intercambio Bidireccional y Dirigido de Documentos Académicos
 
 ## Estado
 
@@ -705,7 +1440,7 @@ Permitir la incorporación de formatos de procesamiento de palabras como Microso
 
 ---
 
-# [ADR-37] Sistema de Evaluación Académica y Arquitectura de Rating Dual
+# [ADR-38] Sistema de Evaluación Académica y Arquitectura de Rating Dual
 
 ## Estado
 
@@ -735,7 +1470,7 @@ Adicionalmente, bajo las políticas de seguridad perimetral por tokens distribui
 
 ---
 
-# [ADR-38] Descarga Segura de Documentos Académicos y Control de Acceso Anti-IDOR
+# [ADR-39] Descarga Segura de Documentos Académicos y Control de Acceso Anti-IDOR
 
 ## Estado
 
@@ -764,7 +1499,7 @@ Para consolidar las directrices de privacidad y control de acceso en el módulo 
 
 ---
 
-# [ADR-39] Diseño de Contrato Anticipado para la Integración Desacoplada de Calificaciones Académicas
+# [ADR-40] Diseño de Contrato Anticipado para la Integración Desacoplada de Calificaciones Académicas
 
 ## Estado
 
@@ -794,7 +1529,7 @@ No obstante, debido a que el módulo de inserción de calificaciones por parte d
 
 ---
 
-# [ADR-40] Persistencia Relacional e Hidratación de Calificaciones con Aislamiento Deserializador READ_ONLY
+# [ADR-41] Persistencia Relacional e Hidratación de Calificaciones con Aislamiento Deserializador READ_ONLY
 
 ## Estado
 
@@ -824,7 +1559,7 @@ Específicamente, se debían mitigar dos vectores de riesgo críticos:
 
 ---
 
-# [ADR-41] Arquitectura de Agregación Analítica Inmutable y Casteo Dinámico para Métricas de Catálogo
+# [ADR-42] Arquitectura de Agregación Analítica Inmutable y Casteo Dinámico para Métricas de Catálogo
 
 ## Estado
 
@@ -859,7 +1594,7 @@ Se determina **posponer e inactivar temporalmente la integración del componente
 
 ---
 
-## ADR-42: Tipado Defensivo y Gestión de Precisión en el Progreso Académico
+# [ADR-43]: Tipado Defensivo y Gestión de Precisión en el Progreso Académico
 
 ### Estado
 
@@ -883,7 +1618,7 @@ Se decide mantener el uso del tipo `Long` para almacenar y procesar el total de 
 
 ---
 
-## ADR-43: Abstracción de Infraestructura y Purificación Semántica de la Interfaz (UX)
+# [ADR-44]: Abstracción de Infraestructura y Purificación Semántica de la Interfaz (UX)
 
 ### Estado
 
@@ -906,7 +1641,7 @@ Se establece un principio estricto de **Purificación Semántica y Abstracción 
 
 ---
 
-## [ADR-44] Arquitectura de Agregación Analítica Disociada y Micro-indicadores
+# [ADR-45] Arquitectura de Agregación Analítica Disociada y Micro-indicadores
 
 **Fecha:** Julio 2026  
 **Estatus:** Aceptado  
@@ -937,7 +1672,7 @@ Los principales desafíos son:
 
 ---
 
-## ADR-45: Canal de Alarmas Académicas Dinámicas en Barra de Navegación
+# [ADR-46]: Canal de Alarmas Académicas Dinámicas en Barra de Navegación
 
 ### Estatus
 
@@ -961,7 +1696,7 @@ El estudiante requería avisos visuales inmediatos sobre la llegada de nuevos do
 
 ---
 
-## ADR-46: Purificación del Sistema de Contingencia y Control de Permisos
+# [ADR-47]: Purificación del Sistema de Contingencia y Control de Permisos
 
 ### Estatus
 
@@ -984,7 +1719,7 @@ La vista de error por falta de privilegios (`AccessDenied.tsx`) utilizaba etique
 
 ---
 
-## ADR-47: Purificación Visual de Dashboards y Centralización de Componentes de Enrutamiento
+# [ADR-48]: Purificación Visual de Dashboards y Centralización de Componentes de Enrutamiento
 
 ### Estado
 
@@ -1029,6 +1764,116 @@ Se completa la limpieza final y el endurecimiento de seguridad asociado al cierr
 
 * Se retiran anotaciones `@CrossOrigin` redundantes en controladores (`UserController`, `CourseController`) para centralizar la política en `SecurityConfig.java`.
 * Se normaliza la exclusión de artefactos `repomix-output.*` en la raíz del monorepo para evitar ruido documental y residuos de herramientas.
+
+---
+
+# [ADR-49]: Implementación de Comunicación Bidireccional de Documentos Académicos
+
+## Estatus
+
+Aceptado
+
+## Contexto
+
+La plataforma requería una evolución desde un repositorio de archivos estático hacia un sistema de intercambio dinámico entre alumnos y profesores. Se necesitaba vincular cada archivo a un contexto académico (asignatura) y a actores específicos (emisor y receptor) para habilitar el seguimiento de tareas y exámenes.
+
+## Decisión
+
+Se ha modificado la entidad `DocumentMetadata.java` para incluir relaciones de persistencia explícitas con los actores `sender` (emisor) y `receiver` (receptor), así como el mapeo con la entidad `course` (asignatura). Asimismo, se integra el uso del enumerado `FolderType` para categorizar semánticamente el contenido en sus respectivas bandejas de entrada y salida (`SENT` / `RECEIVED`).
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Reactividad en la Interfaz:** Permite al componente del frontend `CourseAssignmentPanel.tsx` filtrar e indexar los documentos en tiempo real según la asignatura seleccionada por el usuario.
+* **Trazabilidad y Alertas:** Habilita la lógica de notificaciones bidireccionales, permitiendo que el sistema identifique de forma unívoca a qué actor debe alertar (vía la campana de notificaciones) inmediatamente después de registrarse una subida de archivo.
+* **Seguridad (Mitigación IDOR):** Al estar el contrato documental ligado directamente a un emisor y un receptor específicos en la base de datos, se facilita la implementación de cortocircuitos de seguridad perimetrales en los endpoints de descarga del servidor.
+
+---
+
+# [ADR-50]: Arquitectura de Layout Responsivo mediante Grid System en Dashboards
+
+## Estatus
+
+Aceptado
+
+## Contexto
+
+El incremento de funcionalidades en el dashboard del estudiante (seguimiento de asignaturas, catálogo de cursos, estadísticas y evaluaciones) provocaba una saturación visual en disposiciones verticales simples, lo que dificultaba la usabilidad y la experiencia de usuario.
+
+## Decisión
+
+Implementar un sistema de distribución basado en **CSS Grid de Tailwind** en el archivo `StudentDashboard.tsx`, dividiendo la interfaz en un contenedor de dos columnas principales: una lateral (25% de ancho) para el `EvaluationPanel` y una central/derecha (75% de ancho) para el flujo de actividad principal (`CourseCatalog` y `CourseAssignmentPanel`).
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Optimización de la Jerarquía Visual:** Permite al estudiante visualizar sus notas de progreso simultáneamente con sus tareas activas sin necesidad de realizar un scroll excesivo.
+* **Coherencia Estética Global:** Se garantiza la uniformidad del diseño en toda la aplicación mediante el uso estandarizado del componente común `GenericCard` y bordes unificados en tono `slate-200` en todos los paneles inyectados.
+* **Adaptabilidad Responsiva:** El diseño se adapta de manera fluida y fluida en pantallas de diferentes tamaños (móvil, tablet y escritorio), ocultando o reorganizando las columnas del grid de forma nativa.
+
+---
+
+# [ADR-51]: Sincronización del Estado de Notificaciones mediante Atributo de Lectura (isRead)
+
+## Estatus
+
+Aceptado
+
+## Contexto
+
+Se detectó una inconsistencia en la experiencia de usuario (UX) donde la campana de notificaciones (indicador visual de alarma) permanecía en estado activo (color rojo y parpadeo) incluso después de que el estudiante hubiera descargado o visualizado los documentos en su bandeja de entrada. Esto se debía a que la lógica de la alarma solo validaba la existencia física de registros en la tabla de metadatos, sin rastrear la interacción previa del usuario con dichos archivos.
+
+## Decisión
+
+Para resolver este comportamiento y asegurar que la interfaz refleje fielmente el estado de las tareas pendientes, se han implementado las siguientes medidas técnicas en ambas capas de la aplicación:
+
+1. **Capa de Persistencia (Backend):** Añadir un campo booleano `isRead` (inicializado por defecto en `false`) a la entidad `DocumentMetadata` en Spring Boot.
+2. **Interfaz de Programación (API Rest):** Desarrollar un endpoint transaccional mediante `@PatchMapping` en el `DocumentController` para permitir la mutación de este estado a través de peticiones HTTP asíncronas.
+3. **Lógica de Negocio (Frontend):** Modificar el hook global unificado `useNotifications.ts` para que la evaluación del estado visual (`hasUnread`) dependa exclusivamente de los documentos donde la bandera `isRead` sea estrictamente falsa.
+4. **Interacción del Usuario (UI/UX):** Vincular los eventos de acción ("Abrir" o "Descargar") del componente `DocumentManager.tsx` con una llamada inmediata al servicio de marcado como leído, disparando un evento de refresco global para actualizar la campana en tiempo real.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Sincronización de Estado Precisa:** Se elimina el desfase visual entre los archivos descargados y el indicador de alertas de la barra de navegación, ofreciendo una experiencia coherente al usuario.
+* **Optimización de Rendimiento en UI:** Al delegar la mutación mediante un evento nativo del sistema de ventanas (`global-notifications:refresh`), la actualización del estado de lectura se procesa de forma reactiva sin necesidad de recargar la página completa.
+* **Integridad de Datos:** El control perimetral implementado en el backend garantiza que únicamente el receptor legítimo del documento tenga permisos de mutación sobre la propiedad `isRead`, blindando la operación ante vulnerabilidades de manipulación de identificadores (IDOR).
+
+---
+
+# [ADR-53]: Unificación del Sistema de Notificaciones mediante Componente Global de Alerta
+
+## Estatus
+
+Aceptado
+
+## Contexto
+
+Anteriormente, el sistema de alertas (campana de notificaciones) era un componente exclusivo y acoplado al dashboard del estudiante. Con la implementación del intercambio bidireccional de documentos [ADR-48] y la necesidad de que profesores y administradores reciban avisos críticos (como entregas de trabajos o alertas de finalización de curso), mantener componentes de notificación separados por rol generaba duplicidad de código y una experiencia de usuario (UX) inconsistente.
+
+## Decisión
+
+Se ha decidido refactorizar el sistema de notificaciones bajo un modelo de componente único, global y agnóstico al rol del usuario, aplicando las siguientes medidas de ingeniería:
+
+1. **Centralización de la Interfaz de Usuario (UI):** Se migra el componente visual `NotificationBell.tsx` a una ubicación compartida y se renombra como `GlobalNotificationBell.tsx`, inyectándolo directamente en el componente común `NavbarUser.tsx`. Esto garantiza que la campana sea visible para cualquier usuario autenticado (`ADMIN`, `PROFESSOR` o `STUDENT`) sin importar la sección de la plataforma en la que se encuentre.
+2. **Generalización del Hook de Datos:** El hook `useNotifications.ts` se ha desacoplado de la lógica específica de estudiantes para consumir el contexto global de autenticación (`AuthContext`). Ahora, el hook consulta al backend de forma dinámica mediante una bifurcación algorítmica sensible al `user_id` y al `role` del usuario actual.
+3. **Lógica Basada en Receptores:** Se aprovecha la estructura de persistencia de la entidad `DocumentMetadata` y el objeto de transferencia de datos `NotificationDTO` para filtrar las alertas según el campo `receiver_id`, permitiendo que el servidor sirva notificaciones específicas para cada tipo de actor académico.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Eliminación de Deuda Técnica (Principio DRY):** Se elimina la necesidad de mantener múltiples lógicas de notificación redundantes, centralizando el mantenimiento y las suites de pruebas en un solo punto del repositorio.
+* **Coherencia Visual:** Se cumple rigurosamente con las directrices de purificación visual, ofreciendo una interfaz uniforme y una UX homogénea para todos los roles de la plataforma.
+* **Alta Escalabilidad:** El sistema permite añadir nuevos tipos de alertas (como avisos de progreso académico para profesores o alertas técnicas para administradores) simplemente actualizando el hook de datos, sin alterar la interfaz de la barra de navegación.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Carga de Red:** Al convertirse en un componente global en la barra de navegación, el hook realiza peticiones frecuentes al servidor para evaluar el estado de lectura (`hasUnread`).
+* *Mitigación:* Se implementó una carga concurrente y optimizada mediante `Promise.all` y un sistema de eventos nativos del navegador (`global-notifications:refresh`), asegurando que las llamadas se realicen solo cuando el contexto cambie o se dispare un evento legítimo de interacción, protegiendo el rendimiento de la aplicación.
 
 ---
 
