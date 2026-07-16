@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import NotificationBell from './NotificationBell';
+import NotificationBell from './GlobalNotificationBell';
 import * as notificationsHook from './useNotifications';
 
 describe('NotificationBell - Suite de Alertas Académicas', () => {

@@ -3,7 +3,7 @@ import { Upload, FileText, Download, Loader2, AlertCircle, FileUp, Inbox, Send, 
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import { useDocuments } from './useDocuments';
-import { useNotifications } from './useNotifications'; // <-- RECOMENDACIÓN NOTEBOOKLM: Importación del Hook
+import { useNotifications } from '../../../../components/ui/globalNotificationBell/useNotifications';
 import { markDocumentAsRead } from '../../../../services/documentService'; // <-- RECOMENDACIÓN NOTEBOOKLM: Importación del Servicio
 
 export const DocumentManager = () => {

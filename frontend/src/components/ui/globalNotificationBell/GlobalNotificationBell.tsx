@@ -1,15 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { Bell, FileText, TrendingUp } from 'lucide-react';
 import { useNotifications } from './useNotifications';
-import GenericButton from '../../../../components/ui/genericButton/GenericButton'; // Asegura la ruta a tu botón core
+import type { NotificationDTO } from './useNotifications'; // Importamos el tipo estricto para limpiar el any implícito
+import GenericButton from '../genericButton/GenericButton';
 
 export default function NotificationBell() {
-    // RECOMENDACIÓN NOTEBOOKLM: Extraemos 'hasUnread' para condicionar la estética de la campana
     const { alerts, hasAlerts, hasUnread } = useNotifications();
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    // Cerrar el panel flotante si el usuario hace clic fuera de él
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -22,7 +21,6 @@ export default function NotificationBell() {
 
     return (
         <div className="relative" ref={dropdownRef}>
-            {/* RECOMENDACIÓN NOTEBOOKLM: El fondo cambia según si hay documentos sin leer (hasUnread) */}
             <GenericButton
                 variant="search"
                 onClick={() => setIsOpen(!isOpen)}
@@ -31,16 +29,14 @@ export default function NotificationBell() {
                     : 'bg-white hover:bg-slate-100'
                     }`}
                 icon={
-                    /* RECOMENDACIÓN NOTEBOOKLM: Color rojo y parpadeo condicionado estrictamente a 'hasUnread' */
                     <Bell
                         size={20}
-                        className={hasUnread ? 'text-red-500 animate-pulse' : 'text-slate-505 text-slate-500'}
+                        className={hasUnread ? 'text-red-500 animate-pulse' : 'text-slate-500'}
                     />
                 }
                 ariaLabel="Campana de notificaciones"
             />
 
-            {/* RECOMENDACIÓN NOTEBOOKLM: El punto flotante se renderiza si quedan elementos sin leer */}
             {hasUnread && (
                 <span className="absolute top-1 right-1 flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -48,10 +44,8 @@ export default function NotificationBell() {
                 </span>
             )}
 
-            {/* DESPLEGABLE DE NOTIFICACIONES */}
             {isOpen && (
                 <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                    {/* Encabezado */}
                     <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-100 flex justify-between items-center">
                         <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Avisos del Sistema</span>
                         {hasAlerts && (
@@ -61,7 +55,6 @@ export default function NotificationBell() {
                         )}
                     </div>
 
-                    {/* Cuerpo de Alertas */}
                     <div className="max-h-64 overflow-y-auto divide-y divide-slate-50 custom-scrollbar">
                         {!hasAlerts ? (
                             <div className="p-6 text-center space-y-1">
@@ -69,8 +62,8 @@ export default function NotificationBell() {
                                 <p className="text-[11px] text-slate-400">No tienes avisos pendientes por el momento.</p>
                             </div>
                         ) : (
-                            alerts.map((alert, index) => {
-                                // Seleccionamos el icono temático limpio según el tipo de aviso
+                            // SOLUCIÓN AL ANY IMPLÍCITO: Tipamos explícitamente alert como NotificationDTO e index como number
+                            alerts.map((alert: NotificationDTO, index: number) => {
                                 const isDoc = alert.type === 'DOCUMENT_INBOX';
                                 const iconColor = isDoc ? 'text-blue-500 bg-blue-50' : 'text-emerald-500 bg-emerald-50';
                                 const IconComponent = isDoc ? FileText : TrendingUp;

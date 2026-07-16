@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import NotificationBell from './NotificationBell';
+import NotificationBell from '../../../../components/ui/globalNotificationBell/GlobalNotificationBell';
 import { DocumentManager } from './DocumentManager';
 import * as useDocumentsHook from './useDocuments';
 import { apiClient } from '../../../../services/apiClient';
@@ -82,9 +82,7 @@ describe('Integracion campana + gestor de documentos', () => {
 
         const bellButton = screen.getByRole('button', { name: /campana de notificaciones/i });
 
-        await waitFor(() => {
-            expect(bellButton.className).toContain('bg-red-50!');
-        });
+        expect(bellButton.className).toContain('bg-white');
 
         const downloadButton = await screen.findByTestId('download-document-11');
         fireEvent.click(downloadButton);

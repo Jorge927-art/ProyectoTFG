@@ -6,7 +6,7 @@ import { useAuth } from '../../auth';
 // Auditoría NotebookLM: Importación de la constante centralizada para mitigar hardcoding de roles.
 import { ROLES } from '../../auth/authTypes';
 import { resolveAvatarUrl } from '../../auth/avatarUrl';
-import NotificationBell from '../../routes/pages/student/components/NotificationBell';
+import NotificationBell from '../ui/globalNotificationBell/GlobalNotificationBell';
 
 
 /**
@@ -98,7 +98,10 @@ const NavbarUser = ({ username, userPhoto, onLogout }: NavbarUserProps) => {
 
             {/* 3. SECCIÓN DERECHA */}
             <div className="w-1/3 flex items-center justify-end gap-4">
-                {currentRole === ROLES.STUDENT && <NotificationBell />}
+
+                {/* ELIMINA LA CONDICIONAL ANTERIOR Y DEJA SOLO LA CAMPANA GLOBAL: */}
+                <NotificationBell />
+
                 <GenericButton
                     onClick={handleProfileRedirect}
                     variant="white"
@@ -114,6 +117,7 @@ const NavbarUser = ({ username, userPhoto, onLogout }: NavbarUserProps) => {
                     className="p-2! text-gray-400! hover:text-red-500! bg-transparent! shadow-none!"
                 />
             </div>
+
         </nav>
     );
 };

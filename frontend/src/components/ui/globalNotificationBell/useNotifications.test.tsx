@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import React from 'react';
+import { AuthContext } from '../../../auth/AuthContext'; // Asegura que esta ruta apunte a tu AuthContext real
 import { useNotifications } from './useNotifications';
-import { apiClient } from '../../../../services/apiClient';
-import * as documentService from '../../../../services/documentService';
-import type { DocumentMetadata } from '../../../../services/documentService';
+import { apiClient } from '../../../services/apiClient';
+import * as documentService from '../../../services/documentService';
+import type { DocumentMetadata } from '../../../services/documentService';
 import type { NotificationDTO } from './useNotifications';
 
 const buildDoc = (isRead: boolean): DocumentMetadata => ({
@@ -16,6 +18,30 @@ const buildDoc = (isRead: boolean): DocumentMetadata => ({
     folder_type: 'RECEIVED',
     isRead,
 });
+
+// Componente Wrapper para inyectar de forma controlada la sesión del alumno en las pruebas
+// Componente Wrapper para inyectar de forma controlada la sesión del alumno en las pruebas
+const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
+    const mockAuthValue = {
+        user: {
+            user_id: 1,
+            username: 'alumno',
+            email: 'alumno@tfg.com',
+            role: 'STUDENT' as const // SOLUCIÓN: Usamos 'as const' para que TypeScript infiera el literal exacto sin usar 'any'
+        },
+        isAuthenticated: true,
+        isLoading: false,
+        login: () => { },
+        updateUser: () => { },
+        logout: () => { },
+    };
+
+    return (
+        <AuthContext.Provider value={mockAuthValue as unknown as typeof AuthContext extends React.Context<infer U> ? U : never}>
+            {children}
+        </AuthContext.Provider>
+    );
+};
 
 describe('useNotifications', () => {
     let currentAlerts: NotificationDTO[];
@@ -39,8 +65,9 @@ describe('useNotifications', () => {
     });
 
     it('sincroniza el estado entre instancias al refrescar notificaciones globalmente', async () => {
-        const bellHook = renderHook(() => useNotifications());
-        const panelHook = renderHook(() => useNotifications());
+        // Inyectamos el wrapper en ambas instancias del hook para que lean al alumno simulado
+        const bellHook = renderHook(() => useNotifications(), { wrapper: AuthWrapper });
+        const panelHook = renderHook(() => useNotifications(), { wrapper: AuthWrapper });
 
         await waitFor(() => {
             expect(bellHook.result.current.loading).toBe(false);
