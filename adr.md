@@ -1313,7 +1313,7 @@ Diseñar y desarrollar un servicio especializado (`RecommendationService.java`) 
 
 ---
 
-# ADR-35: Evolución de la Persistencia Multidimensional de Intereses y Sincronización del Ciclo de Vida de Hibernate
+# ADR-35: Modelo de Atribución de Intereses y Perfilado de Usuario
 
 ## Estatus
 
@@ -1352,32 +1352,7 @@ Rediseñar de forma quirúrgica la capa de servicios e infraestructura de persis
 
 ---
 
-# [ADR-36] Gestión de Sesión por Inactividad frente a Expiración Absoluta
-
-## Estado
-
-Aceptado
-
-## Contexto
-
-El Tiempo de Vida (TTL) del token JWT está configurado en 15 minutos (900 segundos) para mitigar ventanas de exposición ante posibles secuestros de sesión. En la implementación previa del frontend, el cliente HTTP calculaba un instante estático de caducidad absoluto (`Date.now() + 15min`) al procesar el inicio de sesión. Esta lógica provocaba la expulsión abrupta y prematura del alumno Luis desde el Dashboard, incluso si se encontraba redactando, interactuando de forma concurrente con el modal de intereses o consumiendo el catálogo de cursos. Adicionalmente, la auditoría del monorrepo arrojó un error en la fórmula matemática del "Clock Skew" del servidor y una doble identidad redundante en las claves de persistencia local (`user` y `auth_user`).
-
-## Decisión
-
-1. **Activity Tracker en el Cliente:** Implementar un monitor de actividad reactivo dentro del `AuthProvider.tsx` que capture interacciones humanas nativas en el DOM (`mousemove`, `keydown`, `click`, `scroll`). Cada evento válido pospone el instante de vencimiento del usuario en memoria y en disco otorgándole un nuevo margen renovado de 15 minutos.
-2. **Mecanismo de Throttle Embebido:** Limitar la frecuencia de actualización del estado de React a un rango de muestreo seguro de 2000 milisegundos mediante el uso táctico de una referencia inmutable (`useRef`). Esto bloquea re-renders masivos del Dashboard preservando el rendimiento gráfico de la interfaz.
-3. **Corrección Aritmética del Clock Skew:** Modificar la validación temporal de `JwtService.java` en el servidor restando la tolerancia de 60 segundos del instante actual (`Instant.now().minusSeconds(skew)`) en lugar de sumarla, garantizando que el token disfrute de un margen de gracia real ante desincronizaciones de reloj entre cliente y servidor.
-4. **Unificación Física del Storage:** Refactorizar `authStorage.ts` para persistir la sesión bajo una única constante e identificador físico inmutable (`auth_user`), mitigando el split-brain informático del localStorage y eliminando de un plumazo el consumo de cuota duplicado detectado en la auditoría.
-
-## Consecuencias
-
-* **Mejora en Usabilidad:** Se elimina la expulsión prematura del alumno activo de la plataforma de manera transparente sin comprometer las directrices estrictas de seguridad.
-* **Consistencia de Datos:** La suite de pruebas de Vitest se elevó a 33 de 33 tests en verde gracias al diseño de relojes virtuales (`vi.useFakeTimers`) que simulan interacciones concurrentes del usuario en el tiempo absoluto.
-* **Aislamiento de Errores:** El servidor tolera desincronizaciones temporales de milisegundos en peticiones HTTP API REST complejas sin corromper el canal.
-
----
-
-# [ADR-35] Consistencia de Identidad Bidireccional y Ordenamiento Determinista en el Flujo de Matrículas
+# [ADR-36] Implementación del Motor de Recomendaciones mediante Algoritmo de Ponderación
 
 ## Estado
 
@@ -1412,7 +1387,32 @@ Finalmente, el valor `undefined` se propagaba a la pasarela HTTP (Axios), mutand
 
 ---
 
-# [ADR-37] Módulo de Intercambio Bidireccional y Dirigido de Documentos Académicos
+# [ADR-37] Gestión de Sesión por Inactividad frente a Expiración Absoluta
+
+## Estado
+
+Aceptado
+
+## Contexto
+
+El Tiempo de Vida (TTL) del token JWT está configurado en 15 minutos (900 segundos) para mitigar ventanas de exposición ante posibles secuestros de sesión. En la implementación previa del frontend, el cliente HTTP calculaba un instante estático de caducidad absoluto (`Date.now() + 15min`) al procesar el inicio de sesión. Esta lógica provocaba la expulsión abrupta y prematura del alumno Luis desde el Dashboard, incluso si se encontraba redactando, interactuando de forma concurrente con el modal de intereses o consumiendo el catálogo de cursos. Adicionalmente, la auditoría del monorrepo arrojó un error en la fórmula matemática del "Clock Skew" del servidor y una doble identidad redundante en las claves de persistencia local (`user` y `auth_user`).
+
+## Decisión
+
+1. **Activity Tracker en el Cliente:** Implementar un monitor de actividad reactivo dentro del `AuthProvider.tsx` que capture interacciones humanas nativas en el DOM (`mousemove`, `keydown`, `click`, `scroll`). Cada evento válido pospone el instante de vencimiento del usuario en memoria y en disco otorgándole un nuevo margen renovado de 15 minutos.
+2. **Mecanismo de Throttle Embebido:** Limitar la frecuencia de actualización del estado de React a un rango de muestreo seguro de 2000 milisegundos mediante el uso táctico de una referencia inmutable (`useRef`). Esto bloquea re-renders masivos del Dashboard preservando el rendimiento gráfico de la interfaz.
+3. **Corrección Aritmética del Clock Skew:** Modificar la validación temporal de `JwtService.java` en el servidor restando la tolerancia de 60 segundos del instante actual (`Instant.now().minusSeconds(skew)`) en lugar de sumarla, garantizando que el token disfrute de un margen de gracia real ante desincronizaciones de reloj entre cliente y servidor.
+4. **Unificación Física del Storage:** Refactorizar `authStorage.ts` para persistir la sesión bajo una única constante e identificador físico inmutable (`auth_user`), mitigando el split-brain informático del localStorage y eliminando de un plumazo el consumo de cuota duplicado detectado en la auditoría.
+
+## Consecuencias
+
+* **Mejora en Usabilidad:** Se elimina la expulsión prematura del alumno activo de la plataforma de manera transparente sin comprometer las directrices estrictas de seguridad.
+* **Consistencia de Datos:** La suite de pruebas de Vitest se elevó a 33 de 33 tests en verde gracias al diseño de relojes virtuales (`vi.useFakeTimers`) que simulan interacciones concurrentes del usuario en el tiempo absoluto.
+* **Aislamiento de Errores:** El servidor tolera desincronizaciones temporales de milisegundos en peticiones HTTP API REST complejas sin corromper el canal.
+
+---
+
+# [ADR-38] Módulo de Intercambio Bidireccional y Dirigido de Documentos Académicos
 
 ## Estado
 
@@ -1440,7 +1440,7 @@ Permitir la incorporación de formatos de procesamiento de palabras como Microso
 
 ---
 
-# [ADR-38] Sistema de Evaluación Académica y Arquitectura de Rating Dual
+# [ADR-39] Sistema de Evaluación Académica y Arquitectura de Rating Dual
 
 ## Estado
 
@@ -1470,7 +1470,7 @@ Adicionalmente, bajo las políticas de seguridad perimetral por tokens distribui
 
 ---
 
-# [ADR-39] Descarga Segura de Documentos Académicos y Control de Acceso Anti-IDOR
+# [ADR-40] Descarga Segura de Documentos Académicos y Control de Acceso Anti-IDOR
 
 ## Estado
 
@@ -1499,7 +1499,7 @@ Para consolidar las directrices de privacidad y control de acceso en el módulo 
 
 ---
 
-# [ADR-40] Diseño de Contrato Anticipado para la Integración Desacoplada de Calificaciones Académicas
+# [ADR-41] Diseño de Contrato Anticipado para la Integración Desacoplada de Calificaciones Académicas
 
 ## Estado
 
@@ -1529,7 +1529,7 @@ No obstante, debido a que el módulo de inserción de calificaciones por parte d
 
 ---
 
-# [ADR-41] Persistencia Relacional e Hidratación de Calificaciones con Aislamiento Deserializador READ_ONLY
+# [ADR-42] Persistencia Relacional e Hidratación de Calificaciones con Aislamiento Deserializador READ_ONLY
 
 ## Estado
 
@@ -1559,7 +1559,7 @@ Específicamente, se debían mitigar dos vectores de riesgo críticos:
 
 ---
 
-# [ADR-42] Arquitectura de Agregación Analítica Inmutable y Casteo Dinámico para Métricas de Catálogo
+# [ADR-43] Arquitectura de Agregación Analítica Inmutable y Casteo Dinámico para Métricas de Catálogo
 
 ## Estado
 
@@ -1594,7 +1594,7 @@ Se determina **posponer e inactivar temporalmente la integración del componente
 
 ---
 
-# [ADR-43]: Tipado Defensivo y Gestión de Precisión en el Progreso Académico
+# [ADR-44]: Tipado Defensivo y Gestión de Precisión en el Progreso Académico
 
 ### Estado
 
@@ -1618,7 +1618,7 @@ Se decide mantener el uso del tipo `Long` para almacenar y procesar el total de 
 
 ---
 
-# [ADR-44]: Abstracción de Infraestructura y Purificación Semántica de la Interfaz (UX)
+# [ADR-45]: Abstracción de Infraestructura y Purificación Semántica de la Interfaz (UX)
 
 ### Estado
 
@@ -1641,7 +1641,7 @@ Se establece un principio estricto de **Purificación Semántica y Abstracción 
 
 ---
 
-# [ADR-45] Arquitectura de Agregación Analítica Disociada y Micro-indicadores
+# [ADR-46] Arquitectura de Agregación Analítica Disociada y Micro-indicadores
 
 **Fecha:** Julio 2026  
 **Estatus:** Aceptado  
@@ -1672,7 +1672,7 @@ Los principales desafíos son:
 
 ---
 
-# [ADR-46]: Canal de Alarmas Académicas Dinámicas en Barra de Navegación
+# [ADR-47]: Canal de Alarmas Académicas Dinámicas en Barra de Navegación
 
 ### Estatus
 
@@ -1696,7 +1696,7 @@ El estudiante requería avisos visuales inmediatos sobre la llegada de nuevos do
 
 ---
 
-# [ADR-47]: Purificación del Sistema de Contingencia y Control de Permisos
+# [ADR-48]: Purificación del Sistema de Contingencia y Control de Permisos
 
 ### Estatus
 
@@ -1719,7 +1719,7 @@ La vista de error por falta de privilegios (`AccessDenied.tsx`) utilizaba etique
 
 ---
 
-# [ADR-48]: Purificación Visual de Dashboards y Centralización de Componentes de Enrutamiento
+# [ADR-49]: Purificación Visual de Dashboards y Centralización de Componentes de Enrutamiento
 
 ### Estado
 
@@ -1767,7 +1767,7 @@ Se completa la limpieza final y el endurecimiento de seguridad asociado al cierr
 
 ---
 
-# [ADR-49]: Implementación de Comunicación Bidireccional de Documentos Académicos
+# [ADR-50]: Implementación de Comunicación Bidireccional de Documentos Académicos
 
 ## Estatus
 
@@ -1791,7 +1791,7 @@ Se ha modificado la entidad `DocumentMetadata.java` para incluir relaciones de p
 
 ---
 
-# [ADR-50]: Arquitectura de Layout Responsivo mediante Grid System en Dashboards
+# [ADR-51]: Arquitectura de Layout Responsivo mediante Grid System en Dashboards
 
 ## Estatus
 
@@ -1815,7 +1815,7 @@ Implementar un sistema de distribución basado en **CSS Grid de Tailwind** en el
 
 ---
 
-# [ADR-51]: Sincronización del Estado de Notificaciones mediante Atributo de Lectura (isRead)
+# [ADR-52]: Sincronización del Estado de Notificaciones mediante Atributo de Lectura (isRead)
 
 ## Estatus
 
