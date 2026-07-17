@@ -1877,6 +1877,48 @@ Se ha decidido refactorizar el sistema de notificaciones bajo un modelo de compo
 
 ---
 
+# ADR-054: Estrategia de Testing en Pirámide y Validación de Flujos de Integración
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Julio 2026
+
+## Contexto
+
+Con la creciente complejidad funcional y de seguridad de la plataforma (intercambio bidireccional de archivos [ADR-48], motor de recomendaciones algorítmicas [ADR-34] y seguridad stateless JWT [ADR-03]), se hacía imperativo establecer un marco estricto de aseguramiento de la calidad (QA) que garantizara que las refactorizaciones profundas (como la unificación de la campana global [ADR-52] o la limpieza de código muerto) no introdujeran regresiones operacionales. Una arquitectura desacoplada y robusta exige que tanto el contrato de datos del backend como la reactividad de la UI en el frontend estén blindados de manera simétrica ante cualquier alteración del entorno de desarrollo.
+
+## Decisión
+
+Adoptar de manera formal una **Estrategia de Testing en Pirámide**, estructurada en tres niveles operativos de validación y ejecutada a través de un ecosistema tecnológico híbrido y complementario [ADR-28]:
+
+1. **Capa Unitaria (Alta Densidad y Aislamiento):**
+   * *Frontend:* Uso de Vitest y React Testing Library para validar el comportamiento de componentes atómicos (`GenericButton`) y aislar la lógica de componentes complejos como `GlobalNotificationBell.test.tsx`.
+   * *Backend:* Pruebas unitarias sobre servicios aislados, destacando `RecommendationServiceTest.java`, que valida la matriz de pesos del algoritmo predictivo de forma independiente del motor de persistencia.
+2. **Capa de Integración Técnica e Infraestructura:**
+   * Validación de la capa criptográfica mediante `JwtServiceTest.java` y comprobación perimetral de red a través de `CorsIntegrationTest.java` para asegurar que el modelo stateless sea infranqueable.
+   * Pruebas reales de persistencia y consistencia relacional en repositorios (`EnrollmentRepositoryTest.java`) para garantizar la integridad de las cláusulas JPQL y el cursor de PostgreSQL tras los procesos transaccionales.
+3. **Capa de Flujo de Negocio (Integración Funcional de Extremo a Extremo):**
+   * Implementación de la suite `NotificationDocumentFlowIntegrationTest.java` en el backend y su equivalente homólogo en el frontend. Estos tests validan el "camino feliz" (*happy path*) completo del sistema: desde que un documento se persiste con metadatos hasta que el sistema de persistencia genera reactivamente la alerta correspondiente indexada por el `receiver_id` del destinatario.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Confianza Absoluta en la Refactorización:** Permite realizar cambios estructurales profundos y tareas de purificación de código inerte con la certeza matemática de que los flujos críticos de la plataforma siguen 100% operativos.
+* **Documentación Técnica Viva:** Las suites de pruebas actúan como una especificación funcional ejecutable que describe de forma exacta cómo deben interactuar los componentes, servicios y contratos entre ambas capas del software.
+* **Automatización del Gobierno de Calidad:** La suite completa está integrada en el pipeline de Integración Continua (CI) mediante GitHub Actions (`ci.yml`), garantizando que ninguna rama de código pueda fusionarse con la rama principal si no supera satisfactoriamente todas las validaciones de la pirámide.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Sobrecarga de Mantenimiento por Alta Cobertura:** El incremento exponencial de la cobertura exige un esfuerzo de ingeniería adicional para actualizar, sincronizar y adaptar las aserciones de los tests cada vez que se modifique una regla de negocio o la estructura de los DTOs compartidos.
+* *Mitigación:* Se implementó un diseño de pruebas estrictamente acotado y guiado por comportamiento, evitando verificar detalles de implementación volátiles o estilos estéticos mutables. Los tests se centran de forma exclusiva en la invariabilidad de las firmas de los contratos y la lógica perimetral de seguridad, minimizando drásticamente la tasa de mantenimiento y falsos positivos en el pipeline.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026
