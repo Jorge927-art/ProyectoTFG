@@ -28,4 +28,24 @@ public interface AcademicEvaluationRepository extends JpaRepository<AcademicEval
      */
     @Query("SELECT COUNT(ae) > 0 FROM AcademicEvaluation ae WHERE ae.user.username = :username AND ae.course.course_id = :courseId")
     boolean existsByUserUsernameAndCourseCourseId(@Param("username") String username, @Param("courseId") Long courseId);
+
+    /**
+     * [CONSOLA DOCENTE - MEDIA GRUPO]: Calcula la media aritmética del progreso o
+     * rendimiento global de todos los alumnos activos matriculados en una
+     * asignatura.
+     */
+    @Query("SELECT AVG(ae.course_score) FROM AcademicEvaluation ae WHERE ae.course.course_id = :courseId " +
+            "AND ae.user.enabled = true")
+    Double getGroupAveragePerformance(@Param("courseId") Long courseId);
+
+    /**
+     * [CONSOLA DOCENTE - NOTA INDIVIDUAL]: Recupera el rendimiento medio de un
+     * estudiante
+     * específico dentro de una asignatura para alimentar la micro-gráfica
+     * comparativa dual.
+     */
+    @Query("SELECT AVG(ae.course_score) FROM AcademicEvaluation ae WHERE ae.course.course_id = :courseId " +
+            "AND ae.user.user_id = :userId")
+    Double getIndividualStudentPerformance(@Param("courseId") Long courseId, @Param("userId") Long userId);
+
 }

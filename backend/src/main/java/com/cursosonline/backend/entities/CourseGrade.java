@@ -5,6 +5,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+import java.math.BigDecimal;
+
 /**
  * Entidad relacional para la persistencia de calificaciones académicas
  * [ADR-39].
@@ -26,8 +28,8 @@ public class CourseGrade {
     @Column(name = "title", nullable = false)
     private String title; // Ej: "Examen Parcial", "Trabajo Fin de Curso"
 
-    @Column(name = "score", nullable = false)
-    private String score; // Ej: "8.5", "10"
+    @Column(name = "score", nullable = false, precision = 10, scale = 2)
+    private BigDecimal score; // Ej: 8.5, 10
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "enrollment_id", nullable = false)

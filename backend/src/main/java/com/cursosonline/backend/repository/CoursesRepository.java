@@ -32,7 +32,7 @@ public interface CoursesRepository extends JpaRepository<Courses, Long> {
          * PostgreSQL.
          */
         @Query(value = "SELECT c.course_id as courseId, " +
-                        "AVG(CASE WHEN cg.score IS NOT NULL AND cg.score <> '' THEN CAST(cg.score AS double precision) ELSE null END) as averageGrade, "
+                        "AVG(cg.score) as averageGrade, "
                         +
                         "COUNT(DISTINCT e.enrollmentid) as localEnrollments, " +
                         "AVG(ae.course_score) as communityRating, " +

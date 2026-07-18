@@ -56,3 +56,29 @@ export const getStudentCourseGrades = async (enrollmentId: number): Promise<Cour
     const response = await apiClient.get<CourseGradeDTO[]>(`/api/v1/users/my-courses/${enrollmentId}/grades`);
     return response.data;
 };
+
+export interface StudentPerformanceDTO {
+    studentId: number;
+    fullName: string;
+    email: string;
+    averageScore: number;
+    progressPercentage: number;
+}
+
+export interface CourseMetricsDTO {
+    courseId: number;
+    groupAverageScore: number;
+    activeStudentsCount: number;
+    pendingTasksCount: number;
+}
+
+export const getActiveStudentsByCourse = async (courseId: number): Promise<StudentPerformanceDTO[]> => {
+    const response = await apiClient.get<StudentPerformanceDTO[]>(`/api/v1/teacher/evaluations/courses/${courseId}/management/students`);
+    return response.data;
+};
+
+export const getCourseManagementMetrics = async (courseId: number): Promise<CourseMetricsDTO> => {
+    const response = await apiClient.get<CourseMetricsDTO>(`/api/v1/teacher/evaluations/courses/${courseId}/management/metrics`);
+    return response.data;
+};
+

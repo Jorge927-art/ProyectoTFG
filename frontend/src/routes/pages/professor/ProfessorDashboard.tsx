@@ -7,10 +7,16 @@ import ProfessorLayout from '../../layouts/DashboardLayout';
 // Importación del componente core unificado según [ADR-13]
 import GenericHeader from '../../../components/ui/genericHeader/GenericHeader';
 
+// Importación del modal local corregido
+import { CourseManagementModal } from './components/CourseManagementModal';
+
 // IMPORTACIÓN CENTRALIZADA DE DOMINIOS [DRY]
 import type { TaughtCourse, TeacherMetric } from '../../../services/userDomains';
 
 const ProfessorDashboard = () => {
+    // Estado reactivo unificado plano (NotebookLM) para controlar el modal
+    const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+
     // 1. ESTADO DE ASIGNATURAS IMPARTIDAS POR EL PROFESOR
     const [myCourses] = useState<TaughtCourse[]>([
         { id: 1, title: "Desarrollo Backend con Spring Boot y Java", studentsCount: 45, averageProgress: 75, category: "Programación" },
@@ -25,10 +31,6 @@ const ProfessorDashboard = () => {
 
     return (
         <ProfessorLayout>
-            {/* 
-               CABECERA PRINCIPAL UNIFICADA [ADR-13]:
-               Sustitución del bloque h1/p manual por el componente core GenericHeader.
-            */}
             <GenericHeader
                 title="Panel de Control Docente"
                 titleSize="text-xl font-bold"
@@ -98,6 +100,7 @@ const ProfessorDashboard = () => {
                                             label="Gestionar Curso"
                                             icon={<ArrowRight size={14} />}
                                             className="w-full flex-row-reverse! gap-1! text-xs! font-bold! py-2! px-3! rounded-lg! justify-center"
+                                            onClick={() => setSelectedCourseId(course.id)}
                                         />
                                     </div>
                                 </GenericCard>
@@ -143,6 +146,13 @@ const ProfessorDashboard = () => {
                 </div>
 
             </div>
+
+            {/* Inyección limpia del modal con sus propiedades exactas */}
+            <CourseManagementModal
+                courseId={selectedCourseId}
+                isOpen={selectedCourseId !== null}
+                onClose={() => setSelectedCourseId(null)}
+            />
         </ProfessorLayout>
     );
 };

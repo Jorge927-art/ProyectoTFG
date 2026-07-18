@@ -34,7 +34,7 @@ public class SecurityConfig {
 
     // Sincronizado con application.properties usando la estructura estandar
     // 'app.cors.allowed-origins'
-    @Value("#{'${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}'.split(',')}")
+    @Value("${app.cors.allowed-origins:${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}}")
     private List<String> allowedOrigins;
 
     /**

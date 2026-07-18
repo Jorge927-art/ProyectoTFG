@@ -33,4 +33,15 @@ public interface UserRepository extends JpaRepository<Users, Long> {
             +
             "WHERE e1.user.username = :username AND e2.user.username <> :username AND e2.user.role = 'STUDENT'")
     List<Users> findClassmatesByUsername(@Param("username") String username);
+
+    /**
+     * [CONSOLA DOCENTE]: Recupera los estudiantes matriculados en un curso
+     * específico,
+     * aplicando un filtro perimetral que excluye de forma estricta a los usuarios
+     * desactivados (enabled = false) por el Administrador.
+     */
+    @Query("SELECT e.user FROM Enrollment e WHERE e.course.course_id = :courseId " +
+            "AND e.user.enabled = true AND e.user.role = 'STUDENT'")
+    List<Users> findActiveStudentsByCourseId(@Param("courseId") Long courseId);
+
 }
