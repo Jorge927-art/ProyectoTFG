@@ -99,4 +99,26 @@ class TeacherEvaluationControllerIntegrationTest {
             assertNotNull(e.getMessage());
         }
     }
+
+    @Test
+    @WithMockUser(roles = "PROFESSOR")
+    void debeEstabilizarElCalculoDeLaMediaGeneralSiExistenAlumnosSinCalificacionesAun() {
+        Long mockCourseId = 5L;
+
+        // 1. Simulamos un escenario crítico: el repositorio devuelve null porque la
+        // consulta posicional AVG() no encuentra registros
+        when(userRepository.findActiveStudentsByCourseId(mockCourseId)).thenReturn(java.util.List.of(mockStudent));
+        when(courseGradeRepository.getGroupAverageScore(mockCourseId)).thenReturn(null);
+
+        // 2. Invocamos el método analítico del controlador
+        ResponseEntity<com.cursosonline.backend.dto.CourseMetricsDTO> response = teacherEvaluationController
+                .getCourseManagementMetrics(mockCourseId);
+
+        // 3. Aserción de Calidad [ADR-055]: Verificamos que el cortocircuito del
+        // backend asigna 0.0 de forma segura
+        assertNotNull(response.getBody());
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(0.0, response.getBody().groupAverageGrade(),
+                "El backend debe estabilizar a 0.0 si el promedio relacional es nulo");
+    }
 }

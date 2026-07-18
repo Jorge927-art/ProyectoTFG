@@ -169,4 +169,45 @@ describe('CourseManagementModal - Suite de Pruebas Unitarias', () => {
             expect(screen.getByText('4 tareas')).toBeInTheDocument();
         });
     });
+
+    it('debe gestionar de forma segura los límites de las micro-barras de progreso en Tailwind ante calificaciones máximas para evitar desbordamientos visuales', async () => {
+        // Simulamos un escenario extremo: un alumno con nota máxima (10) y progreso completo (100)
+        mockGetActiveStudents.mockResolvedValue([
+            {
+                studentId: 202,
+                fullName: 'Alumno Brillante',
+                email: 'brillante@alumnos.com',
+                averageScore: 10.0,
+                progressPercentage: 100
+            }
+        ]);
+
+        mockGetCourseMetrics.mockResolvedValue({
+            activeStudentsCount: 1,
+            groupAverageGrade: 1.5,
+            pendingSubmissionsCount: 0
+        });
+
+        render(
+            <CourseManagementModal
+                courseId={mockCourseId}
+                isOpen={true}
+                onClose={mockOnClose}
+            />
+        );
+
+        // Esperamos a que concluya la hidratación diferida inicial
+        await waitFor(() => {
+            expect(screen.getByText('Alumno Brillante')).toBeInTheDocument();
+        });
+
+        // Capturamos las barras de progreso renderizadas en el DOM simulado de la interfaz
+        const progressBars = document.querySelectorAll('.bg-blue-600, .bg-emerald-500');
+
+        // Verificamos de forma estricta que los estilos inyectados calculen correctamente las dimensiones relativas (100% y 100% respectivamente)
+        progressBars.forEach((bar) => {
+            const element = bar as HTMLElement;
+            expect(element.style.width).toBe('100%');
+        });
+    });
 });
