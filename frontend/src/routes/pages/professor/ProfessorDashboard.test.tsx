@@ -20,14 +20,17 @@ vi.mock('./components/useCourseManagement', () => ({
     useCourseManagement: () => ({
         activeTab: 'alumnado',
         setActiveTab: vi.fn(),
-        students: [], // Evita el .length de undefined de forma inmutable
-        metrics: null,
+        students: [], // <-- Soluciona definitivamente el error .length de undefined
+        metrics: {
+            activeStudentsCount: 0,
+            groupAverageGrade: 0,
+            pendingSubmissionsCount: 0
+        },
         loading: false,
         fileError: null,
         handleFileChange: vi.fn()
     })
 }));
-
 
 describe('ProfessorDashboard', () => {
     beforeEach(() => {
