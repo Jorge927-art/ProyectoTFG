@@ -16,6 +16,19 @@ vi.mock('../../../../services/evaluationService', () => ({
     })
 }));
 
+vi.mock('./components/useCourseManagement', () => ({
+    useCourseManagement: () => ({
+        activeTab: 'alumnado',
+        setActiveTab: vi.fn(),
+        students: [], // Evita el .length de undefined de forma inmutable
+        metrics: null,
+        loading: false,
+        fileError: null,
+        handleFileChange: vi.fn()
+    })
+}));
+
+
 describe('ProfessorDashboard', () => {
     beforeEach(() => {
         vi.clearAllMocks();
