@@ -54,7 +54,7 @@ describe('NotificationBell - Suite de Alertas Académicas', () => {
         render(<NotificationBell />);
 
         const bellButton = screen.getByRole('button');
-        expect(bellButton.className).toContain('bg-red-50!');
+        expect(bellButton.className).toMatch(/bg-red-50!/);
     });
 
     it('debe desplegar el panel flotante y listar las alertas al hacer clic', async () => {

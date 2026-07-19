@@ -221,5 +221,25 @@ export const markDocumentAsRead = async (documentId: number): Promise<{ message:
     return response.data;
 };
 
+/**
+ * [EXCLUSIVO PROFESOR]: Transmite guías, temarios o exámenes asociando el ID de la asignatura
+ * y, de manera opcional, el ID del alumno concreto o toda la clase (receiverId = 0).
+ */
+export const uploadProfessorDocument = async (
+    file: File, 
+    courseId: number, 
+    receiverId: number
+): Promise<UploadDocumentResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('courseId', courseId.toString());
+    formData.append('receiverId', receiverId.toString());
+
+    const response = await apiClient.post<UploadDocumentResponse>(
+        '/api/v1/documents/professor-upload',
+        formData
+    );
+    return response.data;
+};
 
 

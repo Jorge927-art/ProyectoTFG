@@ -1,14 +1,24 @@
 import { X, Users, BookOpen, FileText } from 'lucide-react';
 import { useCourseManagement } from './useCourseManagement';
+import GenericButton from '../../../../components/ui/genericButton/GenericButton';
+
 
 interface CourseManagementModalProps {
     courseId: number | null;
     isOpen: boolean;
     onClose: () => void;
+    // 1. Añadimos la función a la interfaz de propiedades del modal
+    onSyncCount?: (courseId: number, count: number) => void;
 }
 
-export const CourseManagementModal = ({ courseId, isOpen, onClose }: CourseManagementModalProps) => {
-    // Extraemos el estado y el Lazy Loading del hook personalizado
+export const CourseManagementModal = ({
+    courseId,
+    isOpen,
+    onClose,
+    onSyncCount // 2. Extraemos la función aquí
+}: CourseManagementModalProps) => {
+
+    // 3. Se la inyectamos al hook personalizado como tercer parámetro
     const {
         activeTab,
         setActiveTab,
@@ -16,8 +26,14 @@ export const CourseManagementModal = ({ courseId, isOpen, onClose }: CourseManag
         metrics,
         loading,
         fileError,
-        handleFileChange
-    } = useCourseManagement(courseId, isOpen);
+        handleFileChange,
+        selectedStudentId,
+        setSelectedStudentId,
+        selectedFile,
+        isSubmitting,
+        uploadSuccessMessage,
+        handleUploadDocument
+    } = useCourseManagement(courseId, isOpen, onSyncCount);
 
     if (!isOpen || courseId === null) return null;
 
@@ -129,11 +145,12 @@ export const CourseManagementModal = ({ courseId, isOpen, onClose }: CourseManag
                                     )}
                                 </div>
                             )}
+
                             {/* PESTAÑA: TRABAJOS Y EXÁMENES [DOCUMENT MANAGER SENDER + VALIDACIÓN PDF ADR-25] */}
                             {activeTab === 'trabajos' && (
                                 <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm max-w-xl mx-auto">
                                     <div className="mb-5">
-                                        <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">
+                                        <h3 className="text-xs font-bold text-green-700 uppercase tracking-wider mb-1">
                                             Document Manager (Sender Mode)
                                         </h3>
                                         <p className="text-xs text-slate-400">
@@ -142,6 +159,26 @@ export const CourseManagementModal = ({ courseId, isOpen, onClose }: CourseManag
                                     </div>
 
                                     <div className="space-y-4">
+                                        {/* NUEVO SELECTOR DE DESTINATARIO (Aquí es donde usamos las variables) */}
+                                        <div>
+                                            <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
+                                                Seleccionar Destinatario del Documento
+                                            </label>
+                                            <select
+                                                value={selectedStudentId}
+                                                onChange={(e) => setSelectedStudentId(e.target.value)}
+                                                className="w-full text-xs text-slate-700 border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:outline-none focus:border-blue-500 font-medium"
+                                            >
+                                                <option value="0">✨ Toda la clase (Envío masivo)</option>
+                                                {students.map((student) => (
+                                                    <option key={student.studentId} value={student.studentId}>
+                                                        👤 {student.fullName} ({student.email})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {/* SELECCIÓN DE ARCHIVO (Ya existente debajo) */}
                                         <div>
                                             <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
                                                 Seleccionar Documento Académico Oficial
@@ -160,16 +197,22 @@ export const CourseManagementModal = ({ courseId, isOpen, onClose }: CourseManag
                                             </div>
                                         )}
 
-                                        <button
-                                            disabled={!!fileError}
-                                            className="w-full bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 text-white text-xs font-bold py-2.5 px-4 rounded-lg transition-colors shadow-sm cursor-pointer disabled:cursor-not-allowed"
-                                        >
-                                            Transmitir y Publicar Documento
-                                        </button>
+                                        {/* Inyectar justo aquí el NUEVO MENSAJE DE ÉXITO EN COLOR VERDE */}
+                                        {uploadSuccessMessage && (
+                                            <div className="p-2.5 bg-green-50 border border-green-100 rounded-lg text-[11px] text-green-700 font-bold">
+                                                ✓ {uploadSuccessMessage}
+                                            </div>
+                                        )}
+                                        <GenericButton
+                                            variant="primary"
+                                            label={isSubmitting ? "Transmitiendo Documento..." : "Transmitir y Publicar Documento"}
+                                            disabled={isSubmitting || !selectedFile || !!fileError} // Bloqueado si sube o no hay archivo seleccionado
+                                            onClick={handleUploadDocument} // Dispara la subida real en el hook
+                                            className="w-full text-xs! font-bold! py-2.5! px-4! rounded-lg! bg-blue-600! hover:bg-blue-700! text-white! justify-center disabled:bg-slate-300!"
+                                        />
                                     </div>
                                 </div>
                             )}
-
                             {/* PESTAÑA: MÉTRICAS GLOBALES */}
                             {activeTab === 'metricas' && (
                                 <div className="max-w-md mx-auto bg-white p-6 rounded-xl border border-slate-100 shadow-sm space-y-4">

@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // 1. Añadimos useEffect aquí
 import { BookOpen, ArrowRight, Activity } from 'lucide-react';
-import GenericButton from '../../../components/ui/genericButton/GenericButton';
 import GenericCard from '../../../components/ui/genericCard/GenericCard';
 import ProfessorLayout from '../../layouts/DashboardLayout';
+import TaughtCoursesGrid from './components/TaughtCoursesGrid';
 
 // Importación del componente core unificado según [ADR-13]
 import GenericHeader from '../../../components/ui/genericHeader/GenericHeader';
@@ -13,15 +13,54 @@ import { CourseManagementModal } from './components/CourseManagementModal';
 // IMPORTACIÓN CENTRALIZADA DE DOMINIOS [DRY]
 import type { TaughtCourse, TeacherMetric } from '../../../services/userDomains';
 
+// 2. Importamos el servicio para contar los alumnos de raíz
+import { getActiveStudentsByCourse } from '../../../services/evaluationService';
+
 const ProfessorDashboard = () => {
     // Estado reactivo unificado plano (NotebookLM) para controlar el modal
     const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
 
     // 1. ESTADO DE ASIGNATURAS IMPARTIDAS POR EL PROFESOR
-    const [myCourses] = useState<TaughtCourse[]>([
-        { id: 1, title: "Desarrollo Backend con Spring Boot y Java", studentsCount: 45, averageProgress: 75, category: "Programación" },
-        { id: 3, title: "Persistencia de Datos con PostgreSQL y Hibernate", studentsCount: 28, averageProgress: 60, category: "Bases de Datos" }
+    const [myCourses, setMyCourses] = useState<TaughtCourse[]>([
+        { id: 1, title: "Desarrollo Backend con Spring Boot y Java", studentsCount: 0, averageProgress: 75, category: "Programación" },
+        { id: 3, title: "Persistencia de Datos con PostgreSQL y Hibernate", studentsCount: 0, averageProgress: 60, category: "Bases de Datos" }
     ]);
+
+    // 3. EFECTO DE CARGA INICIAL: Hidratar los contadores de alumnos reales nada más abrir la página
+    useEffect(() => {
+        const loadRealStudentCounts = async () => {
+            try {
+                // Mapeamos los cursos y traemos la longitud real de alumnos de cada uno en paralelo
+                const updatedCourses = await Promise.all(
+                    myCourses.map(async (course) => {
+                        const studentsData = await getActiveStudentsByCourse(course.id);
+                        return {
+                            ...course,
+                            studentsCount: studentsData.length // Reemplaza el valor estático por la cantidad real de la API
+                        };
+                    })
+                );
+                setMyCourses(updatedCourses);
+            } catch (error) {
+                console.error("Error cargando los contadores reales en el Dashboard:", error);
+            }
+        };
+
+        loadRealStudentCounts();
+        // Se ejecuta una sola vez al montar el componente de forma segura
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Función intermedia para actualizar el contador real enviado desde el modal (mantiene sincronía si hay cambios dentro)
+    const handleSyncCount = (courseId: number, realCount: number) => {
+        setMyCourses(prevCourses =>
+            prevCourses.map(course =>
+                course.id === courseId
+                    ? { ...course, studentsCount: realCount }
+                    : course
+            )
+        );
+    };
 
     // 2. ESTADO DE MÉTRICAS Y CONTROL DE ALUMNOS
     const [metrics] = useState<TeacherMetric[]>([
@@ -52,61 +91,17 @@ const ProfessorDashboard = () => {
                     <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                         <BookOpen size={20} className="text-blue-600" />
                         <span>Tus asignaturas asignadas</span>
-                        <span className="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-bold">{myCourses.length}</span>
+                        <span className="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-bold">
+                            {myCourses.length}
+                        </span>
                     </h2>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {myCourses.map((course) => {
-                            const progressPct = course.averageProgress;
-                            let tailwindWidthClass = 'w-0';
-
-                            if (progressPct >= 100) tailwindWidthClass = 'w-full';
-                            else if (progressPct >= 90) tailwindWidthClass = 'w-11/12';
-                            else if (progressPct >= 80) tailwindWidthClass = 'w-4/5';
-                            else if (progressPct >= 75) tailwindWidthClass = 'w-3/4';
-                            else if (progressPct >= 70) tailwindWidthClass = 'w-8/12';
-                            else if (progressPct >= 60) tailwindWidthClass = 'w-3/5';
-                            else if (progressPct >= 50) tailwindWidthClass = 'w-1/2';
-                            else if (progressPct >= 40) tailwindWidthClass = 'w-2/5';
-                            else if (progressPct >= 30) tailwindWidthClass = 'w-3/12';
-                            else if (progressPct >= 25) tailwindWidthClass = 'w-1/4';
-                            else if (progressPct >= 20) tailwindWidthClass = 'w-2/12';
-                            else if (progressPct >= 10) tailwindWidthClass = 'w-1/12';
-
-                            return (
-                                <GenericCard key={course.id}>
-                                    <div className="mb-4">
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-slate-100 text-slate-600">
-                                            {course.category}
-                                        </span>
-                                        <h3 className="text-base font-bold text-slate-800 leading-tight mt-2">
-                                            {course.title}
-                                        </h3>
-                                        <p className="text-xs text-slate-400 mt-1">
-                                            Total: {course.studentsCount} alumnos matriculados
-                                        </p>
-                                    </div>
-
-                                    <div className="mt-4 pt-3 border-t border-slate-50">
-                                        <div className="flex justify-between text-xs text-slate-500 mb-1">
-                                            <span>Progreso medio del grupo</span>
-                                            <span className="font-bold text-blue-600">{course.averageProgress}%</span>
-                                        </div>
-                                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
-                                            <div className={`bg-blue-600 h-full transition-all duration-500 ${tailwindWidthClass}`} />
-                                        </div>
-                                        <GenericButton
-                                            variant="dark"
-                                            label="Gestionar Curso"
-                                            icon={<ArrowRight size={14} />}
-                                            className="w-full flex-row-reverse! gap-1! text-xs! font-bold! py-2! px-3! rounded-lg! justify-center"
-                                            onClick={() => setSelectedCourseId(course.id)}
-                                        />
-                                    </div>
-                                </GenericCard>
-                            );
-                        })}
-                    </div>
+                    {/* Inyección del nuevo componente modularizado */}
+                    <TaughtCoursesGrid
+                        courses={myCourses}
+                        onManageCourse={(id: number) => setSelectedCourseId(id)}
+                        actionIcon={<ArrowRight size={14} />}
+                    />
                 </div>
 
                 {/* COLUMNA DERECHA: RESUMEN DE MÉTRICAS */}
@@ -147,11 +142,12 @@ const ProfessorDashboard = () => {
 
             </div>
 
-            {/* Inyección limpia del modal con sus propiedades exactas */}
+            {/* Inyección limpia del modal con la nueva propiedad añadida */}
             <CourseManagementModal
                 courseId={selectedCourseId}
                 isOpen={selectedCourseId !== null}
                 onClose={() => setSelectedCourseId(null)}
+                onSyncCount={handleSyncCount}
             />
         </ProfessorLayout>
     );

@@ -520,4 +520,113 @@ public class DocumentController {
                 "role", user.getRole() != null ? user.getRole().name() : "UNKNOWN");
     }
 
+    /**
+     * [NUEVO ENDPOINT EXCLUSIVO PARA PROFESOR]: Permite transmitir guías, temarios
+     * o exámenes
+     * de forma dirigida a un alumno concreto o masiva a toda la clase (receiverId =
+     * 0).
+     */
+    @PostMapping("/professor-upload")
+    public ResponseEntity<?> professorUploadDocument(
+            Authentication authentication,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("courseId") Long courseId,
+            @RequestParam("receiverId") Long receiverId) {
+
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            if (file == null || file.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "El archivo transmitido está vacío o es inválido."));
+            }
+
+            Users currentUser = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Usuario profesor emisor no encontrado."));
+
+            // Almacenamos el archivo una sola vez físicamente en el disco
+            String relativePath = fileStorageService.storeFile(file, "documents");
+            String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
+
+            // CASO A: ENVÍO MASIVO A TODA LA CLASE (receiverId == 0)
+            if (receiverId == 0) {
+                // Buscamos todas las matrículas activas de la asignatura seleccionada
+                List<Enrollment> classEnrollments = enrollmentRepository.findAll().stream()
+                        .filter(e -> e.getCourse() != null && Objects.equals(e.getCourse().getCourse_id(), courseId))
+                        .toList();
+
+                if (classEnrollments.isEmpty()) {
+                    return ResponseEntity.badRequest()
+                            .body(Map.of("error",
+                                    "No se puede realizar un envío masivo porque no hay alumnos matriculados."));
+                }
+
+                // Generamos los metadatos para cada alumno matriculado de forma masiva
+                for (Enrollment enrollment : classEnrollments) {
+                    if (enrollment.getUser() != null) {
+                        Users classStudent = enrollment.getUser();
+
+                        // Registro de carpeta RECEIVED para que le salte la notificación en la campana
+                        DocumentMetadata bulkReceived = new DocumentMetadata();
+                        bulkReceived.setFilename(relativePath);
+                        bulkReceived.setOriginalname(cleanOriginalName);
+                        bulkReceived.setSender(currentUser);
+                        bulkReceived.setReceiver(classStudent);
+                        bulkReceived.setFolder_type(FolderType.RECEIVED);
+                        bulkReceived.setRead(false);
+                        documentMetadataRepository.save(bulkReceived);
+                    }
+                }
+
+                // Guardamos un único registro SENT global de control para el profesor
+                DocumentMetadata bulkSent = new DocumentMetadata();
+                bulkSent.setFilename(relativePath);
+                bulkSent.setOriginalname(cleanOriginalName);
+                bulkSent.setSender(currentUser);
+                bulkSent.setReceiver(null); // NULL indica que se transmitió al tablón masivo del grupo
+                bulkSent.setFolder_type(FolderType.SENT);
+                documentMetadataRepository.save(bulkSent);
+
+                return ResponseEntity.ok(Map.of(
+                        "message", "Documento transmitido con éxito de forma masiva a toda la clase",
+                        "totalStudents", classEnrollments.size()));
+            }
+
+            // CASO B: ENVÍO SEGMENTADO INDIVIDUAL (receiverId > 0)
+            Users receiverUser = userRepository.findById(receiverId)
+                    .orElseThrow(() -> new RuntimeException("El alumno destinatario seleccionado no existe."));
+
+            DocumentMetadata singleSent = new DocumentMetadata();
+            singleSent.setFilename(relativePath);
+            singleSent.setOriginalname(cleanOriginalName);
+            singleSent.setSender(currentUser);
+            singleSent.setReceiver(receiverUser);
+            singleSent.setFolder_type(FolderType.SENT);
+            documentMetadataRepository.save(singleSent);
+
+            DocumentMetadata singleReceived = new DocumentMetadata();
+            singleReceived.setFilename(relativePath);
+            singleReceived.setOriginalname(cleanOriginalName);
+            singleReceived.setSender(currentUser);
+            singleReceived.setReceiver(receiverUser);
+            singleReceived.setFolder_type(FolderType.RECEIVED);
+            singleReceived.setRead(false);
+            documentMetadataRepository.save(singleReceived);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Documento enviado con éxito de forma individual al alumno",
+                    "receiver", receiverUser.getUsername()));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error crítico al procesar la transmisión académica del profesor",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
 }
