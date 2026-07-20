@@ -210,4 +210,57 @@ describe('CourseManagementModal - Suite de Pruebas Unitarias', () => {
             expect(element.style.width).toBe('100%');
         });
     });
+
+    it('debe mapear el listado de alumnos en el desplegable de destinatarios y habilitar el envío al seleccionar un alumno y un PDF legítimo', async () => {
+        // 1. Hidratamos los mocks con datos de prueba estables
+        mockGetActiveStudents.mockResolvedValue(mockStudentsData);
+        mockGetCourseMetrics.mockResolvedValue(mockMetricsData);
+
+        const { default: userEvent } = await import('@testing-library/user-event');
+
+        render(
+            <CourseManagementModal
+                courseId={mockCourseId}
+                isOpen={true}
+                onClose={mockOnClose}
+            />
+        );
+
+        // Esperamos a que concluya el Lazy Loading de la primera pestaña
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /Alumnado y Rendimiento/i })).toBeInTheDocument();
+        });
+
+        // 2. Navegamos de forma interactiva a la pestaña de Trabajos y Exámenes
+        const tabTrabajos = screen.getByRole('button', { name: /Trabajos y Exámenes/i });
+        await userEvent.click(tabTrabajos);
+
+        // 3. Capturamos el selector de destinatarios mediante su rol nativo de accesibilidad
+        const selectDestinatario = screen.getByRole('combobox') as HTMLSelectElement;
+        expect(selectDestinatario).toBeInTheDocument();
+        expect(selectDestinatario.value).toBe('0'); // Valor por defecto: Toda la clase
+
+        // 4. Simulamos la acción del docente seleccionando al alumno 'Juan Pérez Alumno' (ID: 101)
+        await userEvent.selectOptions(selectDestinatario, '101');
+        expect(selectDestinatario.value).toBe('101');
+
+        // 5. Capturamos el botón y verificamos que sigue deshabilitado porque falta el archivo
+        const btnEnviar = screen.getByRole('button', { name: /Transmitir y Publicar Documento/i });
+        expect(btnEnviar).toBeDisabled();
+
+        // 6. Cargamos un archivo PDF completamente válido simulando la directiva [ADR-25]
+        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+        const fakePdfFile = new File(['%PDF-1.4 ... contenido ficticio'], 'syllabus_backend.pdf', { type: 'application/pdf' });
+
+        Object.defineProperty(fileInput, 'files', {
+            value: [fakePdfFile],
+            writable: true
+        });
+        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+        // 7. Evaluamos de forma asíncrona que el botón pase a estar habilitado al cumplir todas las condiciones
+        await waitFor(() => {
+            expect(btnEnviar).toBeEnabled();
+        });
+    });
 });
