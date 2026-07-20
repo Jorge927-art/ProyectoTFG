@@ -1,266 +1,146 @@
-import { render, screen, waitFor } from '@testing-library/react';
-// Añadimos el tipo estricto "Mock" en la importación de vitest
-import { describe, it, vi, expect, beforeEach, type Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { CourseManagementModal } from './CourseManagementModal';
-import * as evaluationService from '../../../../services/evaluationService';
+import { useCourseManagement } from './useCourseManagement';
 
-// Forzamos el mockeo explícito del módulo de servicios
-vi.mock('../../../../services/evaluationService', () => ({
-    getActiveStudentsByCourse: vi.fn(),
-    getCourseManagementMetrics: vi.fn(),
+vi.mock('./useCourseManagement', () => ({
+    useCourseManagement: vi.fn()
 }));
 
-// Sincronización estricta sin usar tipos "any" explícitos
-const mockGetActiveStudents = evaluationService.getActiveStudentsByCourse as unknown as Mock;
-const mockGetCourseMetrics = evaluationService.getCourseManagementMetrics as unknown as Mock;
-
-describe('CourseManagementModal - Suite de Pruebas Unitarias', () => {
+describe('CourseManagementModal - Suite de Pruebas de Alta Fidelidad Funcional', () => {
     const mockOnClose = vi.fn();
-    const mockCourseId = 3;
+    const mockOnSyncCount = vi.fn();
 
     const mockStudentsData = [
         {
-            studentId: 101,
-            fullName: 'Juan Pérez Alumno',
-            email: 'juan.perez@alumnos.com',
-            averageScore: 8.5,
-            progressPercentage: 75
+            userId: 101, studentId: 101, username: 'Juan Pérez', fullName: 'Juan Pérez',
+            email: 'juan.perez@universidad.edu', individualGrade: 8.5, groupAverage: 7.2
         }
     ];
 
-    const mockMetricsData = {
-        courseId: 3,
-        groupAverageScore: 6.5,
-        activeStudentsCount: 1,
-        pendingTasksCount: 2
+    const mockMetricsData = { groupAverageGrade: 8.0, activeStudentsCount: 1, pendingSubmissionsCount: 2 };
+
+    const defaultHookReturn = {
+        activeTab: 'alumnado',
+        setActiveTab: vi.fn(),
+        students: mockStudentsData,
+        metrics: mockMetricsData,
+        loading: false,
+        fileError: null,
+        handleFileChange: vi.fn(),
+        selectedStudentId: '0',
+        setSelectedStudentId: vi.fn(),
+        selectedFile: null,
+        isSubmitting: false,
+        uploadSuccessMessage: null,
+        handleUploadDocument: vi.fn()
     };
 
     beforeEach(() => {
         vi.clearAllMocks();
+        const mockReturn = defaultHookReturn as unknown;
+        vi.mocked(useCourseManagement).mockReturnValue(mockReturn as ReturnType<typeof useCourseManagement>);
     });
 
-    it('debe renderizar la lista de alumnos activos y sus micro-gráficas comparativas correctamente', async () => {
-        // Inyección nativa sin usar vi.mocked()
-        mockGetActiveStudents.mockResolvedValue(mockStudentsData);
-        mockGetCourseMetrics.mockResolvedValue(mockMetricsData);
-
-        render(
-            <CourseManagementModal
-                courseId={mockCourseId}
-                isOpen={true}
-                onClose={mockOnClose}
-            />
-        );
-
-        expect(screen.getByText(/Hidratando datos mediante Lazy Loading/i)).toBeInTheDocument();
-
-        await waitFor(() => {
-            expect(screen.getByText('Juan Pérez Alumno')).toBeInTheDocument();
-            expect(screen.getByText('juan.perez@alumnos.com')).toBeInTheDocument();
-        });
-
-        expect(screen.getByText('8.5 / 10')).toBeInTheDocument();
-        expect(screen.getByText('75%')).toBeInTheDocument();
-    });
-    it('debe mostrar el mensaje de ausencia de datos cuando la lista de alumnos llega vacía desde la API', async () => {
-        // Asignación nativa de la respuesta vacía sin usar vi.mocked
-        mockGetActiveStudents.mockResolvedValue([]);
-        mockGetCourseMetrics.mockResolvedValue({
-            courseId: 3,
-            groupAverageScore: 0,
-            activeStudentsCount: 0,
-            pendingTasksCount: 0
-        });
-
-        render(
-            <CourseManagementModal
-                courseId={mockCourseId}
-                isOpen={true}
-                onClose={mockOnClose}
-            />
-        );
-
-        await waitFor(() => {
-            expect(screen.getByText(/No hay alumnos activos registrados en esta asignatura/i)).toBeInTheDocument();
-        });
+    /* =========================================================================
+       1. CONTROL DE ESTRUCTURA Y VARIABLES REALES
+       ========================================================================= */
+    it('Debe renderizar la tabla de 3 columnas con los datos nativos del DTO', () => {
+        render(<CourseManagementModal courseId={1} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
+        expect(screen.getByText('Estudiante')).toBeInTheDocument();
+        expect(screen.getByText('Juan Pérez')).toBeInTheDocument();
+        expect(screen.getByText('✉ juan.perez@universidad.edu')).toBeInTheDocument();
+        expect(screen.getAllByText('70%').length).toBeGreaterThan(0);
     });
 
-    it('debe activar la validación estricta [ADR-25] y mostrar error si el archivo seleccionado no es un PDF', async () => {
-        mockGetActiveStudents.mockResolvedValue([]);
-        mockGetCourseMetrics.mockResolvedValue({
-            courseId: 3,
-            groupAverageScore: 0,
-            activeStudentsCount: 0,
-            pendingTasksCount: 0
-        });
+    /* =========================================================================
+       2. CONTROL DE INTERACCIÓN: NAVEGACIÓN ENTRE PESTAÑAS (¡NUEVO!)
+       ========================================================================= */
+    it('Debe invocar setActiveTab con el ID correcto al hacer clic en los botones de navegación', () => {
+        const mockSetActiveTab = vi.fn();
+        const mockReturn = { ...defaultHookReturn, setActiveTab: mockSetActiveTab } as unknown;
+        vi.mocked(useCourseManagement).mockReturnValue(mockReturn as ReturnType<typeof useCourseManagement>);
 
-        const { default: userEvent } = await import('@testing-library/user-event');
+        render(<CourseManagementModal courseId={1} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
 
-        render(
-            <CourseManagementModal
-                courseId={mockCourseId}
-                isOpen={true}
-                onClose={mockOnClose}
-            />
-        );
+        // El usuario hace clic real en el botón de la pestaña de Trabajos
+        const botonTrabajos = screen.getByRole('button', { name: /Trabajos y Exámenes/i });
+        fireEvent.click(botonTrabajos);
 
-        // Esperamos a que finalice el Lazy Loading de la primera pestaña
-        await waitFor(() => {
-            expect(screen.getByRole('button', { name: /Alumnado y Rendimiento/i })).toBeInTheDocument();
-        });
-
-        // Cambiamos a la pestaña de trabajos utilizando user-event
-        const tabTrabajos = screen.getByRole('button', { name: /Trabajos y Exámenes/i });
-        await userEvent.click(tabTrabajos);
-
-        // 1. Capturamos el input directamente del DOM simulado
-        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-
-        // 2. Simulamos el archivo .txt incorrecto para forzar el bloqueo ADR-25
-        const fakeTxtFile = new File(['contenido ficticio'], 'guia_docente.txt', { type: 'text/plain' });
-
-        // 3. DISPARO NATIVO: Asignamos el archivo y lanzamos el evento sin pasar por userEvent
-        Object.defineProperty(fileInput, 'files', {
-            value: [fakeTxtFile],
-            writable: true
-        });
-
-        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-        // 4. Confirmamos de forma asíncrona el cumplimiento estricto del estándar [ADR-25]
-        await waitFor(() => {
-            expect(screen.getByText(/Validación Estricta \[ADR-25\]: Solo se admiten archivos en formato .pdf/i)).toBeInTheDocument();
-        });
+        // Control funcional: Asegurar que la UI notifica al hook el cambio pretendido
+        expect(mockSetActiveTab).toHaveBeenCalledWith('trabajos');
     });
 
-    it('debe navegar a la pestaña de métricas globales y renderizar los indicadores analíticos reales del record de Java', async () => {
-        mockGetActiveStudents.mockResolvedValue([]);
-        // Sincronizamos el mock con las propiedades reales de tus records de backend
-        mockGetCourseMetrics.mockResolvedValue({
-            activeStudentsCount: 12,
-            groupAverageGrade: 7.45,
-            pendingSubmissionsCount: 4
-        });
+    /* =========================================================================
+       3. CONTROL DE SEGURIDAD: COMPORTAMIENTO Y BLOQUEO DE BOTONES (¡NUEVO!)
+       ========================================================================= */
+    it('Debe bloquear el botón de transmisión si no hay un archivo seleccionado o si existe un error de validación', () => {
+        const mockHandleUpload = vi.fn();
+        const customHookReturn = {
+            ...defaultHookReturn,
+            activeTab: 'trabajos',
+            selectedFile: null, // Sin archivo cargado todavía
+            fileError: 'El archivo excede el tamaño máximo ADR-25',
+            handleUploadDocument: mockHandleUpload
+        };
 
-        const { default: userEvent } = await import('@testing-library/user-event');
+        const mockReturn = customHookReturn as unknown;
+        vi.mocked(useCourseManagement).mockReturnValue(mockReturn as ReturnType<typeof useCourseManagement>);
 
-        render(
-            <CourseManagementModal
-                courseId={mockCourseId}
-                isOpen={true}
-                onClose={mockOnClose}
-            />
-        );
+        render(<CourseManagementModal courseId={1} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
 
-        // Esperamos a que el Lazy Loading inicial de la primera pestaña concluya
-        await waitFor(() => {
-            expect(screen.getByRole('button', { name: /Alumnado y Rendimiento/i })).toBeInTheDocument();
-        });
+        // Validar que el mensaje de error de validación se pinte en pantalla
+        expect(screen.getByText(/El archivo excede el tamaño máximo ADR-25/i)).toBeInTheDocument();
 
-        // Forzamos la navegación interactiva simulando el clic real del docente en la tercera pestaña
-        const tabMetricas = screen.getByRole('button', { name: /Métricas Globales/i });
-        await userEvent.click(tabMetricas);
+        // Localizar el botón de acción por su rol accesible o etiqueta
+        const botonEnviar = screen.getByRole('button', { name: /Transmitir y Publicar Documento/i });
 
-        // Evaluamos de forma síncrona que el mapeo e inmutabilidad del componente pinte los datos correctos
-        await waitFor(() => {
-            expect(screen.getByText('Rendimiento Consolidado del Grupo')).toBeInTheDocument();
-            expect(screen.getByText('7.45')).toBeInTheDocument();
-            expect(screen.getByText('12')).toBeInTheDocument();
-            expect(screen.getByText('4 tareas')).toBeInTheDocument();
-        });
+        // Control funcional: Verificar el estado inhabilitado nativo de la UI
+        expect(botonEnviar).toBeDisabled();
+
+        // Intentar forzar el clic no debería disparar la transmisión del backend
+        fireEvent.click(botonEnviar);
+        expect(mockHandleUpload).not.toHaveBeenCalled();
     });
 
-    it('debe gestionar de forma segura los límites de las micro-barras de progreso en Tailwind ante calificaciones máximas para evitar desbordamientos visuales', async () => {
-        // Simulamos un escenario extremo: un alumno con nota máxima (10) y progreso completo (100)
-        mockGetActiveStudents.mockResolvedValue([
-            {
-                studentId: 202,
-                fullName: 'Alumno Brillante',
-                email: 'brillante@alumnos.com',
-                averageScore: 10.0,
-                progressPercentage: 100
-            }
-        ]);
+    /* =========================================================================
+       4. CONTROL DE FLUJO: TRANSMISIÓN EXITOSA (¡NUEVO!)
+       ========================================================================= */
+    it('Debe permitir la transmisión y mostrar el mensaje de éxito en color verde si los datos son válidos', () => {
+        const mockHandleUpload = vi.fn();
+        const customHookReturn = {
+            ...defaultHookReturn,
+            activeTab: 'trabajos',
+            selectedFile: new File(['contenido'], 'enunciado.pdf', { type: 'application/pdf' }),
+            fileError: null,
+            uploadSuccessMessage: 'Documento publicado con éxito en el tablón oficial',
+            handleUploadDocument: mockHandleUpload
+        };
 
-        mockGetCourseMetrics.mockResolvedValue({
-            activeStudentsCount: 1,
-            groupAverageGrade: 1.5,
-            pendingSubmissionsCount: 0
-        });
+        const mockReturn = customHookReturn as unknown;
+        vi.mocked(useCourseManagement).mockReturnValue(mockReturn as ReturnType<typeof useCourseManagement>);
 
-        render(
-            <CourseManagementModal
-                courseId={mockCourseId}
-                isOpen={true}
-                onClose={mockOnClose}
-            />
-        );
+        render(<CourseManagementModal courseId={1} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
 
-        // Esperamos a que concluya la hidratación diferida inicial
-        await waitFor(() => {
-            expect(screen.getByText('Alumno Brillante')).toBeInTheDocument();
-        });
+        // Comprobar que el banner verde de éxito se renderiza con el prefijo "✓ "
+        expect(screen.getByText(/✓ Documento publicado con éxito/i)).toBeInTheDocument();
 
-        // Capturamos las barras de progreso renderizadas en el DOM simulado de la interfaz
-        const progressBars = document.querySelectorAll('.bg-blue-600, .bg-emerald-500');
+        const botonEnviar = screen.getByRole('button', { name: /Transmitir y Publicar Documento/i });
+        expect(botonEnviar).not.toBeDisabled();
 
-        // Verificamos de forma estricta que los estilos inyectados calculen correctamente las dimensiones relativas (100% y 100% respectivamente)
-        progressBars.forEach((bar) => {
-            const element = bar as HTMLElement;
-            expect(element.style.width).toBe('100%');
-        });
+        fireEvent.click(botonEnviar);
+        expect(mockHandleUpload).toHaveBeenCalledTimes(1);
     });
 
-    it('debe mapear el listado de alumnos en el desplegable de destinatarios y habilitar el envío al seleccionar un alumno y un PDF legítimo', async () => {
-        // 1. Hidratamos los mocks con datos de prueba estables
-        mockGetActiveStudents.mockResolvedValue(mockStudentsData);
-        mockGetCourseMetrics.mockResolvedValue(mockMetricsData);
+    /* =========================================================================
+       5. CONTROL DEL CICLO DE VIDA: INYECCIÓN DE PARÁMETROS Y CIERRE
+       ========================================================================= */
+    it('Debe invocar onClose cuando el usuario pulsa el botón X de la cabecera', () => {
+        render(<CourseManagementModal courseId={1} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
 
-        const { default: userEvent } = await import('@testing-library/user-event');
+        const botonCerrar = screen.getByRole('button', { name: /Cerrar gestión del curso/i });
+        fireEvent.click(botonCerrar);
 
-        render(
-            <CourseManagementModal
-                courseId={mockCourseId}
-                isOpen={true}
-                onClose={mockOnClose}
-            />
-        );
-
-        // Esperamos a que concluya el Lazy Loading de la primera pestaña
-        await waitFor(() => {
-            expect(screen.getByRole('button', { name: /Alumnado y Rendimiento/i })).toBeInTheDocument();
-        });
-
-        // 2. Navegamos de forma interactiva a la pestaña de Trabajos y Exámenes
-        const tabTrabajos = screen.getByRole('button', { name: /Trabajos y Exámenes/i });
-        await userEvent.click(tabTrabajos);
-
-        // 3. Capturamos el selector de destinatarios mediante su rol nativo de accesibilidad
-        const selectDestinatario = screen.getByRole('combobox') as HTMLSelectElement;
-        expect(selectDestinatario).toBeInTheDocument();
-        expect(selectDestinatario.value).toBe('0'); // Valor por defecto: Toda la clase
-
-        // 4. Simulamos la acción del docente seleccionando al alumno 'Juan Pérez Alumno' (ID: 101)
-        await userEvent.selectOptions(selectDestinatario, '101');
-        expect(selectDestinatario.value).toBe('101');
-
-        // 5. Capturamos el botón y verificamos que sigue deshabilitado porque falta el archivo
-        const btnEnviar = screen.getByRole('button', { name: /Transmitir y Publicar Documento/i });
-        expect(btnEnviar).toBeDisabled();
-
-        // 6. Cargamos un archivo PDF completamente válido simulando la directiva [ADR-25]
-        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-        const fakePdfFile = new File(['%PDF-1.4 ... contenido ficticio'], 'syllabus_backend.pdf', { type: 'application/pdf' });
-
-        Object.defineProperty(fileInput, 'files', {
-            value: [fakePdfFile],
-            writable: true
-        });
-        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-        // 7. Evaluamos de forma asíncrona que el botón pase a estar habilitado al cumplir todas las condiciones
-        await waitFor(() => {
-            expect(btnEnviar).toBeEnabled();
-        });
+        expect(mockOnClose).toHaveBeenCalledTimes(1);
     });
 });

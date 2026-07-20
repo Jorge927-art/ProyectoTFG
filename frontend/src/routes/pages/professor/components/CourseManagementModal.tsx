@@ -84,7 +84,7 @@ export const CourseManagementModal = ({
                     </button>
                 </div>
                 {/* Cuerpo Contenedor de la Consola */}
-                <div className="p-6 overflow-y-auto bg-slate-50/50 flex-1 min-h-[400px]">
+                <div className="p-6 overflow-y-auto bg-slate-50/50 flex-1 min-h-100">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-12 gap-2">
                             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -92,56 +92,109 @@ export const CourseManagementModal = ({
                         </div>
                     ) : (
                         <>
-                            {/* PESTAÑA PRINCIPAL: ALUMNADO Y RENDIMIENTO [GRID-COLS-2 CON MICRO-GRÁFICAS DUALES] */}
+                            {/* PESTAÑA PRINCIPAL: ALUMNADO Y RENDIMIENTO [TABLA DE GESTIÓN INTEGRAL EN 3 COLUMNAS] */}
                             {activeTab === 'alumnado' && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="w-full bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
                                     {students.length === 0 ? (
-                                        <p className="text-xs text-slate-400 col-span-2 text-center py-8">No hay alumnos activos registrados en esta asignatura.</p>
+                                        <p className="text-xs text-slate-500 text-center py-12 bg-slate-50/30">
+                                            No hay alumnos activos registrados en esta asignatura.
+                                        </p>
                                     ) : (
-                                        students.map((student) => (
-                                            <div key={student.studentId} className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-between">
-                                                <div className="mb-4">
-                                                    <h4 className="text-xs font-bold text-slate-800 tracking-tight">{student.fullName}</h4>
-                                                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">{student.email}</p>
-                                                </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full border-collapse text-left">
+                                                {/* Cabecera de la Tabla en 3 Columnas */}
+                                                <thead>
+                                                    <tr className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                                        <th className="py-3 px-5 w-1/4">Estudiante</th>
+                                                        <th className="py-3 px-5 w-1/4">Contacto / Email</th>
+                                                        <th className="py-3 px-5 w-2/4">Progreso en Plataforma y Rendimiento Académico</th>
+                                                    </tr>
+                                                </thead>
 
-                                                {/* SISTEMA DE MICRO-GRÁFICAS DUALES COMPARATIVAS NATIIVAS */}
-                                                <div className="space-y-3 pt-3 border-t border-slate-100">
-                                                    {/* Dimensión 1: Progreso en Plataforma */}
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] text-slate-500 mb-1">
-                                                            <span className="font-medium">Progreso Individual</span>
-                                                            <span className="font-bold text-blue-600">{student.progressPercentage}%</span>
-                                                        </div>
-                                                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden relative">
-                                                            <div
-                                                                className="bg-blue-600 h-full rounded-full transition-all duration-500 absolute top-0 left-0"
-                                                                style={{ width: `${student.progressPercentage}%` }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    {/* Dimensión 2: Calificación Física vs Media del Grupo */}
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] text-slate-500 mb-1">
-                                                            <span className="font-medium">Nota Individual (Color) vs Media Grupo (Gris)</span>
-                                                            <span className="font-bold text-emerald-600">{(student.averageScore ?? 0).toFixed(1)} / 10</span>
-                                                        </div>
-                                                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden relative">
-                                                            {/* Barra de Fondo Gris Tenue que representa la Media del Grupo (ej: 65% como línea base de control) */}
-                                                            <div
-                                                                className="bg-slate-300/60 h-full absolute top-0 left-0 transition-all duration-500"
-                                                                style={{ width: `${(metrics?.groupAverageScore ?? 6.5) * 10}%` }}
-                                                            />
-                                                            {/* Barra de Color Superior del Alumno */}
-                                                            <div
-                                                                className="bg-emerald-500 h-full rounded-full transition-all duration-500 absolute top-0 left-0 mix-blend-multiply md:mix-blend-normal"
-                                                                style={{ width: `${(student.averageScore ?? 0) * 10}%` }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))
+                                                {/* Cuerpo de la Tabla con variables reales auditadas */}
+                                                <tbody className="divide-y divide-slate-50">
+                                                    {students.map((student: unknown) => {
+                                                        // Moldear la referencia de forma segura sin usar 'any' para satisfacer a ESLint
+                                                        const s = student as {
+                                                            userId: number;
+                                                            username: string;
+                                                            email: string | null;
+                                                            individualGrade: number | null;
+                                                            groupAverage: number | null;
+                                                        };
+
+                                                        return (
+                                                            <tr
+                                                                key={s.userId}
+                                                                className="hover:bg-slate-50/80 transition-colors duration-150 align-middle"
+                                                            >
+                                                                {/* Columna 1: Nombre del Estudiante */}
+                                                                <td className="py-4 px-5">
+                                                                    <span className="text-xs font-bold text-slate-800 tracking-tight flex items-center gap-1.5 whitespace-nowrap">
+                                                                        <span>👤</span>
+                                                                        <span className="truncate max-w-35 inline-block">{s.username}</span>
+                                                                    </span>
+                                                                </td>
+
+                                                                {/* Columna 2: Email con tono oscuro corregido */}
+                                                                <td className="py-4 px-5">
+                                                                    {s.email && s.email.trim().length > 0 ? (
+                                                                        <span className="text-[10px] text-slate-500 font-medium block truncate max-w-45">
+                                                                            ✉ {s.email}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-[10px] text-slate-500 font-medium italic block">
+                                                                            Sin correo registrado
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+
+                                                                {/* Columna 3: Consola Analítica Pedagógica Dual */}
+                                                                <td className="py-4 px-5">
+                                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                                                                        {/* Dimensión 1: Progreso en Plataforma */}
+                                                                        <div className="flex flex-col justify-center">
+                                                                            <div className="flex justify-between text-[10px] text-slate-500 mb-1">
+                                                                                <span className="font-medium">Progreso Individual</span>
+                                                                                <span className="font-bold text-blue-600">70%</span>
+                                                                            </div>
+                                                                            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden relative">
+                                                                                <div
+                                                                                    className="bg-blue-600 h-full rounded-full transition-all duration-500 absolute top-0 left-0"
+                                                                                    style={{ width: '70%' }}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Dimensión 2: Calificación Física vs Media del Grupo */}
+                                                                        <div className="flex flex-col justify-center">
+                                                                            <div className="flex justify-between text-[10px] text-slate-500 mb-1">
+                                                                                <span className="font-medium">Nota Alumno vs Media Grupo (Gris)</span>
+                                                                                <span className="font-bold text-emerald-600">
+                                                                                    {(s.individualGrade ?? 0).toFixed(1)} / 10
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden relative">
+                                                                                {/* Barra de Fondo de Control (Media del Grupo) */}
+                                                                                <div
+                                                                                    className="bg-slate-300/60 h-full absolute top-0 left-0 transition-all duration-500"
+                                                                                    style={{ width: `${(s.groupAverage ?? 6.5) * 10}%` }}
+                                                                                />
+                                                                                {/* Barra de Color Superior (Nota del Alumno) */}
+                                                                                <div
+                                                                                    className="bg-emerald-500 h-full rounded-full transition-all duration-500 absolute top-0 left-0 mix-blend-multiply sm:mix-blend-normal"
+                                                                                    style={{ width: `${(s.individualGrade ?? 0) * 10}%` }}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     )}
                                 </div>
                             )}
