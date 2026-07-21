@@ -1,15 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CourseManagementModal } from './CourseManagementModal';
-import { useCourseManagement } from './useCourseManagement';
-
-vi.mock('./useCourseManagement', () => ({
-    useCourseManagement: vi.fn()
-}));
+import * as courseManagementModule from './useCourseManagement';
 
 describe('CourseManagementModal - Suite de Pruebas de Alta Fidelidad Funcional', () => {
     const mockOnClose = vi.fn();
     const mockOnSyncCount = vi.fn();
+    let useCourseManagementSpy: ReturnType<typeof vi.spyOn>;
 
     const mockStudentsData = [
         {
@@ -38,8 +35,9 @@ describe('CourseManagementModal - Suite de Pruebas de Alta Fidelidad Funcional',
 
     beforeEach(() => {
         vi.clearAllMocks();
+        useCourseManagementSpy = vi.spyOn(courseManagementModule, 'useCourseManagement');
         const mockReturn = defaultHookReturn as unknown;
-        vi.mocked(useCourseManagement).mockReturnValue(mockReturn as ReturnType<typeof useCourseManagement>);
+        useCourseManagementSpy.mockReturnValue(mockReturn as ReturnType<typeof courseManagementModule.useCourseManagement>);
     });
 
     /* =========================================================================
@@ -59,7 +57,7 @@ describe('CourseManagementModal - Suite de Pruebas de Alta Fidelidad Funcional',
     it('Debe invocar setActiveTab con el ID correcto al hacer clic en los botones de navegación', () => {
         const mockSetActiveTab = vi.fn();
         const mockReturn = { ...defaultHookReturn, setActiveTab: mockSetActiveTab } as unknown;
-        vi.mocked(useCourseManagement).mockReturnValue(mockReturn as ReturnType<typeof useCourseManagement>);
+        useCourseManagementSpy.mockReturnValue(mockReturn as ReturnType<typeof courseManagementModule.useCourseManagement>);
 
         render(<CourseManagementModal courseId={1} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
 
@@ -85,7 +83,7 @@ describe('CourseManagementModal - Suite de Pruebas de Alta Fidelidad Funcional',
         };
 
         const mockReturn = customHookReturn as unknown;
-        vi.mocked(useCourseManagement).mockReturnValue(mockReturn as ReturnType<typeof useCourseManagement>);
+        useCourseManagementSpy.mockReturnValue(mockReturn as ReturnType<typeof courseManagementModule.useCourseManagement>);
 
         render(<CourseManagementModal courseId={1} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
 
@@ -118,7 +116,7 @@ describe('CourseManagementModal - Suite de Pruebas de Alta Fidelidad Funcional',
         };
 
         const mockReturn = customHookReturn as unknown;
-        vi.mocked(useCourseManagement).mockReturnValue(mockReturn as ReturnType<typeof useCourseManagement>);
+        useCourseManagementSpy.mockReturnValue(mockReturn as ReturnType<typeof courseManagementModule.useCourseManagement>);
 
         render(<CourseManagementModal courseId={1} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
 

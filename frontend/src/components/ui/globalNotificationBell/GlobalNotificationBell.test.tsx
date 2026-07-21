@@ -1,27 +1,20 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
-import { describe, test, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, test, it, expect, vi, beforeEach } from 'vitest';
 import NotificationBell from './GlobalNotificationBell';
 import * as notificationsHook from './useNotifications';
 
-// Configuramos de forma nativa el mock del módulo perimetral de notificaciones para Vitest
-vi.mock('./useNotifications', () => ({
-    useNotifications: vi.fn()
-}));
-
 describe('NotificationBell - Suite de Alertas Académicas', () => {
     const mockRefresh = vi.fn();
+    let useNotificationsSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
         vi.clearAllMocks();
-    });
-
-    afterEach(() => {
-        vi.restoreAllMocks();
+        useNotificationsSpy = vi.spyOn(notificationsHook, 'useNotifications');
     });
 
     it('debe mostrar la campana en color slate neutro cuando NO hay alertas', () => {
-        vi.spyOn(notificationsHook, 'useNotifications').mockReturnValue({
+        useNotificationsSpy.mockReturnValue({
             alerts: [],
             documents: [],
             hasAlerts: false,
@@ -39,7 +32,7 @@ describe('NotificationBell - Suite de Alertas Académicas', () => {
     });
 
     it('debe cambiar la campana a ROJO parpadeante cuando existen alertas activas', () => {
-        vi.spyOn(notificationsHook, 'useNotifications').mockReturnValue({
+        useNotificationsSpy.mockReturnValue({
             alerts: [
                 { type: 'DOCUMENT_INBOX', title: 'Bandeja', message: '1 doc', redirectUrl: '/docs' }
             ],
@@ -58,7 +51,7 @@ describe('NotificationBell - Suite de Alertas Académicas', () => {
     });
 
     it('debe desplegar el panel flotante y listar las alertas al hacer clic', async () => {
-        vi.spyOn(notificationsHook, 'useNotifications').mockReturnValue({
+        useNotificationsSpy.mockReturnValue({
             alerts: [
                 { type: 'DOCUMENT_INBOX', title: 'Nuevo Documento', message: 'Tienes 1 documento pendiente', redirectUrl: '/docs' }
             ],
@@ -83,7 +76,7 @@ describe('NotificationBell - Suite de Alertas Académicas', () => {
     });
 
     test('Robustez Perimetral: Debe renderizar la campana en estado neutral ante un error 500 del backend sin congelar la interfaz', () => {
-        vi.spyOn(notificationsHook, 'useNotifications').mockReturnValue({
+        useNotificationsSpy.mockReturnValue({
             alerts: [],
             documents: [],
             hasAlerts: false,

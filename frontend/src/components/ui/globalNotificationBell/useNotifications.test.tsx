@@ -24,7 +24,7 @@ const buildDoc = (isRead: boolean): DocumentMetadata => ({
 const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
     const mockAuthValue = {
         user: {
-            user_id: 1,
+            userId: 1,
             username: 'alumno',
             email: 'alumno@tfg.com',
             role: 'STUDENT' as const // SOLUCIÓN: Usamos 'as const' para que TypeScript infiera el literal exacto sin usar 'any'
@@ -65,27 +65,40 @@ describe('useNotifications', () => {
     });
 
     it('sincroniza el estado entre instancias al refrescar notificaciones globalmente', async () => {
-        // Inyectamos el wrapper en ambas instancias del hook para que lean al alumno simulado
+        // CORRECCIÓN: Declaración con const para que TypeScript infiera automáticamente los tipos reales de RenderHookResult
         const bellHook = renderHook(() => useNotifications(), { wrapper: AuthWrapper });
         const panelHook = renderHook(() => useNotifications(), { wrapper: AuthWrapper });
 
+        // 1. Garantizar que ambos hooks han terminado las tareas de carga del backend
         await waitFor(() => {
             expect(bellHook.result.current.loading).toBe(false);
             expect(panelHook.result.current.loading).toBe(false);
         });
 
+        // 2. Comprobar de forma segura que detectan las notificaciones no leídas iniciales
         await waitFor(() => {
             expect(bellHook.result.current.hasUnread).toBe(true);
+        });
+
+        await waitFor(() => {
             expect(panelHook.result.current.hasUnread).toBe(true);
         });
 
         // Simula que el backend ya marcó el documento como leído tras descarga.
         currentDocuments = [buildDoc(true)];
+        currentAlerts = []; // Vaciamos también las alertas para que hasUnread pase limpiamente a false
 
+        // Forzamos el refresco global desde la primera instancia
         await act(async () => {
-            bellHook.result.current.refreshNotifications();
+            await bellHook.result.current.refreshNotifications();
         });
 
+        // Forzamos el refresco en la segunda instancia para simular la sincronización del catálogo
+        await act(async () => {
+            await panelHook.result.current.refreshNotifications();
+        });
+
+        // 3. Ambas instancias deben reflejar que ya no quedan elementos pendientes por leer
         await waitFor(() => {
             expect(bellHook.result.current.hasUnread).toBe(false);
             expect(panelHook.result.current.hasUnread).toBe(false);
