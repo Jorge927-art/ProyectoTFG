@@ -46,8 +46,8 @@ export const EvaluationPanel = () => {
     return (
         <GenericCard className="h-full flex flex-col shadow-sm border-slate-200">
             <div className="flex items-center gap-2 mb-6">
-                <div className="bg-indigo-50 p-2 rounded-lg">
-                    <Star className="text-amber-500 fill-amber-500" size={20} />
+                <div className="bg-blue-50 p-2 rounded-lg">
+                    <Star className="text-blue-500 fill-blue-500" size={20} />
                 </div>
                 <div>
                     <h2 className="text-base font-black text-slate-800 leading-tight">
@@ -125,7 +125,7 @@ export const EvaluationPanel = () => {
                                                     variant="text"
                                                     ariaLabel={`Calificar profesor con ${star} estrellas`}
                                                     icon={<Star size={16} fill={(state.instructor_score || 0) >= star ? "currentColor" : "none"} />}
-                                                    className={`p-0! gap-0! bg-transparent! shadow-none! transition-all! transform! active:scale-150! ${(state.instructor_score || 0) >= star ? 'text-blue-400!' : 'text-slate-200!'}`}
+                                                    className={`p-0! gap-0! bg-transparent! shadow-none! transition-all! transform! active:scale-150! ${(state.instructor_score || 0) >= star ? 'text-green-500!' : 'text-slate-200!'}`}
                                                 />
                                             ))}
                                         </div>
@@ -144,7 +144,7 @@ export const EvaluationPanel = () => {
                                 </div>
 
                                 <GenericButton
-                                    variant="dark"
+                                    variant="primary"
                                     disabled={!canSubmit}
                                     onClick={() => handleSend(item.enrollmentid, item.course.course_id)}
                                     className="w-full text-[10px] font-black uppercase tracking-wider py-2"

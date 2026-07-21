@@ -17,7 +17,7 @@ export const SmartRecommendations = ({ recommendations }: SmartRecommendationsPr
 
             {/* CABECERA CENTRALIZADA DEL MÓDULO */}
             <div className="flex items-center gap-2 mb-4 shrink-0">
-                <Sparkles className="h-5 w-5 text-amber-600" />
+                <Sparkles className="h-5 w-5 text-blue-600" />
                 <h2 className="text-sm font-black text-gray-900">Recomendaciones personalizadas para ti</h2>
             </div>
 
@@ -35,7 +35,7 @@ export const SmartRecommendations = ({ recommendations }: SmartRecommendationsPr
                         >
                             <div>
                                 <div className="flex justify-between items-start gap-2">
-                                    <span className="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wide">
+                                    <span className="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-100 uppercase tracking-wide">
                                         {rec.category}
                                     </span>
                                     <div className="flex items-center gap-0.5 text-amber-500 text-[11px] font-bold">

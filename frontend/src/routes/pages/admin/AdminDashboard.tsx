@@ -143,28 +143,28 @@ const AdminDashboard = () => {
                 titleSize="text-2xl font-bold tracking-tight"
                 titleColor="text-slate-800"
                 textPadding="p-0"
-                containerClass="border-b border-slate-200 pb-4 mb-6"
+                containerClass="border-b border-slate-100 pb-4 mb-6"
                 align="left"
                 description={
-                    <p className="text-sm font-medium text-slate-600 mt-1.5">
+                    <p className="text-sm font-medium text-slate-900 mt-1.5">
                         Consola del sistema: monitorización de persistencia y gestión de accesos corporativos.
                     </p>
                 }
             />
 
             {/* CONTENEDOR GRID EN PARALELO */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start w-full">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start w-full">
 
                 {/* COLUMNA IZQUIERDA: TARJETA DEL BUSCADOR DE USUARIOS */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-lg px-5 py-6 w-full">
+                <div className="bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-6 w-full">
                     {/* Encabezado de tarjeta interna */}
                     <div className="flex items-center gap-3 mb-5 border-b border-slate-100 pb-4">
-                        <div className="p-2.5 bg-red-50 rounded-xl text-red-600">
+                        <div className="p-2.5 bg-blue-50 rounded-xl text-blue-600">
                             <Users size={22} />
                         </div>
                         <div>
-                            <h3 className="text-base font-bold text-slate-800">Buscador de Usuarios</h3>
-                            <p className="text-xs text-slate-500 font-medium">
+                            <h3 className="text-base font-bold text-slate-900">Buscador de Usuarios</h3>
+                            <p className="text-xs text-slate-900 font-medium">
                                 Consulta directa y en tiempo real a PostgreSQL
                             </p>
                         </div>
@@ -183,10 +183,10 @@ const AdminDashboard = () => {
                         <GenericButton
                             type="submit"
                             disabled={loading}
-                            variant="white"
+                            variant="primary"
                             ariaLabel="Buscar en base de datos"
                             icon={loading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
-                            className="p-2! bg-red-600! hover:bg-red-700! text-white! rounded-xl! shadow-md! border border-transparent! h-11.5 flex items-center justify-center"
+                            className="p-2! bg-blue-600! hover:bg-blue-700! text-white! rounded-xl! shadow-md! border border-transparent! h-11.5 flex items-center justify-center"
                         />
                     </form>
 
@@ -211,7 +211,7 @@ const AdminDashboard = () => {
                                     </div>
                                     <div className="flex flex-col items-end gap-0.5">
                                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Rol Actual</span>
-                                        <span className="px-2.5 py-0.5 bg-red-100 border border-red-200 text-red-700 rounded-full text-xs font-bold uppercase tracking-wide">
+                                        <span className="px-2.5 py-0.5 bg-blue-100 border border-blue-200 text-blue-700 rounded-full text-xs font-bold uppercase tracking-wide">
                                             {foundUser.role}
                                         </span>
                                     </div>
@@ -221,9 +221,9 @@ const AdminDashboard = () => {
                                 <div className="flex flex-col gap-1.5">
                                     <label
                                         htmlFor="role-selector"
-                                        className="text-[11px] font-bold text-slate-600 flex items-center gap-1"
+                                        className="text-[11px] font-bold text-slate-900 flex items-center gap-1"
                                     >
-                                        <Shield size={12} className="text-red-500" />
+                                        <Shield size={12} className="text-blue-500" />
                                         <span>Asignar nuevo rol en el sistema:</span>
                                     </label>
                                     <div className="flex gap-2">
@@ -232,7 +232,7 @@ const AdminDashboard = () => {
                                             value={foundUser.role}
                                             disabled={updatingId !== null || deleting}
                                             onChange={(e) => handleRoleChange(foundUser.userId || 0, e.target.value)}
-                                            className="flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all disabled:bg-slate-100"
+                                            className="flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-100"
                                         >
                                             <option value="STUDENT">STUDENT (Alumno)</option>
                                             <option value="PROFESSOR">PROFESSOR (Profesor)</option>
@@ -246,9 +246,9 @@ const AdminDashboard = () => {
                                     </div>
                                 </div>
                                 {/* BOTÓN DE ACCIÓN ADMINISTRATIVA CORREGIDO */}
-                                <div className="mt-2 pt-3 border-t border-red-100">
+                                <div className="mt-2 pt-3 border-t border-slate-100">
                                     {foundUser.username.toLowerCase() === getAdminUsername().toLowerCase() ? (
-                                        <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 p-2.5 rounded-xl text-center font-medium">
+                                        <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 p-2.5 rounded-xl text-center font-medium">
                                             Esta es tu cuenta actual. No puedes eliminarte a ti mismo.
                                         </div>
                                     ) : foundUser.enabled === false ? (
@@ -256,10 +256,10 @@ const AdminDashboard = () => {
                                             type="button"
                                             onClick={handleDeleteUser}
                                             disabled={deleting || updatingId !== null}
-                                            variant="white"
+                                            variant="success"
                                             label={deleting ? 'Reactivando...' : 'Reactivar y dar de alta usuario'}
                                             icon={deleting ? <Loader2 size={14} className="animate-spin" /> : undefined}
-                                            className="w-full py-2! bg-emerald-50! border-2! border-emerald-200! text-emerald-600! rounded-xl! text-xs! font-bold! uppercase! tracking-wide! hover:bg-emerald-100! transition-all! justify-center! gap-2!"
+                                            className="w-full py-2! bg-emerald-600! hover:bg-emerald-700! border-2! border-emerald-600! text-white! rounded-xl! text-xs! font-bold! uppercase! tracking-wide! transition-all! justify-center! gap-2!"
                                         />
                                     ) : (
                                         <GenericButton
@@ -269,7 +269,7 @@ const AdminDashboard = () => {
                                             variant="primary"
                                             label={deleting ? 'Procesando...' : 'Dar de baja temporal usuario'}
                                             icon={deleting ? <Loader2 size={14} className="animate-spin" /> : undefined}
-                                            className="w-full py-2! bg-red-50! border-2! border-red-200! text-red-600! rounded-xl! text-xs! font-bold! uppercase! tracking-wide! hover:bg-red-100! transition-all! justify-center! gap-2!"
+                                            className="w-full py-2! bg-blue-600! hover:bg-blue-700! border-2! border-blue-600! text-white! rounded-xl! text-xs! font-bold! uppercase! tracking-wide! transition-all! justify-center! gap-2!"
                                         />
                                     )}
                                 </div>

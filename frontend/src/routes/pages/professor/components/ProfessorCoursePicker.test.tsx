@@ -128,6 +128,18 @@ describe('ProfessorCoursePicker - Suite de Cobertura Funcional y Regresividad Vi
         expect(mockExecuteAction).not.toHaveBeenCalled();
     });
 
+    it('Debe marcar como no disponible el curso que ya tiene profesor asignado', () => {
+        render(<ProfessorCoursePicker onSelectionSuccess={mockOnSelectionSuccess} />);
+
+        const courseTitle = screen.getByText('Data Analysis Using Python');
+        const courseCard = courseTitle.closest('div.flex.flex-col.h-full.justify-between');
+
+        expect(courseCard).not.toBeNull();
+
+        const unavailableButton = within(courseCard as HTMLElement).getByRole('button', { name: /Curso no disponible/i });
+        expect(unavailableButton).toBeDisabled();
+    });
+
     /* =========================================================================
        4. PRUEBAS DE FLUJO TRANSACCIONAL SEGURO (MOCK EXTENDIDO)
        ========================================================================= */
@@ -138,11 +150,11 @@ describe('ProfessorCoursePicker - Suite de Cobertura Funcional y Regresividad Vi
         const mockExecuteAction = vi.fn().mockImplementation(() => {
             // Buscamos el callback de éxito mediante la función capturada de inicialización
             if (useCourseCatalogMockCallback) {
-                // Sincronizado con el ID 501 que el componente realmente dispara al hacer click
+                // Sincronizado con el ID 502 (curso vacante y asignable)
                 const mockCourseData = {
-                    course_id: 501,
-                    title: 'Data Analysis Using Python',
-                    category: 'Data Science',
+                    course_id: 502,
+                    title: 'Data Analysis and Fundamental Statistics',
+                    category: 'General',
                     instructors: 'profesor_autenticado'
                 } as unknown;
 
@@ -164,8 +176,8 @@ describe('ProfessorCoursePicker - Suite de Cobertura Funcional y Regresividad Vi
 
         render(<ProfessorCoursePicker onSelectionSuccess={mockOnSelectionSuccess} />);
 
-        // Vinculamos el botón de acción al curso objetivo para no depender del label exacto
-        const courseTitle = screen.getByText('Data Analysis Using Python');
+        // Vinculamos el botón de acción al curso vacante para no depender del label exacto
+        const courseTitle = screen.getByText('Data Analysis and Fundamental Statistics');
         const courseCard = courseTitle.closest('div.flex.flex-col.h-full.justify-between');
 
         expect(courseCard).not.toBeNull();
@@ -175,10 +187,10 @@ describe('ProfessorCoursePicker - Suite de Cobertura Funcional y Regresividad Vi
         // Ejecutamos el clic en el botón del primer curso de la lista
         fireEvent.click(courseActionButton);
 
-        // Sincronizado exactamente con lo que recibe el componente en la primera posición (501)
+        // Sincronizado exactamente con el curso vacante (502)
         expect(mockExecuteAction).toHaveBeenCalledWith(
-            501,
-            '/api/courses/501/assign-teacher',
+            502,
+            '/api/courses/502/assign-teacher',
             'post'
         );
 
@@ -186,6 +198,10 @@ describe('ProfessorCoursePicker - Suite de Cobertura Funcional y Regresividad Vi
         await waitFor(() => {
             expect(screen.getByText(/¡Te has asignado correctamente como profesor del curso/i)).toBeInTheDocument();
         });
+
+        // El botón del curso seleccionado debe pasar a verde con estado final asignado
+        const assignedButton = within(courseCard as HTMLElement).getByRole('button', { name: /Curso asignado/i });
+        expect(assignedButton).toBeDisabled();
     });
 });
 

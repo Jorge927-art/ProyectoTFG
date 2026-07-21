@@ -23,17 +23,17 @@ export const CourseSearchEngine = ({
     renderAction
 }: CourseSearchEngineProps) => {
     return (
-        <GenericCard className="p-5 mb-8 max-w-5xl mt-6 flex flex-col">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
+        <GenericCard className="w-full max-w-none mt-4 mb-8 p-6 flex flex-col gap-5 overflow-x-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
                     <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                         <Search size={18} className="text-blue-600" />
                         <span>{title}</span>
                     </h2>
-                    <p className="text-xs text-slate-500 font-medium">{subtitle}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500 font-medium max-w-3xl">{subtitle}</p>
                 </div>
 
-                <div className="relative w-full sm:w-72">
+                <div className="relative w-full sm:w-80 shrink-0">
                     <Input
                         type="text"
                         value={searchKeyword}
@@ -47,7 +47,7 @@ export const CourseSearchEngine = ({
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-5 max-h-72 overflow-y-auto p-1 scrollbar-thin">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-h-80 overflow-y-auto overflow-x-hidden px-1 scrollbar-thin">
                 {visibleCourses.length === 0 && !loadingCatalog ? (
                     <p className="text-xs font-medium text-slate-400 italic py-2 col-span-full">
                         No se encontraron cursos que coincidan con el criterio introducido.
@@ -55,9 +55,9 @@ export const CourseSearchEngine = ({
                 ) : (
                     visibleCourses.map((course) => (
                         <GenericCard key={course.course_id}>
-                            <div className="flex flex-col h-full justify-between">
+                            <div className="flex flex-col h-full justify-between gap-3 min-w-0">
                                 <div>
-                                    <span className="text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-blue-50 text-blue-700">
+                                    <span className="text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-green-50 text-green-700 border border-green-100">
                                         {course.category || "General"}
                                     </span>
                                     <h4 className="text-xs font-bold text-slate-800 mt-2 line-clamp-2 min-h-8">
@@ -67,10 +67,10 @@ export const CourseSearchEngine = ({
                                         Instructores: {course.instructors || "Por asignar"}
                                     </p>
                                 </div>
-                                <div className="mt-4 pt-2 border-t border-slate-50 flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-0.5 text-amber-500 text-xs font-bold">
-                                        <Star size={11} fill="currentColor" />
-                                        <span>{course.rating ? course.rating.toFixed(1) : "5.0"}</span>
+                                <div className="mt-2 pt-3 border-t border-slate-50 flex flex-col gap-3">
+                                    <div className="flex items-center gap-0.5 text-xs font-bold">
+                                        <Star size={11} className="text-amber-500 fill-amber-400" />
+                                        <span className="text-slate-900">{course.rating ? course.rating.toFixed(1) : "5.0"}</span>
                                     </div>
 
                                     {renderAction(course)}

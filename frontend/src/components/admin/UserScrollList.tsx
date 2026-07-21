@@ -25,7 +25,7 @@ export const UserScrollList = () => {
     // Diccionario estático para evitar condicionales sueltos en el render
     const badges = {
         ADMIN: (
-            <div className="flex items-center gap-1 bg-red-50 px-2 py-0.5 rounded border border-red-100 text-[10px] font-bold uppercase tracking-wider text-red-700">
+            <div className="flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 text-[10px] font-bold uppercase tracking-wider text-blue-700">
                 <ShieldAlert size={12} />
                 <span>Admin</span>
             </div>

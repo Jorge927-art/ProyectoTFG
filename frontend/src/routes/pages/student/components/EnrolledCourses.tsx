@@ -89,7 +89,7 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh }:
                                     <div className="flex justify-between items-start gap-4">
 
                                         <div className="flex-1 min-w-0">
-                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-slate-100 text-slate-600">
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-green-50 text-green-700 border border-green-100">
                                                 {enroll.course?.category || "General"}
                                             </span>
                                             <h3 className="text-sm font-bold text-slate-800 leading-tight mt-1.5 truncate">

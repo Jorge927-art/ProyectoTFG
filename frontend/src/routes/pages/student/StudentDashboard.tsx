@@ -133,12 +133,12 @@ const StudentDashboard = () => {
                 */}
                 <div className="bg-linear-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-6 shadow-sm w-full">
                     <div className="flex items-center gap-2 mb-4">
-                        <Sparkles className="h-5 w-5 text-amber-600" />
+                        <Sparkles className="h-5 w-5 text-blue-600" />
                         <h2 className="text-lg font-semibold text-gray-900">Recomendaciones para ti</h2>
                     </div>
                     {loadingRecommendations ? (
                         <div className="p-4 flex justify-center items-center">
-                            <Loader2 size={20} className="animate-spin text-amber-600" />
+                            <Loader2 size={20} className="animate-spin text-blue-600" />
                         </div>
                     ) : (
                         <SmartRecommendations recommendations={recommendations} />
@@ -150,11 +150,11 @@ const StudentDashboard = () => {
                     Un Grid Layout de 3 columnas que sitúa "Tus asignaturas" (1 col) a la izquierda 
                     y el "Catálogo" de referencia (2 cols) a la derecha.
                 */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
                     {/* A la izquierda: "Tus asignaturas" (Toma 1 columna) */}
                     <div className="lg:col-span-1">
-                        <div className="bg-white border rounded-2xl p-6 shadow-sm">
+                        <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
                             <EnrolledCourses
                                 enrolledList={enrolledList}
                                 loadingEnrollments={loadingEnrollments}
@@ -169,7 +169,7 @@ const StudentDashboard = () => {
 
                     {/* A la derecha: "Catálogo de Cursos Disponibles" (Toma 2 columnas - COMPONENTE DE REFERENCIA INTACTO) */}
                     <div className="lg:col-span-2">
-                        <div className="bg-white border rounded-2xl p-6 shadow-sm">
+                        <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
                             <h2 className="text-xl font-bold text-gray-900 mb-4">Catálogo de Cursos Disponibles</h2>
                             <StudentCoursePicker
                                 enrolledList={enrolledList}
@@ -185,15 +185,15 @@ const StudentDashboard = () => {
                     3. REAJUSTE DE LA FILA INFERIOR DE GESTIÓN (GRID DE 3 COLUMNAS - PROPORCIÓN PERFECTA):
                     Copiamos la misma estructura de arriba para que los anchos queden alineados milimétricamente.
                 */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start pt-2">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start pt-2">
 
                     {/* REAJUSTE: "Gestión de Documentos Académicos" recupera el ancho estrecho de arriba (1 columna) */}
-                    <div className="bg-white border rounded-2xl p-6 shadow-sm h-108 overflow-y-auto scrollbar-thin lg:col-span-1">
+                    <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm h-108 overflow-y-auto scrollbar-thin lg:col-span-1">
                         <DocumentManager />
                     </div>
 
                     {/* REAJUSTE: "ASIGNATURAS" gana el espacio panorámico de la derecha (2 columnas) */}
-                    <div className="bg-white border rounded-2xl p-6 shadow-sm h-108 overflow-y-auto scrollbar-thin lg:col-span-2">
+                    <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm h-108 overflow-y-auto scrollbar-thin lg:col-span-2">
                         <CourseAssignmentPanel
                             activeCourseId={activeCourseId}
                             enrolledList={enrolledList}
@@ -205,14 +205,14 @@ const StudentDashboard = () => {
                     4. FILA DE BALANCE FINAL:
                     Mantenemos la simetría final en la base de la pantalla.
                 */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                     {/* Abajo a la izquierda: El componente analítico de la copa (StudentStatsPanel) */}
-                    <div className="bg-white border rounded-2xl p-6 shadow-sm w-full">
+                    <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm w-full">
                         <StudentStatsPanel activeCourseId={activeCourseId} enrolledList={enrolledList} />
                     </div>
 
                     {/* Abajo a la derecha: "Evaluación académica" (EvaluationPanel) */}
-                    <div className="bg-white border rounded-2xl p-6 shadow-sm w-full">
+                    <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm w-full">
                         <EvaluationPanel />
                     </div>
                 </div>

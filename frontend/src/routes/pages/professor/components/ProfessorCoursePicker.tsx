@@ -11,6 +11,7 @@ interface ProfessorCoursePickerProps {
 
 export const ProfessorCoursePicker = ({ onSelectionSuccess }: ProfessorCoursePickerProps) => {
     const [successMessage, setSuccessMessage] = useState<string>('');
+    const [assignedCourseIds, setAssignedCourseIds] = useState<Set<number>>(new Set());
 
     const {
         searchKeyword,
@@ -22,6 +23,11 @@ export const ProfessorCoursePicker = ({ onSelectionSuccess }: ProfessorCoursePic
         executeCourseAction
     } = useCourseCatalog((course) => {
         setSuccessMessage(`¡Te has asignado correctamente como profesor del curso: "${course.title}"!`);
+        setAssignedCourseIds((prev) => {
+            const next = new Set(prev);
+            next.add(course.course_id);
+            return next;
+        });
         if (onSelectionSuccess) {
             onSelectionSuccess(course);
         }
@@ -64,31 +70,38 @@ export const ProfessorCoursePicker = ({ onSelectionSuccess }: ProfessorCoursePic
                 renderAction={(course: DBModelCourse) => {
                     const vacant = isCourseVacant(course);
                     const isProcessing = actionExecutionId === course.course_id;
+                    const isAssigned = assignedCourseIds.has(course.course_id);
+                    const isUnavailable = !vacant && !isAssigned;
+
+                    const buttonLabel = isProcessing
+                        ? 'Asignando...'
+                        : isAssigned
+                            ? 'Curso asignado'
+                            : isUnavailable
+                                ? 'Curso no disponible'
+                                : 'Impartir Curso';
 
                     return (
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 w-full mt-2">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full min-w-0">
                             {vacant ? (
                                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 uppercase tracking-wide">
                                     🪹 Vacante
                                 </span>
                             ) : (
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-30 truncate">
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-100 truncate max-w-full">
                                     👤 {course.instructors}
                                 </span>
                             )}
 
                             <GenericButton
                                 type="button"
-                                disabled={isProcessing}
+                                disabled={isProcessing || isUnavailable || isAssigned}
                                 onClick={() => handleSelectCourse(course.course_id)}
                                 // Usamos estrictamente variantes reales de tu GenericButton
-                                variant={vacant ? "primary" : "white"}
-                                label={isProcessing ? "Asignando..." : "Impartir Curso"}
+                                variant={isAssigned ? 'success' : 'primary'}
+                                label={buttonLabel}
                                 icon={isProcessing ? <Loader2 size={12} className="animate-spin" /> : <BookOpen size={12} />}
-                                className={`text-[10px]! py-1.5! px-3! ${vacant
-                                    ? "bg-indigo-600! hover:bg-indigo-700!"
-                                    : "bg-white! text-gray-700! border border-gray-200!"
-                                    }`}
+                                className="text-[10px]! py-1.5! px-3!"
                             />
                         </div>
                     );

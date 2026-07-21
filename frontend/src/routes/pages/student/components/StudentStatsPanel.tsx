@@ -14,7 +14,7 @@ interface StudentStatsPanelProps {
 /**
  * Panel Estadístico Académico del Alumno [ADR-41].
  * Renderiza micro-indicadores analíticos agregados de PostgreSQL.
- * Dividido en dos sub-cajas con tamaños amplios, scrolls naturales y títulos unificados en azul.
+ * Dividido en dos sub-cajas con tamaños amplios, scrolls naturales y títulos unificados en rojo.
  */
 export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStatsPanelProps) => {
     // Estado interno para almacenar de forma reactiva la asignatura seleccionada [ADR-41]
@@ -33,8 +33,8 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
             <div className="flex flex-col gap-3 mb-5 shrink-0 w-full">
                 {/* Fila 1: Título e Icono */}
                 <div className="flex items-center gap-2 w-full">
-                    <div className="bg-indigo-50 p-2 rounded-lg shrink-0">
-                        <Trophy className="text-indigo-600" size={18} />
+                    <div className="bg-blue-50 p-2 rounded-lg shrink-0">
+                        <Trophy className="text-blue-600" size={18} />
                     </div>
                     <div className="flex-1 min-w-0">
                         <h2 className="text-base font-bold text-slate-800 leading-tight truncate">
@@ -73,7 +73,7 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
                 {/* 1. Estado de Carga Unificado */}
                 {loadingStats && (
                     <div className="flex flex-col items-center justify-center text-slate-400 py-16 flex-1">
-                        <Loader2 className="animate-spin mb-2 text-indigo-600" size={24} />
+                        <Loader2 className="animate-spin mb-2 text-blue-600" size={24} />
                         <p className="text-[11px] font-bold text-center">Calculando agregaciones en PostgreSQL...</p>
                     </div>
                 )}
@@ -100,7 +100,7 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
 
                         {/* CAJA A: MÉTRICAS DE TU CAMPUS (DATOS LOCALES) */}
                         <div className="bg-slate-50/40 border border-slate-100 rounded-xl p-4 flex flex-col min-h-0">
-                            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-wider mb-3 shrink-0">
+                            <p className="text-[10px] font-black text-slate-900 uppercase tracking-wider mb-3 shrink-0">
                                 Métricas de tu Campus (Datos Locales)
                             </p>
 
@@ -110,15 +110,15 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
                                     <div className="p-3 bg-white border border-slate-100 rounded-xl flex items-center gap-2.5 min-w-0 shadow-xs">
                                         <Users size={16} className="text-blue-500 shrink-0" />
                                         <div className="min-w-0">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-tight truncate">Comunidad</p>
+                                            <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight truncate">Comunidad</p>
                                             <p className="text-xs font-black text-slate-700 mt-0.5 truncate">{stats?.localEnrollments || 0} inscritos</p>
                                         </div>
                                     </div>
 
                                     <div className="p-3 bg-white border border-slate-100 rounded-xl flex items-center gap-2.5 min-w-0 shadow-xs">
-                                        <Trophy size={16} className="text-emerald-500 shrink-0" />
+                                        <Trophy size={16} className="text-green-500 shrink-0" />
                                         <div className="min-w-0">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-tight truncate">Nota Media</p>
+                                            <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight truncate">Nota Media</p>
                                             <p className="text-xs font-black text-slate-700 mt-0.5 truncate">
                                                 {stats?.averageGrade ? `${formatDecimal(stats.averageGrade)} / 10` : '--- / 10'}
                                             </p>
@@ -130,7 +130,7 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
                                     <div className="p-3 bg-white border border-slate-100 rounded-xl flex items-center gap-2.5 min-w-0 shadow-xs">
                                         <Star size={16} className="text-amber-500 fill-amber-400 shrink-0" />
                                         <div className="min-w-0">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-tight truncate">Rating Curso</p>
+                                            <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight truncate">Rating Curso</p>
                                             <p className="text-xs font-black text-slate-700 mt-0.5 truncate">
                                                 {stats?.communityRating ? `${formatDecimal(stats.communityRating)} ★` : 'Sin valoraciones'}
                                             </p>
@@ -140,7 +140,7 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
                                     <div className="p-3 bg-white border border-slate-100 rounded-xl flex items-center gap-2.5 min-w-0 shadow-xs">
                                         <Star size={16} className="text-indigo-500 fill-indigo-400 shrink-0" />
                                         <div className="min-w-0">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-tight truncate">Rating Docente</p>
+                                            <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight truncate">Rating Docente</p>
                                             <p className="text-xs font-black text-slate-700 mt-0.5 truncate">
                                                 {stats?.instructorRating ? `${formatDecimal(stats.instructorRating)} ★` : 'Sin valoraciones'}
                                             </p>
@@ -152,7 +152,7 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
 
                         {/* CAJA B: FICHA TÉCNICA DEL CURSO (DATOS DEL CATÁLOGO BASE) */}
                         <div className="flex-1 bg-slate-50/40 border border-slate-100 rounded-xl p-4 flex flex-col min-h-0">
-                            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-wider mb-3 shrink-0">
+                            <p className="text-[10px] font-black text-slate-900 uppercase tracking-wider mb-3 shrink-0">
                                 Ficha Técnica del Curso (Catálogo Base)
                             </p>
 

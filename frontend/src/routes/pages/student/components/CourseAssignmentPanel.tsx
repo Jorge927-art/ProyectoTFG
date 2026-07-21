@@ -176,11 +176,11 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
     };
 
     return (
-        <GenericCard className="h-full flex flex-col shadow-sm border-slate-200 pb-2">
+        <GenericCard className="h-full flex flex-col shadow-sm border-slate-100 pb-2">
             {/* CABECERA PRINCIPAL UNIFICADA CON SELECTOR INTEGRADO */}
             <div className="flex items-center gap-2 mb-6 shrink-0">
-                <div className="bg-indigo-50 p-2 rounded-lg">
-                    <BookOpen className="text-indigo-600" size={18} />
+                <div className="bg-blue-50 p-2 rounded-lg">
+                    <BookOpen className="text-blue-600" size={18} />
                 </div>
                 <div className="flex-1 min-w-0">
                     <h2 className="text-base font-bold text-slate-800 leading-tight truncate uppercase">
@@ -274,7 +274,7 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                                             </>
                                         ) : (
                                             <>
-                                                <Upload className="h-7 w-7 text-slate-400 mx-auto mb-2 group-hover:text-indigo-500 transition-colors" />
+                                                <Upload className="h-7 w-7 text-slate-400 mx-auto mb-2 group-hover:text-blue-500 transition-colors" />
                                                 {/* Mensaje principal integrado y unificado */}
                                                 <p className="text-xs text-slate-800 font-black uppercase tracking-wider mb-1">
                                                     Enviar Trabajo / Examen
@@ -347,13 +347,13 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                             {/* Nota de Trabajos */}
                             <div className="flex items-center justify-between bg-white border border-slate-100 p-3 rounded-lg shadow-xs">
                                 <span className="text-xs font-bold text-slate-600">Nota de Trabajos:</span>
-                                <span className="text-lg font-black text-indigo-600">{grade}</span>
+                                <span className="text-lg font-black text-blue-600">{grade}</span>
                             </div>
 
                             {/* Nota de Examen Final */}
                             <div className="flex items-center justify-between bg-white border border-slate-100 p-3 rounded-lg shadow-xs">
                                 <span className="text-xs font-bold text-slate-600">Examen Final:</span>
-                                <span className="text-lg font-black text-emerald-600">--</span>
+                                <span className="text-lg font-black text-blue-600">--</span>
                             </div>
                         </div>
 

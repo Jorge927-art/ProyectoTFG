@@ -150,12 +150,12 @@ const ProfessorDashboard = () => {
                1. EL BUSCADOR EN ANCHO COMPLETO PANORÁMICO (FUERA DEL GRID): 
                Ocupa de forma independiente todo el ancho horizontal superior sin deformar las columnas.
             */}
-            <div className="w-full block mb-6">
+            <div className="w-full block mb-8 overflow-x-hidden">
                 <ProfessorCoursePicker onSelectionSuccess={handleCourseSelectionSuccess} />
             </div>
 
             {/* 2. REJILLA INDEPENDIENTE: SEPARACIÓN DE CONTENIDOS EN 3 COLUMNAS */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                 {/* COLUMNA IZQUIERDA: ASIGNATURAS QUE IMPARTE (TOMA 2 DE LAS 3 COLUMNAS) */}
                 <div className="lg:col-span-2">
