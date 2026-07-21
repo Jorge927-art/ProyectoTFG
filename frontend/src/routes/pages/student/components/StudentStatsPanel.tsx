@@ -29,33 +29,41 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
 
     return (
         <GenericCard className="flex flex-col flex-1 min-h-0">
-            {/* CABECERA PRINCIPAL UNIFICADA */}
-            <div className="flex items-center gap-2 mb-5 shrink-0">
-                <div className="bg-indigo-50 p-2 rounded-lg">
-                    <Trophy className="text-indigo-600" size={18} />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <h2 className="text-base font-bold text-slate-800 leading-tight truncate">
-                        Rendimiento y Métricas del Curso
-                    </h2>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">
-                        Analítica del catálogo de asignaturas
-                    </p>
+            {/* CABECERA PRINCIPAL UNIFICADA (REESTRUCTURADA EN DOS FILAS) */}
+            <div className="flex flex-col gap-3 mb-5 shrink-0 w-full">
+                {/* Fila 1: Título e Icono */}
+                <div className="flex items-center gap-2 w-full">
+                    <div className="bg-indigo-50 p-2 rounded-lg shrink-0">
+                        <Trophy className="text-indigo-600" size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h2 className="text-base font-bold text-slate-800 leading-tight truncate">
+                            Rendimiento y Métricas del Curso
+                        </h2>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">
+                            Analítica del catálogo de asignaturas
+                        </p>
+                    </div>
                 </div>
 
-                {/* SELECTOR REACTIVO DE CURSOS MATRICULADOS */}
+                {/* Fila 2: Etiqueta y Selector alineados a la derecha */}
                 {enrolledList && enrolledList.length > 0 && (
-                    <select
-                        value={localSelectedId || activeCourseId || ''}
-                        onChange={(e) => setLocalSelectedId(Number(e.target.value))}
-                        className="text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-slate-700 outline-hidden cursor-pointer hover:bg-slate-100 transition-colors max-w-45 truncate shrink-0"
-                    >
-                        {enrolledList.map((enroll) => (
-                            <option key={enroll.enrollmentid} value={enroll.course?.course_id}>
-                                {enroll.course?.title}
-                            </option>
-                        ))}
-                    </select>
+                    <div className="flex items-center justify-end gap-2 w-full">
+                        <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider shrink-0">
+                            ASIGNATURA
+                        </span>
+                        <select
+                            value={localSelectedId || activeCourseId || ''}
+                            onChange={(e) => setLocalSelectedId(Number(e.target.value))}
+                            className="text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-slate-700 outline-hidden cursor-pointer hover:bg-slate-100 transition-colors max-w-45 truncate shrink-0"
+                        >
+                            {enrolledList.map((enroll) => (
+                                <option key={enroll.enrollmentid} value={enroll.course?.course_id}>
+                                    {enroll.course?.title}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 )}
             </div>
 

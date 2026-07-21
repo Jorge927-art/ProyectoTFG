@@ -426,4 +426,44 @@ public class UserService {
         return alerts;
     }
 
+    /**
+     * Lógica transaccional genérica para vincular formalmente un curso a cualquier
+     * cuenta de usuario (PROFESSOR, STUDENT o ADMIN) mediante clave foránea fuerte.
+     *
+     * @param username Nombre de usuario único que solicita o recibe la asignación.
+     * @param courseId Identificador único del curso en PostgreSQL.
+     * @return La entidad Courses actualizada y persistida.
+     */
+    @Transactional
+    public Courses assignUserToCourse(String username, Long courseId) {
+        // 1. Validar la existencia del usuario en el sistema
+        Users user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
+
+        // 2. Validar la existencia del curso en el catálogo de PostgreSQL
+        Courses course = coursesRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Curso no encontrado en el catálogo con el ID: " + courseId));
+
+        // 3. Control de Ocupación Preventivo: Validar si el curso ya está asignado a
+        // otro usuario
+        if (course.getAssignedUser() != null) {
+            throw new ServicesException(
+                    "Acción inválida: Este curso ya cuenta con un usuario titular asignado de forma relacional.");
+        }
+
+        // 4. Establecer la vinculación relacional fuerte (JPA mapeará la clave
+        // assigned_user_id)
+        course.setAssignedUser(user);
+
+        // 5. Mantener sincronía de texto con las búsquedas predictivas existentes si es
+        // un profesor
+        if (user.getRole() == Role.PROFESSOR || user.getRole() == Role.PROFESSOR) {
+            course.setInstructors(user.getUsername());
+        }
+
+        // 6. Volcar los cambios de forma transaccional directa a PostgreSQL
+        return coursesRepository.saveAndFlush(course);
+    }
+
 }

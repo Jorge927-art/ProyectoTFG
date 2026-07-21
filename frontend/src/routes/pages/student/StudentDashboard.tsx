@@ -10,7 +10,7 @@ import DashboardLayout from '../../layouts/DashboardLayout';
 
 // Componentes atómicos del dominio de estudiante [ADR-20]
 import { InterestsModal } from './InterestsModal';
-import { CourseCatalog } from './components/CourseCatalog';
+import { StudentCoursePicker } from './components/StudentCoursePicker';
 import { EnrolledCourses } from './components/EnrolledCourses';
 import { SmartRecommendations } from './components/SmartRecommendations';
 
@@ -84,11 +84,7 @@ const StudentDashboard = () => {
         <DashboardLayout>
             <div className="p-6 max-w-7xl mx-auto space-y-6">
 
-                {/* 
-                   CABECERA PRINCIPAL UNIFICADA [ADR-13]:
-                   Sustitución del div cableado por el componente core GenericHeader utilizando
-                   composición limpia mediante la prop 'description' para inyectar la acción.
-                */}
+                {/* CABECERA PRINCIPAL UNIFICADA REAL DE PRODUCCIÓN [ADR-13] */}
                 <GenericHeader
                     title="Intereses del Estudiante"
                     titleSize="text-3xl font-bold tracking-tight"
@@ -131,13 +127,15 @@ const StudentDashboard = () => {
                     </div>
                 )}
 
-                {/* Sección de Recomendaciones Inteligentes */}
-                <div className="bg-linear-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-6 shadow-sm">
+                {/* 
+                    1. COMPONENTE SUPERIOR PANORÁMICO: 
+                    "Recomendaciones para ti" ocupa todo el ancho por encima de los demás.
+                */}
+                <div className="bg-linear-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-6 shadow-sm w-full">
                     <div className="flex items-center gap-2 mb-4">
                         <Sparkles className="h-5 w-5 text-amber-600" />
                         <h2 className="text-lg font-semibold text-gray-900">Recomendaciones para ti</h2>
                     </div>
-
                     {loadingRecommendations ? (
                         <div className="p-4 flex justify-center items-center">
                             <Loader2 size={20} className="animate-spin text-amber-600" />
@@ -148,55 +146,74 @@ const StudentDashboard = () => {
                 </div>
 
                 {/* 
-   GRID SINCRONIZADO MODIFICADO:
-   - Se cambia 'items-start' por 'items-stretch' para igualar alturas de columnas
-          */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+                    2. FILA CENTRAL DE ACTIVIDAD:
+                    Un Grid Layout de 3 columnas que sitúa "Tus asignaturas" (1 col) a la izquierda 
+                    y el "Catálogo" de referencia (2 cols) a la derecha.
+                */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
 
-                    {/* COLUMNA 1 (IZQUIERDA): Se añade 'flex flex-col' para poder controlar el estiramiento interno */}
-                    <div className="bg-white border rounded-2xl p-6 shadow-sm space-y-6 h-full flex flex-col">
-                        <EnrolledCourses
-                            enrolledList={enrolledList}
-                            loadingEnrollments={loadingEnrollments}
-                            onRefresh={() => {
-                                fetchStudentEnrollments();
-                                setSuccessMessage("¡Curso iniciado con éxito! Sincronizando cronómetro...");
-                                setTimeout(() => setSuccessMessage(''), 5000);
-                            }}
-                        />
-                        <DocumentManager />
-
-                        {/* Tarjeta de la Evaluación Académica Dual: Se añade 'flex-1 flex flex-col' para que se estire al máximo */}
-                        <div className="pt-4 flex-1 flex flex-col">
-                            <EvaluationPanel />
+                    {/* A la izquierda: "Tus asignaturas" (Toma 1 columna) */}
+                    <div className="lg:col-span-1">
+                        <div className="bg-white border rounded-2xl p-6 shadow-sm">
+                            <EnrolledCourses
+                                enrolledList={enrolledList}
+                                loadingEnrollments={loadingEnrollments}
+                                onRefresh={() => {
+                                    fetchStudentEnrollments();
+                                    setSuccessMessage("¡Curso iniciado con éxito! Sincronizando cronómetro...");
+                                    setTimeout(() => setSuccessMessage(''), 5000);
+                                }}
+                            />
                         </div>
                     </div>
 
-                    {/* COLUMNA 2 Y 3 (DERECHA): Distribución estratégica de componentes */}
-                    <div className="lg:col-span-2 space-y-6">
-                        {/* Tarjeta del Catálogo de Cursos Disponibles */}
+                    {/* A la derecha: "Catálogo de Cursos Disponibles" (Toma 2 columnas - COMPONENTE DE REFERENCIA INTACTO) */}
+                    <div className="lg:col-span-2">
                         <div className="bg-white border rounded-2xl p-6 shadow-sm">
                             <h2 className="text-xl font-bold text-gray-900 mb-4">Catálogo de Cursos Disponibles</h2>
-                            <CourseCatalog
+                            <StudentCoursePicker
                                 enrolledList={enrolledList}
                                 onEnrollSuccess={handleEnrollSuccess}
                                 onSetGlobalError={setError}
                                 onSetGlobalSuccess={setSuccessMessage}
                             />
                         </div>
+                    </div>
+                </div>
 
-                        {/* Tarjeta del Panel de Seguimiento de Asignatura [ADR-47] */}
-                        <div className="bg-white border rounded-2xl p-6 shadow-sm">
-                            <CourseAssignmentPanel
-                                activeCourseId={activeCourseId}
-                                enrolledList={enrolledList}
-                            />
-                        </div>
+                {/* 
+                    3. REAJUSTE DE LA FILA INFERIOR DE GESTIÓN (GRID DE 3 COLUMNAS - PROPORCIÓN PERFECTA):
+                    Copiamos la misma estructura de arriba para que los anchos queden alineados milimétricamente.
+                */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start pt-2">
 
-                        {/* PANEL ANALÍTICO ESTADÍSTICO REACTIVO COMPENSADO [ADR-41] */}
-                        <div className="bg-white border rounded-2xl p-6 shadow-sm">
-                            <StudentStatsPanel activeCourseId={activeCourseId} enrolledList={enrolledList} />
-                        </div>
+                    {/* REAJUSTE: "Gestión de Documentos Académicos" recupera el ancho estrecho de arriba (1 columna) */}
+                    <div className="bg-white border rounded-2xl p-6 shadow-sm h-108 overflow-y-auto scrollbar-thin lg:col-span-1">
+                        <DocumentManager />
+                    </div>
+
+                    {/* REAJUSTE: "ASIGNATURAS" gana el espacio panorámico de la derecha (2 columnas) */}
+                    <div className="bg-white border rounded-2xl p-6 shadow-sm h-108 overflow-y-auto scrollbar-thin lg:col-span-2">
+                        <CourseAssignmentPanel
+                            activeCourseId={activeCourseId}
+                            enrolledList={enrolledList}
+                        />
+                    </div>
+                </div>
+
+                {/* 
+                    4. FILA DE BALANCE FINAL:
+                    Mantenemos la simetría final en la base de la pantalla.
+                */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+                    {/* Abajo a la izquierda: El componente analítico de la copa (StudentStatsPanel) */}
+                    <div className="bg-white border rounded-2xl p-6 shadow-sm w-full">
+                        <StudentStatsPanel activeCourseId={activeCourseId} enrolledList={enrolledList} />
+                    </div>
+
+                    {/* Abajo a la derecha: "Evaluación académica" (EvaluationPanel) */}
+                    <div className="bg-white border rounded-2xl p-6 shadow-sm w-full">
+                        <EvaluationPanel />
                     </div>
                 </div>
 
@@ -212,3 +229,4 @@ const StudentDashboard = () => {
 };
 
 export default StudentDashboard;
+

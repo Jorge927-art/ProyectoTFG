@@ -19,47 +19,56 @@ export const useCourseManagement = (
     // Nueva variable de control para evitar re-consultar si el curso tiene 0 alumnos
     const [hasLoadedAlumnado, setHasLoadedAlumnado] = useState<boolean>(false);
 
-    // Efecto de limpieza estricta cuando el modal se cierra o cambia de curso
+    // Efecto de limpieza estricta cuando el modal se cierra o no hay curso activo
     useEffect(() => {
-        if (!isOpen) {
+        if (!isOpen || courseId === null) {
             setActiveTab('alumnado');
             setStudents([]);
             setMetrics(null);
-            setHasLoadedAlumnado(false); // Reseteamos el control al cerrar
+            setHasLoadedAlumnado(false);
+            setSelectedFile(null);
+            setFileError(null);
+            setUploadSuccessMessage(null);
+            setIsSubmitting(false);
+            setSelectedStudentId("0");
         }
     }, [isOpen, courseId]);
 
     // Hidratación diferida bajo demanda (Lazy Loading por pestaña activa)
 
-useEffect(() => {
-    if (!isOpen || courseId === null) return;
+    useEffect(() => {
+        if (!isOpen || courseId === null) return;
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            // Modificamos la condición añadiendo: || activeTab === 'trabajos'
-            if ((activeTab === 'alumnado' || activeTab === 'trabajos') && !hasLoadedAlumnado) {
-                const data = await getActiveStudentsByCourse(courseId);
-                setStudents(data);
-                setHasLoadedAlumnado(true); // Marcamos como cargado definitivamente
-                
-                if (onSyncCount) {
-                    onSyncCount(courseId, data.length);
+        const shouldLoadStudents = (activeTab === 'alumnado' || activeTab === 'trabajos') && !hasLoadedAlumnado;
+        const shouldLoadMetrics = activeTab === 'metricas' && !metrics;
+
+        // Evita alternar loading cuando no hay ninguna consulta pendiente.
+        if (!shouldLoadStudents && !shouldLoadMetrics) return;
+
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                if (shouldLoadStudents) {
+                    const data = await getActiveStudentsByCourse(courseId);
+                    setStudents(data);
+                    setHasLoadedAlumnado(true);
+
+                    if (onSyncCount) {
+                        onSyncCount(courseId, data.length);
+                    }
+                } else if (shouldLoadMetrics) {
+                    const data = await getCourseManagementMetrics(courseId);
+                    setMetrics(data);
                 }
-            } else if (activeTab === 'metricas' && !metrics) {
-                const data = await getCourseManagementMetrics(courseId);
-                setMetrics(data);
+            } catch (error) {
+                console.error("Error asíncrono en useCourseManagement:", error);
+            } finally {
+                setLoading(false);
             }
-        } catch (error) {
-            console.error("Error asíncrono en useCourseManagement:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
+        };
 
-    fetchData();
-
-}, [activeTab, courseId, isOpen, hasLoadedAlumnado, metrics, onSyncCount]);
+        fetchData();
+    }, [activeTab, courseId, isOpen, hasLoadedAlumnado, metrics, onSyncCount]);
 
     // Validación estricta de archivo según directiva [ADR-25]
     const [fileError, setFileError] = useState<string | null>(null);
@@ -119,22 +128,6 @@ useEffect(() => {
             setIsSubmitting(false);
         }
     };
-
-    // Añadimos la limpieza de estos estados nuevos al cerrar el modal (dentro del useEffect de limpieza superior)
-    useEffect(() => {
-        if (!isOpen) {
-            setActiveTab('alumnado');
-            setStudents([]);
-            setMetrics(null);
-            setHasLoadedAlumnado(false);
-            // Limpieza perimetral de estados de subida:
-            setSelectedFile(null);
-            setFileError(null);
-            setUploadSuccessMessage(null);
-            setIsSubmitting(false);
-            setSelectedStudentId("0");
-        }
-    }, [isOpen, courseId]);
 
     return {
         activeTab,

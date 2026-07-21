@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useContext } from 'react';
+import { useCallback, useEffect, useState, useContext, useRef } from 'react';
 import { AuthContext } from '../../../auth/AuthContext'; // Ajusta la ruta exacta según dónde guardes tu carpeta /auth/
 import { apiClient } from '../../../services/apiClient'; // Ajustada la ruta de 4 a 3 niveles
 import { getUserDocuments } from '../../../services/documentService'; // Ajustada la ruta de 4 a 3 niveles
@@ -21,58 +21,46 @@ export const useNotifications = () => {
     const [alerts, setAlerts] = useState<NotificationDTO[]>([]);
     const [documents, setDocuments] = useState<DocumentMetadata[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
+    const isFetchingRef = useRef(false);
+
+    // Derivamos dependencias primitivas para evitar refrescos por cambios no funcionales
+    // del objeto user (por ejemplo, expiresAt en el monitor de inactividad).
+    const userId = user?.userId ?? null;
+    const normalizedRole = typeof user?.role === 'string' ? user.role.toUpperCase() : '';
 
     const fetchAlerts = useCallback(async () => {
         // Cortocircuito defensivo: si no hay usuario autenticado o carece de rol, no hacemos peticiones
-        if (!user || !user.role) {
+        if (!userId || !normalizedRole) {
             setAlerts([]);
             setDocuments([]);
             setLoading(false);
             return;
         }
 
+        // Evita solapamiento de peticiones cuando se emiten varios refresh muy seguidos.
+        if (isFetchingRef.current) {
+            return;
+        }
+
         try {
+            isFetchingRef.current = true;
             setLoading(true);
-            
-            // LA CLAVE RECOMENTADA: Bifurcación algorítmica limpia según el rol del usuario
-            const userRole = user.role.toUpperCase();
-
-            if (userRole === 'ADMIN') {
-                // El Administrador consume las alertas del sistema y documentos globales de auditoría
-                const [alertsResponse, docsResponse] = await Promise.all([
-                    apiClient.get<NotificationDTO[]>('/api/auth/notifications'),
-                    getUserDocuments() // Adapta a tu endpoint de administrador si fuera diferente en el futuro
-                ]);
-                setAlerts(alertsResponse.data || []);
-                setDocuments(docsResponse || []);
-
-            } else if (userRole === 'PROFESSOR' || userRole === 'TEACHER') {
-                // El Profesor monitoriza las entregas recibidas de sus alumnos
-                const [alertsResponse, docsResponse] = await Promise.all([
-                    apiClient.get<NotificationDTO[]>('/api/auth/notifications'),
-                    getUserDocuments() // Traerá los documentos donde él figura como 'receiverUser'
-                ]);
-                setAlerts(alertsResponse.data || []);
-                setDocuments(docsResponse || []);
-
-            } else {
-                // Flujo por defecto para Estudiantes (STUDENT)
-                const [alertsResponse, docsResponse] = await Promise.all([
-                    apiClient.get<NotificationDTO[]>('/api/auth/notifications'),
-                    getUserDocuments() // Trae sus documentos y evalúa estados de lectura o progreso
-                ]);
-                setAlerts(alertsResponse.data || []);
-                setDocuments(docsResponse || []);
-            }
+            const [alertsResponse, docsResponse] = await Promise.all([
+                apiClient.get<NotificationDTO[]>('/api/auth/notifications'),
+                getUserDocuments()
+            ]);
+            setAlerts(alertsResponse.data || []);
+            setDocuments(docsResponse || []);
             
         } catch (err) {
             console.error("Error al sincronizar el canal de alarmas académicas o documentos por rol:", err);
             setAlerts([]); 
             setDocuments([]);
         } finally {
+            isFetchingRef.current = false;
             setLoading(false);
         }
-    }, [user]);
+    }, [normalizedRole, userId]);
 
     // Sincronización inicial y escucha de refrescos globales
     useEffect(() => {

@@ -1966,6 +1966,41 @@ Adoptar de manera formal una **Estrategia de Testing en Pirámide**, estructurad
 
 ---
 
+# ADR-056: Componentización y Abstracción del Motor de Búsqueda de Cursos
+
+## Estatus
+
+Aceptado
+
+## Contexto
+
+Originalmente, el sistema contaba con un componente `CourseCatalog.tsx` exclusivo para el rol de estudiante. Con la implementación del panel del profesor, surgió la necesidad de una funcionalidad de búsqueda idéntica (filtrado, visualización en tarjetas, búsqueda por texto) pero con una finalidad distinta: en lugar de matricularse, el profesor selecciona cursos para impartirlos. Duplicar esta lógica violaría el principio **DRY (Don't Repeat Yourself)** y dificultaría el mantenimiento futuro de la base de código.
+
+## Decisión
+
+Se ha decidido factorizar la lógica de búsqueda en un motor agnóstico al rol de usuario mediante la siguiente arquitectura:
+
+1. **Creación del `CourseSearchEngine.tsx`:** Un componente de UI compartido localizado en `frontend/src/components/ui/courseSearch/` que gestiona exclusivamente la visualización, estados de interfaz y el filtrado avanzado de cursos.
+2. **Abstracción de Servicios:** El hook global unificado `useCourseCatalog.ts` se ha trasladado a la capa de servicios globales para desacoplarlo de las vistas y permitir su consumo agnóstico desde cualquier parte del sistema, exponiendo `actionExecutionId` y `executeCourseAction`.
+3. **Implementación de Wrappers (Pickers) por Rol:**
+   * `StudentCoursePicker.tsx`: Envuelve el motor común e inyecta el botón contextual **"Matricularme"** a través de la propiedad parametrizada `renderAction`.
+   * `ProfessorCoursePicker.tsx`: Envuelve el motor común e inyecta el botón contextual **"Impartir Curso"** a través de la misma propiedad `renderAction`.
+4. **Extensibilidad:** El diseño modular queda blindado y preparado para futuras integraciones, como un buscador administrativo orientado a la gestión global del catálogo.
+
+## Consecuencias
+
+### Positivas
+
+* **Reducción de Deuda Técnica:** Eliminación total de código duplicado mediante la centralización de la lógica de negocio y las llamadas asíncronas de búsqueda.
+* **Consistencia Visual:** Todos los roles del sistema consumen la misma interfaz base de búsqueda, garantizando una experiencia de usuario (UX) coherente en la plataforma.
+* **Escalabilidad Inmediata:** Cualquier optimización futura en el motor (como búsquedas predictivas por voz o nuevos filtros estructurados) se propagará automáticamente a todos los roles sin modificar los envoltorios.
+
+### Riesgos
+
+* **Complejidad en Props:** El componente compartido debe ser lo suficientemente abstracto para procesar diferentes acciones contextuales (`renderAction`), lo que incrementa la complejidad de su interfaz de tipos (**TypeScript**) al requerir generics o tipados estrictos para las funciones inyectadas.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026

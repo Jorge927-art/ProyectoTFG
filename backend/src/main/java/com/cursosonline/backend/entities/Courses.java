@@ -52,6 +52,11 @@ public class Courses {
     @Column(nullable = true, columnDefinition = "TEXT")
     private String instructors;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_user_id", nullable = true)
+    private Users assignedUser;
+
     @Column(nullable = true)
     private Float rating;
 

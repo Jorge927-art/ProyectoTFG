@@ -4,6 +4,8 @@ import com.cursosonline.backend.dto.RecommendationDTO;
 import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.exception.ResourceNotFoundException;
+import com.cursosonline.backend.exception.ServicesException;
 import com.cursosonline.backend.services.RecommendationService;
 import com.cursosonline.backend.services.UserService;
 import lombok.RequiredArgsConstructor;
@@ -75,5 +77,37 @@ public class CourseController {
 
         List<RecommendationDTO> recommendations = recommendationService.getRecommendationsForUser(user.getUser_id());
         return ResponseEntity.ok(recommendations);
+    }
+
+    /**
+     * Endpoint transaccional seguro para procesar la asignación relacional de un
+     * curso.
+     * POST /api/courses/{courseId}/assign-teacher
+     */
+    @PostMapping("/{courseId}/assign-teacher")
+    public ResponseEntity<?> assignTeacherToCourse(@PathVariable Long courseId, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
+        try {
+            // Invocamos la lógica de negocio genérica construida en el servicio de usuarios
+            Courses updatedCourse = userService.assignUserToCourse(principal.getName(), courseId);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "El curso ha sido vinculado relacionalmente con éxito.",
+                    "courseId", updatedCourse.getCourse_id(),
+                    "title", updatedCourse.getTitle(),
+                    "assignedUserId", updatedCourse.getAssignedUser().getUser_id(),
+                    "assignedUsername", updatedCourse.getAssignedUser().getUsername(),
+                    "role", updatedCourse.getAssignedUser().getRole().name()));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (ServicesException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Ocurrió un error inesperado al procesar la vinculación relacional."));
+        }
     }
 }
