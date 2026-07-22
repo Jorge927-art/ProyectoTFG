@@ -1,4 +1,4 @@
-package com.cursosonline.backend;
+package com.cursosonline.backend.services;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -21,7 +21,6 @@ import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
-import com.cursosonline.backend.services.UserService;
 
 /**
  * Clase de pruebas unitarias para UserService. Utiliza Mockito para simular el
