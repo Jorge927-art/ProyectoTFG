@@ -1,306 +1,241 @@
-import { X, Users, BookOpen, FileText } from 'lucide-react';
 import { useCourseManagement } from './useCourseManagement';
-import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 
-
-interface CourseManagementModalProps {
+type CourseManagementModalProps = {
     courseId: number | null;
     isOpen: boolean;
     onClose: () => void;
-    // 1. Añadimos la función a la interfaz de propiedades del modal
     onSyncCount?: (courseId: number, count: number) => void;
-}
+};
+
+type LegacyStudentShape = {
+    studentId?: number;
+    fullName?: string;
+    averageScore?: number;
+    progressPercentage?: number;
+    userId?: number;
+    username?: string;
+    email?: string;
+    individualGrade?: number;
+    groupAverage?: number;
+};
+
+type LegacyMetricsShape = {
+    groupAverageScore?: number;
+    activeStudentsCount?: number;
+    pendingTasksCount?: number;
+    groupAverageGrade?: number;
+    pendingSubmissionsCount?: number;
+};
+
+const toDisplayName = (student: unknown): string => {
+    if (typeof student !== 'object' || student === null) return 'Estudiante sin nombre';
+    const candidate = student as { fullName?: string; username?: string };
+    return (candidate.fullName ?? candidate.username ?? 'Estudiante sin nombre').trim();
+};
+
+const toDisplayEmail = (student: unknown): string => {
+    if (typeof student !== 'object' || student === null) return 'Sin correo registrado';
+    const candidate = student as { email?: string };
+    const rawEmail = (candidate.email ?? '').trim();
+    return rawEmail.length > 0 ? `✉${rawEmail}` : 'Sin correo registrado';
+};
+
+const toDisplayGrade = (student: unknown): string => {
+    if (typeof student !== 'object' || student === null) return '0.0 / 10';
+    const candidate = student as { averageScore?: number; individualGrade?: number };
+    const grade = candidate.averageScore ?? candidate.individualGrade ?? 0;
+    return `${grade.toFixed(1)} / 10`;
+};
+
+const toDisplayProgress = (student: unknown): string => {
+    if (typeof student !== 'object' || student === null) return '0%';
+    const candidate = student as { progressPercentage?: number; groupAverage?: number };
+    if (typeof candidate.progressPercentage === 'number') {
+        return `${Math.round(candidate.progressPercentage)}%`;
+    }
+    if (typeof candidate.groupAverage === 'number') {
+        return `${Math.floor(candidate.groupAverage) * 10}%`;
+    }
+    return '0%';
+};
+
+const toStudentKey = (student: LegacyStudentShape, index: number): string | number => {
+    if (typeof student.studentId === 'number') return student.studentId;
+    if (typeof student.userId === 'number') return student.userId;
+    return index;
+};
 
 export const CourseManagementModal = ({
     courseId,
     isOpen,
     onClose,
-    onSyncCount // 2. Extraemos la función aquí
+    onSyncCount
 }: CourseManagementModalProps) => {
+    const management = useCourseManagement(courseId, isOpen, onSyncCount);
 
-    // 3. Se la inyectamos al hook personalizado como tercer parámetro
-    const {
-        activeTab,
-        setActiveTab,
-        students,
-        metrics,
-        loading,
-        fileError,
-        handleFileChange,
-        selectedStudentId,
-        setSelectedStudentId,
-        selectedFile,
-        isSubmitting,
-        uploadSuccessMessage,
-        handleUploadDocument
-    } = useCourseManagement(courseId, isOpen, onSyncCount);
+    if (!isOpen || courseId === null) {
+        return null;
+    }
 
-    if (!isOpen || courseId === null) return null;
+    const isUploadDisabled = management.isSubmitting || !management.selectedFile || Boolean(management.fileError);
+
+    if (management.loading) {
+        return (
+            <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+                <div className="w-full max-w-3xl rounded-xl bg-white p-6 shadow-xl">
+                    <p className="text-center text-sm font-medium text-slate-700">
+                        Hidratando datos mediante Lazy Loading por pestaña...
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    const students = management.students as unknown as LegacyStudentShape[];
+    const metrics = management.metrics as LegacyMetricsShape | null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden border border-slate-100">
-
-                {/* Cabecera de la Consola */}
-                <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
-                    <div>
-                        <h2 className="text-base font-bold text-slate-800">Consola de Gestión de Asignatura</h2>
-                        <p className="text-xs text-slate-400">Control operativo y seguimiento del Curso ID: {courseId}</p>
-                    </div>
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+            <div className="w-full max-w-5xl rounded-xl bg-white p-6 shadow-xl">
+                <div className="mb-4 flex items-start justify-between gap-4">
+                    <h2 className="text-lg font-bold text-slate-800">
+                        Control operativo y seguimiento del Curso ID: {courseId}
+                    </h2>
                     <button
-                        onClick={onClose}
+                        type="button"
                         aria-label="Cerrar gestión del curso"
-                        className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+                        onClick={onClose}
+                        className="rounded-md border border-slate-300 px-3 py-1 text-sm font-semibold text-slate-700"
                     >
-                        <X size={18} />
+                        X
                     </button>
                 </div>
 
-                {/* Selectores de la Consola */}
-                <div className="flex border-b border-slate-100 bg-white px-4 gap-2">
+                <div className="mb-5 flex flex-wrap gap-2">
                     <button
-                        onClick={() => setActiveTab('alumnado')}
-                        className={`flex items-center gap-1.5 py-3 px-2 text-xs font-bold border-b-2 transition-colors ${activeTab === 'alumnado' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'
-                            }`}
+                        type="button"
+                        onClick={() => management.setActiveTab('alumnado')}
+                        className="rounded-md border px-3 py-2 text-sm font-semibold"
                     >
-                        <Users size={14} />
-                        Alumnado y Rendimiento
+                        Alumnado
                     </button>
                     <button
-                        onClick={() => setActiveTab('trabajos')}
-                        className={`flex items-center gap-1.5 py-3 px-2 text-xs font-bold border-b-2 transition-colors ${activeTab === 'trabajos' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'
-                            }`}
+                        type="button"
+                        onClick={() => management.setActiveTab('trabajos')}
+                        className="rounded-md border px-3 py-2 text-sm font-semibold"
                     >
-                        <FileText size={14} />
                         Trabajos y Exámenes
                     </button>
                     <button
-                        onClick={() => setActiveTab('metricas')}
-                        className={`flex items-center gap-1.5 py-3 px-2 text-xs font-bold border-b-2 transition-colors ${activeTab === 'metricas' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'
-                            }`}
+                        type="button"
+                        onClick={() => management.setActiveTab('metricas')}
+                        className="rounded-md border px-3 py-2 text-sm font-semibold"
                     >
-                        <BookOpen size={14} />
                         Métricas Globales
                     </button>
                 </div>
-                {/* Cuerpo Contenedor de la Consola */}
-                <div className="p-6 overflow-y-auto bg-slate-50/50 flex-1 min-h-100">
-                    {loading ? (
-                        <div className="flex flex-col items-center justify-center py-12 gap-2">
-                            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                            <p className="text-xs text-slate-400 font-medium">Hidratando datos mediante Lazy Loading por pestaña...</p>
-                        </div>
-                    ) : (
-                        <>
-                            {/* PESTAÑA PRINCIPAL: ALUMNADO Y RENDIMIENTO [TABLA DE GESTIÓN INTEGRAL EN 3 COLUMNAS] */}
-                            {activeTab === 'alumnado' && (
-                                <div className="w-full bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-                                    {students.length === 0 ? (
-                                        <p className="text-xs text-slate-500 text-center py-12 bg-slate-50/30">
+
+                {management.activeTab === 'alumnado' && (
+                    <div>
+                        <table className="min-w-full border-collapse">
+                            <thead>
+                                <tr>
+                                    <th className="border-b p-2 text-left">Estudiante</th>
+                                    <th className="border-b p-2 text-left">Contacto / Email</th>
+                                    <th className="border-b p-2 text-left">Progreso en Plataforma y Rendimiento Académico</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {students.length > 0 ? (
+                                    students.map((student, index) => (
+                                        <tr key={toStudentKey(student, index)}>
+                                            <td className="border-b p-2">{toDisplayName(student)}</td>
+                                            <td className="border-b p-2">{toDisplayEmail(student)}</td>
+                                            <td className="border-b p-2">
+                                                <span>{toDisplayGrade(student)}</span>
+                                                <span className="ml-3 text-slate-600">{toDisplayProgress(student)}</span>
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td className="p-4 text-center text-slate-600" colSpan={3}>
                                             No hay alumnos activos registrados en esta asignatura.
-                                        </p>
-                                    ) : (
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full border-collapse text-left">
-                                                {/* Cabecera de la Tabla en 3 Columnas */}
-                                                <thead>
-                                                    <tr className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                                        <th className="py-3 px-5 w-1/4">Estudiante</th>
-                                                        <th className="py-3 px-5 w-1/4">Contacto / Email</th>
-                                                        <th className="py-3 px-5 w-2/4">Progreso en Plataforma y Rendimiento Académico</th>
-                                                    </tr>
-                                                </thead>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
 
-                                                {/* Cuerpo de la Tabla con variables reales auditadas */}
-                                                <tbody className="divide-y divide-slate-50">
-                                                    {students.map((student: unknown) => {
-                                                        // Moldear la referencia de forma segura sin usar 'any' para satisfacer a ESLint
-                                                        const s = student as {
-                                                            userId: number;
-                                                            username: string;
-                                                            email: string | null;
-                                                            individualGrade: number | null;
-                                                            groupAverage: number | null;
-                                                        };
+                {management.activeTab === 'trabajos' && (
+                    <div className="space-y-4">
+                        <div>
+                            <label htmlFor="professor-document-upload" className="mb-2 block text-sm font-semibold text-slate-700">
+                                Seleccionar Documento Académico Oficial
+                            </label>
+                            <input
+                                id="professor-document-upload"
+                                type="file"
+                                accept=".pdf,application/pdf"
+                                onChange={management.handleFileChange}
+                                className="block w-full rounded-md border border-slate-300 p-2"
+                            />
+                        </div>
 
-                                                        return (
-                                                            <tr
-                                                                key={s.userId}
-                                                                className="hover:bg-slate-50/80 transition-colors duration-150 align-middle"
-                                                            >
-                                                                {/* Columna 1: Nombre del Estudiante */}
-                                                                <td className="py-4 px-5">
-                                                                    <span className="text-xs font-bold text-slate-800 tracking-tight flex items-center gap-1.5 whitespace-nowrap">
-                                                                        <span>👤</span>
-                                                                        <span className="truncate max-w-35 inline-block">{s.username}</span>
-                                                                    </span>
-                                                                </td>
+                        {management.fileError && (
+                            <p className="rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+                                ⚠ {management.fileError}
+                            </p>
+                        )}
 
-                                                                {/* Columna 2: Email con tono oscuro corregido */}
-                                                                <td className="py-4 px-5">
-                                                                    {s.email && s.email.trim().length > 0 ? (
-                                                                        <span className="text-[10px] text-slate-500 font-medium block truncate max-w-45">
-                                                                            ✉ {s.email}
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="text-[10px] text-slate-500 font-medium italic block">
-                                                                            Sin correo registrado
-                                                                        </span>
-                                                                    )}
-                                                                </td>
+                        {management.uploadSuccessMessage && (
+                            <p className="rounded-md bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
+                                ✓ {management.uploadSuccessMessage}
+                            </p>
+                        )}
 
-                                                                {/* Columna 3: Consola Analítica Pedagógica Dual */}
-                                                                <td className="py-4 px-5">
-                                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-                                                                        {/* Dimensión 1: Progreso en Plataforma */}
-                                                                        <div className="flex flex-col justify-center">
-                                                                            <div className="flex justify-between text-[10px] text-slate-500 mb-1">
-                                                                                <span className="font-medium">Progreso Individual</span>
-                                                                                <span className="font-bold text-blue-600">70%</span>
-                                                                            </div>
-                                                                            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden relative">
-                                                                                <div
-                                                                                    className="bg-blue-600 h-full rounded-full transition-all duration-500 absolute top-0 left-0"
-                                                                                    style={{ width: '70%' }}
-                                                                                />
-                                                                            </div>
-                                                                        </div>
+                        <button
+                            type="button"
+                            disabled={isUploadDisabled}
+                            onClick={management.handleUploadDocument}
+                            className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+                        >
+                            {management.isSubmitting ? 'Transmitiendo Documento...' : 'Transmitir y Publicar Documento'}
+                        </button>
+                    </div>
+                )}
 
-                                                                        {/* Dimensión 2: Calificación Física vs Media del Grupo */}
-                                                                        <div className="flex flex-col justify-center">
-                                                                            <div className="flex justify-between text-[10px] text-slate-500 mb-1">
-                                                                                <span className="font-medium">Nota Alumno vs Media Grupo (Gris)</span>
-                                                                                <span className="font-bold text-emerald-600">
-                                                                                    {(s.individualGrade ?? 0).toFixed(1)} / 10
-                                                                                </span>
-                                                                            </div>
-                                                                            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden relative">
-                                                                                {/* Barra de Fondo de Control (Media del Grupo) */}
-                                                                                <div
-                                                                                    className="bg-slate-300/60 h-full absolute top-0 left-0 transition-all duration-500"
-                                                                                    style={{ width: `${(s.groupAverage ?? 6.5) * 10}%` }}
-                                                                                />
-                                                                                {/* Barra de Color Superior (Nota del Alumno) */}
-                                                                                <div
-                                                                                    className="bg-emerald-500 h-full rounded-full transition-all duration-500 absolute top-0 left-0 mix-blend-multiply sm:mix-blend-normal"
-                                                                                    style={{ width: `${(s.individualGrade ?? 0) * 10}%` }}
-                                                                                />
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
+                {management.activeTab === 'metricas' && (
+                    <div>
+                        {metrics ? (
+                            <div className="grid gap-3 md:grid-cols-3">
+                                <div className="rounded-md border p-3">
+                                    <p className="text-xs font-bold text-slate-500">Rendimiento Consolidado del Grupo</p>
+                                    <p className="mt-2 text-xs font-semibold text-slate-500">MEDIA GENERAL</p>
+                                    <p className="text-2xl font-bold text-slate-800">
+                                        {(metrics.groupAverageScore ?? metrics.groupAverageGrade ?? 0).toFixed(2)}
+                                    </p>
                                 </div>
-                            )}
-
-                            {/* PESTAÑA: TRABAJOS Y EXÁMENES [DOCUMENT MANAGER SENDER + VALIDACIÓN PDF ADR-25] */}
-                            {activeTab === 'trabajos' && (
-                                <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm max-w-xl mx-auto">
-                                    <div className="mb-5">
-                                        <h3 className="text-xs font-bold text-green-700 uppercase tracking-wider mb-1">
-                                            Document Manager (Sender Mode)
-                                        </h3>
-                                        <p className="text-xs text-slate-400">
-                                            Emite y publica guías, enunciados de exámenes o proyectos académicos directamente al tablón oficial de la asignatura.
-                                        </p>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        {/* NUEVO SELECTOR DE DESTINATARIO (Aquí es donde usamos las variables) */}
-                                        <div>
-                                            <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
-                                                Seleccionar Destinatario del Documento
-                                            </label>
-                                            <select
-                                                value={selectedStudentId}
-                                                onChange={(e) => setSelectedStudentId(e.target.value)}
-                                                className="w-full text-xs text-slate-700 border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:outline-none focus:border-blue-500 font-medium"
-                                            >
-                                                <option value="0">✨ Toda la clase (Envío masivo)</option>
-                                                {students.map((student) => (
-                                                    <option key={student.studentId} value={student.studentId}>
-                                                        👤 {student.fullName} ({student.email})
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        {/* SELECCIÓN DE ARCHIVO (Ya existente debajo) */}
-                                        <div>
-                                            <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
-                                                Seleccionar Documento Académico Oficial
-                                            </label>
-                                            <input
-                                                type="file"
-                                                accept=".pdf"
-                                                onChange={handleFileChange}
-                                                className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 transition-colors border border-slate-200 rounded-lg p-1 bg-slate-50"
-                                            />
-                                        </div>
-
-                                        {fileError && (
-                                            <div className="p-2.5 bg-red-50 border border-red-100 rounded-lg text-[11px] text-red-600 font-medium">
-                                                ⚠ {fileError}
-                                            </div>
-                                        )}
-
-                                        {/* Inyectar justo aquí el NUEVO MENSAJE DE ÉXITO EN COLOR VERDE */}
-                                        {uploadSuccessMessage && (
-                                            <div className="p-2.5 bg-green-50 border border-green-100 rounded-lg text-[11px] text-green-700 font-bold">
-                                                ✓ {uploadSuccessMessage}
-                                            </div>
-                                        )}
-                                        <GenericButton
-                                            variant="primary"
-                                            label={isSubmitting ? "Transmitiendo Documento..." : "Transmitir y Publicar Documento"}
-                                            disabled={isSubmitting || !selectedFile || !!fileError} // Bloqueado si sube o no hay archivo seleccionado
-                                            onClick={handleUploadDocument} // Dispara la subida real en el hook
-                                            className="w-full text-xs! font-bold! py-2.5! px-4! rounded-lg! bg-blue-600! hover:bg-blue-700! text-white! justify-center disabled:bg-slate-300!"
-                                        />
-                                    </div>
+                                <div className="rounded-md border p-3">
+                                    <p className="text-xs font-semibold text-slate-500">ALUMNOS ACTIVOS</p>
+                                    <p className="text-2xl font-bold text-slate-800">{metrics.activeStudentsCount ?? 0}</p>
                                 </div>
-                            )}
-                            {/* PESTAÑA: MÉTRICAS GLOBALES */}
-                            {activeTab === 'metricas' && (
-                                <div className="max-w-md mx-auto bg-white p-6 rounded-xl border border-slate-100 shadow-sm space-y-4">
-                                    <h3 className="text-xs font-bold text-slate-800 border-b border-slate-100 pb-2">
-                                        Rendimiento Consolidado del Grupo
-                                    </h3>
-                                    {metrics ? (
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Media General</p>
-                                                <p className="text-lg font-extrabold text-slate-800 mt-1">
-                                                    {((metrics as unknown as { groupAverageGrade: number }).groupAverageGrade ?? 0).toFixed(2)}
-                                                </p>
-                                            </div>
-                                            <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Alumnos Activos</p>
-                                                <p className="text-lg font-extrabold text-slate-800 mt-1">
-                                                    {metrics.activeStudentsCount}
-                                                </p>
-                                            </div>
-                                            <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg col-span-2">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Entregas Pendientes de Revisión</p>
-                                                <p className="text-lg font-extrabold text-amber-600 mt-1">
-                                                    {((metrics as unknown as { pendingSubmissionsCount: number }).pendingSubmissionsCount ?? 0)} tareas
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <p className="text-xs text-slate-400 text-center py-4">No se pudieron recuperar las métricas globales del curso.</p>
-                                    )}
+                                <div className="rounded-md border p-3">
+                                    <p className="text-xs font-semibold text-slate-500">PENDIENTES</p>
+                                    <p className="text-2xl font-bold text-slate-800">
+                                        {metrics.pendingTasksCount ?? metrics.pendingSubmissionsCount ?? 0} tareas
+                                    </p>
                                 </div>
-                            )}
-                        </>
-                    )}
-                </div>
+                            </div>
+                        ) : (
+                            <p className="rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+                                No se pudieron recuperar las métricas globales del curso.
+                            </p>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

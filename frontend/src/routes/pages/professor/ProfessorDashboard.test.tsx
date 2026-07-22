@@ -7,7 +7,7 @@ vi.mock('../../layouts/DashboardLayout', () => ({
     default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
 }));
 
-vi.mock('../../../../services/evaluationService', () => ({
+vi.mock('../../../services/evaluationService', () => ({
     getActiveStudentsByCourse: vi.fn().mockResolvedValue([]),
     getCourseManagementMetrics: vi.fn().mockResolvedValue({
         groupAverageScore: 7.2,
@@ -16,20 +16,26 @@ vi.mock('../../../../services/evaluationService', () => ({
     })
 }));
 
-vi.mock('./components/useCourseManagement', () => ({
-    useCourseManagement: () => ({
-        activeTab: 'alumnado',
-        setActiveTab: vi.fn(),
-        students: [], // <-- Soluciona definitivamente el error .length de undefined
-        metrics: {
-            activeStudentsCount: 0,
-            groupAverageGrade: 0,
-            pendingSubmissionsCount: 0
-        },
-        loading: false,
-        fileError: null,
-        handleFileChange: vi.fn()
-    })
+vi.mock('./components/CourseManagementModal', () => ({
+    CourseManagementModal: ({
+        courseId,
+        isOpen,
+        onClose
+    }: {
+        courseId: number | null;
+        isOpen: boolean;
+        onClose: () => void;
+    }) => {
+        if (!isOpen || courseId === null) return null;
+        return (
+            <div>
+                <h2>Control operativo y seguimiento del Curso ID: {courseId}</h2>
+                <button type="button" aria-label="Cerrar gestión del curso" onClick={onClose}>
+                    X
+                </button>
+            </div>
+        );
+    }
 }));
 
 describe('ProfessorDashboard', () => {
@@ -44,7 +50,7 @@ describe('ProfessorDashboard', () => {
 
         await user.click(screen.getAllByRole('button', { name: 'Gestionar Curso' })[0]);
 
-        expect(screen.getByText('Consola de Gestión de Asignatura')).toBeInTheDocument();
+        expect(screen.getByText('Control operativo y seguimiento del Curso ID: 1')).toBeInTheDocument();
         expect(screen.getByText(/Curso ID: 1/)).toBeInTheDocument();
     });
 
@@ -55,11 +61,11 @@ describe('ProfessorDashboard', () => {
 
         await user.click(screen.getAllByRole('button', { name: 'Gestionar Curso' })[0]);
 
-        expect(screen.getByText('Consola de Gestión de Asignatura')).toBeInTheDocument();
+        expect(screen.getByText('Control operativo y seguimiento del Curso ID: 1')).toBeInTheDocument();
 
         await user.click(screen.getByRole('button', { name: 'Cerrar gestión del curso' }));
 
-        expect(screen.queryByText('Consola de Gestión de Asignatura')).not.toBeInTheDocument();
+        expect(screen.queryByText('Control operativo y seguimiento del Curso ID: 1')).not.toBeInTheDocument();
         expect(screen.queryByText(/Curso ID: 1/)).not.toBeInTheDocument();
     });
 });

@@ -4,5 +4,7 @@ import { cleanup } from '@testing-library/react';
 
 afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
+    vi.resetAllMocks();
     vi.clearAllMocks();
 });
