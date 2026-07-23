@@ -40,88 +40,91 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 @Transactional
 public class TeacherEvaluationFlowIntegrationTest {
 
-    private MockMvc mockMvc;
+        private MockMvc mockMvc;
 
-    @Autowired
-    private WebApplicationContext webApplicationContext; // Captura el contexto de Spring nativo
+        @Autowired
+        private WebApplicationContext webApplicationContext; // Captura el contexto de Spring nativo
 
-    @Autowired
-    private UserRepository userRepository;
+        @Autowired
+        private UserRepository userRepository;
 
-    @Autowired
-    private DocumentMetadataRepository documentMetadataRepository;
+        @Autowired
+        private DocumentMetadataRepository documentMetadataRepository;
 
-    private Users alumnoReceptor;
+        private Users alumnoReceptor;
 
-    @BeforeEach
-    public void setUp() {
-        // Inicializamos MockMvc aplicando de forma estricta los filtros perimetrales de
-        // Spring Security
-        this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
-                .apply(springSecurity()) // <--- Añadimos esta línea mágica
-                .build();
+        @BeforeEach
+        public void setUp() {
+                // Inicializamos MockMvc aplicando de forma estricta los filtros perimetrales de
+                // Spring Security
+                this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                                .apply(springSecurity()) // <--- Añadimos esta línea mágica
+                                .build();
 
-        // Limpiamos la tabla de documentos para arrancar la prueba a cero
-        documentMetadataRepository.deleteAll();
+                // Limpiamos la tabla de documentos para arrancar la prueba a cero
+                documentMetadataRepository.deleteAll();
 
-        // Aseguramos que existan las cuentas necesarias creadas previamente en el
-        // sistema
-        userRepository.findByUsername("profesor_test").orElseGet(() -> {
-            Users u = new Users();
-            u.setUsername("profesor_test");
-            u.setEmail("profesor@cursos.com");
-            u.setPassword("password_mock_123"); // 1. Evita la restricción NOT NULL en BD
-            u.setRole(Role.PROFESSOR);
-            return userRepository.save(u);
-        });
+                // Aseguramos que existan las cuentas necesarias creadas previamente en el
+                // sistema
+                userRepository.findByUsername("profesor_test").orElseGet(() -> {
+                        Users u = new Users();
+                        u.setUsername("profesor_test");
+                        u.setEmail("profesor@cursos.com");
+                        u.setPassword("password_mock_123"); // 1. Evita la restricción NOT NULL en BD
+                        u.setRole(Role.PROFESSOR);
+                        return userRepository.save(u);
+                });
 
-        alumnoReceptor = userRepository.findByUsername("alumno_test").orElseGet(() -> {
-            Users u = new Users();
-            u.setUsername("alumno_test");
-            u.setEmail("alumno@cursos.com");
-            u.setPassword("password_mock_123"); // 2. Evita la restricción NOT NULL en BD
-            u.setRole(Role.STUDENT);
-            return userRepository.save(u);
-        });
-    }
+                alumnoReceptor = userRepository.findByUsername("alumno_test").orElseGet(() -> {
+                        Users u = new Users();
+                        u.setUsername("alumno_test");
+                        u.setEmail("alumno@cursos.com");
+                        u.setPassword("password_mock_123"); // 2. Evita la restricción NOT NULL en BD
+                        u.setRole(Role.STUDENT);
+                        return userRepository.save(u);
+                });
+        }
 
-    @Test
-    @WithMockUser(username = "profesor_test", roles = { "PROFESSOR" }) // El test actúa bajo el rol de Profesor legítimo
-    public void alEnviarDocumentoAAlumnoEspecifico_DebePersistirRegistrosConReceiverIdCorrecto() throws Exception {
+        @Test
+        @WithMockUser(username = "profesor_test", roles = { "PROFESSOR" }) // El test actúa bajo el rol de Profesor
+                                                                           // legítimo
+        public void alEnviarDocumentoAAlumnoEspecifico_DebePersistirRegistrosConReceiverIdCorrecto() throws Exception {
 
-        // El profesor selecciona un PDF legítimo de sus archivos locales [ADR-25]
-        MockMultipartFile fakePdf = new MockMultipartFile(
-                "file",
-                "guia_arquitectura.pdf",
-                "application/pdf",
-                "%PDF-1.4 ... datos ficticios binarios".getBytes());
+                // El profesor selecciona un PDF legítimo de sus archivos locales [ADR-25]
+                MockMultipartFile fakePdf = new MockMultipartFile(
+                                "file",
+                                "guia_arquitectura.pdf",
+                                "application/pdf",
+                                "%PDF-1.4 ... datos ficticios binarios".getBytes());
 
-        Long courseId = 1L; // ID del curso gestionado actualmente por el profesor en la UI
-        Long receiverId = alumnoReceptor.getUser_id(); // ID del alumno seleccionado en el desplegable de la clase
+                Long courseId = 1L; // ID del curso gestionado actualmente por el profesor en la UI
+                Long receiverId = alumnoReceptor.getUser_id(); // ID del alumno seleccionado en el desplegable de la
+                                                               // clase
 
-        // Se ejecuta la acción del botón de la interfaz: Transmitir Documento
-        mockMvc.perform(multipart("/api/v1/documents/professor-upload")
-                .file(fakePdf)
-                .param("courseId", courseId.toString())
-                .param("receiverId", receiverId.toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Documento enviado con éxito de forma individual al alumno"));
+                // Se ejecuta la acción del botón de la interfaz: Transmitir Documento
+                mockMvc.perform(multipart("/api/v1/documents/professor-upload")
+                                .file(fakePdf)
+                                .param("courseId", courseId.toString())
+                                .param("receiverId", receiverId.toString()))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.message")
+                                                .value("Documento enviado con éxito de forma individual al alumno"));
 
-        // Verificamos que la base de datos guardó los metadatos correspondientes de la
-        // acción
-        List<DocumentMetadata> savedDocs = documentMetadataRepository.findAll();
-        assertEquals(2, savedDocs.size(), "Deberían generarse los registros de metadatos (SENT y RECEIVED)");
+                // Verificamos que la base de datos guardó los metadatos correspondientes de la
+                // acción
+                List<DocumentMetadata> savedDocs = documentMetadataRepository.findAll();
+                assertEquals(2, savedDocs.size(), "Deberían generarse los registros de metadatos (SENT y RECEIVED)");
 
-        DocumentMetadata receivedDoc = savedDocs.stream()
-                .filter(d -> d.getFolder_type() == FolderType.RECEIVED)
-                .findFirst()
-                .orElse(null);
+                DocumentMetadata receivedDoc = savedDocs.stream()
+                                .filter(d -> d.getFolder_type() == FolderType.RECEIVED)
+                                .findFirst()
+                                .orElse(null);
 
-        assertNotNull(receivedDoc, "El alumno debe tener el documento disponible en su bandeja");
-        assertEquals("profesor_test", receivedDoc.getSender().getUsername(),
-                "El emisor registrado debe ser el profesor");
-        assertEquals("alumno_test", receivedDoc.getReceiver().getUsername(),
-                "El receptor debe coincidir con el alumno elegido");
-        assertFalse(receivedDoc.isRead(), "Debe marcarse como no leído para activar sus notificaciones");
-    }
+                assertNotNull(receivedDoc, "El alumno debe tener el documento disponible en su bandeja");
+                assertEquals("profesor_test", receivedDoc.getSender().getUsername(),
+                                "El emisor registrado debe ser el profesor");
+                assertEquals("alumno_test", receivedDoc.getReceiver().getUsername(),
+                                "El receptor debe coincidir con el alumno elegido");
+                assertFalse(receivedDoc.isRead(), "Debe marcarse como no leído para activar sus notificaciones");
+        }
 }
