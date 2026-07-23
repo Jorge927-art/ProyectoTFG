@@ -23,6 +23,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 /**
  * Clase de configuración de seguridad para la aplicación.
  * Configura la seguridad HTTP, CORS, CSRF, gestión de sesiones y filtros de
