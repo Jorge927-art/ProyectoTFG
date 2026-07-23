@@ -26,6 +26,10 @@ import java.util.List;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.Locale;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -245,6 +249,121 @@ public class UserService {
         // [CORREGIDO] Invocamos al repositorio paginado y desenvolvemos la lista con
         // .getContent()
         return coursesRepository.searchCoursesPredictive(formattedKeyword, startKeyword, pageSize).getContent();
+    }
+
+    /**
+     * Recupera las asignaturas vinculadas al profesor autenticado para hidratar
+     * su panel tras iniciar sesión.
+     */
+    @Transactional(readOnly = true)
+    public List<Courses> getAssignedCoursesForProfessor(String principalIdentity) {
+        Optional<Users> userByUsername = userRepository.findByUsername(principalIdentity);
+        Optional<Users> userByEmail = userByUsername.isPresent()
+                ? Optional.empty()
+                : userRepository.findByEmailIgnoreCase(principalIdentity);
+
+        Users user = userByUsername.orElseGet(() -> userByEmail.orElse(null));
+        Set<String> aliases = buildProfessorAliases(principalIdentity, user);
+
+        Set<Long> seenCourseIds = new LinkedHashSet<>();
+        List<Courses> mergedCourses = new ArrayList<>();
+
+        for (String alias : aliases) {
+            List<Courses> relationalAndDirectMatches = coursesRepository.findAllAssignedToProfessor(alias);
+            for (Courses course : relationalAndDirectMatches) {
+                if (course.getCourse_id() == null || seenCourseIds.add(course.getCourse_id())) {
+                    mergedCourses.add(course);
+                }
+            }
+        }
+
+        if (!aliases.isEmpty()) {
+            List<Courses> legacyCandidates = coursesRepository.findAllByInstructorsIsNotNullOrderByTitleAsc();
+
+            for (Courses course : legacyCandidates) {
+                Long courseId = course.getCourse_id();
+                if (courseId != null && seenCourseIds.contains(courseId)) {
+                    continue;
+                }
+
+                if (isLegacyInstructorOwnedByProfessor(course.getInstructors(), aliases)) {
+                    mergedCourses.add(course);
+                    if (courseId != null) {
+                        seenCourseIds.add(courseId);
+                    }
+                }
+            }
+        }
+
+        return mergedCourses;
+    }
+
+    private Set<String> buildProfessorAliases(String principalIdentity, Users user) {
+        Set<String> aliases = new LinkedHashSet<>();
+        addAlias(aliases, principalIdentity);
+        splitAndAddTokens(aliases, principalIdentity);
+
+        if (user != null) {
+            addAlias(aliases, user.getUsername());
+            addAlias(aliases, user.getEmail());
+
+            String email = user.getEmail();
+            if (email != null) {
+                int atIndex = email.indexOf('@');
+                if (atIndex > 0) {
+                    addAlias(aliases, email.substring(0, atIndex));
+                }
+            }
+
+            splitAndAddTokens(aliases, user.getUsername());
+            splitAndAddTokens(aliases, user.getEmail());
+        }
+
+        return aliases;
+    }
+
+    private void splitAndAddTokens(Set<String> aliases, String rawValue) {
+        if (rawValue == null) {
+            return;
+        }
+
+        String[] parts = rawValue.split("[\\s._@-]+");
+        for (String part : parts) {
+            if (part != null && part.length() >= 3) {
+                addAlias(aliases, part);
+            }
+        }
+    }
+
+    private void addAlias(Set<String> aliases, String rawAlias) {
+        if (rawAlias == null) {
+            return;
+        }
+
+        String normalized = rawAlias.trim().toLowerCase(Locale.ROOT);
+        if (!normalized.isEmpty()) {
+            aliases.add(normalized);
+        }
+    }
+
+    private boolean isLegacyInstructorOwnedByProfessor(String instructors, Set<String> aliases) {
+        if (instructors == null || instructors.trim().isEmpty()) {
+            return false;
+        }
+
+        String[] tokens = instructors.split(",");
+        for (String token : tokens) {
+            String normalizedToken = token.trim().toLowerCase(Locale.ROOT);
+            if (normalizedToken.isEmpty()) {
+                continue;
+            }
+
+            if (aliases.contains(normalizedToken)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

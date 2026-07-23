@@ -126,5 +126,44 @@ describe('TaughtCoursesGrid - Suite de Pruebas Unitarias de la Cuadrícula del P
         expect(iconosRenderizados).toHaveLength(2);
         expect(iconosRenderizados[0]).toBeInTheDocument();
     });
+
+    it('Debe mantener la cuadrícula sin scroll cuando hay un máximo de 4 asignaturas', () => {
+        const fourCourses: readonly Course[] = [
+            ...sampleCoursesList,
+            { id: 103, category: 'CLOUD', title: 'Fundamentos de Kubernetes', studentsCount: 22 },
+            { id: 104, category: 'DEVOPS', title: 'Pipelines CI/CD con GitHub Actions', studentsCount: 19 }
+        ];
+
+        render(
+            <TaughtCoursesGrid
+                courses={fourCourses}
+                onManageCourse={mockOnManageCourse}
+            />
+        );
+
+        const scrollContainer = screen.getByTestId('taught-courses-scroll-container');
+        expect(scrollContainer.className).toContain('overflow-y-visible');
+        expect(scrollContainer.className).not.toContain('overflow-y-auto');
+    });
+
+    it('Debe activar el scroll vertical cuando se superan 4 asignaturas', () => {
+        const fiveCourses: readonly Course[] = [
+            ...sampleCoursesList,
+            { id: 103, category: 'CLOUD', title: 'Fundamentos de Kubernetes', studentsCount: 22 },
+            { id: 104, category: 'DEVOPS', title: 'Pipelines CI/CD con GitHub Actions', studentsCount: 19 },
+            { id: 105, category: 'ARQUITECTURA', title: 'Patrones de Microservicios', studentsCount: 31 }
+        ];
+
+        render(
+            <TaughtCoursesGrid
+                courses={fiveCourses}
+                onManageCourse={mockOnManageCourse}
+            />
+        );
+
+        const scrollContainer = screen.getByTestId('taught-courses-scroll-container');
+        expect(scrollContainer.className).toContain('overflow-y-auto');
+        expect(scrollContainer.className).toContain('max-h-[28rem]');
+    });
 });
 

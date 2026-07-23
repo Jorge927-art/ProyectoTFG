@@ -3,6 +3,15 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { ProfessorCoursePicker } from './ProfessorCoursePicker';
 import * as courseCatalogModule from '../../../../services/useCourseCatalog';
 
+vi.mock('../../../../auth/useAuth', () => ({
+    useAuth: () => ({
+        user: {
+            username: 'Laura',
+            email: 'laura@universidad.edu'
+        }
+    })
+}));
+
 describe('ProfessorCoursePicker - Suite de Cobertura Funcional y Regresividad Visual', () => {
     const mockOnSelectionSuccess = vi.fn();
     let useCourseCatalogSpy: ReturnType<typeof vi.spyOn>;
@@ -138,6 +147,50 @@ describe('ProfessorCoursePicker - Suite de Cobertura Funcional y Regresividad Vi
 
         const unavailableButton = within(courseCard as HTMLElement).getByRole('button', { name: /Curso no disponible/i });
         expect(unavailableButton).toBeDisabled();
+    });
+
+    it('Debe mostrar "Curso asignado" al cargar si el curso ya pertenece al profesor autenticado', () => {
+        render(
+            <ProfessorCoursePicker
+                onSelectionSuccess={mockOnSelectionSuccess}
+                initialAssignedCourseIds={[501]}
+            />
+        );
+
+        const courseTitle = screen.getByText('Data Analysis Using Python');
+        const courseCard = courseTitle.closest('div.flex.flex-col.h-full.justify-between');
+
+        expect(courseCard).not.toBeNull();
+
+        const assignedButton = within(courseCard as HTMLElement).getByRole('button', { name: /Curso asignado/i });
+        expect(assignedButton).toBeDisabled();
+    });
+
+    it('Debe mostrar "Curso asignado" cuando el instructor coincide con un alias del profesor autenticado', () => {
+        const aliasCourseCatalog = [
+            {
+                course_id: 701,
+                title: 'Testing Legacy Data Binding',
+                category: 'General',
+                instructors: 'Laura',
+                rating: 4.9
+            }
+        ];
+
+        useCourseCatalogSpy.mockReturnValue({
+            ...defaultHookReturn,
+            catalogCourses: aliasCourseCatalog
+        } as unknown as ReturnType<typeof courseCatalogModule.useCourseCatalog>);
+
+        render(<ProfessorCoursePicker onSelectionSuccess={mockOnSelectionSuccess} />);
+
+        const courseTitle = screen.getByText('Testing Legacy Data Binding');
+        const courseCard = courseTitle.closest('div.flex.flex-col.h-full.justify-between');
+
+        expect(courseCard).not.toBeNull();
+
+        const assignedButton = within(courseCard as HTMLElement).getByRole('button', { name: /Curso asignado/i });
+        expect(assignedButton).toBeDisabled();
     });
 
     /* =========================================================================

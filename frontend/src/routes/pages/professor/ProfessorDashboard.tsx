@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'; // 1. Añadimos useEffect aquí
+import { useState, useCallback, useEffect } from 'react';
 import { BookOpen, ArrowRight, Activity } from 'lucide-react';
+import { useAuth } from '../../../auth/useAuth';
 import GenericCard from '../../../components/ui/genericCard/GenericCard';
 import ProfessorLayout from '../../layouts/DashboardLayout';
 import TaughtCoursesGrid from './components/TaughtCoursesGrid';
@@ -18,75 +19,90 @@ import type { TaughtCourse, TeacherMetric } from '../../../services/userDomains'
 import type { DBModelCourse } from '../../../services/courseTypes';
 
 // 2. Importamos el servicio para contar los alumnos de raíz
-import { getActiveStudentsByCourse } from '../../../services/evaluationService';
-
-const INITIAL_COURSES: TaughtCourse[] = [
-    { id: 1, title: "Desarrollo Backend con Spring Boot y Java", studentsCount: 0, averageProgress: 75, category: "Programación" },
-    { id: 3, title: "Persistencia de Datos con PostgreSQL y Hibernate", studentsCount: 0, averageProgress: 60, category: "Bases de Datos" }
-];
+import { getActiveStudentsByCourse, getProfessorAssignedCourses } from '../../../services/evaluationService';
 
 const DASHBOARD_METRICS: TeacherMetric[] = [
     { id: 201, title: "Alumnos Activos esta semana", value: "68 / 73", description: "93% de participación en plataforma", type: "actividad" },
     { id: 202, title: "Tareas pendientes de revisión", value: 12, description: "Proyectos finales del módulo Backend", type: "tareas" }
 ];
 
+const normalizeCategory = (course: DBModelCourse): string => {
+    const category = (course.category || '').trim();
+    const subCategory = (course.subCategory || '').trim();
+    const courseType = (course.courseType || '').trim();
+
+    // Si la categoría principal es demasiado genérica, priorizamos una etiqueta más específica.
+    if (category.toLowerCase() === 'general') {
+        if (subCategory.length > 0) return subCategory;
+        if (courseType.length > 0) return courseType;
+    }
+
+    if (category.length > 0) return category;
+    if (subCategory.length > 0) return subCategory;
+    if (courseType.length > 0) return courseType;
+
+    return 'General';
+};
+
 const ProfessorDashboard = () => {
+    const { user } = useAuth();
+
+    const professorAliases = [
+        user?.username,
+        user?.email,
+        user?.email?.split('@')[0],
+        ...(user?.username ? user.username.split(/[\s._@-]+/) : [])
+    ]
+        .filter((value): value is string => typeof value === 'string')
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0);
+
     // Estado reactivo unificado plano (NotebookLM) para controlar el modal
     const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
 
     // 1. ESTADO DE ASIGNATURAS IMPARTIDAS POR EL PROFESOR
-    const [myCourses, setMyCourses] = useState<TaughtCourse[]>(INITIAL_COURSES);
+    const [myCourses, setMyCourses] = useState<TaughtCourse[]>([]);
 
-    // 3. EFECTO DE CARGA INICIAL: Hidratar los contadores de alumnos reales nada más abrir la página
     useEffect(() => {
         let cancelled = false;
 
-        const loadRealStudentCounts = async () => {
+        const hydrateAssignedCourses = async () => {
             try {
-                // Mapeamos los cursos y traemos la longitud real de alumnos de cada uno en paralelo
-                const updatedCourses = await Promise.all(
-                    INITIAL_COURSES.map(async (course) => {
-                        const studentsData = await getActiveStudentsByCourse(course.id);
+                const assignedCourses = await getProfessorAssignedCourses();
+
+                const coursesWithCounts = await Promise.all(
+                    assignedCourses.map(async (course) => {
+                        let studentsCount = 0;
+
+                        try {
+                            const studentsData = await getActiveStudentsByCourse(course.course_id);
+                            studentsCount = studentsData.length;
+                        } catch (error) {
+                            console.error(`Error cargando el conteo de alumnos para el curso ${course.course_id}:`, error);
+                        }
+
                         return {
-                            ...course,
-                            studentsCount: studentsData.length // Reemplaza el valor estático por la cantidad real de la API
-                        };
+                            id: course.course_id,
+                            title: course.title,
+                            category: normalizeCategory(course),
+                            studentsCount,
+                            averageProgress: 0
+                        } as TaughtCourse;
                     })
                 );
 
                 if (cancelled) return;
-
-                // Solo mutamos estado si de verdad cambió el contador de algún curso.
-                setMyCourses((prevCourses) => {
-                    const countByCourseId = new Map(updatedCourses.map((course) => [course.id, course.studentsCount]));
-                    let hasAnyChange = false;
-
-                    const nextCourses = prevCourses.map((course) => {
-                        const nextCount = countByCourseId.get(course.id);
-                        if (typeof nextCount !== 'number' || nextCount === course.studentsCount) {
-                            return course;
-                        }
-
-                        hasAnyChange = true;
-                        return {
-                            ...course,
-                            studentsCount: nextCount
-                        };
-                    });
-
-                    return hasAnyChange ? nextCourses : prevCourses;
-                });
+                setMyCourses(coursesWithCounts);
             } catch (error) {
-                console.error("Error cargando los contadores reales en el Dashboard:", error);
+                console.error('Error hidratando asignaturas asignadas del profesor:', error);
             }
         };
 
-        loadRealStudentCounts();
+        hydrateAssignedCourses();
 
         return () => {
             cancelled = true;
         };
-        // Se ejecuta una sola vez al montar el componente de forma segura
     }, []);
 
     // Función intermedia para actualizar el contador real enviado desde el modal (mantiene sincronía si hay cambios dentro)
@@ -111,13 +127,22 @@ const ProfessorDashboard = () => {
      * Callback reactivo que se dispara cuando el buscador común confirma la asignación exitosa en el backend.
      * Transforma el modelo canónico DBModelCourse al dominio local TaughtCourse para inyectarlo en caliente.
      */
-    const handleCourseSelectionSuccess = useCallback((newCourse: DBModelCourse) => {
+    const handleCourseSelectionSuccess = useCallback(async (newCourse: DBModelCourse) => {
+        let studentsCount = 0;
+
+        try {
+            const studentsData = await getActiveStudentsByCourse(newCourse.course_id);
+            studentsCount = studentsData.length;
+        } catch (error) {
+            console.error("Error cargando el conteo inicial de alumnos para el curso asignado:", error);
+        }
+
         const adaptedCourse: TaughtCourse = {
             id: newCourse.course_id,
             title: newCourse.title,
-            category: newCourse.category || 'General',
-            studentsCount: 0,       // Asignatura recién asumida por el profesor, empieza vacía
-            averageProgress: 0      // Progreso inicial de la cohorte
+            category: normalizeCategory(newCourse),
+            studentsCount,
+            averageProgress: 0
         };
 
         setMyCourses(prevCourses => {
@@ -151,7 +176,11 @@ const ProfessorDashboard = () => {
                Ocupa de forma independiente todo el ancho horizontal superior sin deformar las columnas.
             */}
             <div className="w-full block mb-8 overflow-x-hidden">
-                <ProfessorCoursePicker onSelectionSuccess={handleCourseSelectionSuccess} />
+                <ProfessorCoursePicker
+                    onSelectionSuccess={handleCourseSelectionSuccess}
+                    initialAssignedCourseIds={myCourses.map((course) => course.id)}
+                    currentProfessorAliases={professorAliases}
+                />
             </div>
 
             {/* 2. REJILLA INDEPENDIENTE: SEPARACIÓN DE CONTENIDOS EN 3 COLUMNAS */}

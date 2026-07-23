@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../../../../auth/useAuth';
 import { useCourseCatalog } from '../../../../services/useCourseCatalog';
 import { CourseSearchEngine } from '../../../../components/ui/courseSearch/CourseSearchEngine';
 import type { DBModelCourse } from '../../../../services/courseTypes';
@@ -7,11 +8,30 @@ import { Loader2, BookOpen, AlertCircle } from 'lucide-react';
 
 interface ProfessorCoursePickerProps {
     onSelectionSuccess?: (course: DBModelCourse) => void;
+    initialAssignedCourseIds?: readonly number[];
+    currentProfessorAliases?: readonly string[];
 }
 
-export const ProfessorCoursePicker = ({ onSelectionSuccess }: ProfessorCoursePickerProps) => {
+export const ProfessorCoursePicker = ({
+    onSelectionSuccess,
+    initialAssignedCourseIds = [],
+    currentProfessorAliases = []
+}: ProfessorCoursePickerProps) => {
+    const { user } = useAuth();
     const [successMessage, setSuccessMessage] = useState<string>('');
-    const [assignedCourseIds, setAssignedCourseIds] = useState<Set<number>>(new Set());
+    const [assignedCourseIds, setAssignedCourseIds] = useState<Set<number>>(
+        () => new Set(initialAssignedCourseIds)
+    );
+
+    useEffect(() => {
+        if (initialAssignedCourseIds.length === 0) return;
+
+        setAssignedCourseIds((prev) => {
+            const next = new Set(initialAssignedCourseIds);
+            prev.forEach((id) => next.add(id));
+            return next;
+        });
+    }, [initialAssignedCourseIds]);
 
     const {
         searchKeyword,
@@ -37,6 +57,28 @@ export const ProfessorCoursePicker = ({ onSelectionSuccess }: ProfessorCoursePic
         if (!course.instructors) return true;
         const text = course.instructors.trim().toLowerCase();
         return text === '' || text === 'por asignar';
+    };
+
+    const normalizedAliases = currentProfessorAliases
+        .map((alias) => alias.trim().toLowerCase())
+        .filter((alias) => alias.length > 0);
+
+    const isOwnedByCurrentProfessor = (course: DBModelCourse): boolean => {
+        const instructors = course.instructors?.trim();
+        if (!instructors) return false;
+
+        const aliasPool = new Set<string>(normalizedAliases);
+        const username = user?.username?.trim().toLowerCase();
+        if (username) {
+            aliasPool.add(username);
+        }
+
+        const instructorTokens = instructors
+            .split(',')
+            .map((token) => token.trim().toLowerCase())
+            .filter((token) => token.length > 0);
+
+        return instructorTokens.some((token) => aliasPool.has(token));
     };
 
     const handleSelectCourse = async (courseId: number) => {
@@ -70,7 +112,7 @@ export const ProfessorCoursePicker = ({ onSelectionSuccess }: ProfessorCoursePic
                 renderAction={(course: DBModelCourse) => {
                     const vacant = isCourseVacant(course);
                     const isProcessing = actionExecutionId === course.course_id;
-                    const isAssigned = assignedCourseIds.has(course.course_id);
+                    const isAssigned = assignedCourseIds.has(course.course_id) || isOwnedByCurrentProfessor(course);
                     const isUnavailable = !vacant && !isAssigned;
 
                     const buttonLabel = isProcessing

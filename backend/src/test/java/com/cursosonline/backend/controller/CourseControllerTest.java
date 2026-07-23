@@ -36,223 +36,248 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("Suite de Pruebas Unitarias para CourseController")
 class CourseControllerTest {
 
-    private MockMvc mockMvc;
+        private MockMvc mockMvc;
 
-    @InjectMocks
-    private CourseController courseController;
+        @InjectMocks
+        private CourseController courseController;
 
-    @Mock
-    private UserService userService;
+        @Mock
+        private UserService userService;
 
-    @Mock
-    private RecommendationService recommendationService;
+        @Mock
+        private RecommendationService recommendationService;
 
-    private Principal mockPrincipal;
-    private Users studentUser;
-    private Courses sampleCourse;
-    private Enrollment sampleEnrollment;
+        private Principal mockPrincipal;
+        private Users studentUser;
+        private Courses sampleCourse;
+        private Enrollment sampleEnrollment;
 
-    @BeforeEach
-    void setUp() {
-        mockPrincipal = Mockito.mock(Principal.class);
-        mockMvc = MockMvcBuilders.standaloneSetup(courseController).build();
+        @BeforeEach
+        void setUp() {
+                mockPrincipal = Mockito.mock(Principal.class);
+                mockMvc = MockMvcBuilders.standaloneSetup(courseController).build();
 
-        // Configuración Entidad Estudiante
-        studentUser = new Users();
-        studentUser.setUser_id(1L);
-        studentUser.setUsername("mockUser");
-        studentUser.setEmail("alumno@tfg.com");
+                // Configuración Entidad Estudiante
+                studentUser = new Users();
+                studentUser.setUser_id(1L);
+                studentUser.setUsername("mockUser");
+                studentUser.setEmail("alumno@tfg.com");
 
-        // Configuración Entidad Curso
-        sampleCourse = new Courses();
-        sampleCourse.setCourse_id(101L);
-        sampleCourse.setTitle("Data Analysis Using Python");
+                // Configuración Entidad Curso
+                sampleCourse = new Courses();
+                sampleCourse.setCourse_id(101L);
+                sampleCourse.setTitle("Data Analysis Using Python");
 
-        // Configuración Entidad Matrícula
-        sampleEnrollment = new Enrollment();
-        sampleEnrollment.setEnrollmentid(55L);
-        sampleEnrollment.setUser(studentUser);
-        sampleEnrollment.setCourse(sampleCourse);
-        sampleEnrollment.setStatus("ACTIVE");
-    }
+                // Configuración Entidad Matrícula
+                sampleEnrollment = new Enrollment();
+                sampleEnrollment.setEnrollmentid(55L);
+                sampleEnrollment.setUser(studentUser);
+                sampleEnrollment.setCourse(sampleCourse);
+                sampleEnrollment.setStatus("ACTIVE");
+        }
 
-    /*
-     * =========================================================================
-     * 1. ENDPOINT: GET /api/courses/search
-     * =========================================================================
-     */
-    @Test
-    @DisplayName("Debe retornar lista de cursos al buscar por palabra clave")
-    void searchCatalog_ShouldReturnCoursesList() throws Exception {
-        when(userService.searchCourses("data")).thenReturn(List.of(sampleCourse));
+        /*
+         * =========================================================================
+         * 1. ENDPOINT: GET /api/courses/search
+         * =========================================================================
+         */
+        @Test
+        @DisplayName("Debe retornar lista de cursos al buscar por palabra clave")
+        void searchCatalog_ShouldReturnCoursesList() throws Exception {
+                when(userService.searchCourses("data")).thenReturn(List.of(sampleCourse));
 
-        mockMvc.perform(get("/api/courses/search")
-                .param("keyword", "data")
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].course_id").value(101))
-                .andExpect(jsonPath("$[0].title").value("Data Analysis Using Python"));
-    }
+                mockMvc.perform(get("/api/courses/search")
+                                .param("keyword", "data")
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].course_id").value(101))
+                                .andExpect(jsonPath("$[0].title").value("Data Analysis Using Python"));
+        }
 
-    /*
-     * =========================================================================
-     * 2. ENDPOINT: POST /api/courses/enroll/{courseId}
-     * =========================================================================
-     */
-    @Test
-    @DisplayName("Debe retornar 401 Unauthorized al matricularse sin sesión válida")
-    void enrollInCourse_WithoutPrincipal_ShouldReturnUnauthorized() throws Exception {
-        mockMvc.perform(post("/api/courses/enroll/101")
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("Sesión inválida o expirada."));
-    }
+        @Test
+        @DisplayName("Debe retornar 401 Unauthorized al consultar cursos asignados sin sesión")
+        void getAssignedCoursesForProfessor_WithoutPrincipal_ShouldReturnUnauthorized() throws Exception {
+                mockMvc.perform(get("/api/courses/assigned-to-me")
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.error").value("Sesión inválida o expirada."));
+        }
 
-    @Test
-    @DisplayName("Debe procesar la matrícula de forma persistente y retornar 201 Created")
-    void enrollInCourse_WithValidSession_ShouldReturnCreated() throws Exception {
-        when(mockPrincipal.getName()).thenReturn("mockUser");
-        when(userService.enrollStudentInCourse(anyString(), anyLong())).thenReturn(sampleEnrollment);
+        @Test
+        @DisplayName("Debe retornar 200 OK con los cursos asignados al profesor autenticado")
+        void getAssignedCoursesForProfessor_WithValidSession_ShouldReturnCourses() throws Exception {
+                when(mockPrincipal.getName()).thenReturn("mockUser");
+                when(userService.getAssignedCoursesForProfessor("mockUser")).thenReturn(List.of(sampleCourse));
 
-        mockMvc.perform(post("/api/courses/enroll/101")
-                .principal(mockPrincipal)
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.enrollmentId").value(55))
-                .andExpect(jsonPath("$.status").value("ACTIVE"))
-                .andExpect(
-                        jsonPath("$.message").value("Te has matriculado en el curso con éxito de forma persistente."));
-    }
+                mockMvc.perform(get("/api/courses/assigned-to-me")
+                                .principal(mockPrincipal)
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].course_id").value(101))
+                                .andExpect(jsonPath("$[0].title").value("Data Analysis Using Python"));
+        }
 
-    /*
-     * =========================================================================
-     * 3. ENDPOINT: GET /api/courses/recommendations
-     * =========================================================================
-     */
-    @Test
-    @DisplayName("Debe retornar 401 Unauthorized al pedir recomendaciones sin sesión")
-    void getSmartRecommendations_WithoutPrincipal_ShouldReturnUnauthorized() throws Exception {
-        mockMvc.perform(get("/api/courses/recommendations")
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("Sesión inválida o expirada."));
-    }
+        /*
+         * =========================================================================
+         * 2. ENDPOINT: POST /api/courses/enroll/{courseId}
+         * =========================================================================
+         */
+        @Test
+        @DisplayName("Debe retornar 401 Unauthorized al matricularse sin sesión válida")
+        void enrollInCourse_WithoutPrincipal_ShouldReturnUnauthorized() throws Exception {
+                mockMvc.perform(post("/api/courses/enroll/101")
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.error").value("Sesión inválida o expirada."));
+        }
 
-    @Test
-    @DisplayName("Debe retornar 404 Not Found si el alumno no existe en el sistema")
-    void getSmartRecommendations_UserNotFound_ShouldReturnNotFound() throws Exception {
-        when(mockPrincipal.getName()).thenReturn("mockUser");
-        when(userService.findByUsername("mockUser")).thenReturn(Optional.empty());
+        @Test
+        @DisplayName("Debe procesar la matrícula de forma persistente y retornar 201 Created")
+        void enrollInCourse_WithValidSession_ShouldReturnCreated() throws Exception {
+                when(mockPrincipal.getName()).thenReturn("mockUser");
+                when(userService.enrollStudentInCourse(anyString(), anyLong())).thenReturn(sampleEnrollment);
 
-        mockMvc.perform(get("/api/courses/recommendations")
-                .principal(mockPrincipal)
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("Estudiante no registrado en el sistema."));
-    }
+                mockMvc.perform(post("/api/courses/enroll/101")
+                                .principal(mockPrincipal)
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.enrollmentId").value(55))
+                                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                                .andExpect(
+                                                jsonPath("$.message").value(
+                                                                "Te has matriculado en el curso con éxito de forma persistente."));
+        }
 
-    @Test
-    @DisplayName("Debe retornar 200 OK con DTOs de recomendaciones personalizadas")
-    void getSmartRecommendations_ValidUser_ShouldReturnRecommendations() throws Exception {
-        when(mockPrincipal.getName()).thenReturn("mockUser");
-        RecommendationDTO recommendation = new RecommendationDTO(
-                202L,
-                "Algoritmos Complejos",
-                "Por asignar",
-                "General",
-                5.0,
-                "Sugerencia personalizada",
-                92);
+        /*
+         * =========================================================================
+         * 3. ENDPOINT: GET /api/courses/recommendations
+         * =========================================================================
+         */
+        @Test
+        @DisplayName("Debe retornar 401 Unauthorized al pedir recomendaciones sin sesión")
+        void getSmartRecommendations_WithoutPrincipal_ShouldReturnUnauthorized() throws Exception {
+                mockMvc.perform(get("/api/courses/recommendations")
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.error").value("Sesión inválida o expirada."));
+        }
 
-        when(userService.findByUsername("mockUser")).thenReturn(Optional.of(studentUser));
-        when(recommendationService.getRecommendationsForUser(1L)).thenReturn(List.of(recommendation));
+        @Test
+        @DisplayName("Debe retornar 404 Not Found si el alumno no existe en el sistema")
+        void getSmartRecommendations_UserNotFound_ShouldReturnNotFound() throws Exception {
+                when(mockPrincipal.getName()).thenReturn("mockUser");
+                when(userService.findByUsername("mockUser")).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/courses/recommendations")
-                .principal(mockPrincipal)
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(202))
-                .andExpect(jsonPath("$[0].title").value("Algoritmos Complejos"));
-    }
+                mockMvc.perform(get("/api/courses/recommendations")
+                                .principal(mockPrincipal)
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isNotFound())
+                                .andExpect(jsonPath("$.error").value("Estudiante no registrado en el sistema."));
+        }
 
-    /*
-     * =========================================================================
-     * 4. ENDPOINT: POST /api/courses/{courseId}/assign-teacher
-     * =========================================================================
-     */
-    @Test
-    @DisplayName("Debe retornar 401 Unauthorized al asignar docente sin sesión")
-    void assignTeacherToCourse_WithoutPrincipal_ShouldReturnUnauthorized() throws Exception {
-        mockMvc.perform(post("/api/courses/101/assign-teacher")
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("Sesión inválida o expirada."));
-    }
+        @Test
+        @DisplayName("Debe retornar 200 OK con DTOs de recomendaciones personalizadas")
+        void getSmartRecommendations_ValidUser_ShouldReturnRecommendations() throws Exception {
+                when(mockPrincipal.getName()).thenReturn("mockUser");
+                RecommendationDTO recommendation = new RecommendationDTO(
+                                202L,
+                                "Algoritmos Complejos",
+                                "Por asignar",
+                                "General",
+                                5.0,
+                                "Sugerencia personalizada",
+                                92);
 
-    @Test
-    @DisplayName("Debe vincular relacionalmente el profesor con el curso y retornar 200 OK")
-    void assignTeacherToCourse_ValidData_ShouldReturnOk() throws Exception {
-        when(mockPrincipal.getName()).thenReturn("mockUser");
-        // Simulamos el usuario asignado para evitar NullPointerException al construir
-        // la respuesta del JSON
-        Users teacherUser = new Users();
-        teacherUser.setUser_id(2L);
-        teacherUser.setUsername("profesor");
-        teacherUser.setRole(Role.PROFESSOR);
+                when(userService.findByUsername("mockUser")).thenReturn(Optional.of(studentUser));
+                when(recommendationService.getRecommendationsForUser(1L)).thenReturn(List.of(recommendation));
 
-        sampleCourse.setAssignedUser(teacherUser);
+                mockMvc.perform(get("/api/courses/recommendations")
+                                .principal(mockPrincipal)
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].id").value(202))
+                                .andExpect(jsonPath("$[0].title").value("Algoritmos Complejos"));
+        }
 
-        when(userService.assignUserToCourse(anyString(), anyLong())).thenReturn(sampleCourse);
+        /*
+         * =========================================================================
+         * 4. ENDPOINT: POST /api/courses/{courseId}/assign-teacher
+         * =========================================================================
+         */
+        @Test
+        @DisplayName("Debe retornar 401 Unauthorized al asignar docente sin sesión")
+        void assignTeacherToCourse_WithoutPrincipal_ShouldReturnUnauthorized() throws Exception {
+                mockMvc.perform(post("/api/courses/101/assign-teacher")
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.error").value("Sesión inválida o expirada."));
+        }
 
-        mockMvc.perform(post("/api/courses/101/assign-teacher")
-                .principal(mockPrincipal)
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.courseId").value(101))
-                .andExpect(jsonPath("$.title").value("Data Analysis Using Python"))
-                .andExpect(jsonPath("$.message").value("El curso ha sido vinculado relacionalmente con éxito."));
-    }
+        @Test
+        @DisplayName("Debe vincular relacionalmente el profesor con el curso y retornar 200 OK")
+        void assignTeacherToCourse_ValidData_ShouldReturnOk() throws Exception {
+                when(mockPrincipal.getName()).thenReturn("mockUser");
+                // Simulamos el usuario asignado para evitar NullPointerException al construir
+                // la respuesta del JSON
+                Users teacherUser = new Users();
+                teacherUser.setUser_id(2L);
+                teacherUser.setUsername("profesor");
+                teacherUser.setRole(Role.PROFESSOR);
 
-    @Test
-    @DisplayName("Debe retornar 404 Not Found cuando el recurso no existe al asignar docente")
-    void assignTeacherToCourse_ResourceNotFound_ShouldReturnNotFound() throws Exception {
-        when(mockPrincipal.getName()).thenReturn("mockUser");
-        when(userService.assignUserToCourse(anyString(), anyLong()))
-                .thenThrow(new ResourceNotFoundException("Asignatura no encontrada."));
+                sampleCourse.setAssignedUser(teacherUser);
 
-        mockMvc.perform(post("/api/courses/999/assign-teacher")
-                .principal(mockPrincipal)
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("Asignatura no encontrada."));
-    }
+                when(userService.assignUserToCourse(anyString(), anyLong())).thenReturn(sampleCourse);
 
-    @Test
-    @DisplayName("Debe retornar 400 Bad Request ante una excepción de lógica de negocio")
-    void assignTeacherToCourse_ServicesException_ShouldReturnBadRequest() throws Exception {
-        when(mockPrincipal.getName()).thenReturn("mockUser");
-        when(userService.assignUserToCourse(anyString(), anyLong()))
-                .thenThrow(new ServicesException("El curso ya posee un tutor asignado."));
+                mockMvc.perform(post("/api/courses/101/assign-teacher")
+                                .principal(mockPrincipal)
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.courseId").value(101))
+                                .andExpect(jsonPath("$.title").value("Data Analysis Using Python"))
+                                .andExpect(jsonPath("$.message")
+                                                .value("El curso ha sido vinculado relacionalmente con éxito."));
+        }
 
-        mockMvc.perform(post("/api/courses/101/assign-teacher")
-                .principal(mockPrincipal)
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("El curso ya posee un tutor asignado."));
-    }
+        @Test
+        @DisplayName("Debe retornar 404 Not Found cuando el recurso no existe al asignar docente")
+        void assignTeacherToCourse_ResourceNotFound_ShouldReturnNotFound() throws Exception {
+                when(mockPrincipal.getName()).thenReturn("mockUser");
+                when(userService.assignUserToCourse(anyString(), anyLong()))
+                                .thenThrow(new ResourceNotFoundException("Asignatura no encontrada."));
 
-    @Test
-    @DisplayName("Debe retornar 500 Internal Server Error ante un fallo inesperado no controlado")
-    void assignTeacherToCourse_GeneralException_ShouldReturnServerError() throws Exception {
-        when(mockPrincipal.getName()).thenReturn("mockUser");
-        when(userService.assignUserToCourse(anyString(), anyLong()))
-                .thenThrow(new RuntimeException("Fallo crítico inesperado"));
+                mockMvc.perform(post("/api/courses/999/assign-teacher")
+                                .principal(mockPrincipal)
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isNotFound())
+                                .andExpect(jsonPath("$.error").value("Asignatura no encontrada."));
+        }
 
-        mockMvc.perform(post("/api/courses/101/assign-teacher")
-                .principal(mockPrincipal)
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.error")
-                        .value("Ocurrió un error inesperado al procesar la vinculación relacional."));
-    }
+        @Test
+        @DisplayName("Debe retornar 400 Bad Request ante una excepción de lógica de negocio")
+        void assignTeacherToCourse_ServicesException_ShouldReturnBadRequest() throws Exception {
+                when(mockPrincipal.getName()).thenReturn("mockUser");
+                when(userService.assignUserToCourse(anyString(), anyLong()))
+                                .thenThrow(new ServicesException("El curso ya posee un tutor asignado."));
+
+                mockMvc.perform(post("/api/courses/101/assign-teacher")
+                                .principal(mockPrincipal)
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.error").value("El curso ya posee un tutor asignado."));
+        }
+
+        @Test
+        @DisplayName("Debe retornar 500 Internal Server Error ante un fallo inesperado no controlado")
+        void assignTeacherToCourse_GeneralException_ShouldReturnServerError() throws Exception {
+                when(mockPrincipal.getName()).thenReturn("mockUser");
+                when(userService.assignUserToCourse(anyString(), anyLong()))
+                                .thenThrow(new RuntimeException("Fallo crítico inesperado"));
+
+                mockMvc.perform(post("/api/courses/101/assign-teacher")
+                                .principal(mockPrincipal)
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isInternalServerError())
+                                .andExpect(jsonPath("$.error")
+                                                .value("Ocurrió un error inesperado al procesar la vinculación relacional."));
+        }
 }

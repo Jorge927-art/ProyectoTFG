@@ -27,8 +27,14 @@ export const TaughtCoursesGrid = ({
     onManageCourse,
     actionIcon
 }: TaughtCoursesGridProps) => {
+    const shouldEnableScroll = courses.length > 4;
+
     return (
-        <div className="max-h-155 overflow-y-auto pr-2 custom-scrollbar balance-scroll">
+        <div
+            data-testid="taught-courses-scroll-container"
+            className={`pr-2 custom-scrollbar balance-scroll ${shouldEnableScroll ? 'max-h-[28rem] overflow-y-auto' : 'overflow-y-visible'
+                }`}
+        >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {courses.map((course) => (
                     <GenericCard key={course.id}>

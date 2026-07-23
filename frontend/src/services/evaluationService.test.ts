@@ -4,7 +4,8 @@ import {
     submitAcademicEvaluation, 
     getStudentCourseGrades, 
     getActiveStudentsByCourse, 
-    getCourseManagementMetrics 
+    getCourseManagementMetrics,
+    getProfessorAssignedCourses
 } from './evaluationService';
 import { apiClient } from './apiClient';
 import type { 
@@ -14,6 +15,7 @@ import type {
     StudentPerformanceDTO, 
     CourseMetricsDTO 
 } from './evaluationService';
+import type { DBModelCourse } from './courseTypes';
 
 // --- AISLAMIENTO PERIMETRAL ESTRICTO: MOCK TIPADO DE API_CLIENT ---
 vi.mock('./apiClient', () => ({
@@ -132,6 +134,23 @@ describe('evaluationService - Suite de Pruebas Unitarias de Alta Fidelidad', () 
         expect(result).toEqual(mockMetrics);
         expect(mockedApi.get).toHaveBeenCalledTimes(1);
         expect(mockedApi.get).toHaveBeenCalledWith(`/api/v1/teacher/evaluations/courses/${courseId}/management/metrics`);
+    });
+
+    it('debe recuperar las asignaturas asignadas al profesor autenticado para hidratar su panel', async () => {
+        const mockAssignedCourses: DBModelCourse[] = [
+            {
+                course_id: 301,
+                title: 'Microservicios con Spring Cloud',
+                category: 'Arquitectura'
+            }
+        ];
+        mockedApi.get.mockResolvedValueOnce({ data: mockAssignedCourses });
+
+        const result = await getProfessorAssignedCourses();
+
+        expect(result).toEqual(mockAssignedCourses);
+        expect(mockedApi.get).toHaveBeenCalledTimes(1);
+        expect(mockedApi.get).toHaveBeenCalledWith('/api/courses/assigned-to-me');
     });
     // --- BLOQUE 2: GESTIÓN DE EXCEPCIONES Y CONTROL DE ERRORES DE RED ---
     it('debe propagar el error de red cuando falla la obtención de evaluaciones pendientes', async () => {

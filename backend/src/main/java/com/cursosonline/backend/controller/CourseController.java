@@ -37,6 +37,28 @@ public class CourseController {
     }
 
     /**
+     * Endpoint de hidratación del panel docente para recuperar las asignaturas
+     * asignadas al profesor autenticado.
+     * GET /api/courses/assigned-to-me
+     */
+    @GetMapping("/assigned-to-me")
+    public ResponseEntity<?> getAssignedCoursesForProfessor(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
+        try {
+            List<Courses> assignedCourses = userService.getAssignedCoursesForProfessor(principal.getName());
+            return ResponseEntity.ok(assignedCourses);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Ocurrió un error inesperado al consultar las asignaturas asignadas."));
+        }
+    }
+
+    /**
      * Endpoint transaccional seguro para procesar la matrícula de un estudiante.
      * POST /api/courses/enroll/1
      */

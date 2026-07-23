@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import type { DBModelCourse } from './courseTypes';
 
 // Interfaz para mapear la estructura de la matrícula con el curso anidado
 export interface PendingEvaluationDTO {
@@ -79,6 +80,11 @@ export const getActiveStudentsByCourse = async (courseId: number): Promise<Stude
 
 export const getCourseManagementMetrics = async (courseId: number): Promise<CourseMetricsDTO> => {
     const response = await apiClient.get<CourseMetricsDTO>(`/api/v1/teacher/evaluations/courses/${courseId}/management/metrics`);
+    return response.data;
+};
+
+export const getProfessorAssignedCourses = async (): Promise<DBModelCourse[]> => {
+    const response = await apiClient.get<DBModelCourse[]>('/api/courses/assigned-to-me');
     return response.data;
 };
 

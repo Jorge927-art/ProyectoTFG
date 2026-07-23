@@ -9,6 +9,23 @@ import org.springframework.data.repository.query.Param;
 public interface CoursesRepository extends JpaRepository<Courses, Long> {
 
         /**
+         * Recupera las asignaturas asignadas al profesor autenticado tanto por la
+         * relación fuerte assigned_user_id como por el campo legacy instructors.
+         */
+        @Query("SELECT c FROM Courses c " +
+                        "WHERE (c.assignedUser IS NOT NULL AND c.assignedUser.username = :username) " +
+                        "   OR (c.instructors IS NOT NULL AND LOWER(c.instructors) LIKE LOWER(CONCAT('%', :username, '%'))) "
+                        +
+                        "ORDER BY c.title ASC")
+        java.util.List<Courses> findAllAssignedToProfessor(@Param("username") String username);
+
+        /**
+         * Recupera cursos con instructor textual informado para compatibilidad
+         * con datos legacy.
+         */
+        java.util.List<Courses> findAllByInstructorsIsNotNullOrderByTitleAsc();
+
+        /**
          * Búsqueda predictiva optimizada y corregida.
          * Evalúa el título y la categoría en simetría estricta con el Service de Java.
          */
