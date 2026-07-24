@@ -11,6 +11,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -94,7 +95,15 @@ class JwtServiceTest {
     void isTokenValid_AlteredSignature_ShouldReturnFalse() {
         String token = jwtService.generateAccessToken(sampleUserDetails, 45L, "alumno.cripto@tfg.com");
 
-        String alteredToken = token.substring(0, token.length() - 1) + (token.endsWith("A") ? "B" : "A");
+        String[] parts = token.split("\\.");
+        assertEquals(3, parts.length, "El token JWT debe tener 3 segmentos");
+
+        byte[] signatureBytes = Base64.getUrlDecoder().decode(parts[2]);
+        // Alteramos un byte real de la firma para invalidarla de forma determinista.
+        signatureBytes[0] = (byte) (signatureBytes[0] ^ 0x01);
+
+        String alteredSignature = Base64.getUrlEncoder().withoutPadding().encodeToString(signatureBytes);
+        String alteredToken = parts[0] + "." + parts[1] + "." + alteredSignature;
 
         assertFalse(jwtService.isTokenValid(alteredToken), "El validador debe rechazar tokens con firmas mutadas");
         assertFalse(jwtService.isTokenValid(alteredToken, sampleUserDetails));

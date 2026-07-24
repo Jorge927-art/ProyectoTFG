@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAuth } from '../../../../auth/useAuth';
 import { useCourseCatalog } from '../../../../services/useCourseCatalog';
 import { CourseSearchEngine } from '../../../../components/ui/courseSearch/CourseSearchEngine';
@@ -19,19 +19,13 @@ export const ProfessorCoursePicker = ({
 }: ProfessorCoursePickerProps) => {
     const { user } = useAuth();
     const [successMessage, setSuccessMessage] = useState<string>('');
-    const [assignedCourseIds, setAssignedCourseIds] = useState<Set<number>>(
-        () => new Set(initialAssignedCourseIds)
-    );
+    const [locallyAssignedCourseIds, setLocallyAssignedCourseIds] = useState<Set<number>>(() => new Set());
 
-    useEffect(() => {
-        if (initialAssignedCourseIds.length === 0) return;
-
-        setAssignedCourseIds((prev) => {
-            const next = new Set(initialAssignedCourseIds);
-            prev.forEach((id) => next.add(id));
-            return next;
-        });
-    }, [initialAssignedCourseIds]);
+    const assignedCourseIds = useMemo(() => {
+        const next = new Set(initialAssignedCourseIds);
+        locallyAssignedCourseIds.forEach((id) => next.add(id));
+        return next;
+    }, [initialAssignedCourseIds, locallyAssignedCourseIds]);
 
     const {
         searchKeyword,
@@ -43,7 +37,7 @@ export const ProfessorCoursePicker = ({
         executeCourseAction
     } = useCourseCatalog((course) => {
         setSuccessMessage(`¡Te has asignado correctamente como profesor del curso: "${course.title}"!`);
-        setAssignedCourseIds((prev) => {
+        setLocallyAssignedCourseIds((prev) => {
             const next = new Set(prev);
             next.add(course.course_id);
             return next;

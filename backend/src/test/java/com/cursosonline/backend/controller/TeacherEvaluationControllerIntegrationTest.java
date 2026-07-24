@@ -2,8 +2,10 @@ package com.cursosonline.backend.controller;
 
 import com.cursosonline.backend.dto.StudentPerformanceDTO;
 import com.cursosonline.backend.dto.CourseMetricsDTO;
+import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.repository.CourseGradeRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +34,9 @@ class TeacherEvaluationControllerIntegrationTest {
     @MockitoBean
     private CourseGradeRepository courseGradeRepository;
 
+    @MockitoBean
+    private EnrollmentRepository enrollmentRepository;
+
     private Users mockStudent;
     private final Long courseId = 1L;
 
@@ -47,7 +52,11 @@ class TeacherEvaluationControllerIntegrationTest {
     @Test
     @WithMockUser(roles = "PROFESSOR")
     void debeRetornarListaDeAlumnosConCalificacionesCalculadasCorrectamente() {
-        when(userRepository.findActiveStudentsByCourseId(courseId)).thenReturn(List.of(mockStudent));
+        Enrollment mockEnrollment = new Enrollment();
+        mockEnrollment.setEnrollmentid(555L);
+        mockEnrollment.setUser(mockStudent);
+
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(courseId)).thenReturn(List.of(mockEnrollment));
         when(courseGradeRepository.getGroupAverageScore(courseId)).thenReturn(6.5);
         when(courseGradeRepository.getIndividualStudentAverageScore(courseId, mockStudent.getUser_id()))
                 .thenReturn(8.5);
@@ -60,6 +69,7 @@ class TeacherEvaluationControllerIntegrationTest {
         assertEquals(1, response.getBody().size());
 
         StudentPerformanceDTO dto = response.getBody().get(0);
+        assertEquals(555L, dto.enrollmentId());
         assertEquals(101L, dto.userId());
         assertEquals("Luis Nuevo", dto.username());
         assertEquals("luisNuevo@yahoo.es", dto.email());

@@ -47,13 +47,6 @@ describe('useGradingCenter', () => {
         }
     ];
 
-    const mockMetrics = {
-        courseId: 10,
-        groupAverageScore: 7.95,
-        activeStudentsCount: 2,
-        pendingTasksCount: 3
-    };
-
     const mockDocuments = [
         {
             documentid: 1001,
