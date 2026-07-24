@@ -19,14 +19,6 @@ type LegacyStudentShape = {
     groupAverage?: number;
 };
 
-type LegacyMetricsShape = {
-    groupAverageScore?: number;
-    activeStudentsCount?: number;
-    pendingTasksCount?: number;
-    groupAverageGrade?: number;
-    pendingSubmissionsCount?: number;
-};
-
 const toDisplayName = (student: unknown): string => {
     if (typeof student !== 'object' || student === null) return 'Estudiante sin nombre';
     const candidate = student as { fullName?: string; username?: string };
@@ -92,8 +84,6 @@ export const CourseManagementModal = ({
     }
 
     const students = management.students as unknown as LegacyStudentShape[];
-    const metrics = management.metrics as LegacyMetricsShape | null;
-
     return (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
             <div className="w-full max-w-5xl rounded-xl bg-white p-6 shadow-xl">
@@ -125,13 +115,6 @@ export const CourseManagementModal = ({
                         className="rounded-md border px-3 py-2 text-sm font-semibold"
                     >
                         Trabajos y Exámenes
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => management.setActiveTab('metricas')}
-                        className="rounded-md border px-3 py-2 text-sm font-semibold"
-                    >
-                        Métricas Globales
                     </button>
                 </div>
 
@@ -207,35 +190,6 @@ export const CourseManagementModal = ({
                     </div>
                 )}
 
-                {management.activeTab === 'metricas' && (
-                    <div>
-                        {metrics ? (
-                            <div className="grid gap-3 md:grid-cols-3">
-                                <div className="rounded-md border p-3">
-                                    <p className="text-xs font-bold text-slate-500">Rendimiento Consolidado del Grupo</p>
-                                    <p className="mt-2 text-xs font-semibold text-slate-500">MEDIA GENERAL</p>
-                                    <p className="text-2xl font-bold text-slate-800">
-                                        {(metrics.groupAverageScore ?? metrics.groupAverageGrade ?? 0).toFixed(2)}
-                                    </p>
-                                </div>
-                                <div className="rounded-md border p-3">
-                                    <p className="text-xs font-semibold text-slate-500">ALUMNOS ACTIVOS</p>
-                                    <p className="text-2xl font-bold text-slate-800">{metrics.activeStudentsCount ?? 0}</p>
-                                </div>
-                                <div className="rounded-md border p-3">
-                                    <p className="text-xs font-semibold text-slate-500">PENDIENTES</p>
-                                    <p className="text-2xl font-bold text-slate-800">
-                                        {metrics.pendingTasksCount ?? metrics.pendingSubmissionsCount ?? 0} tareas
-                                    </p>
-                                </div>
-                            </div>
-                        ) : (
-                            <p className="rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
-                                No se pudieron recuperar las métricas globales del curso.
-                            </p>
-                        )}
-                    </div>
-                )}
             </div>
         </div>
     );

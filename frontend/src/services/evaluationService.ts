@@ -59,11 +59,14 @@ export const getStudentCourseGrades = async (enrollmentId: number): Promise<Cour
 };
 
 export interface StudentPerformanceDTO {
-    studentId: number;
-    fullName: string;
+    // Nuevo contrato real del backend docente
+    userId: number;
+    username: string;
     email: string;
-    averageScore: number;
-    progressPercentage: number;
+    individualGrade: number;
+    groupAverage: number;
+    // Campo opcional para compatibilidad con flujos donde se expone matrícula explícita
+    enrollmentId?: number;
 }
 
 export interface CourseMetricsDTO {
@@ -73,13 +76,50 @@ export interface CourseMetricsDTO {
     pendingTasksCount: number;
 }
 
+type RawCourseMetricsDTO = Partial<CourseMetricsDTO> & {
+    groupAverageGrade?: number;
+    pendingSubmissionsCount?: number;
+};
+
+const normalizeCourseMetrics = (courseId: number, payload: RawCourseMetricsDTO): CourseMetricsDTO => ({
+    courseId: typeof payload.courseId === 'number' ? payload.courseId : courseId,
+    groupAverageScore:
+        typeof payload.groupAverageScore === 'number'
+            ? payload.groupAverageScore
+            : typeof payload.groupAverageGrade === 'number'
+                ? payload.groupAverageGrade
+                : 0,
+    activeStudentsCount: typeof payload.activeStudentsCount === 'number' ? payload.activeStudentsCount : 0,
+    pendingTasksCount:
+        typeof payload.pendingTasksCount === 'number'
+            ? payload.pendingTasksCount
+            : typeof payload.pendingSubmissionsCount === 'number'
+                ? payload.pendingSubmissionsCount
+                : 0,
+});
+
 export const getActiveStudentsByCourse = async (courseId: number): Promise<StudentPerformanceDTO[]> => {
     const response = await apiClient.get<StudentPerformanceDTO[]>(`/api/v1/teacher/evaluations/courses/${courseId}/management/students`);
     return response.data;
 };
 
 export const getCourseManagementMetrics = async (courseId: number): Promise<CourseMetricsDTO> => {
-    const response = await apiClient.get<CourseMetricsDTO>(`/api/v1/teacher/evaluations/courses/${courseId}/management/metrics`);
+    const response = await apiClient.get<RawCourseMetricsDTO>(`/api/v1/teacher/evaluations/courses/${courseId}/management/metrics`);
+    return normalizeCourseMetrics(courseId, response.data ?? {});
+};
+
+export interface TeacherGradeInput {
+    enrollmentId: number;
+    title: string;
+    score: number;
+    feedback: string;
+}
+
+export const submitStudentGrade = async (payload: TeacherGradeInput): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.post<{ success: boolean; message: string }>(
+        '/api/v1/teacher/evaluations/submit',
+        payload
+    );
     return response.data;
 };
 

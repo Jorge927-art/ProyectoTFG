@@ -5,6 +5,7 @@ import {
     type StudentPerformanceDTO,
     type CourseMetricsDTO
 } from '../../../../services/evaluationService';
+import { uploadProfessorDocument } from '../../../../services/documentService';
 
 export type TabType = 'alumnado' | 'trabajos' | 'metricas';
 
@@ -108,9 +109,6 @@ export const useCourseManagement = (
         setUploadSuccessMessage(null);
 
         try {
-            // Importamos de manera dinámica el servicio para evitar colisiones de dependencias circulares
-            const { uploadProfessorDocument } = await import('../../../../services/documentService');
-            
             const receiverIdNum = parseInt(selectedStudentId, 10);
             
             const response = await uploadProfessorDocument(selectedFile, courseId, receiverIdNum);

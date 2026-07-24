@@ -100,6 +100,76 @@ describe('CourseManagementModal - Suite de Pruebas de Alta Fidelidad Funcional',
         expect(screen.getByText('No hay alumnos activos registrados en esta asignatura.')).toBeInTheDocument();
     });
 
+    it('Debe priorizar progressPercentage y redondearlo cuando está disponible', () => {
+        const studentWithProgressPercentage = [
+            {
+                studentId: 9901,
+                fullName: 'Alumno con porcentaje',
+                email: 'porcentaje@universidad.edu',
+                averageScore: 9.1,
+                progressPercentage: 86.6,
+                groupAverage: 1.2
+            }
+        ];
+
+        const customHookReturn = { ...defaultHookReturn, students: studentWithProgressPercentage };
+        const mockReturn = customHookReturn as unknown;
+        vi.mocked(useCourseManagement).mockReturnValue(
+            mockReturn as ReturnType<typeof useCourseManagement>
+        );
+
+        render(<CourseManagementModal courseId={42} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
+
+        expect(screen.getByText('Alumno con porcentaje')).toBeInTheDocument();
+        expect(screen.getByText('9.1 / 10')).toBeInTheDocument();
+        expect(screen.getByText('87%')).toBeInTheDocument();
+    });
+
+    it('Debe aplicar fallbacks de nombre, nota y progreso cuando faltan campos del alumno', () => {
+        const incompleteStudentShape = [
+            {
+                email: '  '
+            }
+        ];
+
+        const customHookReturn = { ...defaultHookReturn, students: incompleteStudentShape };
+        const mockReturn = customHookReturn as unknown;
+        vi.mocked(useCourseManagement).mockReturnValue(
+            mockReturn as ReturnType<typeof useCourseManagement>
+        );
+
+        render(<CourseManagementModal courseId={42} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
+
+        expect(screen.getByText('Estudiante sin nombre')).toBeInTheDocument();
+        expect(screen.getByText('Sin correo registrado')).toBeInTheDocument();
+        expect(screen.getByText('0.0 / 10')).toBeInTheDocument();
+        expect(screen.getByText('0%')).toBeInTheDocument();
+    });
+
+    it('Debe soportar registros legacy con studentId y renderizar el fallback de nombre', () => {
+        const legacyStudentWithStudentId = [
+            {
+                studentId: 777,
+                email: 'legacy@universidad.edu',
+                individualGrade: 7.0,
+                groupAverage: 6.4
+            }
+        ];
+
+        const customHookReturn = { ...defaultHookReturn, students: legacyStudentWithStudentId };
+        const mockReturn = customHookReturn as unknown;
+        vi.mocked(useCourseManagement).mockReturnValue(
+            mockReturn as ReturnType<typeof useCourseManagement>
+        );
+
+        render(<CourseManagementModal courseId={42} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
+
+        expect(screen.getByText('Estudiante sin nombre')).toBeInTheDocument();
+        expect(screen.getByText('✉legacy@universidad.edu')).toBeInTheDocument();
+        expect(screen.getByText('7.0 / 10')).toBeInTheDocument();
+        expect(screen.getByText('60%')).toBeInTheDocument();
+    });
+
     /* =========================================================================
        2. CONTROL DE INTERACCIÓN AND ENRUTAMIENTO: NAVEGACIÓN ENTRE PESTAÑAS
        ========================================================================= */
@@ -118,7 +188,7 @@ describe('CourseManagementModal - Suite de Pruebas de Alta Fidelidad Funcional',
         expect(mockSetActiveTab).toHaveBeenCalledWith('trabajos');
     });
 
-    it('Debe invocar setActiveTab con "metricas" al hacer clic en el botón de Métricas Globales', () => {
+    it('Debe invocar setActiveTab con "alumnado" al hacer clic en el botón Alumnado', () => {
         const mockSetActiveTab = vi.fn();
         const mockReturn = { ...defaultHookReturn, setActiveTab: mockSetActiveTab } as unknown;
         vi.mocked(useCourseManagement).mockReturnValue(
@@ -127,10 +197,10 @@ describe('CourseManagementModal - Suite de Pruebas de Alta Fidelidad Funcional',
 
         render(<CourseManagementModal courseId={42} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
 
-        const botonMetricas = screen.getByRole('button', { name: /Métricas Globales/i });
-        fireEvent.click(botonMetricas);
+        const botonAlumnado = screen.getByRole('button', { name: /^Alumnado$/i });
+        fireEvent.click(botonAlumnado);
 
-        expect(mockSetActiveTab).toHaveBeenCalledWith('metricas');
+        expect(mockSetActiveTab).toHaveBeenCalledWith('alumnado');
     });
 
     /* =========================================================================
@@ -220,36 +290,15 @@ describe('CourseManagementModal - Suite de Pruebas de Alta Fidelidad Funcional',
         expect(mockHandleUpload).toHaveBeenCalledTimes(1);
     });
 
-    /* =========================================================================
-       5. CONTROL DE RENDERIZADO ANALÍTICO (PESTAÑA MÉTRICAS GLOBALES)
-       ========================================================================= */
-    it('Debe renderizar los paneles consolidados de métricas y formatear el promedio de PostgreSQL a dos decimales', () => {
-        const customHookReturn = { ...defaultHookReturn, activeTab: 'metricas' };
-        const mockReturn = customHookReturn as unknown;
+    it('No debe mostrar la pestaña de Métricas Globales', () => {
+        const mockReturn = defaultHookReturn as unknown;
         vi.mocked(useCourseManagement).mockReturnValue(
             mockReturn as ReturnType<typeof useCourseManagement>
         );
 
         render(<CourseManagementModal courseId={42} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
 
-        expect(screen.getByText('Rendimiento Consolidado del Grupo')).toBeInTheDocument();
-        expect(screen.getByText('MEDIA GENERAL')).toBeInTheDocument();
-        expect(screen.getByText('8.35')).toBeInTheDocument();
-        expect(screen.getByText('ALUMNOS ACTIVOS')).toBeInTheDocument();
-        expect(screen.getByText('12')).toBeInTheDocument();
-        expect(screen.getByText('4 tareas')).toBeInTheDocument();
-    });
-
-    it('Debe renderizar la pantalla de contingencia si las métricas globales devuelven un valor nulo', () => {
-        const customHookReturn = { ...defaultHookReturn, activeTab: 'metricas', metrics: null };
-        const mockReturn = customHookReturn as unknown;
-        vi.mocked(useCourseManagement).mockReturnValue(
-            mockReturn as ReturnType<typeof useCourseManagement>
-        );
-
-        render(<CourseManagementModal courseId={42} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
-
-        expect(screen.getByText('No se pudieron recuperar las métricas globales del curso.')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Métricas Globales/i })).not.toBeInTheDocument();
     });
 
     /* =========================================================================

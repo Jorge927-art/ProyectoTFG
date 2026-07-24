@@ -5,7 +5,8 @@ import {
     getStudentCourseGrades, 
     getActiveStudentsByCourse, 
     getCourseManagementMetrics,
-    getProfessorAssignedCourses
+    getProfessorAssignedCourses,
+    submitStudentGrade
 } from './evaluationService';
 import { apiClient } from './apiClient';
 import type { 
@@ -13,7 +14,8 @@ import type {
     EvaluationInput, 
     CourseGradeDTO, 
     StudentPerformanceDTO, 
-    CourseMetricsDTO 
+    CourseMetricsDTO,
+    TeacherGradeInput
 } from './evaluationService';
 import type { DBModelCourse } from './courseTypes';
 
@@ -103,11 +105,12 @@ describe('evaluationService - Suite de Pruebas Unitarias de Alta Fidelidad', () 
         const courseId = 42;
         const mockPerformance: StudentPerformanceDTO[] = [
             {
-                studentId: 77,
-                fullName: 'Alan Turing',
+                userId: 77,
+                username: 'Alan Turing',
                 email: 'turing@universidad.edu',
-                averageScore: 9.8,
-                progressPercentage: 92
+                individualGrade: 9.8,
+                groupAverage: 8.1,
+                enrollmentId: 901
             }
         ];
         mockedApi.get.mockResolvedValueOnce({ data: mockPerformance });
@@ -127,13 +130,47 @@ describe('evaluationService - Suite de Pruebas Unitarias de Alta Fidelidad', () 
             activeStudentsCount: 25,
             pendingTasksCount: 3
         };
-        mockedApi.get.mockResolvedValueOnce({ data: mockMetrics });
+        mockedApi.get.mockResolvedValueOnce({ data: { ...mockMetrics, groupAverageGrade: 7.6, pendingSubmissionsCount: 3 } });
 
         const result = await getCourseManagementMetrics(courseId);
 
         expect(result).toEqual(mockMetrics);
         expect(mockedApi.get).toHaveBeenCalledTimes(1);
         expect(mockedApi.get).toHaveBeenCalledWith(`/api/v1/teacher/evaluations/courses/${courseId}/management/metrics`);
+    });
+
+    it('debe normalizar payload legacy de métricas con groupAverageGrade y pendingSubmissionsCount', async () => {
+        const courseId = 77;
+        mockedApi.get.mockResolvedValueOnce({
+            data: {
+                activeStudentsCount: 9,
+                groupAverageGrade: 6.4,
+                pendingSubmissionsCount: 5
+            }
+        });
+
+        const result = await getCourseManagementMetrics(courseId);
+
+        expect(result).toEqual({
+            courseId: 77,
+            activeStudentsCount: 9,
+            groupAverageScore: 6.4,
+            pendingTasksCount: 5
+        });
+    });
+
+    it('debe estabilizar métricas en 0 cuando faltan campos numéricos en la respuesta', async () => {
+        const courseId = 88;
+        mockedApi.get.mockResolvedValueOnce({ data: {} });
+
+        const result = await getCourseManagementMetrics(courseId);
+
+        expect(result).toEqual({
+            courseId: 88,
+            activeStudentsCount: 0,
+            groupAverageScore: 0,
+            pendingTasksCount: 0
+        });
     });
 
     it('debe recuperar las asignaturas asignadas al profesor autenticado para hidratar su panel', async () => {
@@ -151,6 +188,23 @@ describe('evaluationService - Suite de Pruebas Unitarias de Alta Fidelidad', () 
         expect(result).toEqual(mockAssignedCourses);
         expect(mockedApi.get).toHaveBeenCalledTimes(1);
         expect(mockedApi.get).toHaveBeenCalledWith('/api/courses/assigned-to-me');
+    });
+
+    it('debe enviar la calificación del profesor incluyendo feedback al endpoint docente', async () => {
+        const payload: TeacherGradeInput = {
+            enrollmentId: 901,
+            title: 'Trabajo Académico Escrito',
+            score: 8.75,
+            feedback: 'Buen razonamiento, mejora la conclusión.'
+        };
+        const response = { success: true, message: 'Calificación registrada con éxito por el docente autorizado.' };
+        mockedApi.post.mockResolvedValueOnce({ data: response });
+
+        const result = await submitStudentGrade(payload);
+
+        expect(result).toEqual(response);
+        expect(mockedApi.post).toHaveBeenCalledTimes(1);
+        expect(mockedApi.post).toHaveBeenCalledWith('/api/v1/teacher/evaluations/submit', payload);
     });
     // --- BLOQUE 2: GESTIÓN DE EXCEPCIONES Y CONTROL DE ERRORES DE RED ---
     it('debe propagar el error de red cuando falla la obtención de evaluaciones pendientes', async () => {

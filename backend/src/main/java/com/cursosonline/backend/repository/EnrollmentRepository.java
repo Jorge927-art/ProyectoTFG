@@ -30,6 +30,14 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
         Optional<Enrollment> findByEnrollmentidAndUserUsername(@Param("enrollmentId") Long enrollmentId,
                         @Param("username") String username);
 
+        /**
+         * Recupera matrículas activas de alumnos para un curso concreto,
+         * incluyendo la referencia al usuario para construir DTOs docentes.
+         */
+        @Query("SELECT e FROM Enrollment e WHERE e.course.course_id = :courseId " +
+                        "AND e.user.enabled = true AND e.user.role = 'STUDENT' ORDER BY e.enrollmentid ASC")
+        List<Enrollment> findActiveStudentEnrollmentsByCourseId(@Param("courseId") Long courseId);
+
         // =========================================================================
         // --- SISTEMA DE EVALUACIÓN ACADÉMICA DUAL ---
         // =========================================================================

@@ -12,6 +12,7 @@ import com.cursosonline.backend.repository.UserRepository;
 import com.cursosonline.backend.services.FileStorageService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -140,6 +141,39 @@ public class DocumentController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                     "error", "Error al recuperar los documentos enviados de la asignatura",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
+    /**
+     * [CENTRO DE CALIFICACIÓN - DOCENTE]: Recupera las entregas asociadas a una
+     * matrícula concreta para revisar trabajos de un alumno antes de calificar.
+     */
+    @GetMapping("/course/enrollment/{enrollmentId}")
+    @PreAuthorize("hasAuthority('PROFESSOR')")
+    public ResponseEntity<?> getDocumentsByEnrollmentId(
+            Authentication authentication,
+            @PathVariable("enrollmentId") Long enrollmentId) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            boolean isAuthorized = enrollmentRepository.isInstructorAuthorizedForEnrollment(
+                    enrollmentId,
+                    authentication.getName());
+
+            if (!isAuthorized) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Acceso denegado: no eres el instructor asignado a esta matrícula."));
+            }
+
+            List<DocumentMetadata> documents = documentMetadataRepository.findDocumentsByEnrollmentId(enrollmentId);
+            return ResponseEntity.ok(documents.stream().map(this::toDocumentResponse).toList());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error al recuperar entregas por matrícula",
                     "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
         }
     }

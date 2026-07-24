@@ -314,6 +314,41 @@ public class DocumentControllerTest {
         }
 
         @Test
+        @DisplayName("Debe devolver las entregas de una matrícula concreta para el profesor autorizado")
+        void debeDevolverDocumentosPorEnrollmentIdSiProfesorAutorizado() {
+                Long enrollmentId = 2001L;
+                Mockito.when(authentication.getName()).thenReturn("profesor_juan");
+                Mockito.when(enrollmentRepository.isInstructorAuthorizedForEnrollment(enrollmentId, "profesor_juan"))
+                                .thenReturn(true);
+
+                Courses course = new Courses();
+                course.setCourse_id(101L);
+
+                DocumentMetadata doc = new DocumentMetadata();
+                doc.setDocumentid(99L);
+                doc.setFilename("documents/uuid_feedback.pdf");
+                doc.setOriginalname("Entrega_Final.pdf");
+                doc.setSender(mockSender);
+                doc.setReceiver(mockReceiver);
+                doc.setCourse(course);
+                doc.setFolder_type(FolderType.RECEIVED);
+
+                Mockito.when(documentMetadataRepository.findDocumentsByEnrollmentId(enrollmentId))
+                                .thenReturn(List.of(doc));
+
+                ResponseEntity<?> response = documentController.getDocumentsByEnrollmentId(authentication,
+                                enrollmentId);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertTrue(response.getBody() instanceof List);
+
+                List<?> payload = (List<?>) response.getBody();
+                assertEquals(1, payload.size());
+                Map<?, ?> first = (Map<?, ?>) payload.get(0);
+                assertEquals("Entrega_Final.pdf", first.get("originalname"));
+        }
+
+        @Test
         @WithMockUser(username = "luis_student")
         void debe_permitir_la_descarga_si_el_usuario_es_el_receptor_legitimo_antiIDOR() throws Exception {
                 Long documentId = 1L;

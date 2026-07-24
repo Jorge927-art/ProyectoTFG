@@ -242,4 +242,11 @@ export const uploadProfessorDocument = async (
     return response.data;
 };
 
-
+/**
+ * [EXCLUSIVO PROFESOR - CENTRO DE CALIFICACIÓN]: Recupera las entregas de documentos 
+ * realizadas por un alumno específico filtrando directamente por su ID de matrícula.
+ */
+export const getDocumentsByEnrollment = async (enrollmentId: number): Promise<DocumentMetadata[]> => {
+    const response = await apiClient.get<RawDocumentMetadata[]>(`/api/v1/documents/course/enrollment/${enrollmentId}`);
+    return normalizeDocumentList(response.data);
+};

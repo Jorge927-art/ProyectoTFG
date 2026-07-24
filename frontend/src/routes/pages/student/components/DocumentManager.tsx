@@ -6,6 +6,10 @@ import { useDocuments } from './useDocuments';
 import { useNotifications } from '../../../../components/ui/globalNotificationBell/useNotifications';
 import { markDocumentAsRead } from '../../../../services/documentService'; // <-- RECOMENDACIÓN NOTEBOOKLM: Importación del Servicio
 
+/**
+ * Componente para gestionar la subida, descarga y visualización de documentos académicos.
+ * @returns JSX.Element
+ */
 export const DocumentManager = () => {
     const {
         documentList,
@@ -23,12 +27,17 @@ export const DocumentManager = () => {
         handleSecureDownload
     } = useDocuments();
 
-    // RECOMENDACIÓN NOTEBOOKLM: Extraemos el refresco para actualizar el estado global de la campana
+    //refresca las notificaciones de la campana para reflejar cambios en documentos leídos
     const { refreshNotifications } = useNotifications();
-
+    //estado local para controlar la descarga en curso y evitar descargas simultáneas
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
+    /**
+     * Maneja el cambio de archivo en el input de subida.
+     * @param e Evento de cambio del input de archivo
+     * @returns Promise<void>
+     */
     const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
@@ -52,7 +61,12 @@ export const DocumentManager = () => {
         }
     };
 
-    // RECOMENDACIÓN NOTEBOOKLM: Modificada para sincronizar la lectura con el backend tras la descarga
+    /**
+     * maneja la descarga segura de un documento y marca como leído si es necesario.
+     * @param documentId ID del documento a descargar
+     * @param originalName Nombre original del archivo
+     * @returns Promise<void>
+     */
     const handleDownload = async (documentId: number, originalName: string) => {
         if (downloadingId !== null) return;
         try {

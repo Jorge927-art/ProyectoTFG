@@ -31,6 +31,9 @@ public class CourseGrade {
     @Column(name = "score", nullable = false, precision = 10, scale = 2)
     private BigDecimal score; // Ej: 8.5, 10
 
+    @Column(name = "feedback", columnDefinition = "TEXT")
+    private String feedback;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "enrollment_id", nullable = false)
     private Enrollment enrollment; // Vinculación física con la matrícula del alumno

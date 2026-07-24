@@ -38,4 +38,14 @@ public interface DocumentMetadataRepository extends JpaRepository<DocumentMetada
         List<DocumentMetadata> findSentDocumentsByUsernameAndCourse(@Param("username") String username,
                         @Param("courseId") Long courseId);
 
+        /**
+         * Recupera las entregas asociadas a una matrícula concreta: mismo alumno
+         * emisor y mismo curso de la matrícula.
+         */
+        @Query("SELECT d FROM DocumentMetadata d JOIN Enrollment e ON e.user = d.sender AND e.course = d.course " +
+                        "WHERE e.enrollmentid = :enrollmentId " +
+                        "AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED " +
+                        "ORDER BY d.documentid DESC")
+        List<DocumentMetadata> findDocumentsByEnrollmentId(@Param("enrollmentId") Long enrollmentId);
+
 }

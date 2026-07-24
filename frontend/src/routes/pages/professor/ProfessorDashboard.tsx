@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { BookOpen, ArrowRight, Activity } from 'lucide-react';
+import { BookOpen, ArrowRight, Activity, GraduationCap } from 'lucide-react';
 import { useAuth } from '../../../auth/useAuth';
 import GenericCard from '../../../components/ui/genericCard/GenericCard';
 import ProfessorLayout from '../../layouts/DashboardLayout';
@@ -13,6 +13,9 @@ import { CourseManagementModal } from './components/CourseManagementModal';
 
 // 1. Importación del nuevo buscador común adaptado al docente
 import { ProfessorCoursePicker } from './components/ProfessorCoursePicker';
+
+// Centro de Calificación: recepción de trabajos/exámenes y envío de notas
+import { GradingCenter } from './components/GradingCenter';
 
 // IMPORTACIÓN CENTRALIZADA DE DOMINIOS [DRY]
 import type { TaughtCourse, TeacherMetric } from '../../../services/userDomains';
@@ -124,8 +127,9 @@ const ProfessorDashboard = () => {
     }, []);
 
     /**
-     * Callback reactivo que se dispara cuando el buscador común confirma la asignación exitosa en el backend.
-     * Transforma el modelo canónico DBModelCourse al dominio local TaughtCourse para inyectarlo en caliente.
+     * Maneja la selección de un nuevo curso desde el buscador y lo agrega a la lista de cursos impartidos.
+     * @param newCourse Curso seleccionado del buscador
+     * @returns Promise<void>
      */
     const handleCourseSelectionSuccess = useCallback(async (newCourse: DBModelCourse) => {
         let studentsCount = 0;
@@ -243,6 +247,22 @@ const ProfessorDashboard = () => {
                     </GenericCard>
                 </div>
 
+                {/* CENTRO DE CALIFICACIÓN: recepción de trabajos/exámenes y envío de notas. */}
+                <div className="lg:col-span-2">
+                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <GraduationCap size={20} className="text-blue-600" />
+                        <span>Centro de Calificación</span>
+                    </h2>
+
+                    <GradingCenter
+                        courseId={selectedCourseId}
+                        availableCourses={myCourses}
+                        onCourseChange={setSelectedCourseId}
+                    />
+                </div>
+
+                {/* HUECO DERECHO DE LA FILA 2: intencionalmente vacío bajo "Métricas de Docencia". */}
+                <div className="hidden lg:block" aria-hidden="true" />
             </div>
 
             {/* Inyección operativa del modal con sincronía reactiva de alumnos */}

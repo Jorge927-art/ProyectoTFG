@@ -6,6 +6,7 @@ package com.cursosonline.backend.dto;
  * Centraliza la captura de información enviada al frontend.
  * StudentPerformanceDTO
  * 
+ * @param enrollmentId
  * @param userId
  * @param username
  * @param email
@@ -13,9 +14,10 @@ package com.cursosonline.backend.dto;
  * @param groupAverage
  */
 public record StudentPerformanceDTO(
-        Long userId,
-        String username,
-        String email,
-        Double individualGrade,
-        Double groupAverage) {
+                Long enrollmentId,
+                Long userId,
+                String username,
+                String email,
+                Double individualGrade,
+                Double groupAverage) {
 }

@@ -7,8 +7,8 @@ import java.math.BigDecimal;
  * de forma segura la calificación de un alumno.
  */
 public record TeacherGradeRequest(
-                Long enrollmentId,
-                String title, // "Trabajo Académico Escrito" o "Examen Final"
-                BigDecimal score // Ej: 8.5
-) {
+        Long enrollmentId,
+        String title, // "Trabajo Académico Escrito" o "Examen Final"
+        BigDecimal score, // Ej: 8.5
+        String feedback) {
 }

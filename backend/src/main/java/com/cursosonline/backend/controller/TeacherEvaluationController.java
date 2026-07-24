@@ -61,6 +61,7 @@ public class TeacherEvaluationController {
         CourseGrade newGrade = new CourseGrade();
         newGrade.setTitle(request.title());
         newGrade.setScore(request.score());
+        newGrade.setFeedback(request.feedback());
         newGrade.setEnrollment(enrollment);
 
         courseGradeRepository.save(newGrade);
@@ -78,9 +79,8 @@ public class TeacherEvaluationController {
      */
     @GetMapping("/courses/{courseId}/management/students")
     public ResponseEntity<List<StudentPerformanceDTO>> getCourseStudentsPerformance(@PathVariable Long courseId) {
-        // 1. Recuperamos exclusivamente alumnos con enabled = true y rol STUDENT en
-        // PostgreSQL
-        List<Users> activeStudents = userRepository.findActiveStudentsByCourseId(courseId);
+        // 1. Recuperamos matrículas activas para incluir enrollmentId real en el DTO
+        List<Enrollment> activeEnrollments = enrollmentRepository.findActiveStudentEnrollmentsByCourseId(courseId);
 
         // 2. Calculamos de forma aislada la media aritmética general del grupo
         Double groupAvg = courseGradeRepository.getGroupAverageScore(courseId);
@@ -89,11 +89,13 @@ public class TeacherEvaluationController {
         List<StudentPerformanceDTO> performanceList = new ArrayList<>();
 
         // 3. Procesamos a alta velocidad en memoria el rendimiento individual
-        for (Users student : activeStudents) {
+        for (Enrollment enrollment : activeEnrollments) {
+            Users student = enrollment.getUser();
             Double studentAvg = courseGradeRepository.getIndividualStudentAverageScore(courseId, student.getUser_id());
             double stabilizedStudentAvg = (studentAvg != null) ? studentAvg : 0.0;
 
             performanceList.add(new StudentPerformanceDTO(
+                    enrollment.getEnrollmentid(),
                     student.getUser_id(),
                     student.getUsername(),
                     student.getEmail(),
