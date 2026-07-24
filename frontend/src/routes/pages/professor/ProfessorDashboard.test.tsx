@@ -7,7 +7,7 @@ const { mockedAuthUser } = vi.hoisted(() => ({
     mockedAuthUser: {
         username: 'Laura',
         email: 'laura@universidad.edu'
-    } as { username?: string; email?: string } | undefined
+    } as { username?: string; email?: string }
 }));
 
 vi.mock('../../../auth/useAuth', () => ({
@@ -377,11 +377,11 @@ describe('ProfessorDashboard', () => {
     });
 
     it('activa la rama cancelled al desmontar antes de resolver la hidratación', async () => {
-        let resolveAssignedCourses: ((value: Array<{ course_id: number; title: string; category: string }>) => void) | null = null;
+        let resolveAssignedCourses: (value: Array<{ course_id: number; title: string; category: string }>) => void = () => undefined;
 
         mockedGetProfessorAssignedCourses.mockImplementationOnce(
             () => new Promise((resolve) => {
-                resolveAssignedCourses = resolve;
+                resolveAssignedCourses = resolve as (value: Array<{ course_id: number; title: string; category: string }>) => void;
             })
         );
 
@@ -389,7 +389,7 @@ describe('ProfessorDashboard', () => {
 
         unmount();
 
-        resolveAssignedCourses?.([
+        resolveAssignedCourses([
             {
                 course_id: 700,
                 title: 'Curso tardío',

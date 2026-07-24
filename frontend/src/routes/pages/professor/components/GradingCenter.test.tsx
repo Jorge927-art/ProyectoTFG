@@ -4,6 +4,8 @@ import { GradingCenter } from './GradingCenter';
 import { useGradingCenter } from './useGradingCenter';
 import { downloadDocumentSecure } from '../../../../services/documentService';
 import type { TaughtCourse } from '../../../../services/userDomains';
+import type { StudentPerformanceDTO } from '../../../../services/evaluationService';
+import type { DocumentMetadata } from '../../../../services/documentService';
 
 vi.mock('./useGradingCenter', () => ({
     useGradingCenter: vi.fn()
@@ -16,9 +18,12 @@ vi.mock('../../../../services/documentService', () => ({
 describe('GradingCenter', () => {
     const mockOnCourseChange = vi.fn();
     const mockHandleFileSelection = vi.fn();
-    const mockHandleSendDocument = vi.fn();
-    const mockHandleSelectStudentById = vi.fn();
-    const mockHandleGradeSubmit = vi.fn((event: React.FormEvent) => event.preventDefault());
+    const mockHandleSendDocument = vi.fn(async () => undefined);
+    const mockHandleSelectStudent = vi.fn(async () => undefined);
+    const mockHandleSelectStudentById = vi.fn(async () => undefined);
+    const mockHandleGradeSubmit = vi.fn(async (event: React.FormEvent) => {
+        event.preventDefault();
+    });
     const mockSetEvaluationTitle = vi.fn();
     const mockSetScore = vi.fn();
     const mockSetFeedback = vi.fn();
@@ -28,7 +33,37 @@ describe('GradingCenter', () => {
         { id: 2, title: 'Arquitectura de Software', category: 'Ingenieria', studentsCount: 15, averageProgress: 82 }
     ];
 
-    const baseHookReturn = {
+    const mockStudent: StudentPerformanceDTO = {
+        userId: 10,
+        username: 'ana',
+        email: 'ana@uni.es',
+        individualGrade: 8.2,
+        groupAverage: 7.6,
+        enrollmentId: 301
+    };
+
+    const mockStudentDocument: DocumentMetadata = {
+        documentid: 777,
+        filename: 'documents/actividad-final.pdf',
+        originalname: 'actividad-final.pdf',
+        upload_date: '2026-07-24T10:00:00Z',
+        sender: {
+            userId: 10,
+            username: 'ana',
+            email: 'ana@uni.es',
+            role: 'STUDENT'
+        },
+        receiver: {
+            userId: 1,
+            username: 'profesor',
+            email: 'profe@uni.es',
+            role: 'PROFESSOR'
+        },
+        folder_type: 'RECEIVED',
+        isRead: false
+    };
+
+    const baseHookReturn: ReturnType<typeof useGradingCenter> = {
         students: [],
         selectedStudent: null,
         studentDocuments: [],
@@ -47,6 +82,7 @@ describe('GradingCenter', () => {
         isUploadingDocument: false,
         handleFileSelection: mockHandleFileSelection,
         handleSendDocument: mockHandleSendDocument,
+        handleSelectStudent: mockHandleSelectStudent,
         handleSelectStudentById: mockHandleSelectStudentById,
         handleGradeSubmit: mockHandleGradeSubmit
     };
@@ -81,7 +117,7 @@ describe('GradingCenter', () => {
     it('selecciona alumno y ejecuta handleSelectStudentById', () => {
         vi.mocked(useGradingCenter).mockReturnValue({
             ...baseHookReturn,
-            students: [{ userId: 10, username: 'ana', email: 'ana@uni.es' }]
+            students: [mockStudent]
         } as ReturnType<typeof useGradingCenter>);
 
         render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
@@ -103,7 +139,7 @@ describe('GradingCenter', () => {
         const selectedFile = new File(['pdf'], 'entrega.pdf', { type: 'application/pdf' });
         vi.mocked(useGradingCenter).mockReturnValue({
             ...baseHookReturn,
-            selectedStudent: { userId: 10, username: 'ana', email: 'ana@uni.es' }
+            selectedStudent: mockStudent
         } as ReturnType<typeof useGradingCenter>);
 
         render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
@@ -117,7 +153,7 @@ describe('GradingCenter', () => {
     it('envia documento al pulsar el boton de envio', () => {
         vi.mocked(useGradingCenter).mockReturnValue({
             ...baseHookReturn,
-            selectedStudent: { userId: 10, username: 'ana', email: 'ana@uni.es' },
+            selectedStudent: mockStudent,
             selectedFile: new File(['pdf'], 'entrega.pdf', { type: 'application/pdf' })
         } as ReturnType<typeof useGradingCenter>);
 
@@ -130,13 +166,8 @@ describe('GradingCenter', () => {
     it('descarga documento de la lista de entregas del alumno', () => {
         vi.mocked(useGradingCenter).mockReturnValue({
             ...baseHookReturn,
-            selectedStudent: { userId: 10, username: 'ana', email: 'ana@uni.es' },
-            studentDocuments: [
-                {
-                    documentid: 777,
-                    originalname: 'actividad-final.pdf'
-                }
-            ]
+            selectedStudent: mockStudent,
+            studentDocuments: [mockStudentDocument]
         } as ReturnType<typeof useGradingCenter>);
 
         render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
@@ -154,7 +185,7 @@ describe('GradingCenter', () => {
     it('envia calificacion mediante submit del formulario', () => {
         vi.mocked(useGradingCenter).mockReturnValue({
             ...baseHookReturn,
-            selectedStudent: { userId: 10, username: 'ana', email: 'ana@uni.es' },
+            selectedStudent: mockStudent,
             score: '8.5',
             feedback: 'Buen trabajo'
         } as ReturnType<typeof useGradingCenter>);
@@ -181,7 +212,7 @@ describe('GradingCenter', () => {
     it('muestra estado de carga de documentos del alumno', () => {
         vi.mocked(useGradingCenter).mockReturnValue({
             ...baseHookReturn,
-            selectedStudent: { userId: 10, username: 'ana', email: 'ana@uni.es' },
+            selectedStudent: mockStudent,
             loadingDocs: true
         } as ReturnType<typeof useGradingCenter>);
 
@@ -193,7 +224,7 @@ describe('GradingCenter', () => {
     it('deshabilita envio de documento cuando esta subiendo archivo', () => {
         vi.mocked(useGradingCenter).mockReturnValue({
             ...baseHookReturn,
-            selectedStudent: { userId: 10, username: 'ana', email: 'ana@uni.es' },
+            selectedStudent: mockStudent,
             selectedFile: new File(['pdf'], 'entrega.pdf', { type: 'application/pdf' }),
             isUploadingDocument: true
         } as ReturnType<typeof useGradingCenter>);
@@ -207,7 +238,7 @@ describe('GradingCenter', () => {
     it('deshabilita submit de calificacion durante el envio de nota', () => {
         vi.mocked(useGradingCenter).mockReturnValue({
             ...baseHookReturn,
-            selectedStudent: { userId: 10, username: 'ana', email: 'ana@uni.es' },
+            selectedStudent: mockStudent,
             isSubmitting: true
         } as ReturnType<typeof useGradingCenter>);
 
@@ -220,7 +251,7 @@ describe('GradingCenter', () => {
     it('propaga cambios de campos de evaluacion al hook', () => {
         vi.mocked(useGradingCenter).mockReturnValue({
             ...baseHookReturn,
-            selectedStudent: { userId: 10, username: 'ana', email: 'ana@uni.es' }
+            selectedStudent: mockStudent
         } as ReturnType<typeof useGradingCenter>);
 
         render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);

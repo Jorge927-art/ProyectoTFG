@@ -9,6 +9,7 @@ import {
     getDocumentsByEnrollment,
     uploadProfessorDocument
 } from '../../../../services/documentService';
+import type { DocumentMetadata } from '../../../../services/documentService';
 
 const mockRefreshNotifications = vi.fn();
 
@@ -47,7 +48,7 @@ describe('useGradingCenter', () => {
         }
     ];
 
-    const mockDocuments = [
+    const mockDocuments: DocumentMetadata[] = [
         {
             documentid: 1001,
             filename: 'doc_1001.pdf',
