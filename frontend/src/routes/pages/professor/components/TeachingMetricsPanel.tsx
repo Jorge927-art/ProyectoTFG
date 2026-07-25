@@ -31,7 +31,7 @@ export const TeachingMetricsPanel = ({
     const { summary, students, loading, error } = useTeachingMetrics(selectedCourseId);
 
     return (
-        <GenericCard className="h-fit space-y-4">
+        <GenericCard className="h-full flex-1 space-y-4">
             <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                 <Activity size={18} className="text-blue-600" />
                 <span>Métricas de Docencia</span>

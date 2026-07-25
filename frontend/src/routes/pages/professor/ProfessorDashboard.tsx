@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { BookOpen, ArrowRight, GraduationCap } from 'lucide-react';
 import { useAuth } from '../../../auth/useAuth';
 import ProfessorLayout from '../../layouts/DashboardLayout';
@@ -60,6 +60,9 @@ const ProfessorDashboard = () => {
 
     // 1. ESTADO DE ASIGNATURAS IMPARTIDAS POR EL PROFESOR
     const [myCourses, setMyCourses] = useState<TaughtCourse[]>([]);
+    const [metricsColumnMinHeight, setMetricsColumnMinHeight] = useState<number>(0);
+
+    const leftColumnRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -102,6 +105,30 @@ const ProfessorDashboard = () => {
             cancelled = true;
         };
     }, []);
+
+    useLayoutEffect(() => {
+        const node = leftColumnRef.current;
+        if (!node) return;
+
+        const syncHeight = () => {
+            const shouldSync = window.innerWidth >= 1024;
+            setMetricsColumnMinHeight(shouldSync ? Math.ceil(node.getBoundingClientRect().height) : 0);
+        };
+
+        syncHeight();
+
+        const resizeObserver = new ResizeObserver(() => {
+            syncHeight();
+        });
+        resizeObserver.observe(node);
+
+        window.addEventListener('resize', syncHeight);
+
+        return () => {
+            resizeObserver.disconnect();
+            window.removeEventListener('resize', syncHeight);
+        };
+    }, [myCourses, selectedCourseId]);
 
     // Función intermedia para actualizar el contador real enviado desde el modal (mantiene sincronía si hay cambios dentro)
     const handleSyncCount = useCallback((courseId: number, realCount: number) => {
@@ -180,10 +207,10 @@ const ProfessorDashboard = () => {
             </div>
 
             {/* 2. REJILLA PRINCIPAL: columna izquierda apilada + panel de métricas a la derecha */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
 
                 {/* COLUMNA IZQUIERDA: ASIGNATURAS + CENTRO DE CALIFICACIÓN APILADOS */}
-                <div className="lg:col-span-2 space-y-8">
+                <div ref={leftColumnRef} className="lg:col-span-2 space-y-12">
                     <section>
                         <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                             <BookOpen size={20} className="text-blue-600" />
@@ -216,7 +243,10 @@ const ProfessorDashboard = () => {
                 </div>
 
                 {/* COLUMNA DERECHA: RESUMEN DE MÉTRICAS */}
-                <div className="lg:col-span-1 lg:sticky lg:top-20 self-start">
+                <div
+                    className="lg:col-span-1 lg:sticky lg:top-20 lg:self-stretch lg:flex h-full"
+                    style={metricsColumnMinHeight > 0 ? { minHeight: `${metricsColumnMinHeight}px` } : undefined}
+                >
                     <TeachingMetricsPanel
                         selectedCourseId={selectedCourseId}
                         onCourseChange={setSelectedCourseId}
