@@ -37,9 +37,15 @@ vi.mock('../../../../components/ui/Input', () => ({
 
 describe('UserSearchPanel', () => {
     const mockSetSearchName = vi.fn();
-    const mockHandleSearchUser = vi.fn((e: React.FormEvent) => e.preventDefault());
-    const mockHandleRoleChange = vi.fn();
-    const mockHandleDeleteUser = vi.fn();
+    const mockHandleSearchUser = vi.fn(async (e: React.FormEvent) => {
+        e.preventDefault();
+    });
+    const mockHandleRoleChange = vi.fn(async (_targetId: number, _newRole: string) => {
+        return;
+    });
+    const mockHandleDeleteUser = vi.fn(async () => {
+        return;
+    });
 
     const sampleUserEntity: UserEntity = {
         userId: 101,
