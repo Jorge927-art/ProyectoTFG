@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { BookOpen, ArrowRight, Activity, GraduationCap } from 'lucide-react';
+import { BookOpen, ArrowRight, GraduationCap } from 'lucide-react';
 import { useAuth } from '../../../auth/useAuth';
-import GenericCard from '../../../components/ui/genericCard/GenericCard';
 import ProfessorLayout from '../../layouts/DashboardLayout';
 import TaughtCoursesGrid from './components/TaughtCoursesGrid';
 
@@ -16,18 +15,14 @@ import { ProfessorCoursePicker } from './components/ProfessorCoursePicker';
 
 // Centro de Calificación: recepción de trabajos/exámenes y envío de notas
 import { GradingCenter } from './components/GradingCenter';
+import { TeachingMetricsPanel } from './components/TeachingMetricsPanel';
 
 // IMPORTACIÓN CENTRALIZADA DE DOMINIOS [DRY]
-import type { TaughtCourse, TeacherMetric } from '../../../services/userDomains';
+import type { TaughtCourse } from '../../../services/userDomains';
 import type { DBModelCourse } from '../../../services/courseTypes';
 
 // 2. Importamos el servicio para contar los alumnos de raíz
 import { getActiveStudentsByCourse, getProfessorAssignedCourses } from '../../../services/evaluationService';
-
-const DASHBOARD_METRICS: TeacherMetric[] = [
-    { id: 201, title: "Alumnos Activos esta semana", value: "68 / 73", description: "93% de participación en plataforma", type: "actividad" },
-    { id: 202, title: "Tareas pendientes de revisión", value: 12, description: "Proyectos finales del módulo Backend", type: "tareas" }
-];
 
 const normalizeCategory = (course: DBModelCourse): string => {
     const category = (course.category || '').trim();
@@ -156,9 +151,6 @@ const ProfessorDashboard = () => {
         });
     }, []);
 
-    // 2. ESTADO DE MÉTRICAS Y CONTROL DE ALUMNOS
-    const metrics = DASHBOARD_METRICS;
-
     return (
         <ProfessorLayout>
             <GenericHeader
@@ -187,82 +179,50 @@ const ProfessorDashboard = () => {
                 />
             </div>
 
-            {/* 2. REJILLA INDEPENDIENTE: SEPARACIÓN DE CONTENIDOS EN 3 COLUMNAS */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* 2. REJILLA PRINCIPAL: columna izquierda apilada + panel de métricas a la derecha */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-                {/* COLUMNA IZQUIERDA: ASIGNATURAS QUE IMPARTE (TOMA 2 DE LAS 3 COLUMNAS) */}
-                <div className="lg:col-span-2">
-                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                        <BookOpen size={20} className="text-blue-600" />
-                        <span>Tus asignaturas asignadas</span>
-                        <span className="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-bold">
-                            {myCourses.length}
-                        </span>
-                    </h2>
-
-                    {/* Rejilla interna modularizada de asignaturas */}
-                    <TaughtCoursesGrid
-                        courses={myCourses}
-                        onManageCourse={(id: number) => setSelectedCourseId(id)}
-                        actionIcon={<ArrowRight size={14} />}
-                    />
-                </div>
-
-                {/* COLUMNA DERECHA: RESUMEN DE MÉTRICAS (TOMA 1 DE LAS 3 COLUMNAS) */}
-                <div className="lg:col-span-1">
-                    {/* Consumo estricto de GenericCard para unificar el fondo visual y limpiar alertas de ESLint */}
-                    <GenericCard className="h-fit">
-                        <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <Activity size={18} className="text-blue-600" />
-                            <span>Métricas de Docencia</span>
+                {/* COLUMNA IZQUIERDA: ASIGNATURAS + CENTRO DE CALIFICACIÓN APILADOS */}
+                <div className="lg:col-span-2 space-y-8">
+                    <section>
+                        <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <BookOpen size={20} className="text-blue-600" />
+                            <span>Tus asignaturas asignadas</span>
+                            <span className="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-bold">
+                                {myCourses.length}
+                            </span>
                         </h2>
 
-                        <div className="flex flex-col gap-3">
-                            {metrics.map((metric) => (
-                                <GenericCard key={metric.id} className="p-4 border-slate-100 shadow-none hover:shadow-none bg-slate-50/30">
-                                    <div className="mb-4">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide ${metric.type === 'actividad' ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
-                                                }`}>
-                                                {metric.type === 'actividad' ? "Rendimiento" : "Correcciones"}
-                                            </span>
-                                            <div className="flex items-center gap-0.5 text-slate-800 text-base font-extrabold">
-                                                <span>{metric.value}</span>
-                                            </div>
-                                        </div>
-                                        <h3 className="text-base font-bold text-slate-800 leading-tight">
-                                            {metric.title}
-                                        </h3>
-                                        <p className="text-xs text-slate-400 mt-1">Estado actual</p>
-                                    </div>
+                        {/* Rejilla interna modularizada de asignaturas */}
+                        <TaughtCoursesGrid
+                            courses={myCourses}
+                            onManageCourse={(id: number) => setSelectedCourseId(id)}
+                            actionIcon={<ArrowRight size={14} />}
+                        />
+                    </section>
 
-                                    <div className="mt-4 pt-3 border-t border-slate-100">
-                                        <p className="text-xs text-slate-600 bg-white p-2 rounded border border-slate-100">
-                                            📊 {metric.description}
-                                        </p>
-                                    </div>
-                                </GenericCard>
-                            ))}
-                        </div>
-                    </GenericCard>
+                    <section>
+                        <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <GraduationCap size={20} className="text-blue-600" />
+                            <span>Centro de Calificación</span>
+                        </h2>
+
+                        <GradingCenter
+                            courseId={selectedCourseId}
+                            availableCourses={myCourses}
+                            onCourseChange={setSelectedCourseId}
+                        />
+                    </section>
                 </div>
 
-                {/* CENTRO DE CALIFICACIÓN: recepción de trabajos/exámenes y envío de notas. */}
-                <div className="lg:col-span-2">
-                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                        <GraduationCap size={20} className="text-blue-600" />
-                        <span>Centro de Calificación</span>
-                    </h2>
-
-                    <GradingCenter
-                        courseId={selectedCourseId}
-                        availableCourses={myCourses}
+                {/* COLUMNA DERECHA: RESUMEN DE MÉTRICAS */}
+                <div className="lg:col-span-1 lg:sticky lg:top-20 self-start">
+                    <TeachingMetricsPanel
+                        selectedCourseId={selectedCourseId}
                         onCourseChange={setSelectedCourseId}
+                        availableCourses={myCourses}
                     />
                 </div>
-
-                {/* HUECO DERECHO DE LA FILA 2: intencionalmente vacío bajo "Métricas de Docencia". */}
-                <div className="hidden lg:block" aria-hidden="true" />
             </div>
 
             {/* Inyección operativa del modal con sincronía reactiva de alumnos */}

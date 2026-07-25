@@ -1,115 +1,177 @@
 package com.cursosonline.backend.repository;
 
+import com.cursosonline.backend.entities.AcademicEvaluation;
 import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Users;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
+import java.time.LocalDateTime;
+import java.util.List;
 
-@DisplayName("Suite de Pruebas Unitarias para AcademicEvaluationRepository")
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@SpringBootTest
+@ActiveProfiles("test-ci")
+@Transactional
+@DisplayName("Suite de Pruebas de Persistencia para AcademicEvaluationRepository")
 class AcademicEvaluationRepositoryTest {
 
+    @Autowired
     private AcademicEvaluationRepository academicEvaluationRepository;
-    private Users studentUser;
-    private Courses sampleCourse;
 
-    @BeforeEach
-    void setUp() {
-        // 1. Creamos el simulador (mock) del propio repositorio de forma directa
-        academicEvaluationRepository = Mockito.mock(AcademicEvaluationRepository.class);
+    @Autowired
+    private UserRepository userRepository;
 
-        // 2. Instanciamos entidades de prueba reales de Java para simular los DTOs de
-        // PostgreSQL
-        studentUser = new Users();
-        studentUser.setUser_id(1L);
-        studentUser.setUsername("alumno_analitico");
+    @Autowired
+    private CoursesRepository coursesRepository;
 
-        sampleCourse = new Courses();
-        sampleCourse.setCourse_id(101L);
-        sampleCourse.setTitle("Data Analysis Using Python");
+    @Autowired
+    private EnrollmentRepository enrollmentRepository;
+
+    private Users activeStudent;
+    private Users secondaryStudent;
+    private Users inactiveStudent;
+    private Courses courseAlpha;
+    private Courses courseBeta;
+
+    private void seedData() {
+        activeStudent = saveUser("ana_evaluaciones", true);
+        secondaryStudent = saveUser("bruno_evaluaciones", true);
+        inactiveStudent = saveUser("carlos_evaluaciones", false);
+
+        courseAlpha = saveCourse("Arquitectura de Software", "Brandon Krakowsky");
+        courseBeta = saveCourse("Programacion Avanzada", "Brandon Krakowsky");
+
+        saveEnrollment(activeStudent, courseAlpha);
+        saveEnrollment(secondaryStudent, courseAlpha);
+        saveEnrollment(inactiveStudent, courseAlpha);
+        saveEnrollment(activeStudent, courseBeta);
+
+        saveEvaluation(activeStudent, courseAlpha, 5, 4);
+        saveEvaluation(secondaryStudent, courseAlpha, 3, 5);
+        saveEvaluation(inactiveStudent, courseAlpha, 1, 1);
+        saveEvaluation(activeStudent, courseBeta, 4, 4);
     }
 
-    /*
-     * =========================================================================
-     * 1. VERIFICACIÓN: getAverageCourseScore
-     * =========================================================================
-     */
-    @Test
-    @DisplayName("Debe calcular correctamente la media aritmética del curso")
-    void getAverageCourseScore_ShouldReturnCorrectAverage() {
-        when(academicEvaluationRepository.getAverageCourseScore(101L)).thenReturn(8.5);
+    private Users saveUser(String username, boolean enabled) {
+        Users user = new Users();
+        user.setUsername(username);
+        user.setPassword("secret-pass");
+        user.setRole(Role.STUDENT);
+        user.setEmail(username + "@uni.es");
+        user.setEnabled(enabled);
+        return userRepository.saveAndFlush(user);
+    }
 
-        Double score = academicEvaluationRepository.getAverageCourseScore(101L);
+    private Courses saveCourse(String title, String instructors) {
+        Courses course = new Courses();
+        course.setTitle(title);
+        course.setCategory("Ingenieria");
+        course.setInstructors(instructors);
+        return coursesRepository.saveAndFlush(course);
+    }
+
+    private Enrollment saveEnrollment(Users user, Courses course) {
+        Enrollment enrollment = new Enrollment();
+        enrollment.setUser(user);
+        enrollment.setCourse(course);
+        enrollment.setEnrolled_at(LocalDateTime.now().minusDays(7));
+        enrollment.setStarted_at(LocalDateTime.now().minusDays(6));
+        enrollment.setStatus("EN_PROGRESO");
+        enrollment.setProgress_percentage(80);
+        return enrollmentRepository.saveAndFlush(enrollment);
+    }
+
+    private AcademicEvaluation saveEvaluation(Users user, Courses course, int courseScore, int instructorScore) {
+        AcademicEvaluation evaluation = new AcademicEvaluation();
+        evaluation.setUser(user);
+        evaluation.setCourse(course);
+        evaluation.setCourse_score(courseScore);
+        evaluation.setInstructor_score(instructorScore);
+        evaluation.setCourseComment("Buen curso");
+        evaluation.setInstructorComment("Buen docente");
+        evaluation.setEvaluation_date(LocalDateTime.now());
+        return academicEvaluationRepository.saveAndFlush(evaluation);
+    }
+
+    @Test
+    @DisplayName("Debe calcular la media de la asignatura incluyendo todas las valoraciones persistidas")
+    void getAverageCourseScore_ShouldReturnCorrectAverage() {
+        seedData();
+
+        Double score = academicEvaluationRepository.getAverageCourseScore(courseAlpha.getCourse_id());
 
         assertNotNull(score);
-        assertEquals(8.5, score, 0.01);
+        assertEquals(3.0, score, 0.01);
     }
 
-    /*
-     * =========================================================================
-     * 2. VERIFICACIÓN: getAverageInstructorScore
-     * =========================================================================
-     */
     @Test
-    @DisplayName("Debe calcular correctamente la media del docente basándose en su nombre")
+    @DisplayName("Debe calcular la media del docente a partir del nombre exacto del instructor")
     void getAverageInstructorScore_ShouldReturnCorrectAverage() {
-        when(academicEvaluationRepository.getAverageInstructorScore("Brandon Krakowsky")).thenReturn(9.0);
+        seedData();
 
         Double score = academicEvaluationRepository.getAverageInstructorScore("Brandon Krakowsky");
 
         assertNotNull(score);
-        assertEquals(9.0, score, 0.01);
+        assertEquals(3.5, score, 0.01);
     }
 
-    /*
-     * =========================================================================
-     * 3. VERIFICACIÓN: existsByUserUsernameAndCourseCourseId
-     * =========================================================================
-     */
     @Test
-    @DisplayName("Debe confirmar si el alumno ya calificó el curso antes de insertar")
+    @DisplayName("Debe confirmar si el alumno ya emitió una evaluación para el curso")
     void existsByUserUsernameAndCourseCourseId_ShouldReturnTrueIfExists() {
-        when(academicEvaluationRepository.existsByUserUsernameAndCourseCourseId("alumno_analitico", 101L))
-                .thenReturn(true);
+        seedData();
 
-        boolean exists = academicEvaluationRepository.existsByUserUsernameAndCourseCourseId("alumno_analitico", 101L);
+        boolean exists = academicEvaluationRepository.existsByUserUsernameAndCourseCourseId(
+                activeStudent.getUsername(), courseBeta.getCourse_id());
 
         assertTrue(exists);
     }
 
-    /*
-     * =========================================================================
-     * 4. VERIFICACIÓN: getGroupAveragePerformance
-     * =========================================================================
-     */
     @Test
-    @DisplayName("Debe calcular el rendimiento del grupo de alumnos activos")
+    @DisplayName("Debe calcular la media del grupo filtrando alumnos desactivados")
     void getGroupAveragePerformance_ShouldReturnCorrectAverage() {
-        when(academicEvaluationRepository.getGroupAveragePerformance(101L)).thenReturn(7.8);
+        seedData();
 
-        Double score = academicEvaluationRepository.getGroupAveragePerformance(101L);
+        Double score = academicEvaluationRepository.getGroupAveragePerformance(courseAlpha.getCourse_id());
 
         assertNotNull(score);
-        assertEquals(7.8, score, 0.01);
+        assertEquals(4.0, score, 0.01);
     }
 
-    /*
-     * =========================================================================
-     * 5. VERIFICACIÓN: getIndividualStudentPerformance
-     * =========================================================================
-     */
     @Test
-    @DisplayName("Debe recuperar la nota media individual de un alumno en una asignatura")
+    @DisplayName("Debe recuperar el rendimiento individual de un alumno en una asignatura")
     void getIndividualStudentPerformance_ShouldReturnCorrectValue() {
-        when(academicEvaluationRepository.getIndividualStudentPerformance(101L, 1L)).thenReturn(8.5);
+        seedData();
 
-        Double score = academicEvaluationRepository.getIndividualStudentPerformance(101L, 1L);
+        Double score = academicEvaluationRepository.getIndividualStudentPerformance(
+                courseAlpha.getCourse_id(), activeStudent.getUser_id());
 
         assertNotNull(score);
-        assertEquals(8.5, score, 0.01);
+        assertEquals(5.0, score, 0.01);
+    }
+
+    @Test
+    @DisplayName("Debe calcular las medias agregadas para varias asignaturas del panel docente")
+    void aggregateMetrics_ShouldReturnCorrectValues() {
+        seedData();
+
+        Double courseScore = academicEvaluationRepository.getAverageCourseScoreByCourseIds(
+                List.of(courseAlpha.getCourse_id(), courseBeta.getCourse_id()));
+        Double instructorScore = academicEvaluationRepository.getAverageInstructorScoreByCourseIds(
+                List.of(courseAlpha.getCourse_id(), courseBeta.getCourse_id()));
+
+        assertNotNull(courseScore);
+        assertNotNull(instructorScore);
+        assertEquals(3.25, courseScore, 0.01);
+        assertEquals(3.5, instructorScore, 0.01);
     }
 }

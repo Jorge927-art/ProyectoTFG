@@ -1,0 +1,47 @@
+// frontend/src/routes/pages/professor/components/StudentGradeBreakdown.tsx
+import { Award } from 'lucide-react';
+import GenericCard from '../../../../components/ui/genericCard/GenericCard';
+import type { StudentMetricBreakdown } from '../../../../services/teachingMetricsService';
+
+interface StudentGradeBreakdownProps {
+    students: StudentMetricBreakdown[];
+    showCourseColumn: boolean; // true cuando el ámbito del selector es TODOS
+}
+
+/**
+ * Desglose individual de nota media por alumno para el panel "Métricas de
+ * Docencia" [nueva funcionalidad]. Cuando el selector está en TODOS, muestra
+ * además la asignatura de cada fila para distinguir el origen del dato.
+ */
+export const StudentGradeBreakdown = ({ students, showCourseColumn }: StudentGradeBreakdownProps) => (
+    <GenericCard className="space-y-2">
+        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <Award size={16} className="text-blue-600" />
+            Nota Alumno
+        </h3>
+        <div className="max-h-48 overflow-y-auto pr-1 space-y-1.5">
+            {students.length === 0 ? (
+                <p className="text-[11px] text-slate-400 italic text-center py-3">
+                    Sin calificaciones registradas en el ámbito seleccionado.
+                </p>
+            ) : (
+                students.map((student) => (
+                    <div
+                        key={`${student.courseId}-${student.userId}`}
+                        className="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-100 text-[11px]"
+                    >
+                        <div className="min-w-0">
+                            <p className="font-semibold text-slate-700 truncate">{student.username}</p>
+                            {showCourseColumn && (
+                                <p className="text-[10px] text-slate-400 truncate">{student.courseTitle}</p>
+                            )}
+                        </div>
+                        <span className="font-bold text-emerald-600 shrink-0">
+                            {student.averageGrade ? `${student.averageGrade.toFixed(1)} / 10` : '---'}
+                        </span>
+                    </div>
+                ))
+            )}
+        </div>
+    </GenericCard>
+);

@@ -76,4 +76,30 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
                         @Param("enrollmentId") Long enrollmentId,
                         @Param("instructorName") String instructorName);
 
+        /**
+         * [PANEL DOCENTE - DESGLOSE ALUMNO]: Matrículas activas de estudiantes para un
+         * conjunto de asignaturas (una sola, o todas las del profesor si viene la lista
+         * completa).
+         */
+        @Query("SELECT e FROM Enrollment e JOIN FETCH e.course WHERE e.course.course_id IN :courseIds " +
+                        "AND e.user.enabled = true AND e.user.role = 'STUDENT' " +
+                        "ORDER BY e.course.title ASC, e.user.username ASC")
+        List<Enrollment> findActiveStudentEnrollmentsByCourseIds(@Param("courseIds") List<Long> courseIds);
+
+        /**
+         * [PANEL DOCENTE - PROGRESO COLECTIVO]: Media de progreso de todos los alumnos
+         * activos matriculados en el conjunto de asignaturas dado.
+         */
+        @Query("SELECT AVG(e.progress_percentage) FROM Enrollment e WHERE e.course.course_id IN :courseIds " +
+                        "AND e.user.enabled = true")
+        Double getAverageProgressByCourseIds(@Param("courseIds") List<Long> courseIds);
+
+        /**
+         * [PANEL DOCENTE - TASA DE FINALIZACIÓN]: Porcentaje de matrículas activas
+         * que alcanzaron el 100% de progreso sobre el total de matrículas activas.
+         */
+        @Query("SELECT (SUM(CASE WHEN e.progress_percentage = 100 THEN 1.0 ELSE 0.0 END) * 100.0) / COUNT(e) " +
+                        "FROM Enrollment e WHERE e.course.course_id IN :courseIds AND e.user.enabled = true")
+        Double getCompletionRateByCourseIds(@Param("courseIds") List<Long> courseIds);
+
 }
