@@ -40,7 +40,7 @@ describe('UserSearchPanel', () => {
     const mockHandleSearchUser = vi.fn(async (e: React.FormEvent) => {
         e.preventDefault();
     });
-    const mockHandleRoleChange = vi.fn(async (_targetId: number, _newRole: string) => {
+    const mockHandleRoleChange = vi.fn(async () => {
         return;
     });
     const mockHandleDeleteUser = vi.fn(async () => {
