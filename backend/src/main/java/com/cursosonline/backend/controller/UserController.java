@@ -176,7 +176,7 @@ public class UserController {
      * Endpoint para obtener la lista de todos los usuarios.
      */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<List<Map<String, Object>>> listAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers().stream().map(this::toAdminUserResponse).toList());
     }
@@ -186,7 +186,7 @@ public class UserController {
      * usuario.
      */
     @PatchMapping("/users/{username}/role")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<?> changeUserRoleByAdmin(
             @PathVariable String username,
             @RequestBody Map<String, String> requestBody) {
@@ -216,7 +216,7 @@ public class UserController {
      * Reactivación).
      */
     @DeleteMapping("/users/{username}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<?> deleteUserByAdmin(@PathVariable String username, Principal principal) {
         if (principal == null || principal.getName() == null || principal.getName().trim().isEmpty()) {
             return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
@@ -240,7 +240,7 @@ public class UserController {
      * [UBICADO AL FINAL DE LOS GET PARA EVITAR INTERCEPTAR LAS RUTAS ESTÁTICAS]
      */
     @GetMapping("/{username}")
-    @PreAuthorize("hasRole('ADMIN') or #username == authentication.name")
+    @PreAuthorize("hasAuthority('ADMIN') or #username == authentication.name")
     public ResponseEntity<Users> getUserProfile(@PathVariable String username) {
         Users user = userService.findByUsername(username)
                 .orElseThrow(() -> new ServicesException("Perfil de usuario no encontrado"));

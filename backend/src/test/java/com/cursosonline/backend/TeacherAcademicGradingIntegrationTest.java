@@ -73,7 +73,7 @@ public class TeacherAcademicGradingIntegrationTest {
         }
 
         @Test
-        @WithMockUser(username = "profesor_test", roles = { "PROFESSOR" })
+        @WithMockUser(username = "profesor_test", authorities = { "PROFESSOR" })
         @DisplayName("El envío de una nota por parte del docente debe impactar de inmediato en el DTO de rendimiento analítico")
         public void alRegistrarNota_DebeCalcularYReflejarLaMediaEnElExpediente() throws Exception {
                 Long fakeEnrollmentId = 888L;

@@ -66,7 +66,7 @@ public class RoleBasedAccessIntegrationTest {
         professorUserDetails = new User(
                 "teacher_tfg_2026",
                 "protected_password",
-                Collections.singletonList(new SimpleGrantedAuthority("ROLE_PROFESSOR")));
+                Collections.singletonList(new SimpleGrantedAuthority("PROFESSOR")));
     }
 
     // --- BLOQUE 1: CASOS DE INTENTOS DE VIOLACIÓN DE ACCESO DE ESTUDIANTE (ALUMNO

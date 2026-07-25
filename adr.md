@@ -2001,6 +2001,48 @@ Se ha decidido factorizar la lógica de búsqueda en un motor agnóstico al rol 
 
 ---
 
+# ADR-057: Corrección del Contrato de Autorización RBAC (hasRole vs. hasAuthority)
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Julio 2026
+
+## Contexto
+
+Durante la implementación del panel "Métricas de Docencia" [nueva funcionalidad] se detectó que un endpoint recién creado devolvía sistemáticamente `403 Forbidden` a profesores autenticados con el rol correcto. La investigación reveló un fallo de seguridad estructural preexistente en varios controladores: `UserController.java` (4 endpoints: `listAllUsers`, `changeUserRoleByAdmin`, `deleteUserByAdmin`, `getUserProfile`) y `TeacherEvaluationController.java` (anotación de clase, afectando a `/submit`, `/management/students` y `/management/metrics`) protegían sus rutas con `@PreAuthorize("hasRole('ADMIN')")` / `@PreAuthorize("hasRole('PROFESSOR')")`.
+
+Sin embargo, tanto `Users.getAuthorities()` como `CustomUserDetailsService` construyen las autoridades del contexto de seguridad como el nombre de rol "plano" (`new SimpleGrantedAuthority(role.name())`, p. ej. `"ADMIN"`, `"PROFESSOR"`), **sin el prefijo `"ROLE_"`**. La expresión `hasRole(...)` de Spring Security exige por defecto dicho prefijo (comprueba internamente `"ROLE_" + argumento`), mientras que `hasAuthority(...)` compara la cadena literal sin transformarla. Esta discrepancia provocaba que **ningún usuario real** (Administrador o Profesor) pudiera superar el check, independientemente de tener el rol correcto en base de datos — un fallo silencioso, ya que el frontend interpretaba el 403 como "lista vacía" en lugar de mostrar un error explícito (caso observado: "Consola de Usuarios" mostrando "0 cuentas en PostgreSQL").
+
+Cabe destacar que esta inconsistencia ya convivía en el propio código: `DocumentController.java` y la regla global `SecurityConfig.java` (`.requestMatchers("/api/auth/users/**").hasAuthority("ADMIN")`) usaban correctamente `hasAuthority`, mientras que los controladores mencionados usaban `hasRole` de forma incorrecta — evidenciando que el patrón correcto ya existía en el proyecto pero no se aplicó de forma uniforme.
+
+## Decisión
+
+Sustituir toda anotación `@PreAuthorize("hasRole('X')")` por `@PreAuthorize("hasAuthority('X')")` en los controladores afectados, estableciendo `hasAuthority(...)` como el **único patrón autorizado** para el control de acceso basado en roles en todo el proyecto, dado que refleja fielmente el contrato real de autoridades emitidas por `CustomUserDetailsService` / `JwtAuthenticationFilter`. Como salvaguarda de regresión, se corrigió también `RoleBasedAccessIntegrationTest.java`, que construía su usuario de prueba "profesor válido" con la autoridad `"ROLE_PROFESSOR"` (con prefijo) — un caso que nunca ocurre en producción y que enmascaraba el fallo en la suite de tests.
+
+## Justificación para el TFG
+
+* **Trazabilidad de la Causa Raíz:** El fallo no se resolvió mediante prueba y error, sino identificando la discrepancia exacta entre el emisor de autoridades (`Users.java`) y el consumidor (`@PreAuthorize`), demostrando un proceso de depuración metódico y verificable.
+* **Prevención de Regresiones Futuras:** Fijar `hasAuthority(...)` como estándar único (y no una mezcla de ambos) elimina la ambigüedad para cualquier controlador que se añada en el futuro, reduciendo el riesgo de reintroducir el mismo defecto.
+* **Coherencia con ADR-055:** La corrección del test de integración asegura que la suite de pruebas exprese fielmente el contrato de producción, evitando que un test mal construido oculte una vulnerabilidad de autorización real.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* **Restauración de Funcionalidad Crítica:** Se desbloquean funciones core que estaban rotas en producción sin que el frontend lo reportara como error explícito: listado y gestión de usuarios (panel Admin) y envío/consulta de calificaciones (Centro de Calificación del Profesor).
+* **Estandarización del Contrato RBAC:** Cualquier nuevo endpoint protegido por rol debe usar `hasAuthority(...)`, alineado con el resto de reglas ya correctas en `SecurityConfig.java`.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Fallo Silencioso Difícil de Detectar:** Un `403 Forbidden` en una lista puede degradarse visualmente a "sin resultados" en el frontend, retrasando la detección del problema.
+* *Mitigación:* Se recomienda que, en futuras revisiones, los hooks de datos (`useXxx.ts`) distingan explícitamente un error de autorización (403) de una respuesta vacía legítima, en lugar de colapsar ambos casos al mismo estado de "lista vacía".
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026

@@ -22,7 +22,7 @@ import java.util.ArrayList;
 @RestController
 @RequestMapping("/api/v1/teacher/evaluations")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('PROFESSOR')")
+@PreAuthorize("hasAuthority('PROFESSOR')")
 public class TeacherEvaluationController {
 
     private final EnrollmentRepository enrollmentRepository;

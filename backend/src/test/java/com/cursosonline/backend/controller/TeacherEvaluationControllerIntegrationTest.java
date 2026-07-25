@@ -50,7 +50,7 @@ class TeacherEvaluationControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "PROFESSOR")
+    @WithMockUser(authorities = "PROFESSOR")
     void debeRetornarListaDeAlumnosConCalificacionesCalculadasCorrectamente() {
         Enrollment mockEnrollment = new Enrollment();
         mockEnrollment.setEnrollmentid(555L);
@@ -78,7 +78,7 @@ class TeacherEvaluationControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "PROFESSOR")
+    @WithMockUser(authorities = "PROFESSOR")
     void debeRetornarMetricasGlobalesDelCursoCorrectamente() {
         when(userRepository.findActiveStudentsByCourseId(courseId)).thenReturn(List.of(mockStudent));
         when(courseGradeRepository.getGroupAverageScore(courseId)).thenReturn(7.2);
@@ -111,7 +111,7 @@ class TeacherEvaluationControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "PROFESSOR")
+    @WithMockUser(authorities = "PROFESSOR")
     void debeEstabilizarElCalculoDeLaMediaGeneralSiExistenAlumnosSinCalificacionesAun() {
         Long mockCourseId = 5L;
 
