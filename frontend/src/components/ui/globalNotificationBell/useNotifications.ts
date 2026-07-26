@@ -4,18 +4,28 @@ import { apiClient } from '../../../services/apiClient'; // Ajustada la ruta de 
 import { getUserDocuments } from '../../../services/documentService'; // Ajustada la ruta de 4 a 3 niveles
 import type { DocumentMetadata } from '../../../services/documentService';
 
-/** Contrato estricto del DTO de notificaciones devuelto por Spring Boot */
+/**
+ * DTO para representar una notificación en el sistema.
+ * Contiene información sobre el tipo de notificación, título, mensaje y URL de redirección.
+ */
 export interface NotificationDTO {
-    type: 'DOCUMENT_INBOX' | 'COURSE_PROGRESS';
+    type: 'DOCUMENT_INBOX' | 'COURSE_PROGRESS' | 'STUDENT_NEAR_COMPLETION';
     title: string;
     message: string;
     redirectUrl: string;
 }
 
-// Renombramos el evento a uno global agnóstico al rol para el TFG
+/**
+ * Constante que define el nombre del evento personalizado para refrescar las notificaciones globales.
+ */
 const NOTIFICATIONS_REFRESH_EVENT = 'global-notifications:refresh';
 
-/** Hook general sensible al rol para el consumo y refresco dinámico de alarmas académicas */
+/**
+ *  Hook personalizado para gestionar las notificaciones globales del usuario.
+ *  Este hook se encarga de obtener las notificaciones y documentos del usuario autenticado,
+ *  así como de manejar el estado de carga y la sincronización de datos.
+ * @returns Un objeto que contiene las notificaciones, documentos, estado de carga y funciones para refrescar los datos.
+ */
 export const useNotifications = () => {
     const { user } = useContext(AuthContext); // Consumimos el contexto global de autenticación
     const [alerts, setAlerts] = useState<NotificationDTO[]>([]);
@@ -80,16 +90,25 @@ export const useNotifications = () => {
         window.dispatchEvent(new Event(NOTIFICATIONS_REFRESH_EVENT));
     }, []);
 
-    // Evalúa si hay documentos recibidos no leídos (isRead === false) compartida para todos los roles
-    const hasUnread = documents.some(doc => !doc.isRead);
-
-    return { 
-        alerts, 
-        documents, 
+   const dismissNotifications = useCallback(async () => {
+        try {
+            await apiClient.patch('/api/auth/notifications/dismiss');
+        } catch (err) {
+            console.error('Error al marcar notificaciones como vistas:', err);
+        } finally {
+            broadcastRefresh();
+        }
+    }, [broadcastRefresh]);
+    
+    // Retornamos un objeto con los datos y funciones necesarias para el componente que use este hook
+    return {
+        alerts,
+        documents,
         hasAlerts: alerts.length > 0,
-        hasUnread, 
+        hasUnread: alerts.length > 0,
         refreshAlerts: broadcastRefresh,
-        refreshNotifications: broadcastRefresh, 
-        loading 
+        refreshNotifications: broadcastRefresh,
+        dismissNotifications,
+        loading
     };
 };

@@ -24,6 +24,10 @@ import java.util.List;
 import java.security.Principal;
 import java.util.LinkedHashMap;
 
+/**
+ * 
+ * UserController
+ */
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -35,7 +39,11 @@ public class UserController {
     private final UserProfileRepository userProfileRepository;
 
     /**
-     * Endpoint para el registro de nuevos usuarios.
+     * Endpoint para registrar un nuevo usuario (alumno) en la plataforma.
+     * Asigna automáticamente el rol de STUDENT al usuario registrado.
+     * 
+     * @param user El usuario a registrar.
+     * @return Una respuesta con los datos mínimos del usuario registrado.
      */
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody Users user) {
@@ -50,7 +58,13 @@ public class UserController {
     }
 
     /**
-     * Endpoint para el login de usuarios (JWT Stateless).
+     * Endpoint para el inicio de sesión de usuarios.
+     * Valida las credenciales y genera un token JWT para el usuario autenticado.
+     * 
+     * @param loginRequest La solicitud de inicio de sesión que contiene el nombre
+     *                     de usuario y la contraseña.
+     * @return Una respuesta con el token JWT y la información del usuario
+     *         autenticado.
      */
     @PostMapping("/login")
     public ResponseEntity<AuthTokenResponse> login(@RequestBody LoginRequest loginRequest) {
@@ -76,9 +90,12 @@ public class UserController {
     }
 
     /**
-     * Endpoint para recuperar los intereses y criterios de filtrado guardados del
+     * Endpoint seguro para recuperar los intereses y criterios de filtrado del
      * alumno en sesión.
-     * [PRIORIDAD RUTA ESTÁTICA - ADR-18]
+     * Extrae la identidad mediante las credenciales del token JWT activo.
+     * 
+     * @param principal El principal que representa al usuario autenticado.
+     * @return Una respuesta con los intereses y criterios de filtrado del alumno.
      */
     @GetMapping("/my-interests")
     public ResponseEntity<?> getStudentInterests(Principal principal) {
@@ -90,11 +107,12 @@ public class UserController {
     }
 
     /**
-     * Endpoint unificado para guardar o actualizar los intereses y criterios de
-     * filtrado del alumno en sesión.
-     * Soporta POST y PUT de forma segura para evitar fallos de parpadeo (405 Method
-     * Not Allowed) in el frontend.
-     * [PRIORIDAD RUTA ESTÁTICA - ADR-18]
+     * Endpoint para guardar o actualizar los intereses y criterios de filtrado del
+     * alumno en sesión.
+     * 
+     * @param interestDTO Los intereses y criterios de filtrado del alumno.
+     * @param principal   El principal que representa al usuario autenticado.
+     * @return Una respuesta indicando el éxito de la operación.
      */
     @RequestMapping(value = "/my-interests", method = { RequestMethod.POST, RequestMethod.PUT })
     public ResponseEntity<?> saveStudentInterests(@RequestBody com.cursosonline.backend.dto.InterestDTO interestDTO,
@@ -114,6 +132,9 @@ public class UserController {
     /**
      * Endpoint seguro para recuperar las alertas dinámicas del alumno en sesión.
      * Extrae la identidad mediante las credenciales del token JWT activo.
+     * 
+     * @param principal El principal que representa al usuario autenticado.
+     * @return Una respuesta con la lista de alertas dinámicas del alumno.
      */
     @GetMapping("/notifications")
     public ResponseEntity<List<com.cursosonline.backend.dto.NotificationDTO>> getNotifications(Principal principal) {
@@ -126,7 +147,28 @@ public class UserController {
     }
 
     /**
-     * Endpoint de identidad del usuario autenticado para hidratación de sesión.
+     * Endpoint seguro para descartar todas las alertas dinámicas del alumno en
+     * sesión.
+     * Extrae la identidad mediante las credenciales del token JWT activo.
+     * 
+     * @param principal El principal que representa al usuario autenticado.
+     * @return Una respuesta indicando el éxito de la operación.
+     */
+    @PatchMapping("/notifications/dismiss")
+    public ResponseEntity<?> dismissNotifications(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+        userService.dismissUserNotifications(principal.getName());
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    /**
+     * Endpoint seguro para recuperar la información del usuario autenticado.
+     * Extrae la identidad mediante las credenciales del token JWT activo.
+     * 
+     * @param principal El principal que representa al usuario autenticado.
+     * @return Una respuesta con la información del usuario autenticado.
      */
     @GetMapping("/me")
     public ResponseEntity<?> me(Principal principal) {
@@ -146,11 +188,11 @@ public class UserController {
     }
 
     /**
-     * Endpoint especializado para la hidratación del bloque de asignaturas en
-     * progreso.
-     * Recibe el username de forma explícita para evitar fallos de inyección (HTTP
-     * 400) con el filtro JWT.
-     * [PRIORIDAD RUTA ESTÁTICA - ADR-18]
+     * Endpoint para recuperar la lista de cursos activos del alumno autenticado.
+     * Extrae la identidad mediante las credenciales del token JWT activo.
+     * 
+     * @param username El nombre de usuario del alumno autenticado.
+     * @return Una respuesta con la lista de cursos activos del alumno.
      */
     @GetMapping("/my-active-courses")
     public ResponseEntity<List<Enrollment>> getMyActiveCourses(@RequestParam("username") String username) {
@@ -173,7 +215,10 @@ public class UserController {
     }
 
     /**
-     * Endpoint para obtener la lista de todos los usuarios.
+     * Endpoint exclusivo para que el Administrador recupere la lista completa de
+     * usuarios registrados en la plataforma.
+     * 
+     * @return Una respuesta con la lista de usuarios.
      */
     @GetMapping
     @PreAuthorize("hasAuthority('ADMIN')")
@@ -182,8 +227,13 @@ public class UserController {
     }
 
     /**
-     * Endpoint exclusivo para que el Administrador cambie el rol de cualquier
-     * usuario.
+     * Endpoint exclusivo para que el Administrador cambie el rol de un usuario.
+     * Se asegura de que el Administrador no pueda cambiar su propio rol.
+     * 
+     * @param username    El nombre de usuario del usuario cuyo rol se desea
+     *                    cambiar.
+     * @param requestBody Un mapa que contiene el nuevo rol bajo la clave "role".
+     * @return Una respuesta indicando el éxito de la operación.
      */
     @PatchMapping("/users/{username}/role")
     @PreAuthorize("hasAuthority('ADMIN')")
@@ -212,8 +262,13 @@ public class UserController {
     }
 
     /**
-     * Endpoint para alternar el estado de acceso de un usuario (Borrado lógico /
-     * Reactivación).
+     * Endpoint exclusivo para que el Administrador elimine (baja lógica) o reactive
+     * un usuario.
+     * Se asegura de que el Administrador no pueda eliminar su propia cuenta.
+     * 
+     * @param username  El nombre de usuario del usuario a eliminar o reactivar.
+     * @param principal El principal que representa al Administrador autenticado.
+     * @return Una respuesta indicando el éxito de la operación.
      */
     @DeleteMapping("/users/{username}")
     @PreAuthorize("hasAuthority('ADMIN')")
@@ -236,8 +291,11 @@ public class UserController {
     }
 
     /**
-     * Endpoint para obtener el perfil de un usuario específico.
-     * [UBICADO AL FINAL DE LOS GET PARA EVITAR INTERCEPTAR LAS RUTAS ESTÁTICAS]
+     * Endpoint para obtener el perfil completo de un usuario específico.
+     * Solo accesible para el Administrador o el propio usuario autenticado.
+     * 
+     * @param username El nombre de usuario del perfil a obtener.
+     * @return El objeto Users correspondiente al perfil solicitado.
      */
     @GetMapping("/{username}")
     @PreAuthorize("hasAuthority('ADMIN') or #username == authentication.name")
@@ -247,6 +305,15 @@ public class UserController {
         return ResponseEntity.ok(user);
     }
 
+    /**
+     * Convierte un objeto Users en un mapa de respuesta para el endpoint de listado
+     * de usuarios.
+     * Este método asegura que solo se expongan los campos necesarios y evita la
+     * exposición de información sensible como contraseñas.
+     * 
+     * @param user El objeto Users a convertir.
+     * @return Un mapa con los campos relevantes del usuario.
+     */
     private Map<String, Object> toAdminUserResponse(Users user) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("userId", user.getUser_id());
@@ -258,9 +325,12 @@ public class UserController {
     }
 
     /**
-     * Endpoint blindado para iniciar el contador de tiempo de un curso [ADR-34].
-     * Valida la identidad física del alumno antes de alterar el estado en
-     * PostgreSQL.
+     * Endpoint seguro para iniciar un curso específico para el alumno autenticado.
+     * Valida la propiedad del curso mediante el username del token JWT activo.
+     * 
+     * @param id        El ID de la matrícula del curso a iniciar.
+     * @param principal El principal que representa al usuario autenticado.
+     * @return Una respuesta indicando el éxito de la operación.
      */
     @PostMapping("/enrollment/{id}/start")
     public ResponseEntity<?> startCourse(@PathVariable Long id, Principal principal) {

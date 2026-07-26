@@ -43,6 +43,23 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
     );
 };
 
+const NoAuthWrapper = ({ children }: { children: React.ReactNode }) => {
+    const mockAuthValue = {
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        login: () => { },
+        updateUser: () => { },
+        logout: () => { },
+    };
+
+    return (
+        <AuthContext.Provider value={mockAuthValue as unknown as typeof AuthContext extends React.Context<infer U> ? U : never}>
+            {children}
+        </AuthContext.Provider>
+    );
+};
+
 describe('useNotifications', () => {
     let currentAlerts: NotificationDTO[];
     let currentDocuments: DocumentMetadata[];
@@ -103,5 +120,44 @@ describe('useNotifications', () => {
             expect(bellHook.result.current.hasUnread).toBe(false);
             expect(panelHook.result.current.hasUnread).toBe(false);
         });
+    });
+
+    it('ejecuta dismiss contra el endpoint y refresca estado', async () => {
+        const patchSpy = vi.spyOn(apiClient, 'patch').mockResolvedValue({} as never);
+        const hook = renderHook(() => useNotifications(), { wrapper: AuthWrapper });
+
+        await waitFor(() => {
+            expect(hook.result.current.loading).toBe(false);
+        });
+
+        currentAlerts = [];
+        currentDocuments = [buildDoc(true)];
+
+        await act(async () => {
+            await hook.result.current.dismissNotifications();
+        });
+
+        expect(patchSpy).toHaveBeenCalledWith('/api/auth/notifications/dismiss');
+
+        await waitFor(() => {
+            expect(hook.result.current.hasUnread).toBe(false);
+        });
+    });
+
+    it('cortocircuita llamadas remotas si no hay usuario autenticado', async () => {
+        const getAlertsSpy = vi.spyOn(apiClient, 'get');
+        const getDocsSpy = vi.spyOn(documentService, 'getUserDocuments');
+
+        const hook = renderHook(() => useNotifications(), { wrapper: NoAuthWrapper });
+
+        await waitFor(() => {
+            expect(hook.result.current.loading).toBe(false);
+        });
+
+        expect(getAlertsSpy).not.toHaveBeenCalled();
+        expect(getDocsSpy).not.toHaveBeenCalled();
+        expect(hook.result.current.alerts).toEqual([]);
+        expect(hook.result.current.documents).toEqual([]);
+        expect(hook.result.current.hasUnread).toBe(false);
     });
 });

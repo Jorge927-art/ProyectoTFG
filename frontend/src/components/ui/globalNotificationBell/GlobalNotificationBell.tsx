@@ -5,7 +5,7 @@ import type { NotificationDTO } from './useNotifications'; // Importamos el tipo
 import GenericButton from '../genericButton/GenericButton';
 
 export default function NotificationBell() {
-    const { alerts, hasAlerts, hasUnread } = useNotifications();
+    const { alerts, hasAlerts, hasUnread, dismissNotifications } = useNotifications();
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -23,7 +23,13 @@ export default function NotificationBell() {
         <div className="relative" ref={dropdownRef}>
             <GenericButton
                 variant="search"
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => {
+                    const willOpen = !isOpen;
+                    setIsOpen(willOpen);
+                    if (willOpen && hasUnread) {
+                        void dismissNotifications();
+                    }
+                }}
                 className={`relative p-2.5! transition-all ${hasUnread
                     ? 'bg-red-50! border-red-200! hover:bg-red-100!'
                     : 'bg-white hover:bg-slate-100'

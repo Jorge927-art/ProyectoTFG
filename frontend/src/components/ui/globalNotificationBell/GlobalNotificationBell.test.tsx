@@ -6,6 +6,7 @@ import * as notificationsHook from './useNotifications';
 
 describe('NotificationBell - Suite de Alertas Académicas', () => {
     const mockRefresh = vi.fn();
+    const mockDismiss = vi.fn();
     let useNotificationsSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
@@ -21,6 +22,7 @@ describe('NotificationBell - Suite de Alertas Académicas', () => {
             hasUnread: false,
             refreshAlerts: mockRefresh,
             refreshNotifications: mockRefresh,
+            dismissNotifications: mockDismiss,
             loading: false
         });
 
@@ -41,6 +43,7 @@ describe('NotificationBell - Suite de Alertas Académicas', () => {
             hasUnread: true,
             refreshAlerts: mockRefresh,
             refreshNotifications: mockRefresh,
+            dismissNotifications: mockDismiss,
             loading: false
         });
 
@@ -60,6 +63,7 @@ describe('NotificationBell - Suite de Alertas Académicas', () => {
             hasUnread: true,
             refreshAlerts: mockRefresh,
             refreshNotifications: mockRefresh,
+            dismissNotifications: mockDismiss,
             loading: false
         });
 
@@ -83,6 +87,7 @@ describe('NotificationBell - Suite de Alertas Académicas', () => {
             hasUnread: false,
             refreshAlerts: vi.fn(),
             refreshNotifications: vi.fn(),
+            dismissNotifications: mockDismiss,
             loading: false
         });
 
@@ -100,6 +105,46 @@ describe('NotificationBell - Suite de Alertas Académicas', () => {
 
         const pulseIndicator = container.querySelector('.animate-pulse');
         expect(pulseIndicator).toBeNull();
+    });
+
+    it('debe marcar notificaciones como vistas al abrir si hay no leidas', () => {
+        useNotificationsSpy.mockReturnValue({
+            alerts: [
+                { type: 'DOCUMENT_INBOX', title: 'Bandeja', message: '1 doc', redirectUrl: '/docs' }
+            ],
+            documents: [],
+            hasAlerts: true,
+            hasUnread: true,
+            refreshAlerts: mockRefresh,
+            refreshNotifications: mockRefresh,
+            dismissNotifications: mockDismiss,
+            loading: false
+        });
+
+        render(<NotificationBell />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Campana de notificaciones' }));
+
+        expect(mockDismiss).toHaveBeenCalledTimes(1);
+    });
+
+    it('no debe marcar notificaciones como vistas al abrir si no hay no leidas', () => {
+        useNotificationsSpy.mockReturnValue({
+            alerts: [],
+            documents: [],
+            hasAlerts: false,
+            hasUnread: false,
+            refreshAlerts: mockRefresh,
+            refreshNotifications: mockRefresh,
+            dismissNotifications: mockDismiss,
+            loading: false
+        });
+
+        render(<NotificationBell />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Campana de notificaciones' }));
+
+        expect(mockDismiss).not.toHaveBeenCalled();
     });
 });
 

@@ -5,6 +5,7 @@ import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.entities.Interest;
 import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.entities.DocumentMetadata;
 import com.cursosonline.backend.dto.InterestDTO;
 import com.cursosonline.backend.repository.UserRepository;
 import com.cursosonline.backend.repository.CoursesRepository;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Optional;
 import java.util.List;
@@ -31,14 +33,19 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Servicio que maneja la lógica de negocio relacionada con los usuarios de la
- * plataforma. Optimized for TFG.
+ * Servicio de gestión de usuarios y operaciones relacionadas con la plataforma
+ * de cursos online.
+ * UserService
  */
 @Service
 @RequiredArgsConstructor
 public class UserService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -46,6 +53,7 @@ public class UserService {
     private final CoursesRepository coursesRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final DocumentMetadataRepository documentMetadataRepository;
+    private final JdbcTemplate jdbcTemplate;
     private Clock clock = Clock.systemUTC();
 
     /**
@@ -57,9 +65,13 @@ public class UserService {
     }
 
     /**
-     * Registra un nuevo usuario en la plataforma.
-     * Verifica que el nombre de usuario no exista previamente, cifra la contraseña
-     * y asigna el rol de student por defecto.
+     * Registra un nuevo usuario en la plataforma, asegurando que el nombre de
+     * usuario sea único y que la contraseña se almacene de forma segura mediante
+     * codificación.
+     * 
+     * @param user El objeto Users que contiene los datos del nuevo usuario.
+     * @return El usuario registrado con su ID generado y la contraseña codificada.
+     * @throws UserAlreadyExistsException Si el nombre de usuario ya está en uso.
      */
     @Transactional
     public Users registerUser(Users user) {
@@ -74,8 +86,12 @@ public class UserService {
     }
 
     /**
-     * Realiza el proceso de login verificando el nombre de usuario y la contraseña.
-     * Valida que la cuenta no se encuentre dada de baja lógicamente.
+     * Permite autenticar a un usuario verificando su nombre de usuario y
+     * contraseña.
+     * 
+     * @param username    El nombre de usuario del usuario que intenta autenticarse.
+     * @param rawPassword La contraseña en texto plano proporcionada por el usuario.
+     * @return El usuario autenticado si las credenciales son correctas.
      */
     @Transactional(readOnly = true)
     public Users login(String username, String rawPassword) {
@@ -83,7 +99,7 @@ public class UserService {
                 .orElseThrow(() -> new ServicesException("Usuario no encontrado"));
 
         if (!user.isEnabled()) {
-            throw new ServicesException("Acceso denegada: La cuenta de este usuario ha sido dada de baja.");
+            throw new ServicesException("Acceso denegado: La cuenta de este usuario ha sido dada de baja.");
         }
 
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
@@ -93,7 +109,10 @@ public class UserService {
     }
 
     /**
-     * Obtiene una lista de todos los usuarios registrados en la plataforma.
+     * Recupera de forma transaccional todos los usuarios registrados en la
+     * plataforma.
+     * 
+     * @return Lista de todos los usuarios registrados en la plataforma.
      */
     @Transactional(readOnly = true)
     public List<Users> getAllUsers() {
@@ -101,7 +120,12 @@ public class UserService {
     }
 
     /**
-     * Actualiza el rol de un usuario específico en la plataforma.
+     * Permite actualizar el rol de un usuario de forma transaccional, asegurando
+     * que los cambios se persistan correctamente.
+     * 
+     * @param username El nombre de usuario del usuario cuyo rol se va a actualizar.
+     * @param newRole  El nuevo rol que se asignará al usuario.
+     * @return El usuario actualizado con el nuevo rol.
      */
     @Transactional
     public Users updateUserRole(String username, Role newRole) {
@@ -113,9 +137,11 @@ public class UserService {
     }
 
     /**
-     * Realiza el borrado lógico de un usuario desactivando su acceso.
-     * Lanzamiento de ResourceNotFoundException (HTTP 404) en
-     * lugar de RuntimeException.
+     * Permite habilitar o deshabilitar un usuario de forma transaccional, cambiando
+     * su estado de "enabled".
+     * 
+     * @param username El nombre de usuario del usuario a habilitar o deshabilitar.
+     * @return El usuario actualizado con el estado de "enabled" modificado.
      */
     @Transactional
     public Users deleteByUsername(String username) {
@@ -134,8 +160,10 @@ public class UserService {
     /**
      * Recupera de forma transaccional los intereses de un usuario específico.
      * 
-     * @param username
-     * @return
+     * @param username El nombre de usuario del usuario cuyos intereses se van a
+     *                 recuperar.
+     * @return Un objeto InterestDTO que contiene los intereses del usuario.
+     *         Si el usuario no tiene intereses registrados, devuelve listas vacías.
      */
     @Transactional(readOnly = true)
     public InterestDTO getUserInterests(String username) {
@@ -177,11 +205,14 @@ public class UserService {
     }
 
     /**
-     * Guarda o actualiza de forma transaccional las preferencias de un estudiante.
-     * Si es la primera vez que configura sus intereses, se instancia una nueva
-     * entidad vinculada a su cuenta de PostgreSQL usando @MapsId.
-     * Corregido bajo [ADR-18] para preservar los envoltorios PersistentBag de
-     * Hibernate.
+     * Permite guardar o actualizar de forma transaccional los intereses de un
+     * usuario específico, preservando la integridad de las referencias de Hibernate
+     * y evitando la creación de nuevas listas.
+     * 
+     * @param username El nombre de usuario del usuario cuyos intereses se van a
+     *                 guardar o actualizar.
+     * @param dto      El objeto InterestDTO que contiene los nuevos intereses del
+     *                 usuario.
      */
     @Transactional
     public void saveUserInterests(String username, InterestDTO dto) {
@@ -213,10 +244,12 @@ public class UserService {
     }
 
     /**
-     * Método auxiliar privado que implementa el mecanismo destructivo-limpio
-     * [ADR-18].
-     * Modifica el contenido de la lista gestionada por el ORM sin romper su
-     * envoltorio PersistentBag.
+     * Permite actualizar de forma transaccional una colección de cadenas de texto
+     * preservando la referencia de Hibernate y evitando la creación de nuevas
+     * listas.
+     * 
+     * @param current La colección actual gestionada por Hibernate.
+     * @param next    La nueva colección de valores a actualizar.
      */
     private void updateCollection(List<String> current, List<String> next) {
         current.clear();
@@ -226,9 +259,13 @@ public class UserService {
     }
 
     /**
-     * Consulta predictiva corregida. Formatea los comodines en Java para evitar
-     * colisiones de binding en el ORM de PostgreSQL y limita el resultado a 12
-     * elementos.
+     * Recupera de forma transaccional las asignaturas que coinciden con una palabra
+     * clave de búsqueda, limitando el resultado a 12 elementos para la UI.
+     * Si la palabra clave está vacía, devuelve los primeros 12 cursos del catálogo.
+     * 
+     * @param keyword La palabra clave de búsqueda para filtrar los cursos.
+     * @return Lista de cursos que coinciden con la palabra clave de búsqueda,
+     *         limitada a 12 elementos.
      */
     @Transactional(readOnly = true)
     public List<Courses> searchCourses(String keyword) {
@@ -252,8 +289,12 @@ public class UserService {
     }
 
     /**
-     * Recupera las asignaturas vinculadas al profesor autenticado para hidratar
-     * su panel tras iniciar sesión.
+     * Recupera de forma transaccional las asignaturas asignadas a un profesor
+     * autenticado, considerando su identidad principal y posibles alias derivados
+     * de su cuenta de usuario. La búsqueda es robusta y evita duplicidades.
+     * 
+     * @param principalIdentity La identidad principal del profesor autenticado.
+     * @return Lista de asignaturas asignadas al profesor autenticado.
      */
     @Transactional(readOnly = true)
     public List<Courses> getAssignedCoursesForProfessor(String principalIdentity) {
@@ -298,6 +339,16 @@ public class UserService {
         return mergedCourses;
     }
 
+    /**
+     * Construye un conjunto de alias normalizados para un profesor autenticado,
+     * combinando
+     * su identidad principal y los datos de la entidad Users si está disponible.
+     * 
+     * @param principalIdentity La identidad principal del profesor autenticado.
+     * @param user              La entidad Users asociada al profesor, si está
+     *                          disponible.
+     * @return Un conjunto de alias normalizados para el profesor.
+     */
     private Set<String> buildProfessorAliases(String principalIdentity, Users user) {
         Set<String> aliases = new LinkedHashSet<>();
         addAlias(aliases, principalIdentity);
@@ -322,6 +373,13 @@ public class UserService {
         return aliases;
     }
 
+    /**
+     * Divide un valor de cadena en tokens basados en delimitadores comunes y agrega
+     * cada token válido al conjunto de alias.
+     * 
+     * @param aliases  El conjunto de alias donde se agregarán los tokens.
+     * @param rawValue El valor de cadena que se dividirá en tokens.
+     */
     private void splitAndAddTokens(Set<String> aliases, String rawValue) {
         if (rawValue == null) {
             return;
@@ -335,6 +393,12 @@ public class UserService {
         }
     }
 
+    /**
+     * Agrega un alias normalizado al conjunto de alias si no está vacío.
+     * 
+     * @param aliases  El conjunto de alias donde se agregará el alias.
+     * @param rawAlias El alias en bruto que se normalizará y agregará.
+     */
     private void addAlias(Set<String> aliases, String rawAlias) {
         if (rawAlias == null) {
             return;
@@ -346,6 +410,14 @@ public class UserService {
         }
     }
 
+    /**
+     * Verifica si un curso con un campo de instructores heredado (legacy) está
+     * asociado a un profesor específico mediante sus alias.
+     * 
+     * @param instructors El campo de instructores heredado del curso.
+     * @param aliases     El conjunto de alias del profesor.
+     * @return true si el curso está asociado al profesor, false en caso contrario.
+     */
     private boolean isLegacyInstructorOwnedByProfessor(String instructors, Set<String> aliases) {
         if (instructors == null || instructors.trim().isEmpty()) {
             return false;
@@ -367,9 +439,13 @@ public class UserService {
     }
 
     /**
-     * Matricula de forma segura a un estudiante en un curso utilizando la entidad
-     * intermedia Enrollment. Valida preventivamente en PostgreSQL para evitar
-     * registros duplicados.
+     * Permite matricular a un estudiante en un curso específico, asegurando que no
+     * exista duplicidad y que tanto el usuario como el curso existan en la base de
+     * datos. La operación es transaccional y garantiza la integridad de los datos.
+     * 
+     * @param username El nombre de usuario del estudiante.
+     * @param courseId El ID del curso.
+     * @return La entidad Enrollment creada y persistida.
      */
     @Transactional
     public Enrollment enrollStudentInCourse(String username, Long courseId) {
@@ -399,10 +475,12 @@ public class UserService {
     }
 
     /**
+     * Marca la fecha de inicio de un curso para un estudiante específico,
+     * asegurando
+     * que solo pueda iniciar su propio curso y mitigando ataques de sondeo de IDs.
      * 
-     * Método seguro para iniciar el cronómetro de un curso [ADR-34].
-     * Valida la identidad del alumno frente a la matrícula antes de guardar el
-     * sello de tiempo.
+     * @param enrollmentId          El ID de la matrícula.
+     * @param authenticatedUsername El nombre de usuario autenticado del estudiante.
      */
     @Transactional
     public void startCourseSecure(Long enrollmentId, String authenticatedUsername) {
@@ -424,11 +502,23 @@ public class UserService {
     }
 
     /**
-     * Calcula el progreso real basado en el tiempo transcurrido (24h/día) de forma
-     * determinista y libre de operaciones concurrentes en base de datos.
+     * Calcula el progreso actual de un estudiante en un curso específico basado en
+     * la
+     * fecha de inicio y la duración total del curso. Devuelve un porcentaje entre 0
+     * y 100, acotado estrictamente. Si el curso no ha sido iniciado, devuelve 0.
+     * 
+     * @param enrollment La matrícula del estudiante en el curso.
+     * @return El progreso actual como un porcentaje entero entre 0 y 100.
+     *         Devuelve 0 si el curso no ha sido iniciado o si la duración es
+     *         inválida.
+     *         Devuelve 100 si el tiempo transcurrido supera la duración total del
+     *         curso.
+     *         El cálculo es preciso y seguro, evitando errores de tipo y
+     *         garantizando la consistencia.
      */
     public int calculateCurrentProgress(Enrollment enrollment) {
-        if (enrollment.getStarted_at() == null)
+        if (enrollment == null || enrollment.getStarted_at() == null || enrollment.getCourse() == null
+                || enrollment.getCourse().getDuration() == null)
             return 0;
 
         // Mapeo seguro .longValue() para evitar problemas de tipos primitivos con Float
@@ -455,9 +545,13 @@ public class UserService {
     }
 
     /**
-     * Recupera de forma transaccional las asignaturas activas del estudiante
-     * y calcula de forma dinámica su progreso al vuelo antes de enviarlas al
-     * frontend.
+     * Recupera de forma transaccional las asignaturas activas de un estudiante y
+     * calcula
+     * su progreso dinámico en cada una de ellas. Evita consultas N+1 y fuerza la
+     * inicialización de las notas para su posterior serialización.
+     * 
+     * @param userId El ID del usuario (estudiante).
+     * @return Lista de matrículas activas del estudiante con el progreso calculado.
      */
     @Transactional(readOnly = true)
     public List<Enrollment> getStudentActiveCoursesWithCalculatedProgress(Long userId) {
@@ -481,8 +575,11 @@ public class UserService {
     }
 
     /**
-     * Recupera y consolida de forma segura las métricas analíticas desde SQL Nativo
-     * [ADR-41].
+     * Recupera de forma transaccional las estadísticas analíticas de un curso
+     * específico.
+     * 
+     * @param courseId El ID del curso.
+     * @return Objeto CourseStatsDTO con las estadísticas analíticas del curso.
      */
     @Transactional(readOnly = true)
     public com.cursosonline.backend.dto.CourseStatsDTO getCourseStats(Long courseId) {
@@ -503,46 +600,201 @@ public class UserService {
     }
 
     /**
-     * Calcula y centraliza de forma transaccional las alertas activas del
-     * estudiante.
-     * Evalúa la bandeja de entrada de documentos y el progreso de los cursos.
+     * Recupera de forma transaccional las notificaciones activas de un usuario
+     * específico.
+     * 
+     * @param username El nombre de usuario del receptor de las notificaciones.
+     * @return Lista de notificaciones activas del usuario.
      */
     @Transactional(readOnly = true)
     public List<com.cursosonline.backend.dto.NotificationDTO> getUserNotifications(String username) {
-        java.util.List<com.cursosonline.backend.dto.NotificationDTO> alerts = new java.util.ArrayList<>();
+        List<com.cursosonline.backend.dto.NotificationDTO> alerts = new ArrayList<>();
+        Users user = userRepository.findByUsername(username).orElse(null);
+        if (user == null) {
+            return alerts;
+        }
 
-        // 1. Regla de negocio: Documentos en bandeja de entrada
-        java.util.List<com.cursosonline.backend.entities.DocumentMetadata> receivedDocs = documentMetadataRepository
-                .findReceivedDocumentsByUsername(username);
-
-        if (receivedDocs != null && !receivedDocs.isEmpty()) {
+        // 1. Documentos/trabajos/exámenes recibidos y NO leídos — aplica a los 3 roles
+        List<com.cursosonline.backend.entities.DocumentMetadata> unreadDocs = documentMetadataRepository
+                .findUnreadReceivedDocumentsByUsername(username);
+        if (unreadDocs != null && !unreadDocs.isEmpty()) {
             alerts.add(new com.cursosonline.backend.dto.NotificationDTO(
                     "DOCUMENT_INBOX",
                     "Bandeja de Entrada",
-                    "Tienes " + receivedDocs.size() + " documento(s) pendiente(s) en tu bandeja.",
-                    "/student/documents"));
+                    "Tienes " + unreadDocs.size() + " documento(s) pendiente(s) en tu bandeja.",
+                    "/" + user.getRole().name().toLowerCase()));
         }
 
-        // 2. Regla de negocio: Cursos con progreso >= 90% y < 100%
+        if (hasProgressAlertColumns()) {
+            appendProgressNotificationsSafely(user, username, alerts);
+        } else {
+            LOGGER.warn(
+                    "Se omiten alertas de progreso para usuario {} porque faltan columnas progress_alert_* en enrollment.",
+                    username);
+        }
+        // ADMIN: no entra en los bloques 2 ni 3, solo puede recibir el bloque 1.
+
+        return alerts;
+    }
+
+    /**
+     * Marca todas las notificaciones de documentos recibidos como leídas y
+     * actualiza
+     * los estados de progreso de cursos para estudiantes y profesores según
+     * corresponda.
+     * 
+     * @param username El nombre de usuario del receptor de las notificaciones.
+     */
+    @Transactional
+    public void dismissUserNotifications(String username) {
+        markAllReceivedAsReadSafely(username);
+
         Users user = userRepository.findByUsername(username).orElse(null);
-        if (user != null) {
-            java.util.List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(user.getUser_id());
-            if (enrollments != null) {
-                for (Enrollment enrollment : enrollments) {
-                    int progress = calculateCurrentProgress(enrollment);
-                    if (progress >= 90 && progress < 100) {
-                        alerts.add(new com.cursosonline.backend.dto.NotificationDTO(
-                                "COURSE_PROGRESS",
-                                "Asignatura por finalizar",
-                                "El curso '" + enrollment.getCourse().getTitle() + "' está al " + progress
-                                        + "%. ¡Ya casi lo tienes!",
-                                "/student/courses"));
+        if (user == null) {
+            return;
+        }
+
+        if (hasProgressAlertColumns()) {
+            acknowledgeProgressNotificationsSafely(user, username);
+        } else {
+            LOGGER.warn(
+                    "Se omite ACK de alertas de progreso para usuario {} porque faltan columnas progress_alert_* en enrollment.",
+                    username);
+        }
+    }
+
+    /**
+     * Verifica si el esquema actual ya incluye las columnas de ACK de alertas de
+     * progreso en enrollment.
+     */
+    private boolean hasProgressAlertColumns() {
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.columns " +
+                            "WHERE table_schema = current_schema() " +
+                            "AND table_name = 'enrollment' " +
+                            "AND column_name IN ('progress_alert_student_ack','progress_alert_professor_ack')",
+                    Integer.class);
+            return count != null && count == 2;
+        } catch (RuntimeException ex) {
+            LOGGER.warn("No se pudo verificar el esquema de enrollment para alertas de progreso.", ex);
+            return false;
+        }
+    }
+
+    /**
+     * Añade alertas de progreso sin romper el endpoint si el esquema de matrícula
+     * aún
+     * no está completamente migrado.
+     */
+    private void appendProgressNotificationsSafely(Users user, String username,
+            List<com.cursosonline.backend.dto.NotificationDTO> alerts) {
+        try {
+            // 2. Estudiante: su propia asignatura al 95% de tiempo consumido
+            if (user.getRole() == Role.STUDENT) {
+                List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(user.getUser_id());
+                if (enrollments != null) {
+                    for (Enrollment enrollment : enrollments) {
+                        int progress = calculateCurrentProgress(enrollment);
+                        if (progress >= 95 && progress < 100 && !enrollment.isProgressAlertStudentAck()) {
+                            alerts.add(new com.cursosonline.backend.dto.NotificationDTO(
+                                    "COURSE_PROGRESS",
+                                    "Asignatura por finalizar",
+                                    "El curso '" + enrollment.getCourse().getTitle() + "' está al " + progress
+                                            + "%. ¡Ya casi lo tienes!",
+                                    "/student"));
+                        }
                     }
                 }
             }
-        }
 
-        return alerts;
+            // 3. Profesor: alumno propio al 90% de tiempo consumido de su asignatura
+            if (user.getRole() == Role.PROFESSOR) {
+                List<Long> courseIds = getAssignedCoursesForProfessor(username).stream()
+                        .map(course -> course != null ? course.getCourse_id() : null)
+                        .filter(java.util.Objects::nonNull)
+                        .toList();
+                if (!courseIds.isEmpty()) {
+                    List<Enrollment> studentEnrollments = enrollmentRepository
+                            .findActiveStudentEnrollmentsByCourseIds(courseIds);
+                    for (Enrollment enrollment : studentEnrollments) {
+                        int progress = calculateCurrentProgress(enrollment);
+                        if (progress >= 90 && progress < 100 && !enrollment.isProgressAlertProfessorAck()) {
+                            alerts.add(new com.cursosonline.backend.dto.NotificationDTO(
+                                    "STUDENT_NEAR_COMPLETION",
+                                    "Alumno a punto de finalizar",
+                                    "'" + enrollment.getUser().getUsername() + "' en '"
+                                            + enrollment.getCourse().getTitle() + "' está al " + progress
+                                            + "%. Prepara el examen final.",
+                                    "/professor"));
+                        }
+                    }
+                }
+            }
+        } catch (RuntimeException ex) {
+            LOGGER.warn(
+                    "No se pudieron calcular alertas de progreso para usuario {}. Se devuelven solo alertas de documentos.",
+                    username, ex);
+        }
+    }
+
+    /**
+     * Marca como reconocidas las alertas de progreso sin bloquear el dismiss global
+     * si falta alguna columna de esquema.
+     */
+    private void acknowledgeProgressNotificationsSafely(Users user, String username) {
+        try {
+            if (user.getRole() == Role.STUDENT) {
+                List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(user.getUser_id());
+                for (Enrollment enrollment : enrollments) {
+                    int progress = calculateCurrentProgress(enrollment);
+                    if (progress >= 95 && progress < 100 && !enrollment.isProgressAlertStudentAck()) {
+                        enrollment.setProgressAlertStudentAck(true);
+                        enrollmentRepository.save(enrollment);
+                    }
+                }
+            } else if (user.getRole() == Role.PROFESSOR) {
+                List<Long> courseIds = getAssignedCoursesForProfessor(username).stream()
+                        .map(course -> course != null ? course.getCourse_id() : null)
+                        .filter(java.util.Objects::nonNull)
+                        .toList();
+                if (!courseIds.isEmpty()) {
+                    List<Enrollment> studentEnrollments = enrollmentRepository
+                            .findActiveStudentEnrollmentsByCourseIds(courseIds);
+                    for (Enrollment enrollment : studentEnrollments) {
+                        int progress = calculateCurrentProgress(enrollment);
+                        if (progress >= 90 && progress < 100 && !enrollment.isProgressAlertProfessorAck()) {
+                            enrollment.setProgressAlertProfessorAck(true);
+                            enrollmentRepository.save(enrollment);
+                        }
+                    }
+                }
+            }
+        } catch (RuntimeException ex) {
+            LOGGER.warn("No se pudieron actualizar ACK de alertas de progreso para usuario {}.", username, ex);
+        }
+    }
+
+    /**
+     * Marca documentos recibidos como leídos usando update masivo y aplica fallback
+     * por entidad si el proveedor JPA o la consulta fallan en runtime.
+     */
+    private void markAllReceivedAsReadSafely(String username) {
+        try {
+            documentMetadataRepository.markAllReceivedAsRead(username);
+        } catch (RuntimeException ex) {
+            LOGGER.warn("Bulk update de notificaciones falló para usuario {}. Se aplica fallback por entidad.",
+                    username, ex);
+            List<DocumentMetadata> unreadDocs = documentMetadataRepository
+                    .findUnreadReceivedDocumentsByUsername(username);
+            if (unreadDocs.isEmpty()) {
+                return;
+            }
+            for (DocumentMetadata document : unreadDocs) {
+                document.setRead(true);
+            }
+            documentMetadataRepository.saveAll(unreadDocs);
+        }
     }
 
     /**

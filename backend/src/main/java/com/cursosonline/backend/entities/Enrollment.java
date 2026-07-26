@@ -50,6 +50,12 @@ public class Enrollment {
     @Column(name = "started_at")
     private LocalDateTime started_at;
 
+    @Column(name = "progress_alert_student_ack", nullable = false)
+    private boolean progressAlertStudentAck = false;
+
+    @Column(name = "progress_alert_professor_ack", nullable = false)
+    private boolean progressAlertProfessorAck = false;
+
     /**
      * Relación bidireccional con las calificaciones del curso [ADR-39].
      * Mapeado por el campo 'enrollment' de la entidad CourseGrade.

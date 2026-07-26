@@ -22,8 +22,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -216,5 +218,33 @@ class UserControllerTest {
                                 .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(2)))
                                 .andExpect(jsonPath("$[0].type").value("DOCUMENT_INBOX"))
                                 .andExpect(jsonPath("$[1].type").value("COURSE_PROGRESS"));
+        }
+
+        @Test
+        void dismissNotificationsDebeMarcarNotificacionesComoVistasConPrincipalValido() throws Exception {
+                java.security.Principal mockPrincipal = () -> "Luis";
+
+                mockMvc.perform(patch("/api/auth/notifications/dismiss")
+                                .principal(mockPrincipal)
+                                .contentType(org.springframework.http.MediaType.APPLICATION_JSON))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true));
+
+                verify(userService).dismissUserNotifications("Luis");
+        }
+
+        @Test
+        void dismissNotificationsDebeDevolver401SiNoHayPrincipal() throws Exception {
+                mockMvc.perform(patch("/api/auth/notifications/dismiss")
+                                .contentType(org.springframework.http.MediaType.APPLICATION_JSON))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.error").value("Sesión inválida o expirada."));
+        }
+
+        @Test
+        void getNotificationsDebeDevolver401SiNoHayPrincipal() throws Exception {
+                mockMvc.perform(get("/api/auth/notifications")
+                                .contentType(org.springframework.http.MediaType.APPLICATION_JSON))
+                                .andExpect(status().isUnauthorized());
         }
 }

@@ -13,12 +13,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.repository.DocumentMetadataRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
 
@@ -43,6 +45,12 @@ public class UserServiceTest {
 
         @Mock
         private com.cursosonline.backend.repository.InterestRepository interestRepository;
+
+        @Mock
+        private DocumentMetadataRepository documentMetadataRepository;
+
+        @Mock
+        private JdbcTemplate jdbcTemplate;
 
         @InjectMocks
         private UserService userService;
@@ -308,6 +316,84 @@ public class UserServiceTest {
 
                 verify(userRepository, times(1)).findByUsername(username);
                 verify(interestRepository, times(1)).findById(2L);
+        }
+
+        @Test
+        void calculateCurrentProgress_DebeRetornarCero_CuandoEnrollmentEsNulo() {
+                assertEquals(0, userService.calculateCurrentProgress(null));
+        }
+
+        @Test
+        void calculateCurrentProgress_DebeRetornarCero_CuandoCursoODuracionNoEstanDisponibles() {
+                Users user = new Users(1L, "Luis", "pwd", Role.STUDENT, "luis@example.com", true,
+                                new java.util.ArrayList<>());
+
+                Enrollment sinCurso = new Enrollment(1001L, user, null, null, "EN_CURSO", 0,
+                                java.time.LocalDateTime.now());
+                assertEquals(0, userService.calculateCurrentProgress(sinCurso));
+
+                Courses cursoSinDuracion = new Courses();
+                cursoSinDuracion.setCourse_id(11L);
+                cursoSinDuracion.setDuration(null);
+                Enrollment sinDuracion = new Enrollment(1002L, user, cursoSinDuracion, null, "EN_CURSO", 0,
+                                java.time.LocalDateTime.now());
+                assertEquals(0, userService.calculateCurrentProgress(sinDuracion));
+
+                Courses cursoDuracionCero = new Courses();
+                cursoDuracionCero.setCourse_id(12L);
+                cursoDuracionCero.setDuration(0f);
+                Enrollment duracionNoValida = new Enrollment(1003L, user, cursoDuracionCero, null, "EN_CURSO", 0,
+                                java.time.LocalDateTime.now());
+                assertEquals(0, userService.calculateCurrentProgress(duracionNoValida));
+        }
+
+        @Test
+        void getUserNotifications_DebeDevolverAlertaDeDocumentos_AunSinColumnasDeProgreso() {
+                Users admin = new Users(9L, "admin_verif", "pwd", Role.ADMIN, "admin@example.com", true,
+                                new java.util.ArrayList<>());
+
+                when(userRepository.findByUsername("admin_verif")).thenReturn(Optional.of(admin));
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(1);
+
+                com.cursosonline.backend.entities.DocumentMetadata doc = mock(
+                                com.cursosonline.backend.entities.DocumentMetadata.class);
+                when(documentMetadataRepository.findUnreadReceivedDocumentsByUsername("admin_verif"))
+                                .thenReturn(java.util.List.of(doc));
+
+                java.util.List<com.cursosonline.backend.dto.NotificationDTO> alerts = userService
+                                .getUserNotifications("admin_verif");
+
+                assertEquals(1, alerts.size());
+                assertEquals("DOCUMENT_INBOX", alerts.get(0).type());
+                assertEquals("/admin", alerts.get(0).redirectUrl());
+        }
+
+        @Test
+        void dismissUserNotifications_DebeAplicarFallbackSiFallaBulkUpdate() {
+                Users student = new Users(1L, "Luis", "pwd", Role.STUDENT, "luis@example.com", true,
+                                new java.util.ArrayList<>());
+
+                when(userRepository.findByUsername("Luis")).thenReturn(Optional.of(student));
+                doThrow(new RuntimeException("bulk failed"))
+                                .when(documentMetadataRepository)
+                                .markAllReceivedAsRead("Luis");
+
+                com.cursosonline.backend.entities.DocumentMetadata doc1 = mock(
+                                com.cursosonline.backend.entities.DocumentMetadata.class);
+                com.cursosonline.backend.entities.DocumentMetadata doc2 = mock(
+                                com.cursosonline.backend.entities.DocumentMetadata.class);
+                when(documentMetadataRepository.findUnreadReceivedDocumentsByUsername("Luis"))
+                                .thenReturn(java.util.List.of(doc1, doc2));
+
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(0);
+
+                userService.dismissUserNotifications("Luis");
+
+                verify(documentMetadataRepository).markAllReceivedAsRead("Luis");
+                verify(documentMetadataRepository).findUnreadReceivedDocumentsByUsername("Luis");
+                verify(doc1).setRead(true);
+                verify(doc2).setRead(true);
+                verify(documentMetadataRepository).saveAll(anyList());
         }
 
 }
