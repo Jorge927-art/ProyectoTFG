@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
@@ -512,6 +513,26 @@ public class UserServiceTest {
 
                 assertThrows(ResourceNotFoundException.class,
                                 () -> userService.deleteUserPermanently("fantasma", "root_admin"));
+        }
+
+        @Test
+        void deleteUserPermanently_DebeTraducirViolacionDeIntegridadAErrorDeNegocioControlado() {
+                Users student = new Users(10L, "laura_student", "enc", Role.STUDENT, "laura@a.com", true,
+                                new java.util.ArrayList<>());
+                when(userRepository.findByUsername("laura_student")).thenReturn(Optional.of(student));
+                when(academicEvaluationRepository.findByUserId(10L)).thenReturn(List.of());
+                when(enrollmentRepository.findAllByUserIdWithCourses(10L)).thenReturn(List.of());
+
+                doThrow(new DataIntegrityViolationException("fk users"))
+                                .when(userRepository)
+                                .flush();
+
+                ServicesException exception = assertThrows(ServicesException.class,
+                                () -> userService.deleteUserPermanently("laura_student", "root_admin"));
+
+                assertEquals(
+                                "No se pudo eliminar permanentemente al usuario por dependencias activas en la base de datos.",
+                                exception.getMessage());
         }
 
 }

@@ -11,6 +11,7 @@ import {
     resolvePermanentDeleteErrorMessage
 } from '../../../../services/adminUserService';
 import type { UserEntity } from '../../../../services/userDomains';
+import { USER_DIRECTORY_REFRESH_EVENT } from '../../../../components/admin/UserScrollList';
 
 /**
  * Hook del "Buscador de Usuarios" [espejo de useGradingCenter / useCourseManagement].
@@ -68,6 +69,7 @@ export const useUserSearch = (currentAdminUsername: string) => {
         try {
             await updateUserRole(foundUser.username, newRole);
             setFoundUser({ ...foundUser, role: newRole });
+            window.dispatchEvent(new Event(USER_DIRECTORY_REFRESH_EVENT));
         } catch (err) {
             console.error('Error al cambiar el rol en el servidor:', err);
             setError(resolveRoleUpdateErrorMessage(err));
@@ -102,6 +104,7 @@ export const useUserSearch = (currentAdminUsername: string) => {
             const { message, enabled } = await toggleUserStatus(foundUser.username);
             alert(message);
             setFoundUser({ ...foundUser, enabled });
+            window.dispatchEvent(new Event(USER_DIRECTORY_REFRESH_EVENT));
         } catch (err) {
             console.error('Error en la petición de baja temporal:', err);
             setError(resolveStatusToggleErrorMessage(err));
@@ -137,6 +140,7 @@ export const useUserSearch = (currentAdminUsername: string) => {
             alert(message);
             setFoundUser(null);
             setSearchName('');
+            window.dispatchEvent(new Event(USER_DIRECTORY_REFRESH_EVENT)); // refresca "Consola de Usuarios" sin recargar la página
         } catch (err) {
             console.error('Error en la baja permanente:', err);
             setError(resolvePermanentDeleteErrorMessage(err));

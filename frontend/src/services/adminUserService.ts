@@ -3,6 +3,20 @@ import { apiClient } from './apiClient';
 import axios from 'axios';
 import type { UserEntity } from './userDomains';
 
+type BackendErrorPayload = {
+    message?: string;
+    error?: string;
+};
+
+const getBackendErrorMessage = (err: unknown): string | null => {
+    if (!axios.isAxiosError(err)) {
+        return null;
+    }
+
+    const data = err.response?.data as BackendErrorPayload | undefined;
+    return data?.message ?? data?.error ?? null;
+};
+
 /**
  * Busca un usuario por su nombre de usuario.
  *
@@ -71,9 +85,8 @@ export const toggleUserStatus = async (username: string): Promise<{ message: str
  * @returns Un mensaje de error legible para el usuario.
  */
 export const resolveStatusToggleErrorMessage = (err: unknown): string => {
-    if (axios.isAxiosError(err) && err.response?.data?.error) {
-        return err.response.data.error;
-    }
+    const backendMessage = getBackendErrorMessage(err);
+    if (backendMessage) return backendMessage;
     return 'Error crítico: No se pudo modificar el estado del usuario.';
 };
 
@@ -95,8 +108,7 @@ export const deleteUserPermanently = async (username: string): Promise<{ message
  * @returns Un mensaje de error legible para el usuario.
  */
 export const resolvePermanentDeleteErrorMessage = (err: unknown): string => {
-    if (axios.isAxiosError(err) && err.response?.data?.error) {
-        return err.response.data.error;
-    }
+    const backendMessage = getBackendErrorMessage(err);
+    if (backendMessage) return backendMessage;
     return 'Error crítico: No se pudo eliminar permanentemente al usuario.';
 };

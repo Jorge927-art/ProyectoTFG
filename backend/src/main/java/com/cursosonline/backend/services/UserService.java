@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Optional;
 import java.util.List;
@@ -191,38 +192,44 @@ public class UserService {
 
         Long userId = user.getUser_id();
 
-        // 1. Documentos enviados o recibidos por el usuario
-        documentMetadataRepository.deleteAllBySenderOrReceiver(userId);
+        try {
+            // 1. Documentos enviados o recibidos por el usuario
+            documentMetadataRepository.deleteAllBySenderOrReceiver(userId);
 
-        // 2. Si es PROFESSOR: desasignar (no borrar) sus cursos
-        if (user.getRole() == Role.PROFESSOR) {
-            List<Courses> assigned = getAssignedCoursesForProfessor(username);
-            for (Courses course : assigned) {
-                course.setAssignedUser(null);
-                coursesRepository.save(course);
-            }
-        }
-
-        // 3. Si es STUDENT: anonimizar valoraciones (NO borrarlas) y borrar matrículas
-        // propias
-        if (user.getRole() == Role.STUDENT) {
-            List<AcademicEvaluation> evaluations = academicEvaluationRepository.findByUserId(userId);
-            for (AcademicEvaluation evaluation : evaluations) {
-                evaluation.setUser(null);
-                academicEvaluationRepository.save(evaluation);
+            // 2. Si es PROFESSOR: desasignar (no borrar) sus cursos
+            if (user.getRole() == Role.PROFESSOR) {
+                List<Courses> assigned = getAssignedCoursesForProfessor(username);
+                for (Courses course : assigned) {
+                    course.setAssignedUser(null);
+                    coursesRepository.save(course);
+                }
             }
 
-            List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(userId);
-            enrollmentRepository.deleteAll(enrollments); // cascada -> CourseGrade
+            // 3. Si es STUDENT: anonimizar valoraciones (NO borrarlas) y borrar
+            // matrículas propias
+            if (user.getRole() == Role.STUDENT) {
+                List<AcademicEvaluation> evaluations = academicEvaluationRepository.findByUserId(userId);
+                for (AcademicEvaluation evaluation : evaluations) {
+                    evaluation.setUser(null);
+                    academicEvaluationRepository.save(evaluation);
+                }
+
+                List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(userId);
+                enrollmentRepository.deleteAll(enrollments); // cascada -> CourseGrade
+            }
+
+            // 4. Perfil e intereses personales (clave primaria compartida, no cascadean
+            // solos)
+            userProfileRepository.findById(userId).ifPresent(userProfileRepository::delete);
+            interestRepository.findById(userId).ifPresent(interestRepository::delete);
+
+            // 5. Finalmente, el propio usuario
+            userRepository.delete(user);
+            userRepository.flush();
+        } catch (DataIntegrityViolationException ex) {
+            throw new ServicesException(
+                    "No se pudo eliminar permanentemente al usuario por dependencias activas en la base de datos.");
         }
-
-        // 4. Perfil e intereses personales (clave primaria compartida, no cascadean
-        // solos)
-        userProfileRepository.findById(userId).ifPresent(userProfileRepository::delete);
-        interestRepository.findById(userId).ifPresent(interestRepository::delete);
-
-        // 5. Finalmente, el propio usuario
-        userRepository.delete(user);
     }
 
     /**

@@ -11,15 +11,27 @@ interface UserListEntity {
     enabled: boolean; // <-- INTEGRADO: Mapeo de estado para la auditoría de borrado lógico
 }
 
+export const USER_DIRECTORY_REFRESH_EVENT = 'user-directory-refresh';
+
 export const UserScrollList = () => {
     const [users, setUsers] = useState<UserListEntity[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
 
     useEffect(() => {
-        apiClient.get<UserListEntity[]>('/api/auth')
-            .then((response) => setUsers(response.data))
-            .catch((error) => console.error('Error en pasarela de usuarios:', error))
-            .finally(() => setLoading(false));
+        const fetchUsers = () => {
+            setLoading(true);
+            apiClient.get<UserListEntity[]>('/api/auth')
+                .then((response) => setUsers(response.data))
+                .catch((error) => console.error('Error en pasarela de usuarios:', error))
+                .finally(() => setLoading(false));
+        };
+
+        fetchUsers(); // carga inicial
+
+        // Se refresca automáticamente cuando el buscador de usuarios modifica
+        // (baja permanente, baja temporal o cambio de rol) el estado en PostgreSQL.
+        window.addEventListener(USER_DIRECTORY_REFRESH_EVENT, fetchUsers);
+        return () => window.removeEventListener(USER_DIRECTORY_REFRESH_EVENT, fetchUsers);
     }, []);
 
     // Diccionario estático para evitar condicionales sueltos en el render

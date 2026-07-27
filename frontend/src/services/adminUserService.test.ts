@@ -114,7 +114,16 @@ describe('adminUserService', () => {
         });
     });
 
-    it('resolveStatusToggleErrorMessage devuelve error del backend si existe', () => {
+    it('resolveStatusToggleErrorMessage devuelve message del backend si existe', () => {
+        const err = { response: { data: { message: 'Cuenta protegida por politica interna.' } } };
+        vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+        const msg = resolveStatusToggleErrorMessage(err);
+
+        expect(msg).toBe('Cuenta protegida por politica interna.');
+    });
+
+    it('resolveStatusToggleErrorMessage mantiene compatibilidad con payload error', () => {
         const err = { response: { data: { error: 'Acción denegada' } } };
         vi.mocked(axios.isAxiosError).mockReturnValue(true);
 
@@ -147,7 +156,16 @@ describe('adminUserService', () => {
         });
     });
 
-    it('resolvePermanentDeleteErrorMessage devuelve el error del backend si existe', () => {
+    it('resolvePermanentDeleteErrorMessage devuelve message del backend si existe', () => {
+        const err = { response: { data: { message: 'Acción denegada: no puedes eliminarte permanentemente a ti mismo.' } } };
+        vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+        const msg = resolvePermanentDeleteErrorMessage(err);
+
+        expect(msg).toBe('Acción denegada: no puedes eliminarte permanentemente a ti mismo.');
+    });
+
+    it('resolvePermanentDeleteErrorMessage mantiene compatibilidad con payload error', () => {
         const err = { response: { data: { error: 'Acción denegada: cuenta protegida.' } } };
         vi.mocked(axios.isAxiosError).mockReturnValue(true);
 
