@@ -25,7 +25,7 @@ export const UserSearchPanel = ({ currentAdminUsername }: UserSearchPanelProps) 
     } = useUserSearch(currentAdminUsername);
 
     return (
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-6 w-full">
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-6 w-full h-full">
             <div className="flex items-center gap-3 mb-5 border-b border-slate-100 pb-4">
                 <div className="p-2.5 bg-blue-50 rounded-xl text-blue-600">
                     <Users size={22} />

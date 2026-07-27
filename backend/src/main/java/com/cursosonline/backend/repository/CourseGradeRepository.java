@@ -35,4 +35,17 @@ public interface CourseGradeRepository extends JpaRepository<CourseGrade, Long> 
         @Query("SELECT AVG(cg.score) FROM CourseGrade cg WHERE cg.enrollment.course.course_id IN :courseIds " +
                         "AND cg.enrollment.user.enabled = true")
         Double getGroupAverageScoreByCourseIds(@Param("courseIds") List<Long> courseIds);
+
+        /**
+         * [PANEL DOCENTE - PORCENTAJE DE APROBADOS]: Cuenta el número de alumnos con
+         * nota
+         * superior a 5 en un curso específico.
+         * 
+         * @param courseId El ID del curso para el cual se desea contar los alumnos
+         *                 aprobados.
+         * @return El número de alumnos con nota superior a 5 en el curso especificado.
+         */
+        @Query("SELECT COUNT(DISTINCT cg.enrollment.enrollmentid) FROM CourseGrade cg " +
+                        "WHERE cg.enrollment.course.course_id = :courseId AND cg.score > 5")
+        long countStudentsWithPassingGradeByCourseId(@Param("courseId") Long courseId);
 }

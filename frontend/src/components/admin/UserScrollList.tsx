@@ -57,7 +57,7 @@ export const UserScrollList = () => {
     };
 
     return (
-        <div className="w-full bg-white rounded-2xl border border-slate-200 shadow-lg p-5">
+        <div className="w-full h-full bg-white rounded-2xl border border-slate-200 shadow-lg p-5">
             {/* 1. MAQUETACIÓN DEL ENCABEZADO */}
             <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">

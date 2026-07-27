@@ -7,54 +7,94 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Repository para gestionar las operaciones de persistencia relacionadas con la
+ * entidad Enrollment.
+ * Proporciona métodos para realizar consultas personalizadas y operaciones CRUD
+ * sobre las matrículas de los alumnos en los cursos.
+ * EnrollmentRepository
+ */
 public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
 
+        /**
+         * [PANEL DOCENTE - LISTADO CURSOS DEL ALUMNO]: Recupera los IDs de los cursos
+         * en los que un usuario específico está matriculado.
+         * 
+         * @param userId El ID del usuario para el cual se desean obtener los IDs de los
+         *               cursos.
+         * @return Lista de IDs de cursos en los que el usuario está matriculado.
+         */
         @Query("SELECT e.course.course_id FROM Enrollment e WHERE e.user.user_id = :userId")
         List<Long> findEnrolledCourseIdsByUserId(@Param("userId") Long userId);
 
+        /**
+         * [PANEL DOCENTE - LISTADO CURSOS DEL ALUMNO]: Recupera la matrícula de un
+         * usuario específico para un curso concreto, incluyendo la referencia al curso.
+         * 
+         * @param userId   El ID del usuario para el cual se desea obtener la matrícula.
+         * @param courseId El ID del curso para el cual se desea obtener la matrícula.
+         * @return Optional de la matrícula si existe, vacío en caso contrario.
+         */
         @Query("SELECT e FROM Enrollment e WHERE e.user.user_id = :userId AND e.course.course_id = :courseId")
         Optional<Enrollment> findByUserIdAndCourseId(@Param("userId") Long userId, @Param("courseId") Long courseId);
 
         /**
-         * [CORRECCIÓN EFECTO DOMINÓ]: Añadido ORDER BY estricto por enrollmentid
-         * para fijar el cursor de PostgreSQL tras los updates.
+         * [PANEL DOCENTE - LISTADO CURSOS DEL ALUMNO]: Recupera todas las matrículas de
+         * un usuario específico, incluyendo la referencia al curso, ordenadas por el ID
+         * de la matrícula.
+         * 
+         * @param userId El ID del usuario para el cual se desean obtener las
+         *               matrículas.
+         * @return Lista de matrículas del usuario especificado, incluyendo la
+         *         referencia al curso.
          */
         @Query("SELECT e FROM Enrollment e JOIN FETCH e.course WHERE e.user.user_id = :userId ORDER BY e.enrollmentid ASC")
         List<Enrollment> findAllByUserIdWithCourses(@Param("userId") Long userId);
 
         /**
-         * [CORRECCIÓN EFECTO DOMINÓ]: Añadido ORDER BY estricto por enrollmentid
-         * para fijar el cursor de PostgreSQL tras los updates.
+         * [CONTROL DE SEGURIDAD EXCLUSIVO]: Recupera una matrícula específica de un
+         * usuario concreto, verificando que el nombre de usuario coincide con el de la
+         * 
+         * @param enrollmentId El ID de la matrícula.
+         * @param username     El nombre de usuario del alumno.
+         * @return Optional de la matrícula si existe y pertenece al usuario, vacío en
+         *         caso contrario.
          */
         @Query("SELECT e FROM Enrollment e WHERE e.enrollmentid = :enrollmentId AND e.user.username = :username")
         Optional<Enrollment> findByEnrollmentidAndUserUsername(@Param("enrollmentId") Long enrollmentId,
                         @Param("username") String username);
 
         /**
-         * Recupera matrículas activas de alumnos para un curso concreto,
-         * incluyendo la referencia al usuario para construir DTOs docentes.
+         * [PANEL DOCENTE - LISTADO ALUMNOS]: Recupera todas las matrículas activas de
+         * alumnos para un curso concreto, incluyendo la referencia al curso.
+         * 
+         * @param courseId El ID del curso para el cual se desean obtener las matrículas
+         *                 activas de alumnos.
+         * @return Lista de matrículas activas de alumnos para el curso especificado.
          */
         @Query("SELECT e FROM Enrollment e WHERE e.course.course_id = :courseId " +
                         "AND e.user.enabled = true AND e.user.role = 'STUDENT' ORDER BY e.enrollmentid ASC")
         List<Enrollment> findActiveStudentEnrollmentsByCourseId(@Param("courseId") Long courseId);
 
-        // =========================================================================
-        // --- SISTEMA DE EVALUACIÓN ACADÉMICA DUAL ---
-        // =========================================================================
-
         /**
-         * [CONTROL DE SEGURIDAD EXCLUSIVO]: Valida si un nombre de usuario cuenta con
-         * una matrícula legítima para un ID de curso específico antes de procesar el
-         * voto.
+         * [CONTROL DE SEGURIDAD EXCLUSIVO]: Comprueba si un usuario específico está
+         * matriculado en un curso concreto.
+         * 
+         * @param username El nombre de usuario del alumno.
+         * @param courseId El ID del curso.
+         * @return true si el usuario está matriculado en el curso, false en caso
+         *         contrario.
          */
         @Query("SELECT COUNT(e) > 0 FROM Enrollment e WHERE e.user.username = :username AND e.course.course_id = :courseId")
         boolean existsByUsernameAndCourseId(@Param("username") String username, @Param("courseId") Long courseId);
 
         /**
-         * [FILTRADO DOCENTE ACTIVO]: Recupera las matrículas del alumno inicializando
-         * 'course'
-         * y excluyendo por subconsulta los cursos que ya cuenten con una calificación
-         * previa de este usuario.
+         * [CONTROL DE SEGURIDAD EXCLUSIVO]: Recupera todas las matrículas de alumnos
+         * que aún no han completado la evaluación académica para un usuario específico.
+         * 
+         * @param username El nombre de usuario del alumno.
+         * @return Lista de matrículas pendientes de evaluación académica para el
+         *         usuario especificado.
          */
         @Query("SELECT e FROM Enrollment e JOIN FETCH e.course c WHERE e.user.username = :username " +
                         "AND c.course_id NOT IN (SELECT ae.course.course_id FROM AcademicEvaluation ae WHERE ae.user.username = :username) "
@@ -63,11 +103,15 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
         List<Enrollment> findPendingEvaluationsByUsername(@Param("username") String username);
 
         /**
-         * [BLINDAJE DE SEGURIDAD EXCLUSIVO - CONTROL DOCENTE]:
-         * Valida si un profesor específico es el instructor legítimo del curso en el
-         * que
-         * está matriculado un alumno (por su enrollmentId) antes de permitirle poner
-         * una nota.
+         * [CONTROL DE SEGURIDAD EXCLUSIVO]: Valida si un instructor tiene autorización
+         * para
+         * gestionar una matrícula específica, verificando que el nombre del instructor
+         * coincide con uno de los instructores del curso.
+         * 
+         * @param enrollmentId   El ID de la matrícula.
+         * @param instructorName El nombre del instructor.
+         * @return true si el instructor está autorizado para gestionar la matrícula,
+         *         false en caso contrario.
          */
         @Query("SELECT COUNT(e) > 0 FROM Enrollment e " +
                         "WHERE e.enrollmentid = :enrollmentId " +
@@ -77,9 +121,12 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
                         @Param("instructorName") String instructorName);
 
         /**
-         * [PANEL DOCENTE - DESGLOSE ALUMNO]: Matrículas activas de estudiantes para un
-         * conjunto de asignaturas (una sola, o todas las del profesor si viene la lista
-         * completa).
+         * [PANEL DOCENTE - LISTADO ALUMNOS]: Recupera todas las matrículas activas de
+         * alumnos para un conjunto de cursos dado, incluyendo la referencia al curso.
+         * 
+         * @param courseIds El conjunto de IDs de cursos para los cuales se desean
+         *                  obtener las matrículas activas de alumnos.
+         * @return Lista de matrículas activas de alumnos para los cursos especificados.
          */
         @Query("SELECT e FROM Enrollment e JOIN FETCH e.course WHERE e.course.course_id IN :courseIds " +
                         "AND e.user.enabled = true AND e.user.role = 'STUDENT' " +
@@ -87,19 +134,42 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
         List<Enrollment> findActiveStudentEnrollmentsByCourseIds(@Param("courseIds") List<Long> courseIds);
 
         /**
-         * [PANEL DOCENTE - PROGRESO COLECTIVO]: Media de progreso de todos los alumnos
-         * activos matriculados en el conjunto de asignaturas dado.
+         * [PANEL DOCENTE - PROGRESO PROMEDIO]: Recupera el progreso promedio de los
+         * alumnos activos en el conjunto de asignaturas dado.
+         * 
+         * @param courseIds El conjunto de IDs de cursos para los cuales se desea
+         *                  calcular el progreso promedio.
+         * @return El progreso promedio de los alumnos activos en los cursos
+         *         especificados.
          */
         @Query("SELECT AVG(e.progress_percentage) FROM Enrollment e WHERE e.course.course_id IN :courseIds " +
                         "AND e.user.enabled = true")
         Double getAverageProgressByCourseIds(@Param("courseIds") List<Long> courseIds);
 
         /**
-         * [PANEL DOCENTE - TASA DE FINALIZACIÓN]: Porcentaje de matrículas activas
-         * que alcanzaron el 100% de progreso sobre el total de matrículas activas.
+         * [PANEL DOCENTE - TASA DE COMPLETADO]: Porcentaje de alumnos activos que han
+         * completado el curso (nota > 5) en el conjunto de asignaturas dado.
+         * 
+         * @param courseIds El conjunto de IDs de cursos para los cuales se desea
+         *                  calcular la tasa de completado.
+         * @return El porcentaje de alumnos activos que han completado los cursos
+         *         especificados.
          */
         @Query("SELECT (SUM(CASE WHEN e.progress_percentage = 100 THEN 1.0 ELSE 0.0 END) * 100.0) / COUNT(e) " +
                         "FROM Enrollment e WHERE e.course.course_id IN :courseIds AND e.user.enabled = true")
         Double getCompletionRateByCourseIds(@Param("courseIds") List<Long> courseIds);
+
+        /**
+         * [PANEL DOCENTE - LISTADO ALUMNOS]: Recupera todas las matrículas activas de
+         * alumnos para un curso concreto, incluyendo la referencia al usuario para
+         * construir DTOs docentes.
+         * 
+         * @param courseId El ID del curso para el cual se desean obtener las matrículas
+         *                 activas de alumnos.
+         * @return Lista de matrículas activas de alumnos para el curso especificado.
+         */
+        @Query("SELECT e FROM Enrollment e JOIN FETCH e.user WHERE e.course.course_id = :courseId " +
+                        "ORDER BY e.user.username ASC")
+        List<Enrollment> findAllByCourseId(@Param("courseId") Long courseId);
 
 }

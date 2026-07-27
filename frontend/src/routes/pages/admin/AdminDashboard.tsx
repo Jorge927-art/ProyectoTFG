@@ -3,6 +3,7 @@ import AdminLayout from '../../layouts/DashboardLayout';
 import { UserScrollList } from '../../../components/admin/UserScrollList';
 import { UserSearchPanel } from './components/UserSearchPanel';
 import GenericHeader from '../../../components/ui/genericHeader/GenericHeader';
+import { CourseInsightPanel } from './components/CourseInsightPanel';
 
 const AdminDashboard = () => {
     const { user } = useAuth();
@@ -23,12 +24,17 @@ const AdminDashboard = () => {
                 }
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start w-full">
-                <UserSearchPanel currentAdminUsername={user?.username ?? ''} />
-
-                <div className="w-full">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch w-full">
+                <div className="h-full">
+                    <UserSearchPanel currentAdminUsername={user?.username ?? ''} />
+                </div>
+                <div className="h-full">
                     <UserScrollList />
                 </div>
+            </div>
+
+            <div className="w-full mt-6">
+                <CourseInsightPanel />
             </div>
         </AdminLayout>
     );
