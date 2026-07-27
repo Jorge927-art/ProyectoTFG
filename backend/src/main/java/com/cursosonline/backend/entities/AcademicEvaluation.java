@@ -12,6 +12,14 @@ import java.time.LocalDateTime;
         // duplique evaluaciones para la misma asignatura matriculada.
         @UniqueConstraint(columnNames = { "user_id", "course_id" })
 })
+
+/**
+ * Representa una evaluación académica de un curso por parte de un estudiante.
+ * Contiene puntuaciones numéricas y comentarios opcionales tanto para el curso
+ * como para el instructor.
+ * Además, almacena metadatos como la fecha de evaluación y referencias a las
+ * entidades de usuario y curso.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -40,8 +48,9 @@ public class AcademicEvaluation {
     private LocalDateTime evaluation_date = LocalDateTime.now();
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private Users user; // El estudiante autenticado que emite el voto
+    @JoinColumn(name = "user_id", nullable = true) // nullable: permite anonimizar tras baja permanente
+    private Users user; // El estudiante autenticado que emite el voto(puede ser null si la cuenta fue
+                        // eliminada)
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id", nullable = false)

@@ -16,10 +16,12 @@ export const UserSearchPanel = ({ currentAdminUsername }: UserSearchPanelProps) 
         loading,
         updatingId,
         deleting,
+        deletingPermanently,
         error,
         handleSearchUser,
         handleRoleChange,
-        handleDeleteUser
+        handleDeleteUser,
+        handleDeletePermanently
     } = useUserSearch(currentAdminUsername);
 
     return (
@@ -134,6 +136,23 @@ export const UserSearchPanel = ({ currentAdminUsername }: UserSearchPanelProps) 
                                 />
                             )}
                         </div>
+                        {foundUser.username.toLowerCase() !== currentAdminUsername.toLowerCase() && (
+                            <div className="mt-2 pt-3 border-t border-slate-100">
+                                <GenericButton
+                                    type="button"
+                                    onClick={handleDeletePermanently}
+                                    disabled={deleting || deletingPermanently || updatingId !== null}
+                                    variant="primary"
+                                    label={deletingPermanently ? 'Eliminando...' : 'Dar de baja permanente usuario'}
+                                    icon={deletingPermanently ? <Loader2 size={14} className="animate-spin" /> : undefined}
+                                    className="w-full py-2! bg-red-600! hover:bg-red-700! border-2! border-red-600! text-white! rounded-xl! text-xs! font-bold! uppercase! tracking-wide! transition-all! justify-center! gap-2!"
+                                />
+                                <p className="text-[10px] text-slate-400 text-center mt-1.5">
+                                    Borrado físico e irreversible. No podrá recuperarse.
+                                </p>
+                            </div>
+                        )}
+
                     </div>
                 </div>
             )}

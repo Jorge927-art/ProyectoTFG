@@ -174,4 +174,27 @@ class AcademicEvaluationRepositoryTest {
         assertEquals(3.25, courseScore, 0.01);
         assertEquals(3.5, instructorScore, 0.01);
     }
+
+    @Test
+    @DisplayName("findByUserId debe recuperar únicamente las evaluaciones emitidas por ese alumno")
+    void findByUserId_DebeRecuperarSoloLasEvaluacionesDelAlumnoIndicado() {
+        seedData();
+
+        List<AcademicEvaluation> result = academicEvaluationRepository.findByUserId(activeStudent.getUser_id());
+
+        assertNotNull(result);
+        assertEquals(2, result.size(), "activeStudent evaluó courseAlpha y courseBeta");
+        assertTrue(result.stream().allMatch(ev -> ev.getUser().getUser_id().equals(activeStudent.getUser_id())));
+    }
+
+    @Test
+    @DisplayName("findByUserId debe devolver lista vacía si el alumno no ha evaluado nada")
+    void findByUserId_DebeDevolverListaVacia_CuandoNoHayEvaluaciones() {
+        Users sinEvaluaciones = saveUser("sin_evaluaciones_tfg", true);
+
+        List<AcademicEvaluation> result = academicEvaluationRepository.findByUserId(sinEvaluaciones.getUser_id());
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+    }
 }

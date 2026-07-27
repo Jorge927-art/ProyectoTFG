@@ -115,4 +115,20 @@ class DocumentMetadataRepositoryTest {
         assertNotNull(result);
         assertEquals(1, result.size());
     }
+
+    /*
+     * =========================================================================
+     * 5. VERIFICACIÓN: deleteAllBySenderOrReceiver (BAJA PERMANENTE)
+     * =========================================================================
+     */
+    @Test
+    @DisplayName("Debe invocar el borrado en bloque de documentos donde el usuario es emisor o receptor")
+    void deleteAllBySenderOrReceiver_ShouldInvokeBulkDelete() {
+        when(documentMetadataRepository.deleteAllBySenderOrReceiver(10L)).thenReturn(3);
+
+        int affected = documentMetadataRepository.deleteAllBySenderOrReceiver(10L);
+
+        assertEquals(3, affected, "Debe reportar el número de filas físicamente eliminadas");
+        verify(documentMetadataRepository, times(1)).deleteAllBySenderOrReceiver(10L);
+    }
 }

@@ -6,6 +6,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
 
+/**
+ * Repositorio para la entidad DocumentMetadata, proporcionando métodos de
+ * CRUD y consultas personalizadas relacionadas con los documentos.
+ */
 public interface DocumentMetadataRepository extends JpaRepository<DocumentMetadata, Long> {
 
         /**
@@ -88,5 +92,17 @@ public interface DocumentMetadataRepository extends JpaRepository<DocumentMetada
         @Query("UPDATE DocumentMetadata d SET d.read = true WHERE d.receiver.username = :username " +
                         "AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED AND d.read = false")
         int markAllReceivedAsRead(@Param("username") String username);
+
+        /**
+         * Elimina todos los documentos asociados a un usuario específico, ya sea como
+         * emisor o receptor, para cumplir con la política de privacidad y protección de
+         * datos.
+         * 
+         * @param userId El ID del usuario.
+         * @return El número de documentos eliminados.
+         */
+        @org.springframework.data.jpa.repository.Modifying
+        @Query("DELETE FROM DocumentMetadata d WHERE d.sender.user_id = :userId OR d.receiver.user_id = :userId")
+        int deleteAllBySenderOrReceiver(@Param("userId") Long userId);
 
 }

@@ -25,8 +25,12 @@ import java.security.Principal;
 import java.util.LinkedHashMap;
 
 /**
- * 
  * UserController
+ *
+ * Controlador REST para la gestión de usuarios, incluyendo registro, inicio de
+ * sesión,
+ * intereses, notificaciones y eliminación de usuarios por parte del
+ * administrador.
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -288,6 +292,28 @@ public class UserController {
         return ResponseEntity.ok(Map.of(
                 "enabled", updatedUser.isEnabled(),
                 "message", "El usuario '" + username + "' ha sido " + accion + " en PostgreSQL con éxito."));
+    }
+
+    /**
+     * Endpoint exclusivo para que el Administrador elimine permanentemente un
+     * usuario de la plataforma.
+     * Esto incluye la eliminación de documentos, segúncorresponda.
+     * 
+     * @param username  El nombre de usuario del usuario a eliminar permanentemente.
+     * @param principal El principal que representa al Administrador autenticado.
+     * @return Una respuesta indicando el éxito de la operación.
+     */
+    @DeleteMapping("/users/{username}/permanent")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<?> deleteUserPermanently(@PathVariable String username, Principal principal) {
+        if (principal == null || principal.getName() == null || principal.getName().trim().isEmpty()) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
+        userService.deleteUserPermanently(username, principal.getName());
+
+        return ResponseEntity.ok(Map.of(
+                "message", "El usuario '" + username + "' ha sido eliminado permanentemente de PostgreSQL."));
     }
 
     /**

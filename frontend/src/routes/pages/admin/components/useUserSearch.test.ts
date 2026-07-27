@@ -8,7 +8,9 @@ import {
     updateUserRole,
     resolveRoleUpdateErrorMessage,
     toggleUserStatus,
-    resolveStatusToggleErrorMessage
+    resolveStatusToggleErrorMessage,
+    deleteUserPermanently,
+    resolvePermanentDeleteErrorMessage
 } from '../../../../services/adminUserService';
 import type { UserEntity } from '../../../../services/userDomains';
 
@@ -18,7 +20,9 @@ vi.mock('../../../../services/adminUserService', () => ({
     updateUserRole: vi.fn(),
     resolveRoleUpdateErrorMessage: vi.fn(),
     toggleUserStatus: vi.fn(),
-    resolveStatusToggleErrorMessage: vi.fn()
+    resolveStatusToggleErrorMessage: vi.fn(),
+    deleteUserPermanently: vi.fn(),
+    resolvePermanentDeleteErrorMessage: vi.fn()
 }));
 
 describe('useUserSearch', () => {
@@ -246,5 +250,110 @@ describe('useUserSearch', () => {
         });
 
         expect(toggleUserStatus).not.toHaveBeenCalled();
+    });
+
+    it('handleDeletePermanently bloquea el autoborrado del propio admin', async () => {
+        vi.mocked(searchUserByUsername).mockResolvedValue(adminUserEntity);
+
+        const { result } = renderHook(() => useUserSearch('root_admin'));
+
+        act(() => {
+            result.current.setSearchName('root_admin');
+        });
+
+        await act(async () => {
+            await result.current.handleSearchUser(fakeFormEvent);
+        });
+
+        await act(async () => {
+            await result.current.handleDeletePermanently();
+        });
+
+        expect(deleteUserPermanently).not.toHaveBeenCalled();
+        expect(result.current.error).toBe('Acción denegada: no puedes eliminarte permanentemente a ti mismo.');
+    });
+
+    it('handleDeletePermanently no ejecuta la baja si el usuario cancela el diálogo de confirmación', async () => {
+        vi.mocked(searchUserByUsername).mockResolvedValue(sampleUserEntity);
+        vi.stubGlobal('confirm', vi.fn(() => false));
+
+        const { result } = renderHook(() => useUserSearch('root_admin'));
+
+        act(() => {
+            result.current.setSearchName('laura_student');
+        });
+
+        await act(async () => {
+            await result.current.handleSearchUser(fakeFormEvent);
+        });
+
+        await act(async () => {
+            await result.current.handleDeletePermanently();
+        });
+
+        expect(deleteUserPermanently).not.toHaveBeenCalled();
+    });
+
+    it('handleDeletePermanently ejecuta la baja definitiva y limpia la búsqueda tras confirmar', async () => {
+        vi.mocked(searchUserByUsername).mockResolvedValue(sampleUserEntity);
+        vi.mocked(deleteUserPermanently).mockResolvedValue({
+            message: "El usuario 'laura_student' ha sido eliminado permanentemente de PostgreSQL."
+        });
+
+        const { result } = renderHook(() => useUserSearch('root_admin'));
+
+        act(() => {
+            result.current.setSearchName('laura_student');
+        });
+
+        await act(async () => {
+            await result.current.handleSearchUser(fakeFormEvent);
+        });
+
+        await act(async () => {
+            await result.current.handleDeletePermanently();
+        });
+
+        expect(window.confirm).toHaveBeenCalled();
+        expect(deleteUserPermanently).toHaveBeenCalledWith('laura_student');
+        expect(window.alert).toHaveBeenCalledWith("El usuario 'laura_student' ha sido eliminado permanentemente de PostgreSQL.");
+        expect(result.current.foundUser).toBeNull();
+        expect(result.current.searchName).toBe('');
+        expect(result.current.deletingPermanently).toBe(false);
+    });
+
+    it('handleDeletePermanently captura un error y lo traduce mediante el servicio', async () => {
+        vi.mocked(searchUserByUsername).mockResolvedValue(sampleUserEntity);
+        const fakeError = new Error('delete-error');
+        vi.mocked(deleteUserPermanently).mockRejectedValue(fakeError);
+        vi.mocked(resolvePermanentDeleteErrorMessage).mockReturnValue('Error crítico: No se pudo eliminar permanentemente al usuario.');
+
+        const { result } = renderHook(() => useUserSearch('root_admin'));
+
+        act(() => {
+            result.current.setSearchName('laura_student');
+        });
+
+        await act(async () => {
+            await result.current.handleSearchUser(fakeFormEvent);
+        });
+
+        await act(async () => {
+            await result.current.handleDeletePermanently();
+        });
+
+        expect(result.current.error).toBe('Error crítico: No se pudo eliminar permanentemente al usuario.');
+        // El usuario encontrado NO debe borrarse de la vista si la petición falló
+        expect(result.current.foundUser).toEqual(sampleUserEntity);
+    });
+
+    it('handleDeletePermanently no hace nada si no hay usuario encontrado', async () => {
+        const { result } = renderHook(() => useUserSearch('root_admin'));
+
+        await act(async () => {
+            await result.current.handleDeletePermanently();
+        });
+
+        expect(deleteUserPermanently).not.toHaveBeenCalled();
     });
 });

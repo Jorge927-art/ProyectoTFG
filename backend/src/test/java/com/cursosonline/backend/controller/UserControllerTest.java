@@ -4,8 +4,9 @@ import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.exception.GlobalExceptionHandler;
 import com.cursosonline.backend.repository.EnrollmentRepository;
-import com.cursosonline.backend.repository.UserProfileRepository; // ✅ Importación necesaria
+import com.cursosonline.backend.repository.UserProfileRepository;
 import com.cursosonline.backend.security.jwt.JwtService;
 import com.cursosonline.backend.services.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,11 +18,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -52,7 +59,9 @@ class UserControllerTest {
 
         @BeforeEach
         void setUp() {
-                mockMvc = MockMvcBuilders.standaloneSetup(userController).build();
+                mockMvc = MockMvcBuilders.standaloneSetup(userController)
+                                .setControllerAdvice(new GlobalExceptionHandler())
+                                .build();
         }
 
         @Test
@@ -64,7 +73,7 @@ class UserControllerTest {
                 when(userService.login("Luis", "secret123")).thenReturn(user);
                 when(enrollmentRepository.findEnrolledCourseIdsByUserId(1L)).thenReturn(List.of(101L));
 
-                // ✅ Evita el fallo simulando que el usuario aún no tiene un avatar guardado en
+                // Evita el fallo simulando que el usuario aún no tiene un avatar guardado en
                 // base de datos
                 when(userProfileRepository.findById(1L)).thenReturn(Optional.empty());
 
@@ -246,5 +255,43 @@ class UserControllerTest {
                 mockMvc.perform(get("/api/auth/notifications")
                                 .contentType(org.springframework.http.MediaType.APPLICATION_JSON))
                                 .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        void deleteUserPermanentlyDebeRetornarOkCuandoElAdminEliminaAOtroUsuario() throws Exception {
+                java.security.Principal mockPrincipal = () -> "root_admin";
+
+                doNothing().when(userService).deleteUserPermanently("laura_student", "root_admin");
+
+                mockMvc.perform(delete("/api/auth/users/laura_student/permanent")
+                                .principal(mockPrincipal))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.message")
+                                                .value("El usuario 'laura_student' ha sido eliminado permanentemente de PostgreSQL."));
+
+                verify(userService, times(1)).deleteUserPermanently("laura_student", "root_admin");
+        }
+
+        @Test
+        void deleteUserPermanentlyDebeRetornar401CuandoNoHayPrincipal() throws Exception {
+                mockMvc.perform(delete("/api/auth/users/laura_student/permanent"))
+                                .andExpect(status().isUnauthorized());
+
+                verify(userService, never()).deleteUserPermanently(anyString(), anyString());
+        }
+
+        @Test
+        void deleteUserPermanentlyDebePropagarErrorDeNegocioComoRespuestaControlada() throws Exception {
+                java.security.Principal mockPrincipal = () -> "root_admin";
+
+                doThrow(new com.cursosonline.backend.exception.ServicesException(
+                                "Acción denegada: no puedes eliminarte permanentemente a ti mismo."))
+                                .when(userService).deleteUserPermanently("root_admin", "root_admin");
+
+                mockMvc.perform(delete("/api/auth/users/root_admin/permanent")
+                                .principal(mockPrincipal))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.message")
+                                                .value("Acción denegada: no puedes eliminarte permanentemente a ti mismo."));
         }
 }

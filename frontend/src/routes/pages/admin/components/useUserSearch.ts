@@ -6,7 +6,9 @@ import {
     updateUserRole,
     resolveRoleUpdateErrorMessage,
     toggleUserStatus,
-    resolveStatusToggleErrorMessage
+    resolveStatusToggleErrorMessage,
+    deleteUserPermanently,
+    resolvePermanentDeleteErrorMessage
 } from '../../../../services/adminUserService';
 import type { UserEntity } from '../../../../services/userDomains';
 
@@ -23,10 +25,16 @@ export const useUserSearch = (currentAdminUsername: string) => {
     const [searchName, setSearchName] = useState<string>('');
     const [foundUser, setFoundUser] = useState<UserEntity | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
-    const [updatingId, setUpdatingId] = useState<number | null>(null);
+    const [updatingId, setUpdatingId] = useState<number | null>(null); 
     const [deleting, setDeleting] = useState<boolean>(false);
+    const [deletingPermanently, setDeletingPermanently] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
-
+    
+    /**
+     * Maneja la búsqueda de un usuario por nombre de usuario.
+     * @param e El evento de envío del formulario.
+     * @returns Una promesa que se resuelve cuando la operación se completa.
+     */
     const handleSearchUser = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!searchName.trim()) return;
@@ -44,7 +52,14 @@ export const useUserSearch = (currentAdminUsername: string) => {
             setLoading(false);
         }
     };
-
+    
+    /**
+     * Maneja el cambio de rol de un usuario.
+     *
+     * @param targetId El ID del usuario cuyo rol se va a cambiar.
+     * @param newRole El nuevo rol a asignar al usuario.
+     * @returns Una promesa que se resuelve cuando la operación se completa.
+     */
     const handleRoleChange = async (targetId: number, newRole: string) => {
         if (!foundUser) return;
         setUpdatingId(targetId);
@@ -60,7 +75,12 @@ export const useUserSearch = (currentAdminUsername: string) => {
             setUpdatingId(null);
         }
     };
-
+    
+    /**
+     * Maneja la baja temporal o reactivación de un usuario.
+     *
+     * @returns Una promesa que se resuelve cuando la operación se completa.
+     */
     const handleDeleteUser = async () => {
         if (!foundUser) return;
 
@@ -90,16 +110,53 @@ export const useUserSearch = (currentAdminUsername: string) => {
         }
     };
 
-    return {
+    /**
+     * Maneja la eliminación permanente de un usuario.
+     *
+     * @returns Una promesa que se resuelve cuando la operación se completa.
+     */
+    const handleDeletePermanently = async () => {
+        if (!foundUser) return;
+
+        if (foundUser.username.toLowerCase() === currentAdminUsername.toLowerCase()) {
+            setError('Acción denegada: no puedes eliminarte permanentemente a ti mismo.');
+            return;
+        }
+
+        const confirmed = window.confirm(
+            `⚠️ ATENCIÓN: vas a ELIMINAR PERMANENTEMENTE a ${foundUser.username} de la base de datos. ` +
+            `Esta acción NO se puede deshacer. ¿Continuar?`
+        );
+        if (!confirmed) return;
+
+        setDeletingPermanently(true);
+        setError('');
+
+        try {
+            const { message } = await deleteUserPermanently(foundUser.username);
+            alert(message);
+            setFoundUser(null);
+            setSearchName('');
+        } catch (err) {
+            console.error('Error en la baja permanente:', err);
+            setError(resolvePermanentDeleteErrorMessage(err));
+        } finally {
+            setDeletingPermanently(false);
+        }
+    };
+
+   return {
         searchName,
         setSearchName,
         foundUser,
         loading,
         updatingId,
         deleting,
+        deletingPermanently,
         error,
         handleSearchUser,
         handleRoleChange,
-        handleDeleteUser
+        handleDeleteUser,
+        handleDeletePermanently
     };
 };

@@ -3,6 +3,7 @@ package com.cursosonline.backend.services;
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.entities.Interest;
+import com.cursosonline.backend.entities.AcademicEvaluation;
 import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.DocumentMetadata;
@@ -53,11 +54,21 @@ public class UserService {
     private final CoursesRepository coursesRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final DocumentMetadataRepository documentMetadataRepository;
+    private final com.cursosonline.backend.repository.AcademicEvaluationRepository academicEvaluationRepository;
+    private final com.cursosonline.backend.repository.UserProfileRepository userProfileRepository;
     private final JdbcTemplate jdbcTemplate;
     private Clock clock = Clock.systemUTC();
 
+    @org.springframework.beans.factory.annotation.Value("${app.security.protected-username:admin_cole}")
+    private String protectedUsername;
+
     /**
-     * Busca un usuario por su nombre de usuario.
+     * Permite buscar un usuario por su nombre de usuario de forma transaccional,
+     * devolviendo un Optional que puede estar vacío si no se encuentra.
+     * 
+     * @param username El nombre de usuario del usuario a buscar.
+     * @return Un Optional que contiene el usuario si se encuentra, o está vacío si
+     *         no se encuentra.
      */
     @Transactional(readOnly = true)
     public Optional<Users> findByUsername(String username) {
@@ -158,6 +169,63 @@ public class UserService {
     }
 
     /**
+     * Permite eliminar permanentemente un usuario de la plataforma, junto con sus
+     * documentos, valoraciones y matrículas según corresponda.
+     * 
+     * @param username          El nombre de usuario del usuario a eliminar.
+     * @param requesterUsername El nombre de usuario del solicitante de la
+     *                          eliminación.
+     */
+    @Transactional
+    public void deleteUserPermanently(String username, String requesterUsername) {
+        Users user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
+
+        if (username.equalsIgnoreCase(requesterUsername)) {
+            throw new ServicesException("Acción denegada: no puedes eliminarte permanentemente a ti mismo.");
+        }
+        if (username.equalsIgnoreCase(protectedUsername)) {
+            throw new ServicesException(
+                    "Acción denegada: esta cuenta de administrador está protegida y no puede eliminarse.");
+        }
+
+        Long userId = user.getUser_id();
+
+        // 1. Documentos enviados o recibidos por el usuario
+        documentMetadataRepository.deleteAllBySenderOrReceiver(userId);
+
+        // 2. Si es PROFESSOR: desasignar (no borrar) sus cursos
+        if (user.getRole() == Role.PROFESSOR) {
+            List<Courses> assigned = getAssignedCoursesForProfessor(username);
+            for (Courses course : assigned) {
+                course.setAssignedUser(null);
+                coursesRepository.save(course);
+            }
+        }
+
+        // 3. Si es STUDENT: anonimizar valoraciones (NO borrarlas) y borrar matrículas
+        // propias
+        if (user.getRole() == Role.STUDENT) {
+            List<AcademicEvaluation> evaluations = academicEvaluationRepository.findByUserId(userId);
+            for (AcademicEvaluation evaluation : evaluations) {
+                evaluation.setUser(null);
+                academicEvaluationRepository.save(evaluation);
+            }
+
+            List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(userId);
+            enrollmentRepository.deleteAll(enrollments); // cascada -> CourseGrade
+        }
+
+        // 4. Perfil e intereses personales (clave primaria compartida, no cascadean
+        // solos)
+        userProfileRepository.findById(userId).ifPresent(userProfileRepository::delete);
+        interestRepository.findById(userId).ifPresent(interestRepository::delete);
+
+        // 5. Finalmente, el propio usuario
+        userRepository.delete(user);
+    }
+
+    /**
      * Recupera de forma transaccional los intereses de un usuario específico.
      * 
      * @param username El nombre de usuario del usuario cuyos intereses se van a
@@ -182,7 +250,6 @@ public class UserService {
                     Collections.emptyList());
         }
 
-        // [HIDRATACIÓN EXPLÍCITA FORZADA - ADR-31]
         // Obliga a Hibernate a resolver los proxies de colecciones y serializar los
         // datos antes de cerrar la sesión
         if (interest.getCategory() != null)
@@ -538,7 +605,12 @@ public class UserService {
     }
 
     /**
-     * Permite inyectar un reloj alternativo desde la suite de pruebas unitarias.
+     * Permite inyectar un reloj personalizado para pruebas unitarias y control de
+     * tiempo.
+     * Esto facilita la simulación de escenarios temporales y garantiza la
+     * consistencia de los cálculos de progreso.
+     * 
+     * @param clock El reloj personalizado a inyectar.
      */
     public void setClock(Clock clock) {
         this.clock = clock;
@@ -664,8 +736,10 @@ public class UserService {
     }
 
     /**
-     * Verifica si el esquema actual ya incluye las columnas de ACK de alertas de
-     * progreso en enrollment.
+     * Verifica de forma segura si la tabla de matrícula (enrollment) contiene las
+     * columnas necesarias para las alertas de progreso de estudiantes y profesores.
+     * 
+     * @return true si las columnas necesarias existen, false en caso contrario.
      */
     private boolean hasProgressAlertColumns() {
         try {
@@ -683,9 +757,14 @@ public class UserService {
     }
 
     /**
-     * Añade alertas de progreso sin romper el endpoint si el esquema de matrícula
-     * aún
-     * no está completamente migrado.
+     * Agrega de forma segura las notificaciones de progreso para estudiantes y
+     * profesores, evitando errores de esquema si faltan columnas en la tabla de
+     * matrícula (enrollment).
+     * 
+     * @param user     El usuario autenticado.
+     * @param username El nombre de usuario del usuario autenticado.
+     * @param alerts   La lista de notificaciones a la que se agregarán las alertas
+     *                 de progreso.
      */
     private void appendProgressNotificationsSafely(Users user, String username,
             List<com.cursosonline.backend.dto.NotificationDTO> alerts) {
@@ -739,8 +818,12 @@ public class UserService {
     }
 
     /**
-     * Marca como reconocidas las alertas de progreso sin bloquear el dismiss global
-     * si falta alguna columna de esquema.
+     * Marca de forma segura las notificaciones de progreso como reconocidas (ACK)
+     * para estudiantes y profesores, evitando errores de esquema si faltan columnas
+     * en la tabla de matrícula (enrollment).
+     * 
+     * @param user     El usuario autenticado.
+     * @param username El nombre de usuario del usuario autenticado.
      */
     private void acknowledgeProgressNotificationsSafely(Users user, String username) {
         try {
@@ -776,8 +859,12 @@ public class UserService {
     }
 
     /**
-     * Marca documentos recibidos como leídos usando update masivo y aplica fallback
-     * por entidad si el proveedor JPA o la consulta fallan en runtime.
+     * Marca de forma segura todos los documentos recibidos como leídos para un
+     * usuario específico. Si la operación de actualización masiva falla, se aplica
+     * un
+     * fallback por entidad.
+     * 
+     * @param username El nombre de usuario del receptor de los documentos.
      */
     private void markAllReceivedAsReadSafely(String username) {
         try {

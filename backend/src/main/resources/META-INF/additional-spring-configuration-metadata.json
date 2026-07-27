@@ -4,6 +4,11 @@
       "name": "app.cors.allowed-origins",
       "type": "java.lang.String",
       "description": "Lista de orígenes permitidos para CORS separados por coma."
+    },
+    {
+      "name": "app.security.protected-username",
+      "type": "java.lang.String",
+      "description": "Nombre de usuario protegido contra eliminación permanente."
     }
   ]
 }

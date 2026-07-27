@@ -46,6 +46,9 @@ describe('UserSearchPanel', () => {
     const mockHandleDeleteUser = vi.fn(async () => {
         return;
     });
+    const mockHandleDeletePermanently = vi.fn(async () => {
+        return;
+    });
 
     const sampleUserEntity: UserEntity = {
         userId: 101,
@@ -61,10 +64,12 @@ describe('UserSearchPanel', () => {
         loading: false,
         updatingId: null,
         deleting: false,
+        deletingPermanently: false,
         error: '',
         handleSearchUser: mockHandleSearchUser,
         handleRoleChange: mockHandleRoleChange,
-        handleDeleteUser: mockHandleDeleteUser
+        handleDeleteUser: mockHandleDeleteUser,
+        handleDeletePermanently: mockHandleDeletePermanently
     };
 
     beforeEach(() => {
@@ -160,5 +165,50 @@ describe('UserSearchPanel', () => {
 
         expect(screen.getByTestId('btn-reactivar-y-dar-de-alta-usuario')).toBeInTheDocument();
         expect(screen.queryByTestId('btn-dar-de-baja-temporal-usuario')).not.toBeInTheDocument();
+    });
+
+    it('muestra el botón de baja permanente junto al de baja temporal cuando hay usuario encontrado', () => {
+        vi.mocked(useUserSearch).mockReturnValue({
+            ...baseHookReturn,
+            foundUser: sampleUserEntity
+        } as ReturnType<typeof useUserSearch>);
+
+        render(<UserSearchPanel currentAdminUsername="root_admin" />);
+
+        const botonPermanente = screen.getByTestId('btn-dar-de-baja-permanente-usuario');
+        expect(botonPermanente).toBeInTheDocument();
+
+        fireEvent.click(botonPermanente);
+        expect(mockHandleDeletePermanently).toHaveBeenCalled();
+    });
+
+    it('oculta el botón de baja permanente cuando el usuario encontrado es el propio admin', () => {
+        const adminUserEntity: UserEntity = {
+            userId: 999,
+            username: 'root_admin',
+            role: 'ADMIN',
+            enabled: true
+        };
+
+        vi.mocked(useUserSearch).mockReturnValue({
+            ...baseHookReturn,
+            foundUser: adminUserEntity
+        } as ReturnType<typeof useUserSearch>);
+
+        render(<UserSearchPanel currentAdminUsername="root_admin" />);
+
+        expect(screen.queryByTestId('btn-dar-de-baja-permanente-usuario')).not.toBeInTheDocument();
+    });
+
+    it('deshabilita el botón de baja permanente mientras deletingPermanently está en curso', () => {
+        vi.mocked(useUserSearch).mockReturnValue({
+            ...baseHookReturn,
+            foundUser: sampleUserEntity,
+            deletingPermanently: true
+        } as ReturnType<typeof useUserSearch>);
+
+        render(<UserSearchPanel currentAdminUsername="root_admin" />);
+
+        expect(screen.getByTestId('btn-eliminando...')).toBeDisabled();
     });
 });

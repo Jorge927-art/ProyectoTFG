@@ -1,6 +1,9 @@
 package com.cursosonline.backend.services;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -9,6 +12,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import java.util.List;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -20,7 +24,8 @@ import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Users;
-import com.cursosonline.backend.repository.DocumentMetadataRepository;
+import com.cursosonline.backend.exception.ResourceNotFoundException;
+import com.cursosonline.backend.exception.ServicesException;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
 
@@ -38,8 +43,6 @@ public class UserServiceTest {
         @Mock
         private PasswordEncoder passwordEncoder;
 
-        // [AÑADIDO PARA LA AUDITORÍA]: Mock del repositorio de matrículas requerida
-        // para el Activity Tracker
         @Mock
         private EnrollmentRepository enrollmentRepository;
 
@@ -47,10 +50,19 @@ public class UserServiceTest {
         private com.cursosonline.backend.repository.InterestRepository interestRepository;
 
         @Mock
-        private DocumentMetadataRepository documentMetadataRepository;
+        private com.cursosonline.backend.repository.CoursesRepository coursesRepository;
+
+        @Mock
+        private com.cursosonline.backend.repository.DocumentMetadataRepository documentMetadataRepository;
 
         @Mock
         private JdbcTemplate jdbcTemplate;
+
+        @Mock
+        private com.cursosonline.backend.repository.AcademicEvaluationRepository academicEvaluationRepository;
+
+        @Mock
+        private com.cursosonline.backend.repository.UserProfileRepository userProfileRepository;
 
         @InjectMocks
         private UserService userService;
@@ -394,6 +406,112 @@ public class UserServiceTest {
                 verify(doc1).setRead(true);
                 verify(doc2).setRead(true);
                 verify(documentMetadataRepository).saveAll(anyList());
+        }
+
+        /*
+         * =========================================================================
+         * SUITE: deleteUserPermanently (BAJA PERMANENTE / BORRADO FÍSICO)
+         * =========================================================================
+         */
+
+        @Test
+        void deleteUserPermanently_DebeLanzarExcepcion_CuandoElAdminIntentaAutoeliminarse() {
+                when(userRepository.findByUsername("root_admin")).thenReturn(
+                                Optional.of(new Users(1L, "root_admin", "enc", Role.ADMIN, "a@a.com", true,
+                                                new java.util.ArrayList<>())));
+
+                assertThrows(ServicesException.class,
+                                () -> userService.deleteUserPermanently("root_admin", "root_admin"));
+
+                verify(userRepository, never()).delete(any());
+        }
+
+        @Test
+        void deleteUserPermanently_DebeLanzarExcepcion_CuandoElUsuarioObjetivoEsElAdminProtegido() {
+                org.springframework.test.util.ReflectionTestUtils.setField(userService, "protectedUsername",
+                                "admin_cole");
+
+                when(userRepository.findByUsername("admin_cole")).thenReturn(
+                                Optional.of(new Users(2L, "admin_cole", "enc", Role.ADMIN, "cole@a.com", true,
+                                                new java.util.ArrayList<>())));
+
+                assertThrows(ServicesException.class,
+                                () -> userService.deleteUserPermanently("admin_cole", "otro_admin"));
+
+                verify(userRepository, never()).delete(any());
+        }
+
+        @Test
+        void deleteUserPermanently_CasoEstudiante_DebeAnonimizarEvaluacionesYBorrarMatriculasYDocumentos() {
+                Users student = new Users(10L, "laura_student", "enc", Role.STUDENT, "laura@a.com", true,
+                                new java.util.ArrayList<>());
+                when(userRepository.findByUsername("laura_student")).thenReturn(Optional.of(student));
+
+                com.cursosonline.backend.entities.AcademicEvaluation evaluation = new com.cursosonline.backend.entities.AcademicEvaluation();
+                evaluation.setUser(student);
+                when(academicEvaluationRepository.findByUserId(10L)).thenReturn(List.of(evaluation));
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(500L);
+                enrollment.setUser(student);
+                when(enrollmentRepository.findAllByUserIdWithCourses(10L)).thenReturn(List.of(enrollment));
+
+                userService.deleteUserPermanently("laura_student", "root_admin");
+
+                // 1. Documentos enviados/recibidos borrados
+                verify(documentMetadataRepository, times(1)).deleteAllBySenderOrReceiver(10L);
+
+                // 2. Evaluación anonimizada (NO borrada), no eliminada de la tabla
+                assertNull(evaluation.getUser(), "La evaluación debe quedar anonimizada, no borrada");
+                verify(academicEvaluationRepository, times(1)).save(evaluation);
+                verify(academicEvaluationRepository, never()).delete(any());
+
+                // 3. Matrículas propias borradas (arrastra CourseGrade por cascada JPA)
+                verify(enrollmentRepository, times(1)).deleteAll(List.of(enrollment));
+
+                // 4. Perfil/intereses y usuario final eliminados
+                verify(userProfileRepository, times(1)).findById(10L);
+                verify(interestRepository, times(1)).findById(10L);
+                verify(userRepository, times(1)).delete(student);
+        }
+
+        @Test
+        void deleteUserPermanently_CasoProfesor_DebeDesasignarCursosSinBorrarlosYNoTocarMatriculas() {
+                Users professor = new Users(20L, "laura_teacher", "enc", Role.PROFESSOR, "laura.t@a.com", true,
+                                new java.util.ArrayList<>());
+                when(userRepository.findByUsername("laura_teacher")).thenReturn(Optional.of(professor));
+
+                Courses course = new Courses();
+                course.setCourse_id(300L);
+                course.setAssignedUser(professor);
+
+                when(coursesRepository.findAllAssignedToProfessor(anyString())).thenReturn(List.of(course));
+                when(coursesRepository.findAllByInstructorsIsNotNullOrderByTitleAsc()).thenReturn(List.of());
+
+                userService.deleteUserPermanently("laura_teacher", "root_admin");
+
+                // 1. Documentos borrados igual que para cualquier rol
+                verify(documentMetadataRepository, times(1)).deleteAllBySenderOrReceiver(20L);
+
+                // 2. El curso se desasigna, pero NUNCA se borra
+                assertNull(course.getAssignedUser(), "El curso debe quedar sin profesor asignado");
+                verify(coursesRepository, times(1)).save(course);
+                verify(coursesRepository, never()).delete(any());
+
+                // 3. No se tocan evaluaciones ni matrículas (no son del profesor)
+                verify(academicEvaluationRepository, never()).findByUserId(any());
+                verify(enrollmentRepository, never()).deleteAll(any());
+
+                // 4. Usuario finalmente eliminado
+                verify(userRepository, times(1)).delete(professor);
+        }
+
+        @Test
+        void deleteUserPermanently_DebeLanzarResourceNotFoundException_CuandoElUsuarioNoExiste() {
+                when(userRepository.findByUsername("fantasma")).thenReturn(Optional.empty());
+
+                assertThrows(ResourceNotFoundException.class,
+                                () -> userService.deleteUserPermanently("fantasma", "root_admin"));
         }
 
 }

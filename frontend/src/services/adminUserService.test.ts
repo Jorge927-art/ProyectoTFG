@@ -5,7 +5,9 @@ import {
     updateUserRole,
     resolveRoleUpdateErrorMessage,
     toggleUserStatus,
-    resolveStatusToggleErrorMessage
+    resolveStatusToggleErrorMessage,
+    deleteUserPermanently,
+    resolvePermanentDeleteErrorMessage
 } from './adminUserService';
 import { apiClient } from './apiClient';
 import axios from 'axios';
@@ -127,5 +129,38 @@ describe('adminUserService', () => {
         const msg = resolveStatusToggleErrorMessage(new Error('x'));
 
         expect(msg).toBe('Error crítico: No se pudo modificar el estado del usuario.');
+    });
+
+    it('deleteUserPermanently llama DELETE al endpoint /permanent y devuelve solo el message', async () => {
+        vi.mocked(apiClient.delete).mockResolvedValue({
+            data: {
+                message: "El usuario 'laura_student' ha sido eliminado permanentemente de PostgreSQL.",
+                extraCampoIgnorado: true
+            }
+        });
+
+        const result = await deleteUserPermanently('laura_student');
+
+        expect(apiClient.delete).toHaveBeenCalledWith('/api/auth/users/laura_student/permanent');
+        expect(result).toEqual({
+            message: "El usuario 'laura_student' ha sido eliminado permanentemente de PostgreSQL."
+        });
+    });
+
+    it('resolvePermanentDeleteErrorMessage devuelve el error del backend si existe', () => {
+        const err = { response: { data: { error: 'Acción denegada: cuenta protegida.' } } };
+        vi.mocked(axios.isAxiosError).mockReturnValue(true);
+
+        const msg = resolvePermanentDeleteErrorMessage(err);
+
+        expect(msg).toBe('Acción denegada: cuenta protegida.');
+    });
+
+    it('resolvePermanentDeleteErrorMessage devuelve el fallback para otros errores', () => {
+        vi.mocked(axios.isAxiosError).mockReturnValue(false);
+
+        const msg = resolvePermanentDeleteErrorMessage(new Error('boom'));
+
+        expect(msg).toBe('Error crítico: No se pudo eliminar permanentemente al usuario.');
     });
 });

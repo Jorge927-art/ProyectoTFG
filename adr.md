@@ -2043,6 +2043,55 @@ Sustituir toda anotación `@PreAuthorize("hasRole('X')")` por `@PreAuthorize("ha
 
 ---
 
+---
+
+# ADR-058: Estrategia de Borrado Físico vs. Anonimización en la Baja Permanente de Usuarios
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Julio 2026
+
+## Contexto
+
+El panel de administración solo contaba con una baja lógica (`enabled = false`) reversible. Se requirió añadir una baja **permanente** e irreversible que ejecute un borrado físico real en PostgreSQL. El reto no era el borrado en sí, sino decidir qué hacer con las entidades relacionadas que referencian al usuario mediante claves foráneas: `AcademicEvaluation` (valoraciones de curso/profesor, `user_id NOT NULL`), `Courses.assignedUser` (profesor asignado, FK nullable), `Enrollment` (matrículas del alumno, con `CourseGrade` en cascada) y `DocumentMetadata` (documentos enviados/recibidos, `sender_id`/`receiver_id` `NOT NULL`).
+
+Un borrado físico ingenuo (`userRepository.delete(user)`) habría lanzado una violación de integridad referencial en cuanto existiera al menos una valoración o un documento asociado, o habría arrastrado en cascada datos que sí tienen valor agregado más allá de la cuenta individual (la media de valoración de un curso no debería depender de que el alumno que la emitió siga existiendo).
+
+## Decisión
+
+Diferenciar el tratamiento por tipo de relación en lugar de aplicar un borrado uniforme:
+
+1. **`AcademicEvaluation` (valoraciones emitidas por un alumno a cursos/profesores):** se **anonimizan** (`evaluation.setUser(null)`), no se borran. Se relajó la columna `user_id` de `NOT NULL` a nullable mediante migración (`ALTER TABLE academic_evaluations ALTER COLUMN user_id DROP NOT NULL`).
+2. **`Courses.assignedUser` (asignación de un profesor a sus cursos):** se **desasigna** (`course.setAssignedUser(null)`), el curso en sí nunca se borra. Como las valoraciones de un profesor no tienen FK directa a `Users` (se casan por el string `Courses.instructors`), sobreviven automáticamente sin código adicional siempre que el curso no se elimine.
+3. **`Enrollment` (matrículas propias del alumno) y `CourseGrade` (sus calificaciones académicas):** se **borran físicamente**, aprovechando la cascada `CascadeType.ALL` + `orphanRemoval` ya definida entre `Enrollment` y `CourseGrade`.
+4. **`DocumentMetadata` (documentos enviados/recibidos):** se **borran físicamente** en bloque (`deleteAllBySenderOrReceiver`), sin anonimizar, por simplicidad y porque no se pidió preservarlos.
+5. **Cuenta de administrador protegida:** se introdujo un username reservado (configurable vía `app.security.protected-username`) que el backend rechaza eliminar de forma explícita, independientemente de si la petición llega desde el frontend o directamente contra la API.
+
+## Justificación para el TFG
+
+* **Integridad de datos agregados sobre integridad de identidad:** las valoraciones y las asignaciones de curso alimentan medias y reportes que deben sobrevivir a la baja de una cuenta individual; solo se purga el vínculo con la persona, no el dato en sí.
+* **Cumplimiento del requisito funcional explícito:** el enunciado de negocio distingue expresamente qué calificaciones deben conservarse (a profesores y cursos) frente a qué debe desaparecer del todo (la cuenta, sus documentos, su historial de matrícula propio).
+* **Atomicidad:** toda la operación se ejecuta dentro de un único método `@Transactional`, evitando estados intermedios de "usuario a medio borrar" si un paso falla.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* Permite cumplir con un borrado real (útil para casos GDPR/derecho al olvido) sin degradar la fiabilidad estadística de valoraciones ni cursos.
+* El desacoplamiento por string entre `Courses.instructors` y `Users` (heredado de un diseño previo) resultó, de forma no buscada, una ventaja: protege las valoraciones de un profesor sin necesidad de lógica de anonimización adicional en ese caso.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Pérdida de trazabilidad en documentos:** al borrar físicamente `DocumentMetadata`, si se elimina a un alumno, el profesor pierde también el registro de los documentos que ese alumno le envió (la FK `NOT NULL` no permite otra opción sin una migración adicional).
+* *Mitigación futura:* si se necesitara conservar el historial documental, la misma estrategia de anonimización aplicada a `AcademicEvaluation` (relajar la FK a nullable) sería extensible a `DocumentMetadata`.
+* **Irreversibilidad:** a diferencia de la baja temporal, esta operación no tiene "deshacer". Se mitiga con doble confirmación en el frontend (`window.confirm`) y bloqueo explícito de autoborrado y de la cuenta de administrador protegida, verificado tanto en frontend como en backend.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026
