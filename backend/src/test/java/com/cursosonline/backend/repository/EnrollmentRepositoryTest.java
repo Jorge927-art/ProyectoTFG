@@ -17,6 +17,12 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+/**
+ * Clase de prueba para el repositorio EnrollmentRepository. Contiene pruebas
+ * unitarias
+ * y de integración para verificar el correcto funcionamiento de los métodos de
+ * EnrollmentRepository.
+ */
 @SpringBootTest
 @ActiveProfiles("test-ci")
 @Transactional
@@ -160,5 +166,28 @@ class EnrollmentRepositoryTest {
         assertEquals(2, enrollments.size());
         assertEquals(courseAlpha.getTitle(), enrollments.get(0).getCourse().getTitle());
         assertEquals(courseBeta.getTitle(), enrollments.get(1).getCourse().getTitle());
+    }
+
+    @Test
+    @DisplayName("[PANEL ESTADÍSTICO ADMIN] findAllByCourseId debe recuperar TODAS las matrículas del curso, activas e inactivas, ordenadas por username")
+    void findAllByCourseId_ShouldReturnAllEnrollmentsRegardlessOfUserStatus() {
+        seedData();
+
+        List<Enrollment> enrollments = enrollmentRepository.findAllByCourseId(courseAlpha.getCourse_id());
+
+        assertEquals(3, enrollments.size(), "courseAlpha tiene 3 matrículas: ana, bruno (activos) y carlos (inactivo)");
+        assertEquals("ana_docencia", enrollments.get(0).getUser().getUsername());
+        assertEquals("bruno_docencia", enrollments.get(1).getUser().getUsername());
+        assertEquals("carlos_docencia", enrollments.get(2).getUser().getUsername());
+    }
+
+    @Test
+    @DisplayName("[PANEL ESTADÍSTICO ADMIN] findAllByCourseId debe devolver lista vacía si el curso no tiene matrículas")
+    void findAllByCourseId_ShouldReturnEmptyList_WhenCourseHasNoEnrollments() {
+        Courses cursoVacio = saveCourse("Curso Sin Matriculas");
+
+        List<Enrollment> enrollments = enrollmentRepository.findAllByCourseId(cursoVacio.getCourse_id());
+
+        assertEquals(0, enrollments.size());
     }
 }

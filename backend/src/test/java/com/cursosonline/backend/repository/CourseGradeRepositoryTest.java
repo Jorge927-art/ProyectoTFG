@@ -19,6 +19,11 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+/**
+ * Clase de prueba para el repositorio CourseGradeRepository. Contiene pruebas
+ * correcto funcionamiento de los métodos de CourseGradeRepository.
+ * CourseGradeRepositoryTest
+ */
 @SpringBootTest
 @ActiveProfiles("test-ci")
 @Transactional
@@ -134,5 +139,32 @@ class CourseGradeRepositoryTest {
 
         assertNotNull(score);
         assertEquals(8.25, score, 0.01);
+    }
+
+    @Test
+    @DisplayName("[PANEL ESTADÍSTICO ADMIN] countStudentsWithPassingGradeByCourseId debe contar alumnos distintos con nota > 5")
+    void countStudentsWithPassingGradeByCourseId_ShouldCountDistinctStudentsAboveThreshold() {
+        seedData();
+        // courseAlpha: activeStudent (8.0, 9.0), secondaryStudent (6.0),
+        // inactiveStudent (10.0) -> los 3 aprueban
+
+        long passingAlpha = courseGradeRepository.countStudentsWithPassingGradeByCourseId(courseAlpha.getCourse_id());
+        long passingBeta = courseGradeRepository.countStudentsWithPassingGradeByCourseId(courseBeta.getCourse_id());
+
+        assertEquals(3, passingAlpha);
+        assertEquals(1, passingBeta);
+    }
+
+    @Test
+    @DisplayName("[PANEL ESTADÍSTICO ADMIN] countStudentsWithPassingGradeByCourseId no debe contar notas <= 5")
+    void countStudentsWithPassingGradeByCourseId_ShouldExcludeFailingGrades() {
+        Users reprobado = saveUser("dario_notas", true);
+        Courses cursoReprobado = saveCourse("Curso Con Suspenso");
+        Enrollment enrollment = saveEnrollment(reprobado, cursoReprobado);
+        saveGrade(enrollment, "Examen Final", "4.5");
+
+        long passing = courseGradeRepository.countStudentsWithPassingGradeByCourseId(cursoReprobado.getCourse_id());
+
+        assertEquals(0, passing);
     }
 }

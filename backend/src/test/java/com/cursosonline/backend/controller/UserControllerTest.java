@@ -60,7 +60,7 @@ class UserControllerTest {
         @BeforeEach
         void setUp() {
                 mockMvc = MockMvcBuilders.standaloneSetup(userController)
-                                .setControllerAdvice(new GlobalExceptionHandler())
+                                .setControllerAdvice(new com.cursosonline.backend.exception.GlobalExceptionHandler())
                                 .build();
         }
 
@@ -291,7 +291,8 @@ class UserControllerTest {
                 mockMvc.perform(delete("/api/auth/users/root_admin/permanent")
                                 .principal(mockPrincipal))
                                 .andExpect(status().isBadRequest())
-                                .andExpect(jsonPath("$.message")
-                                                .value("Acción denegada: no puedes eliminarte permanentemente a ti mismo."));
+                                .andExpect(jsonPath("$.status").value(400))
+                                .andExpect(jsonPath("$.message").value(
+                                                "Acción denegada: no puedes eliminarte permanentemente a ti mismo."));
         }
 }
