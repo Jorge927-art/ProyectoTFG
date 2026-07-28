@@ -15,6 +15,12 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import java.util.Map;
 
+/**
+ * Controlador REST para gestionar las operaciones relacionadas con el perfil de
+ * usuario. Proporciona endpoints para obtener información del perfil,
+ * actualizar datos y subir un avatar.
+ * ProfileController
+ */
 @RestController
 @RequestMapping("/api/v1/profile")
 @Transactional
@@ -24,6 +30,13 @@ public class ProfileController {
         private final UserProfileRepository profileRepository;
         private final UserRepository userRepository;
 
+        /**
+         * Constructor para inyectar las dependencias necesarias en el controlador.
+         * 
+         * @param fileStorageService Servicio para el almacenamiento de archivos.
+         * @param profileRepository  Repositorio para acceder a los perfiles de usuario.
+         * @param userRepository     Repositorio para acceder a los usuarios.
+         */
         public ProfileController(FileStorageService fileStorageService,
                         UserProfileRepository profileRepository,
                         UserRepository userRepository) {
@@ -32,7 +45,14 @@ public class ProfileController {
                 this.userRepository = userRepository;
         }
 
-        // 1. ENDPOINT GET REFACTORIZADO
+        /**
+         * Endpoint GET para obtener la información del perfil del usuario autenticado.
+         * 
+         * @param authentication Objeto Authentication que contiene la información del
+         *                       usuario autenticado.
+         * @return ResponseEntity con la información del perfil del usuario o un mensaje
+         *         de error en caso de fallo.
+         */
         @GetMapping
         public ResponseEntity<?> getProfile(Authentication authentication) {
                 try {
@@ -64,7 +84,15 @@ public class ProfileController {
                 }
         }
 
-        // 2. ENDPOINT POST AVATAR
+        /**
+         * Endpoint POST para subir un avatar de perfil para el usuario autenticado.
+         * 
+         * @param authentication Objeto Authentication que contiene la información del
+         *                       usuario autenticado.
+         * @param file           El archivo de imagen que se desea subir como avatar.
+         * @return ResponseEntity con el resultado de la operación o un mensaje de error
+         *         en caso de fallo.
+         */
         @PostMapping("/avatar")
         public ResponseEntity<?> uploadAvatar(
                         Authentication authentication,
@@ -111,7 +139,16 @@ public class ProfileController {
                 }
         }
 
-        // 3. ENDPOINT PUT UPDATE CON LA CORRECCIÓN DE REASOCIACIÓN DE NOTEBOOKLM
+        /**
+         * Endpoint PUT para actualizar los datos del perfil extendido del usuario
+         * autenticado.
+         * 
+         * @param authentication Objeto Authentication que contiene la información del
+         *                       usuario autenticado.
+         * @param updateDTO      Objeto ProfileUpdateDTO con los datos a actualizar.
+         * @return ResponseEntity con el resultado de la operación o un mensaje de error
+         *         en caso de fallo.
+         */
         @PutMapping("/update")
         public ResponseEntity<?> updateProfileData(
                         Authentication authentication,

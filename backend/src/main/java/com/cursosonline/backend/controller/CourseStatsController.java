@@ -9,22 +9,32 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/**
+ * Controlador REST para gestionar las operaciones relacionadas con las
+ * estadísticas de cursos.
+ * Proporciona un endpoint para obtener estadísticas consolidadas de un curso
+ * específico.
+ * CourseStatsController
+ */
 @RestController
 @RequestMapping("/api/v1/stats")
 public class CourseStatsController {
 
     private final UserService userService;
 
-    // Modificamos el constructor para inyectar el servicio en lugar del repositorio
     public CourseStatsController(UserService userService) {
         this.userService = userService;
     }
 
     /**
-     * Endpoint analítico para obtener las estadísticas consolidadas de un curso
-     * [ADR-41].
-     * Valida de forma implícita la sesión mediante el token JWT y responde con el
-     * DTO inmutable.
+     * Endpoint para obtener estadísticas consolidadas de un curso específico.
+     * 
+     * @param courseId       El ID del curso del cual se desean obtener las
+     *                       estadísticas.
+     * @param authentication Objeto Authentication que contiene la información del
+     *                       usuario autenticado.
+     * @return ResponseEntity con las estadísticas del curso o un mensaje de error
+     *         en caso de fallo.
      */
     @GetMapping("/course/{courseId}")
     public ResponseEntity<?> getCourseStatistics(@PathVariable(name = "courseId") Long courseId,

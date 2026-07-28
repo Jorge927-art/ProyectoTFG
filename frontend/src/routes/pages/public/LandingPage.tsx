@@ -2,6 +2,7 @@ import { MainNavbar } from "@/components/navbar";
 import Hero from "@/components/Hero";
 import Features from "@/components/Features";
 import Testimonials from "@/components/Testimonials";
+import Footer from "@/components/ui/footer/Footer";
 
 const LandingPage = () => {
     return (
@@ -9,12 +10,14 @@ const LandingPage = () => {
             <MainNavbar />
             <main>
                 <Hero />
-                <Features />
-                <Testimonials />
+                <div id="features">
+                    <Features />
+                </div>
+                <div id="testimonials">
+                    <Testimonials />
+                </div>
             </main>
-            <footer className="py-10 text-center text-slate-400 text-sm">
-                &copy; 2026 Proyecto TFG
-            </footer>
+            <Footer />
         </div>
     );
 };

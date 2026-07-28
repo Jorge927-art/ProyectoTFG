@@ -17,6 +17,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Controlador REST para gestionar las evaluaciones académicas de los alumnos.
+ * Proporciona endpoints para obtener asignaturas pendientes de evaluación y
+ * enviar evaluaciones académicas.
+ * AcademicEvaluationController
+ */
 @RestController
 @RequestMapping("/api/v1/evaluations")
 @Transactional
@@ -38,9 +44,13 @@ public class AcademicEvaluationController {
         }
 
         /**
-         * [ENDPOINT FILTRADO DOCENTE]: Obtiene las asignaturas y profesores que el
-         * alumno
-         * cursa activamente y que se encuentran pendientes de recibir calificación.
+         * [ENDPOINT OBTENER ASIGNATURAS PENDIENTES]: Recupera las asignaturas en las
+         * que el alumno autenticado aún no ha emitido una evaluación académica.
+         * 
+         * @param authentication Objeto de autenticación que contiene la información del
+         *                       usuario autenticado.
+         * @return ResponseEntity con la lista de asignaturas pendientes de evaluación o
+         *         un mensaje de error en caso de fallo.
          */
         @GetMapping("/pending")
         public ResponseEntity<?> getPendingEvaluations(Authentication authentication) {
@@ -71,8 +81,18 @@ public class AcademicEvaluationController {
         }
 
         /**
-         * [ENDPOINT CARGA PUNTUACIONES]: Valida las precondiciones de seguridad y
-         * almacena el voto granular de estrellas y comentarios en PostgreSQL.
+         * [ENDPOINT ENVIAR EVALUACIÓN]: Permite a un alumno autenticado enviar una
+         * evaluación académica para una asignatura específica. Se valida que el alumno
+         * esté matriculado en la asignatura y que no haya emitido una evaluación
+         * previa.
+         * 
+         * @param authentication Objeto de autenticación que contiene la información del
+         *                       usuario autenticado.
+         * @param payload        Mapa con los datos de la evaluación (course_id,
+         *                       course_score, instructor_score, course_comment,
+         *                       instructor_comment).
+         * @return ResponseEntity con el resultado de la operación o un mensaje de error
+         *         en caso de fallo.
          */
         @PostMapping("/submit")
         public ResponseEntity<?> submitEvaluation(

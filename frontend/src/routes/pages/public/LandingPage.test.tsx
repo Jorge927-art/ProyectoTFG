@@ -19,6 +19,10 @@ vi.mock('@/components/Testimonials', () => ({
     default: () => <section data-testid="mock-testimonials" />,
 }));
 
+vi.mock('@/components/ui/footer/Footer', () => ({
+    default: () => <footer data-testid="mock-footer" />,
+}));
+
 describe('LandingPage - Suite de Pruebas Unitarias Completa', () => {
     it('debe estructurar y renderizar correctamente la estructura jerárquica de la landing page', () => {
         const { container } = render(<LandingPage />);
@@ -41,14 +45,20 @@ describe('LandingPage - Suite de Pruebas Unitarias Completa', () => {
         expect(mainElement).toContainElement(hero);
         expect(mainElement).toContainElement(features);
         expect(mainElement).toContainElement(testimonials);
+
+        // 4. Verificar que las secciones ancla existen para los enlaces del footer
+        expect(container.querySelector('#features')).toContainElement(features);
+        expect(container.querySelector('#testimonials')).toContainElement(testimonials);
     });
 
-    it('debe renderizar el pie de página semántico con el copyright legal estático actualizado', () => {
-        render(<LandingPage />);
+    it('debe renderizar el componente Footer institucional dentro de la landing', () => {
+        const { container } = render(<LandingPage />);
 
-        const footerElement = screen.getByRole('contentinfo');
-        expect(footerElement).toBeInTheDocument();
-        expect(footerElement).toHaveClass('py-10', 'text-center', 'text-slate-400', 'text-sm');
-        expect(footerElement.textContent).toContain('© 2026 Proyecto TFG');
+        const footer = screen.getByTestId('mock-footer');
+        expect(footer).toBeInTheDocument();
+
+        // Confirma que el footer se renderiza después del <main>, no dentro de él
+        const mainElement = container.querySelector('main');
+        expect(mainElement).not.toContainElement(footer);
     });
 });

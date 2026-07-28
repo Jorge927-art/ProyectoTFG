@@ -5,6 +5,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+/**
+ * Clase de configuración web para la aplicación.
+ * Configura el manejo de recursos estáticos, como la carpeta de subidas.
+ * WebConfig
+ */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 

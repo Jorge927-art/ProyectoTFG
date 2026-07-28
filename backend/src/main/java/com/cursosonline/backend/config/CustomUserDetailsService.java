@@ -12,6 +12,13 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * Servicio personalizado para cargar los detalles del usuario desde la base de
+ * datos.
+ * Implementa la interfaz UserDetailsService de Spring Security para
+ * proporcionar
+ * CustomUserDetailsService
+ */
 @Service
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {

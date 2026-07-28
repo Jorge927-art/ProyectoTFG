@@ -17,18 +17,30 @@ import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Controlador REST para gestionar las operaciones relacionadas con los cursos.
+ * Proporciona endpoints para buscar cursos, obtener asignaturas asignadas a un
+ * profesor, matricular estudiantes en cursos, obtener recomendaciones
+ * personalizadas y asignar profesores a cursos.
+ * CourseController
+ */
 @RestController
 @RequestMapping("/api/courses")
 @RequiredArgsConstructor
 public class CourseController {
 
     private final UserService userService;
-    // INYECCIÓN DEL NUEVO SERVICIO ALGORÍTMICO [ADR-30]
+
     private final RecommendationService recommendationService;
 
     /**
-     * Endpoint de búsqueda aproximada y predictiva.
+     * Endpoint para buscar cursos en el catálogo utilizando un término de búsqueda
+     * (keyword).
      * GET /api/courses/search?keyword=data
+     * 
+     * @param keyword El término de búsqueda utilizado para filtrar los cursos.
+     * @return ResponseEntity con la lista de cursos que coinciden con el término de
+     *         búsqueda.
      */
     @GetMapping("/search")
     public ResponseEntity<List<Courses>> searchCatalog(
@@ -37,9 +49,13 @@ public class CourseController {
     }
 
     /**
-     * Endpoint de hidratación del panel docente para recuperar las asignaturas
-     * asignadas al profesor autenticado.
+     * Endpoint para obtener las asignaturas asignadas al profesor autenticado.
      * GET /api/courses/assigned-to-me
+     * 
+     * @param principal Objeto Principal que contiene la información del usuario
+     *                  autenticado.
+     * @return ResponseEntity con la lista de cursos asignados al profesor o un
+     *         mensaje de error en caso de fallo.
      */
     @GetMapping("/assigned-to-me")
     public ResponseEntity<?> getAssignedCoursesForProfessor(Principal principal) {
@@ -60,7 +76,13 @@ public class CourseController {
 
     /**
      * Endpoint transaccional seguro para procesar la matrícula de un estudiante.
-     * POST /api/courses/enroll/1
+     * POST /api/courses/enroll/{courseId}
+     * 
+     * @param courseId  El ID del curso en el cual se desea matricular al
+     *                  estudiante.
+     * @param principal Objeto Principal que contiene la información del usuario
+     *                  autenticado.
+     * @return ResponseEntity con el resultado de la operación de matrícula.
      */
     @PostMapping("/enroll/{courseId}")
     public ResponseEntity<?> enrollInCourse(@PathVariable Long courseId, Principal principal) {
@@ -79,9 +101,14 @@ public class CourseController {
     }
 
     /**
-     * Endpoint seguro para alimentar las sugerencias personalizadas de la vista del
-     * alumno [ADR-30].
+     * Endpoint para obtener recomendaciones inteligentes para el estudiante
+     * autenticado.
      * GET /api/courses/recommendations
+     * 
+     * @param principal Objeto Principal que contiene la información del usuario
+     *                  autenticado.
+     * @return ResponseEntity con la lista de recomendaciones personalizadas o un
+     *         mensaje de error en caso de fallo.
      */
     @GetMapping("/recommendations")
     public ResponseEntity<?> getSmartRecommendations(Principal principal) {
@@ -105,6 +132,11 @@ public class CourseController {
      * Endpoint transaccional seguro para procesar la asignación relacional de un
      * curso.
      * POST /api/courses/{courseId}/assign-teacher
+     * 
+     * @param courseId  El ID del curso al cual se desea asignar un profesor.
+     * @param principal Objeto Principal que contiene la información del usuario
+     *                  autenticado.
+     * @return ResponseEntity con el resultado de la operación de asignación.
      */
     @PostMapping("/{courseId}/assign-teacher")
     public ResponseEntity<?> assignTeacherToCourse(@PathVariable Long courseId, Principal principal) {

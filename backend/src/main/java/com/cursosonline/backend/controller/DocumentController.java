@@ -22,6 +22,11 @@ import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Objects;
 
+/**
+ * Controlador REST para gestionar las operaciones relacionadas con la
+ * gestión de documentos.
+ * DocumentController
+ */
 @RestController
 @RequestMapping("/api/v1/documents")
 @Transactional
@@ -32,8 +37,16 @@ public class DocumentController {
     private final UserRepository userRepository;
     private final EnrollmentRepository enrollmentRepository;
 
-    // CONSTRUCTOR ACTUALIZADO: Inyectamos el repositorio de matrículas necesario
-    // para el directorio académico
+    /**
+     * Constructor de la clase DocumentController.
+     * 
+     * @param fileStorageService         Servicio para el almacenamiento de
+     *                                   archivos.
+     * @param documentMetadataRepository Repositorio para la gestión de metadatos de
+     *                                   documentos.
+     * @param userRepository             Repositorio para la gestión de usuarios.
+     * @param enrollmentRepository       Repositorio para la gestión de matrículas.
+     */
     public DocumentController(FileStorageService fileStorageService,
             DocumentMetadataRepository documentMetadataRepository,
             UserRepository userRepository,
@@ -45,9 +58,12 @@ public class DocumentController {
     }
 
     /**
-     * [ENDPOINT DE CONSULTA MODIFICADO]: Devuelve por defecto los documentos
-     * RECIBIDOS
-     * del usuario autenticado para alimentar la pestaña principal.
+     * Endpoint para obtener los documentos recibidos del usuario autenticado.
+     * 
+     * @param authentication Objeto Authentication que contiene la información del
+     *                       usuario autenticado.
+     * @return ResponseEntity con la lista de documentos recibidos o un mensaje de
+     *         error en caso de fallo.
      */
     @GetMapping
     public ResponseEntity<?> getUserDocuments(Authentication authentication) {
@@ -71,8 +87,12 @@ public class DocumentController {
     }
 
     /**
-     * [NUEVO ENDPOINT]: Devuelve de forma aislada los documentos ENVIADOS por el
-     * usuario.
+     * Endpoint para obtener los documentos enviados del usuario autenticado.
+     * 
+     * @param authentication Objeto Authentication que contiene la información del
+     *                       usuario autenticado.
+     * @return ResponseEntity con la lista de documentos enviados o un mensaje de
+     *         error en caso de fallo.
      */
     @GetMapping("/sent")
     public ResponseEntity<?> getSentDocuments(Authentication authentication) {
@@ -94,8 +114,14 @@ public class DocumentController {
     }
 
     /**
-     * Recupera los documentos recibidos del usuario autenticado filtrados por
-     * asignatura.
+     * Endpoint para obtener los documentos recibidos del usuario autenticado
+     * filtrados por asignatura.
+     * 
+     * @param authentication Objeto Authentication que contiene la información del
+     *                       usuario autenticado.
+     * @param courseId       El ID del curso por el cual se filtran los documentos.
+     * @return ResponseEntity con la lista de documentos recibidos filtrados por
+     *         asignatura o un mensaje de error en caso de fallo.
      */
     @GetMapping("/course/{courseId}/received")
     public ResponseEntity<?> getReceivedDocumentsByCourse(
@@ -120,8 +146,14 @@ public class DocumentController {
     }
 
     /**
-     * Recupera los documentos enviados del usuario autenticado filtrados por
-     * asignatura.
+     * Endpoint para obtener los documentos enviados del usuario autenticado
+     * filtrados por asignatura.
+     * 
+     * @param authentication Objeto Authentication que contiene la información del
+     *                       usuario autenticado.
+     * @param courseId       El ID del curso por el cual se filtran los documentos.
+     * @return ResponseEntity con la lista de documentos enviados filtrados por
+     *         asignatura o un mensaje de error en caso de fallo.
      */
     @GetMapping("/course/{courseId}/sent")
     public ResponseEntity<?> getSentDocumentsByCourse(
@@ -146,8 +178,15 @@ public class DocumentController {
     }
 
     /**
-     * [CENTRO DE CALIFICACIÓN - DOCENTE]: Recupera las entregas asociadas a una
-     * matrícula concreta para revisar trabajos de un alumno antes de calificar.
+     * Endpoint para obtener los documentos asociados a una matrícula específica.
+     * Valida que el usuario autenticado sea el instructor asignado a la matrícula.
+     * 
+     * @param authentication Objeto Authentication que contiene la información del
+     *                       usuario autenticado.
+     * @param enrollmentId   El ID de la matrícula por la cual se filtran los
+     *                       documentos.
+     * @return ResponseEntity con la lista de documentos asociados a la matrícula o
+     *         un mensaje de error en caso de fallo.
      */
     @GetMapping("/course/enrollment/{enrollmentId}")
     @PreAuthorize("hasAuthority('PROFESSOR')")
@@ -179,9 +218,14 @@ public class DocumentController {
     }
 
     /**
-     * [ENDPOINT DE CARGA DIRIGIDO ORIGINAL]: Recibe el archivo y el ID del
-     * destinatario
-     * obligatorio para mensajería general. (RESTAURADO PARA LOS TESTS)
+     * Endpoint para subir un documento y enviarlo a otro usuario.
+     * 
+     * @param authentication Objeto Authentication que contiene la información del
+     *                       usuario autenticado.
+     * @param file           El archivo a enviar.
+     * @param receiverId     El ID del usuario destinatario.
+     * @return ResponseEntity con el resultado de la operación de envío del
+     *         documento.
      */
     @PostMapping("/upload")
     public ResponseEntity<?> uploadDocument(
@@ -245,8 +289,16 @@ public class DocumentController {
     }
 
     /**
-     * [ENDPOINT ACADÉMICO EXCLUSIVO NUEVO]: Recibe el archivo de una asignatura,
-     * valida que tenga un profesor legítimo asignado y registra la entrega.
+     * Endpoint para subir un documento de entrega académica y enviarlo al profesor
+     * asignado.
+     * 
+     * @param authentication Objeto Authentication que contiene la información del
+     *                       usuario autenticado.
+     * @param file           El archivo de entrega académica.
+     * @param courseId       El ID del curso al cual pertenece la entrega.
+     * @param evaluationType El tipo de evaluación asociado a la entrega.
+     * @return ResponseEntity con el resultado de la operación de envío del
+     *         documento.
      */
     @PostMapping("/upload/assignment")
     public ResponseEntity<?> uploadAssignmentDocument(
@@ -344,8 +396,15 @@ public class DocumentController {
     }
 
     /**
-     * [DIRECTORIO DINÁMICO]: Recupera los profesores de los cursos en los que el
-     * alumno está matriculado.
+     * [NUEVO ENDPOINT ANTI-IDOR]: Descarga segura de archivos con stream binario.
+     * Recupera el recurso del disco solo si el usuario autenticado es emisor o
+     * receptor.
+     * 
+     * @param authentication Objeto Authentication que contiene la información del
+     *                       usuario autenticado.
+     * @param documentId     El ID del documento que se desea descargar.
+     * @return ResponseEntity con el recurso del archivo o un mensaje de error en
+     *         caso de fallo.
      */
     @GetMapping("/directory/teachers")
     public ResponseEntity<?> getMyTeachers(Authentication authentication) {
@@ -380,8 +439,12 @@ public class DocumentController {
     }
 
     /**
-     * [DIRECTORIO DINÁMICO]: Recupera los compañeros de clase que comparten
-     * asignaturas con el alumno.
+     * Endpoint para obtener los compañeros de clase del usuario autenticado.
+     * 
+     * @param authentication Objeto Authentication que contiene la información del
+     *                       usuario autenticado.
+     * @return ResponseEntity con la lista de compañeros de clase o un mensaje de
+     *         error en caso de fallo.
      */
     @GetMapping("/directory/classmates")
     public ResponseEntity<?> getMyClassmates(Authentication authentication) {
@@ -402,8 +465,12 @@ public class DocumentController {
     }
 
     /**
-     * [DIRECTORIO DINÁMICO]: Recupera las cuentas de administración de la
-     * plataforma.
+     * Endpoint para obtener los administradores de la plataforma.
+     * 
+     * @param authentication Objeto Authentication que contiene la información del
+     *                       usuario autenticado.
+     * @return ResponseEntity con la lista de administradores de la plataforma o un
+     *         mensaje de error en caso de fallo.
      */
     @GetMapping("/directory/admins")
     public ResponseEntity<?> getPlatformAdmins(Authentication authentication) {
@@ -423,9 +490,14 @@ public class DocumentController {
     }
 
     /**
-     * [NUEVO ENDPOINT ANTI-IDOR]: Descarga segura de archivos con stream binario.
-     * Recupera el recurso del disco solo si el usuario autenticado es emisor o
-     * receptor.
+     * Endpoint para descargar un documento de manera segura. Solo permite la
+     * descarga si el usuario autenticado es el emisor o receptor del documento.
+     * 
+     * @param authentication Objeto Authentication que contiene la información del
+     *                       usuario autenticado.
+     * @param documentId     El ID del documento que se desea descargar.
+     * @return ResponseEntity con el recurso del archivo o un mensaje de error en
+     *         caso de fallo.
      */
     @GetMapping("/download/{documentId}")
     public ResponseEntity<?> downloadDocumentSecure(
@@ -479,8 +551,16 @@ public class DocumentController {
     }
 
     /**
-     * [NUEVO ENDPOINT]: Marca un documento recibido como leído para actualizar
-     * el estado de la campana de notificaciones en el frontend.
+     * Endpoint para marcar un documento como leído. Solo permite la operación si el
+     * usuario autenticado es el receptor legítimo del documento y si el documento
+     * pertenece a la carpeta de recibidos (RECEIVED).
+     * 
+     * @param authentication Objeto Authentication que contiene la información del
+     *                       usuario autenticado.
+     * @param documentId     El ID del documento que se desea marcar como leído.
+     * @return ResponseEntity con el resultado de la operación o un mensaje de error
+     *         en
+     *         caso de fallo.
      */
     @PatchMapping("/{documentId}/read")
     public ResponseEntity<?> markAsRead(
@@ -528,6 +608,12 @@ public class DocumentController {
         }
     }
 
+    /**
+     * Convierte un objeto DocumentMetadata en un mapa de respuesta para la API.
+     * 
+     * @param document El objeto DocumentMetadata que se desea convertir.
+     * @return Mapa de respuesta que representa el documento para la API.
+     */
     private Map<String, Object> toDocumentResponse(DocumentMetadata document) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("documentid", document.getDocumentid());
@@ -542,6 +628,12 @@ public class DocumentController {
         return payload;
     }
 
+    /**
+     * Convierte un objeto Users en un mapa de resumen para la API.
+     * 
+     * @param user El objeto Users que se desea convertir.
+     * @return Mapa de resumen que representa al usuario para la API.
+     */
     private Map<String, Object> toUserSummary(Users user) {
         if (user == null) {
             return null;
@@ -555,10 +647,17 @@ public class DocumentController {
     }
 
     /**
-     * [NUEVO ENDPOINT EXCLUSIVO PARA PROFESOR]: Permite transmitir guías, temarios
-     * o exámenes
-     * de forma dirigida a un alumno concreto o masiva a toda la clase (receiverId =
-     * 0).
+     * Endpoint para que un profesor suba un documento y lo envíe a un alumno o a
+     * toda la clase.
+     * 
+     * @param authentication Objeto Authentication que contiene la información del
+     *                       usuario autenticado.
+     * @param file           El archivo que se desea subir.
+     * @param courseId       El ID del curso al cual se desea enviar el documento.
+     * @param receiverId     El ID del alumno destinatario. Si es 0, se envía a toda
+     *                       la clase.
+     * @return ResponseEntity con el resultado de la operación o un mensaje de error
+     *         en caso de fallo.
      */
     @PostMapping("/professor-upload")
     public ResponseEntity<?> professorUploadDocument(

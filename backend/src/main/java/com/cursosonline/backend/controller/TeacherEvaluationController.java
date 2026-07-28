@@ -19,6 +19,13 @@ import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
 
+/**
+ * Controlador REST para gestionar las evaluaciones de los estudiantes por parte
+ * de los profesores.
+ * Proporciona endpoints para que los profesores puedan calificar a los
+ * estudiantes.
+ * TeacherEvaluationController
+ */
 @RestController
 @RequestMapping("/api/v1/teacher/evaluations")
 @RequiredArgsConstructor
@@ -30,9 +37,14 @@ public class TeacherEvaluationController {
     private final UserRepository userRepository;
 
     /**
-     * Endpoint exclusivo para que un profesor califique a un alumno.
-     * Valida estrictamente que el profesor imparte la asignatura antes de guardar
-     * la nota.
+     * Endpoint POST para que un profesor califique a un estudiante en una matrícula
+     * específica.
+     * 
+     * @param request   Objeto TeacherGradeRequest con los datos de la calificación.
+     * @param principal Objeto Principal que contiene la información del profesor
+     *                  autenticado.
+     * @return ResponseEntity con el resultado de la operación o un mensaje de error
+     *         en caso de fallo.
      */
     @PostMapping("/submit")
     public ResponseEntity<?> gradeStudent(@RequestBody TeacherGradeRequest request, Principal principal) {
@@ -72,10 +84,13 @@ public class TeacherEvaluationController {
     }
 
     /**
-     * [CONSOLA DOCENTE - ALUMNADO Y RENDIMIENTO]: Lista de alumnos activos del
-     * curso
-     * mapeados junto con su rendimiento individual frente a la media global del
-     * grupo.
+     * Endpoint GET para obtener el rendimiento de los estudiantes en un curso
+     * específico.
+     * 
+     * @param courseId ID del curso para el cual se desea obtener el rendimiento de
+     *                 los estudiantes.
+     * @return ResponseEntity con la lista de StudentPerformanceDTO que contiene el
+     *         rendimiento individual de los estudiantes y la media del grupo.
      */
     @GetMapping("/courses/{courseId}/management/students")
     public ResponseEntity<List<StudentPerformanceDTO>> getCourseStudentsPerformance(@PathVariable Long courseId) {
@@ -107,9 +122,14 @@ public class TeacherEvaluationController {
     }
 
     /**
-     * [CONSOLA DOCENTE - MÉTRICAS DE CALIFICACIÓN]: Proporciona indicadores
-     * analíticos
-     * de control y volumen total para la tercera pestaña del modal.
+     * Endpoint GET para obtener métricas de gestión del curso, incluyendo el número
+     * de estudiantes activos, la media del grupo y el número de entregas
+     * pendientes.
+     * 
+     * @param courseId ID del curso para el cual se desean obtener las métricas de
+     *                 gestión.
+     * @return ResponseEntity con un CourseMetricsDTO que contiene las métricas del
+     *         curso.
      */
     @GetMapping("/courses/{courseId}/management/metrics")
     public ResponseEntity<CourseMetricsDTO> getCourseManagementMetrics(@PathVariable Long courseId) {

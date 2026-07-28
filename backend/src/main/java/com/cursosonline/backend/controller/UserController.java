@@ -203,17 +203,10 @@ public class UserController {
         if (username == null || username.trim().isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-
-        // 1. Conservamos el username exacto almacenado en sesión para respetar el
-        // contrato del repositorio
         String normalizedUsername = username.trim();
-
-        // 2. Resolución de identidad transaccional mediante el servicio
         Users user = userService.findByUsername(normalizedUsername)
                 .orElseThrow(
                         () -> new ServicesException("Usuario no encontrado para el nombre: " + normalizedUsername));
-
-        // 3. Consulta indexada por clave primaria sobre la relación JOIN FETCH
         List<Enrollment> enrollments = userService.getStudentActiveCoursesWithCalculatedProgress(user.getUser_id());
         return ResponseEntity.ok(enrollments);
     }
@@ -249,16 +242,13 @@ public class UserController {
         if (roleStr == null || roleStr.trim().isEmpty()) {
             throw new IllegalArgumentException("El campo 'role' es requerido");
         }
-
         Role newRole;
         try {
             newRole = Role.valueOf(roleStr.toUpperCase().trim());
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Rol inválido. Opciones válidas: STUDENT, PROFESSOR, ADMIN");
         }
-
         Users updatedUser = userService.updateUserRole(username, newRole);
-
         return ResponseEntity.ok(Map.of(
                 "username", updatedUser.getUsername(),
                 "role", updatedUser.getRole().name(),
@@ -363,14 +353,8 @@ public class UserController {
         if (principal == null || principal.getName() == null || principal.getName().trim().isEmpty()) {
             return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
         }
-
-        // 1. Recuperamos el nombre de usuario (email/username) del token JWT activo
         String authenticatedUsername = principal.getName();
-
-        // 2. Delegamos en el servicio la validación de propiedad y activación del
-        // cronómetro
         userService.startCourseSecure(id, authenticatedUsername);
-
         return ResponseEntity.ok().build();
     }
 }
