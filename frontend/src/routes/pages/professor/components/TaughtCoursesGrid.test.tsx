@@ -163,7 +163,7 @@ describe('TaughtCoursesGrid - Suite de Pruebas Unitarias de la Cuadrícula del P
 
         const scrollContainer = screen.getByTestId('taught-courses-scroll-container');
         expect(scrollContainer.className).toContain('overflow-y-auto');
-        expect(scrollContainer.className).toContain('max-h-[28rem]');
+        expect(scrollContainer.className).toContain('max-h-136');
     });
 });
 
