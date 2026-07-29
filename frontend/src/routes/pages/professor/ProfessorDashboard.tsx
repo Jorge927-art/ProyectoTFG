@@ -75,6 +75,8 @@ const ProfessorDashboard = () => {
     const focusDocumentId = Number.isFinite(focusDocumentIdParam) && focusDocumentIdParam > 0
         ? focusDocumentIdParam
         : null;
+    const effectiveSelectedCourseId = selectedCourseId
+        ?? (shouldFocusDocuments && myCourses.length > 0 ? myCourses[0].id : null);
 
     const leftColumnRef = useRef<HTMLDivElement | null>(null);
     const gradingCenterRef = useRef<HTMLElement | null>(null);
@@ -146,7 +148,7 @@ const ProfessorDashboard = () => {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [getStudentsForCourse]);
 
     useLayoutEffect(() => {
         const node = leftColumnRef.current;
@@ -183,18 +185,6 @@ const ProfessorDashboard = () => {
     useEffect(() => {
         senderCourseResolutionDoneRef.current = false;
     }, [shouldFocusDocuments, focusStudentUserId]);
-
-    useEffect(() => {
-        if (!shouldFocusDocuments) {
-            return;
-        }
-
-        if (selectedCourseId !== null || myCourses.length === 0) {
-            return;
-        }
-
-        setSelectedCourseId(myCourses[0].id);
-    }, [myCourses, selectedCourseId, shouldFocusDocuments]);
 
     useEffect(() => {
         if (!shouldFocusDocuments || !focusStudentUserId || myCourses.length === 0 || senderCourseResolutionDoneRef.current) {
@@ -368,7 +358,7 @@ const ProfessorDashboard = () => {
                         </h2>
 
                         <GradingCenter
-                            courseId={selectedCourseId}
+                            courseId={effectiveSelectedCourseId}
                             availableCourses={myCourses}
                             onCourseChange={setSelectedCourseId}
                             autoFocusDocuments={shouldFocusDocuments}
@@ -384,7 +374,7 @@ const ProfessorDashboard = () => {
                     style={metricsColumnMinHeight > 0 ? { minHeight: `${metricsColumnMinHeight}px` } : undefined}
                 >
                     <TeachingMetricsPanel
-                        selectedCourseId={selectedCourseId}
+                        selectedCourseId={effectiveSelectedCourseId}
                         onCourseChange={setSelectedCourseId}
                         availableCourses={myCourses}
                     />

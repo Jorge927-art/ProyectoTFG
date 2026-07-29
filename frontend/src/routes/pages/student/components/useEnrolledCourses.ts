@@ -244,7 +244,7 @@ export const useEnrolledCourses = (successTrigger: string) => {
         } finally {
             setLoadingEnrollments(false);
         }
-    }, [user?.username]);
+    }, [user?.username, user?.userId]);
 
     useEffect(() => {
         fetchStudentEnrollments();
