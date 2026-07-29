@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-
 import { describe, it, expect, vi } from 'vitest';
 import { StudentStatsPanel } from './StudentStatsPanel';
 
@@ -35,23 +34,128 @@ vi.mock('../../../../components/ui/genericCard/GenericCard', () => {
 });
 
 describe('StudentStatsPanel - Pruebas de Control [ADR-41]', () => {
+    it('debería mostrar la nota del examen y los trabajos individuales de la matrícula', () => {
+        render(
+            <StudentStatsPanel
+                activeCourseId={1}
+                enrolledList={[
+                    {
+                        enrollmentid: 10,
+                        enrolled_at: '2026-07-01T10:00:00Z',
+                        started_at: null,
+                        status: 'EN_PROGRESO',
+                        progress_percentage: 40,
+                        course: {
+                            course_id: 1,
+                            title: 'Migrating to Cloud SQL',
+                            category: 'Cloud',
+                            instructors: 'Profesor Demo',
+                            duration: 20
+                        },
+                        grades: [
+                            { title: 'Trabajo 1 - Diseño', score: '8.5' },
+                            { title: 'Trabajo 2 - Despliegue', score: '9.0' },
+                            { title: 'Examen final', score: '7.5' }
+                        ]
+                    }
+                ]}
+            />
+        );
 
-    it('debería renderizar el mensaje de respaldo cuando no existen valoraciones registradas', () => {
-        // ACT
-        render(<StudentStatsPanel activeCourseId={1} enrolledList={[]} />);
-
-        // ASSERT: Validamos que se muestren tus textos reales de nulidad pedagógica
-        const fallbackTexts = screen.getAllByText(/Sin valoraciones/i);
-        expect(fallbackTexts.length).toBeGreaterThan(0);
+        expect(screen.getByText('Rendimiento y Métricas del Curso')).toBeInTheDocument();
+        expect(screen.getByText('Nota del examen')).toBeInTheDocument();
+        expect(screen.getByText('7.5 / 10')).toBeInTheDocument();
+        expect(screen.getByText('Trabajo 1 - Diseño')).toBeInTheDocument();
+        expect(screen.getByText('Trabajo 2 - Despliegue')).toBeInTheDocument();
     });
 
-    it('debería mantener de forma estricta la clase h-102 para garantizar la simetría geométrica de la UI', () => {
-        // ACT
-        render(<StudentStatsPanel activeCourseId={1} enrolledList={[]} />);
-        // ASSERT: Como la altura h-120 se gestiona en el layout del Dashboard, 
-        // el componente estadístico debe ser flexible (flex-1) para ocupar todo el espacio asignado.
+    it('debería mantener de forma estricta la clase flex-1 para ocupar el espacio asignado', () => {
+        render(
+            <StudentStatsPanel
+                activeCourseId={1}
+                enrolledList={[]}
+            />
+        );
+
         const article = screen.getByRole('article');
         expect(article).toHaveClass('flex-1');
     });
 
+    it('debería combinar notas de múltiples matrículas del mismo curso', () => {
+        render(
+            <StudentStatsPanel
+                activeCourseId={1}
+                enrolledList={[
+                    {
+                        enrollmentid: 101,
+                        enrolled_at: '2026-07-01T10:00:00Z',
+                        started_at: null,
+                        status: 'EN_PROGRESO',
+                        progress_percentage: 40,
+                        course: {
+                            course_id: 1,
+                            title: 'Migrating to Cloud SQL',
+                            category: 'Cloud',
+                            instructors: 'Profesor Demo',
+                            duration: 20
+                        },
+                        grades: [{ title: 'Trabajo Académico Escrito', score: '7.0' }]
+                    },
+                    {
+                        enrollmentid: 102,
+                        enrolled_at: '2026-07-02T10:00:00Z',
+                        started_at: null,
+                        status: 'EN_PROGRESO',
+                        progress_percentage: 45,
+                        course: {
+                            course_id: 1,
+                            title: 'Migrating to Cloud SQL',
+                            category: 'Cloud',
+                            instructors: 'Profesor Demo',
+                            duration: 20
+                        },
+                        grades: [{ title: 'Trabajo de Investigación', score: '8.0' }]
+                    }
+                ]}
+            />
+        );
+
+        expect(screen.getByText('2 entregas')).toBeInTheDocument();
+        expect(screen.getByText('Trabajo Académico Escrito')).toBeInTheDocument();
+        expect(screen.getByText('Trabajo de Investigación')).toBeInTheDocument();
+    });
+
+    it('no debe clasificar como examen los trabajos cuyo título contiene la palabra final', () => {
+        render(
+            <StudentStatsPanel
+                activeCourseId={1}
+                enrolledList={[
+                    {
+                        enrollmentid: 110,
+                        enrolled_at: '2026-07-01T10:00:00Z',
+                        started_at: null,
+                        status: 'EN_PROGRESO',
+                        progress_percentage: 40,
+                        course: {
+                            course_id: 1,
+                            title: 'Migrating to Cloud SQL',
+                            category: 'Cloud',
+                            instructors: 'Profesor Demo',
+                            duration: 20
+                        },
+                        grades: [
+                            { title: 'Trabajo final módulo 1', score: '7.0' },
+                            { title: 'Trabajo final módulo 2', score: '8.5' },
+                            { title: 'Examen final', score: '9.0' }
+                        ]
+                    }
+                ]}
+            />
+        );
+
+        expect(screen.getByText('2 entregas')).toBeInTheDocument();
+        expect(screen.getByText('Trabajo final módulo 1')).toBeInTheDocument();
+        expect(screen.getByText('Trabajo final módulo 2')).toBeInTheDocument();
+        expect(screen.getByText('9.0 / 10')).toBeInTheDocument();
+    });
 });

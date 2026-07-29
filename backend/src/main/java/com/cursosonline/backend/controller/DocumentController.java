@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Controlador REST para gestionar las operaciones relacionadas con la
@@ -208,7 +209,8 @@ public class DocumentController {
                         .body(Map.of("error", "Acceso denegado: no eres el instructor asignado a esta matrícula."));
             }
 
-            List<DocumentMetadata> documents = documentMetadataRepository.findDocumentsByEnrollmentId(enrollmentId);
+            List<DocumentMetadata> documents = documentMetadataRepository
+                    .findReceivedDocumentsByEnrollmentIdForInstructor(enrollmentId, authentication.getName());
             return ResponseEntity.ok(documents.stream().map(this::toDocumentResponse).toList());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
@@ -244,8 +246,7 @@ public class DocumentController {
                         .body(Map.of("error", "El archivo transmitido está vacío o es inválido."));
             }
 
-            Users currentUser = userRepository.findByUsername(authentication.getName())
-                    .orElseThrow(() -> new RuntimeException("Usuario emisor no encontrado."));
+            Users currentUser = resolveAuthenticatedUser(authentication.getName(), "Usuario emisor no encontrado.");
 
             if (currentUser.getUser_id().equals(receiverId)) {
                 return ResponseEntity.badRequest()
@@ -318,8 +319,7 @@ public class DocumentController {
                         .body(Map.of("error", "El archivo transmitido está vacío o es inválido."));
             }
 
-            Users currentUser = userRepository.findByUsername(authentication.getName())
-                    .orElseThrow(() -> new RuntimeException("Usuario emisor no encontrado."));
+            Users currentUser = resolveAuthenticatedUser(authentication.getName(), "Usuario emisor no encontrado.");
 
             // Selección determinista y acotada al alumno autenticado para evitar
             // asociaciones
@@ -370,6 +370,7 @@ public class DocumentController {
             sentMetadata.setOriginalname(cleanOriginalName);
             sentMetadata.setSender(currentUser);
             sentMetadata.setReceiver(receiverUser);
+            sentMetadata.setCourse(enrollment.getCourse());
             sentMetadata.setFolder_type(FolderType.SENT);
             documentMetadataRepository.save(sentMetadata);
 
@@ -378,6 +379,7 @@ public class DocumentController {
             receivedMetadata.setOriginalname(cleanOriginalName);
             receivedMetadata.setSender(currentUser);
             receivedMetadata.setReceiver(receiverUser);
+            receivedMetadata.setCourse(enrollment.getCourse());
             receivedMetadata.setFolder_type(FolderType.RECEIVED);
             documentMetadataRepository.save(receivedMetadata);
 
@@ -677,8 +679,8 @@ public class DocumentController {
                         .body(Map.of("error", "El archivo transmitido está vacío o es inválido."));
             }
 
-            Users currentUser = userRepository.findByUsername(authentication.getName())
-                    .orElseThrow(() -> new RuntimeException("Usuario profesor emisor no encontrado."));
+            Users currentUser = resolveAuthenticatedUser(authentication.getName(),
+                    "Usuario profesor emisor no encontrado.");
 
             // Almacenamos el archivo una sola vez físicamente en el disco
             String relativePath = fileStorageService.storeFile(file, "documents");
@@ -686,10 +688,9 @@ public class DocumentController {
 
             // CASO A: ENVÍO MASIVO A TODA LA CLASE (receiverId == 0)
             if (receiverId == 0) {
-                // Buscamos todas las matrículas activas de la asignatura seleccionada
-                List<Enrollment> classEnrollments = enrollmentRepository.findAll().stream()
-                        .filter(e -> e.getCourse() != null && Objects.equals(e.getCourse().getCourse_id(), courseId))
-                        .toList();
+                // Buscamos únicamente matrículas activas de estudiantes para la asignatura.
+                List<Enrollment> classEnrollments = enrollmentRepository
+                        .findActiveStudentEnrollmentsByCourseId(courseId);
 
                 if (classEnrollments.isEmpty()) {
                     return ResponseEntity.badRequest()
@@ -697,10 +698,18 @@ public class DocumentController {
                                     "No se puede realizar un envío masivo porque no hay alumnos matriculados."));
                 }
 
-                // Generamos los metadatos para cada alumno matriculado de forma masiva
+                // Generamos metadatos por alumno para respetar receiver_id NOT NULL.
                 for (Enrollment enrollment : classEnrollments) {
                     if (enrollment.getUser() != null) {
                         Users classStudent = enrollment.getUser();
+
+                        DocumentMetadata bulkSentPerStudent = new DocumentMetadata();
+                        bulkSentPerStudent.setFilename(relativePath);
+                        bulkSentPerStudent.setOriginalname(cleanOriginalName);
+                        bulkSentPerStudent.setSender(currentUser);
+                        bulkSentPerStudent.setReceiver(classStudent);
+                        bulkSentPerStudent.setFolder_type(FolderType.SENT);
+                        documentMetadataRepository.save(bulkSentPerStudent);
 
                         // Registro de carpeta RECEIVED para que le salte la notificación en la campana
                         DocumentMetadata bulkReceived = new DocumentMetadata();
@@ -713,15 +722,6 @@ public class DocumentController {
                         documentMetadataRepository.save(bulkReceived);
                     }
                 }
-
-                // Guardamos un único registro SENT global de control para el profesor
-                DocumentMetadata bulkSent = new DocumentMetadata();
-                bulkSent.setFilename(relativePath);
-                bulkSent.setOriginalname(cleanOriginalName);
-                bulkSent.setSender(currentUser);
-                bulkSent.setReceiver(null); // NULL indica que se transmitió al tablón masivo del grupo
-                bulkSent.setFolder_type(FolderType.SENT);
-                documentMetadataRepository.save(bulkSent);
 
                 return ResponseEntity.ok(Map.of(
                         "message", "Documento transmitido con éxito de forma masiva a toda la clase",
@@ -760,6 +760,25 @@ public class DocumentController {
                     "error", "Error crítico al procesar la transmisión académica del profesor",
                     "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
         }
+    }
+
+    /**
+     * Resuelve el usuario autenticado tolerando variaciones de identidad del
+     * principal (username exacto, username case-insensitive o email).
+     */
+    private Users resolveAuthenticatedUser(String principalName, String notFoundMessage) {
+        Optional<Users> byUsername = userRepository.findByUsername(principalName);
+        if (byUsername.isPresent()) {
+            return byUsername.get();
+        }
+
+        Optional<Users> byUsernameIgnoreCase = userRepository.findByUsernameIgnoreCase(principalName);
+        if (byUsernameIgnoreCase.isPresent()) {
+            return byUsernameIgnoreCase.get();
+        }
+
+        return userRepository.findByEmailIgnoreCase(principalName)
+                .orElseThrow(() -> new RuntimeException(notFoundMessage));
     }
 
 }

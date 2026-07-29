@@ -1,8 +1,136 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../../../../services/apiClient';
 import { useAuth } from '../../../../auth/useAuth';
-import { readStoredAuthUser } from '../../../../auth/authStorage';
-import type { EnrollmentInfo} from '../../../../services/courseTypes';
+import { readStoredAuthUser, readStoredToken } from '../../../../auth/authStorage';
+import type { EnrollmentInfo } from '../../../../services/courseTypes';
+
+type EnrollmentApiRecord = Record<string, unknown>;
+type AuthMeResponse = {
+    username?: string;
+};
+type EnrollmentApiPayload =
+    | EnrollmentApiRecord[]
+    | {
+        enrollments?: EnrollmentApiRecord[];
+        data?: EnrollmentApiRecord[];
+        items?: EnrollmentApiRecord[];
+        content?: EnrollmentApiRecord[];
+    };
+
+type LoadAttempt = {
+    source: 'token' | 'username' | 'user-id' | 'canonical-username';
+    username?: string;
+    userId?: number;
+};
+
+const normalizeEnrollmentsPayload = (payload: EnrollmentApiPayload | null | undefined): EnrollmentApiRecord[] => {
+    if (Array.isArray(payload)) {
+        return payload;
+    }
+
+    if (payload && typeof payload === 'object') {
+        const candidates = [payload.enrollments, payload.data, payload.items, payload.content];
+        const resolved = candidates.find(Array.isArray);
+        if (resolved) {
+            return resolved;
+        }
+    }
+
+    return [];
+};
+
+const sanitizeUsername = (value: unknown): string | null => {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+};
+
+const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
+    try {
+        const parts = token.split('.');
+        if (parts.length < 2) {
+            return null;
+        }
+
+        const payloadPart = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        const padLength = (4 - (payloadPart.length % 4)) % 4;
+        const padded = payloadPart + '='.repeat(padLength);
+        const decoded = typeof atob === 'function' ? atob(padded) : '';
+
+        if (!decoded) {
+            return null;
+        }
+
+        const parsed = JSON.parse(decoded);
+        return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+    } catch {
+        return null;
+    }
+};
+
+const normalizeEnrollmentRecord = (enrollment: EnrollmentApiRecord): EnrollmentInfo => {
+    const courseData = (enrollment.course || enrollment.courses || enrollment) as Record<string, unknown>;
+    const normalizeGrades = (rawGrades: unknown): EnrollmentInfo['grades'] => {
+        if (!Array.isArray(rawGrades)) {
+            return [];
+        }
+
+        return rawGrades
+            .map((grade) => {
+                if (!grade || typeof grade !== 'object') {
+                    return null;
+                }
+
+                const gradeRecord = grade as Record<string, unknown>;
+                const title = String(gradeRecord.title || '').trim();
+                const scoreValue = gradeRecord.score;
+                const score = typeof scoreValue === 'number' || typeof scoreValue === 'bigint'
+                    ? String(scoreValue)
+                    : String(scoreValue || '').trim();
+
+                if (!title || !score) {
+                    return null;
+                }
+
+                return { title, score };
+            })
+            .filter((grade): grade is NonNullable<typeof grade> => grade !== null);
+    };
+
+    const rawEnrollmentId =
+        enrollment.enrollmentid
+        ?? enrollment.enrollmentId
+        ?? enrollment.enrollment_id
+        ?? enrollment.id;
+    const enrollmentId = Number(rawEnrollmentId ?? 0);
+    const safeCourseId = Number(courseData.course_id || courseData.id || 0);
+    const resolvedEnrollmentId = Number.isFinite(enrollmentId) && enrollmentId > 0
+        ? enrollmentId
+        : Number.isFinite(safeCourseId) && safeCourseId > 0
+            ? safeCourseId
+            : 0;
+
+    return {
+        enrollmentid: resolvedEnrollmentId,
+        enrolled_at: String(enrollment.enrolled_at || new Date().toISOString()),
+        started_at: enrollment.started_at || enrollment.startedAt
+            ? String(enrollment.started_at || enrollment.startedAt)
+            : null,
+        status: String(enrollment.status || 'EN_PROGRESO'),
+        progress_percentage: Number(enrollment.progress_percentage ?? enrollment.progress ?? 0),
+        course: {
+            course_id: Number.isFinite(safeCourseId) ? safeCourseId : 0,
+            title: String(courseData.title || ''),
+            category: String(courseData.category || 'General'),
+            instructors: String(courseData.instructors || 'Por asignar'),
+            duration: Number(courseData.duration || 0)
+        },
+        grades: normalizeGrades(enrollment.grades ?? enrollment.course_grades ?? enrollment.courseGrades)
+    };
+};
 
 export const useEnrolledCourses = (successTrigger: string) => {
     const { user } = useAuth();
@@ -10,85 +138,121 @@ export const useEnrolledCourses = (successTrigger: string) => {
     const [loadingEnrollments, setLoadingEnrollments] = useState<boolean>(false);
     const [enrollmentError, setEnrollmentError] = useState<string>('');
 
-    /**
-     * Recupera las asignaturas activas del estudiante pasando el username como parámetro.
-     * Sincroniza el contrato de red con el endpoint especializado del Backend.
-     */
     const fetchStudentEnrollments = useCallback(async () => {
         setLoadingEnrollments(true);
         setEnrollmentError('');
+
         try {
-            const currentUsername = user?.username?.trim() ?? readStoredAuthUser()?.username?.trim();
+            const storedUser = readStoredAuthUser();
+            const localUsername = sanitizeUsername(user?.username)
+                ?? sanitizeUsername(storedUser?.username);
+            const localUserId = typeof user?.userId === 'number' && Number.isFinite(user.userId)
+                ? user.userId
+                : typeof storedUser?.userId === 'number' && Number.isFinite(storedUser.userId)
+                    ? storedUser.userId
+                    : null;
 
-            if (!currentUsername) {
-                setEnrollmentError('No se pudo identificar al estudiante autenticado.');
-                return;
+            const token = readStoredToken();
+            const tokenPayload = token ? decodeJwtPayload(token) : null;
+            const tokenSubject = sanitizeUsername(tokenPayload?.sub);
+            const tokenEmail = sanitizeUsername(tokenPayload?.email);
+
+            const attempts: LoadAttempt[] = [{ source: 'token' }];
+            const attemptedIdentities = new Set<string>();
+
+            if (localUsername) {
+                attempts.push({ source: 'username', username: localUsername });
+                attemptedIdentities.add(localUsername.toLowerCase());
             }
 
-            const response = await apiClient.get<Record<string, unknown>[]>('/api/auth/my-active-courses', {
-                params: { username: currentUsername }
-            });
+            if (tokenSubject && !attemptedIdentities.has(tokenSubject.toLowerCase())) {
+                attempts.push({ source: 'username', username: tokenSubject });
+                attemptedIdentities.add(tokenSubject.toLowerCase());
+            }
 
-            if (response.status === 200 && response.data) {
-                // Mapeo adaptativo estricto
-                const normalizedData = response.data.map((enrollment) => {
-                    const courseData = (enrollment.course || enrollment.courses || enrollment) as Record<string, unknown>;
-                    
-                    // [CORRECCIÓN CRÍTICA CRASH]: Forzar la extracción exacta de PostgreSQL (en minúsculas)
-                    const rawEnrollmentId = enrollment.enrollmentid ?? enrollment.enrollmentId;
-                    const safeCourseId = Number(courseData.course_id || courseData.id || 0);
+            if (tokenEmail && !attemptedIdentities.has(tokenEmail.toLowerCase())) {
+                attempts.push({ source: 'username', username: tokenEmail });
+                attemptedIdentities.add(tokenEmail.toLowerCase());
+            }
 
-                    // Si llega a ser undefined por un fallo de payload, lanzamos un warning controlado para depurar
-                    if (!rawEnrollmentId) {
-                        console.warn(`[WARN TFG] Matrícula detectada sin ID físico de base de datos para el curso: ${courseData.title}`);
+            if (localUserId && localUserId > 0) {
+                attempts.push({ source: 'user-id', userId: localUserId });
+            }
+
+            let recoveredPayload: EnrollmentApiRecord[] = [];
+            let attemptsFailedByTransport = false;
+
+            for (const attempt of attempts) {
+                try {
+                    const response = attempt.source === 'token'
+                        ? await apiClient.get<EnrollmentApiPayload>('/api/auth/my-active-courses')
+                        : attempt.source === 'user-id'
+                            ? await apiClient.get<EnrollmentApiPayload>('/api/auth/my-active-courses', {
+                                params: { userId: attempt.userId }
+                            })
+                            : await apiClient.get<EnrollmentApiPayload>('/api/auth/my-active-courses', {
+                                params: { username: attempt.username }
+                            });
+
+                    const attemptPayload = response.status === 200 && response.data
+                        ? normalizeEnrollmentsPayload(response.data)
+                        : [];
+
+                    if (attemptPayload.length > 0) {
+                        recoveredPayload = attemptPayload;
+                        break;
                     }
-
-                    return {
-                        // Mantenemos la integridad estricta del ID numérico real. Nunca un fallback falso.
-                        enrollmentid: rawEnrollmentId ? Number(rawEnrollmentId) : 0,
-                        enrolled_at: String(enrollment.enrolled_at || new Date().toISOString()),
-                        
-                        // Sello de tiempo del cronómetro
-                        started_at: enrollment.started_at || enrollment.startedAt ? String(enrollment.started_at || enrollment.startedAt) : null,
-                        
-                        status: String(enrollment.status || "EN_PROGRESO"),
-                        progress_percentage: Number(enrollment.progress_percentage ?? enrollment.progress ?? 0),
-                        course: {
-                            course_id: safeCourseId,
-                            title: String(courseData.title || ""),
-                            category: String(courseData.category || "General"),
-                            instructors: String(courseData.instructors || "Por asignar"),
-                            duration: Number(courseData.duration || 0)
-                        }
-                    };
-                });
-
-                // Filtrar cualquier fila corrupta que haya venido sin ID real para proteger el DOM virtual de React
-                const validEnrollments = normalizedData.filter(e => e.enrollmentid !== 0);
-                setEnrolledList(validEnrollments as EnrollmentInfo[]);
+                } catch {
+                    attemptsFailedByTransport = true;
+                }
             }
+
+            const shouldAttemptCanonicalLookup = recoveredPayload.length === 0 && !tokenSubject && !tokenEmail;
+
+            if (shouldAttemptCanonicalLookup) {
+                try {
+                    const meResponse = await apiClient.get<AuthMeResponse>('/api/auth/me');
+                    const canonicalUsername = sanitizeUsername(meResponse.data?.username);
+
+                    if (canonicalUsername && !attemptedIdentities.has(canonicalUsername.toLowerCase())) {
+                        const canonicalResponse = await apiClient.get<EnrollmentApiPayload>('/api/auth/my-active-courses', {
+                            params: { username: canonicalUsername }
+                        });
+
+                        recoveredPayload = canonicalResponse.status === 200 && canonicalResponse.data
+                            ? normalizeEnrollmentsPayload(canonicalResponse.data)
+                            : [];
+                    }
+                } catch {
+                    // Fallback opcional no bloqueante.
+                }
+            }
+
+            const validEnrollments = recoveredPayload
+                .map(normalizeEnrollmentRecord)
+                .filter((enrollment) => enrollment.enrollmentid > 0);
+
+            if (validEnrollments.length === 0 && attemptsFailedByTransport) {
+                setEnrollmentError('No se pudieron sincronizar tus asignaturas activas desde PostgreSQL.');
+            }
+
+            setEnrolledList(validEnrollments);
         } catch (err) {
-            console.error("Error crítico en la pasarela HTTP de matrículas:", err);
-            setEnrollmentError("No se pudieron sincronizar tus asignaturas activas desde PostgreSQL.");
+            console.error('Error crítico en la pasarela HTTP de matrículas:', err);
+            setEnrollmentError('No se pudieron sincronizar tus asignaturas activas desde PostgreSQL.');
+            setEnrolledList([]);
         } finally {
             setLoadingEnrollments(false);
         }
     }, [user?.username]);
 
-    // Reactividad: Se ejecuta al montar el componente y cada vez que cambia el successTrigger
     useEffect(() => {
         fetchStudentEnrollments();
     }, [successTrigger, fetchStudentEnrollments]);
 
-        /**
-     * Inyecta de forma optimista la matrícula en caliente en el estado local
-     */
     const injectLocalEnrollment = () => {
-        // Al ser una inserción optimista local inmediata sin ID de DB asignado aún,
-        // forzamos el refresco limpio desde PostgreSQL para evitar IDs temporales que rompan las keys.
         fetchStudentEnrollments();
     };
-
 
     return {
         enrolledList,

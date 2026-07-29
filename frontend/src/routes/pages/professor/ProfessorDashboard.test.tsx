@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ProfessorDashboard from './ProfessorDashboard';
@@ -93,6 +93,10 @@ describe('ProfessorDashboard', () => {
         vi.clearAllMocks();
         mockedAuthUser.username = 'Laura';
         mockedAuthUser.email = 'laura@universidad.edu';
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+            configurable: true,
+            value: vi.fn(),
+        });
         consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
         mockedGetProfessorAssignedCourses.mockResolvedValue([]);
         mockedGetActiveStudentsByCourse.mockResolvedValue([]);
@@ -376,6 +380,32 @@ describe('ProfessorDashboard', () => {
         expect(screen.getByText('Total: 1 alumnos matriculados')).toBeInTheDocument();
     });
 
+    it('no abre el modal de gestión al cambiar la asignatura desde Métricas de Docencia', async () => {
+        const user = userEvent.setup();
+
+        mockedGetProfessorAssignedCourses.mockResolvedValue([
+            {
+                course_id: 901,
+                title: 'Métricas Curso A',
+                category: 'Backend'
+            }
+        ]);
+        mockedGetActiveStudentsByCourse.mockResolvedValue([{ studentId: 1 }]);
+
+        render(<ProfessorDashboard />);
+
+        await screen.findByRole('heading', { name: 'Métricas Curso A' });
+
+        fireEvent.change(screen.getByLabelText('Asignatura'), { target: { value: '901' } });
+
+        expect(screen.queryByText('Control operativo y seguimiento del Curso ID: 901')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Cerrar gestión del curso' })).not.toBeInTheDocument();
+
+        // El modal sigue abriéndose solo con el botón explícito de gestión del curso.
+        await user.click(screen.getByRole('button', { name: 'Gestionar Curso' }));
+        expect(screen.getByText('Control operativo y seguimiento del Curso ID: 901')).toBeInTheDocument();
+    });
+
     it('activa la rama cancelled al desmontar antes de resolver la hidratación', async () => {
         let resolveAssignedCourses: (value: Array<{ course_id: number; title: string; category: string }>) => void = () => undefined;
 
@@ -401,5 +431,50 @@ describe('ProfessorDashboard', () => {
         await Promise.resolve();
 
         expect(mockedGetProfessorAssignedCourses).toHaveBeenCalledTimes(1);
+    });
+
+    it('con focus=documents y senderId cambia automáticamente al curso donde está el alumno', async () => {
+        window.history.pushState({}, '', '/professor?focus=documents&senderId=77');
+
+        mockedGetProfessorAssignedCourses.mockResolvedValue([
+            {
+                course_id: 101,
+                title: 'Curso A',
+                category: 'Backend'
+            },
+            {
+                course_id: 202,
+                title: 'Curso B',
+                category: 'Cloud'
+            }
+        ]);
+
+        mockedGetActiveStudentsByCourse.mockImplementation(async (courseId: number) => {
+            if (courseId === 202) {
+                return [{ userId: 77 }] as Array<{ userId: number }>;
+            }
+            return [] as Array<{ userId: number }>;
+        });
+
+        render(<ProfessorDashboard />);
+
+        await waitFor(() => {
+            const callsToCourse101 = mockedGetActiveStudentsByCourse.mock.calls
+                .filter(([courseId]) => courseId === 101).length;
+            const callsToCourse202 = mockedGetActiveStudentsByCourse.mock.calls
+                .filter(([courseId]) => courseId === 202).length;
+
+            // Con caché y resolución paralela debe evitar duplicar llamadas innecesarias.
+            expect(callsToCourse101).toBeGreaterThanOrEqual(1);
+            expect(callsToCourse202).toBeGreaterThanOrEqual(1);
+            expect(callsToCourse101).toBeLessThanOrEqual(2);
+            expect(callsToCourse202).toBeLessThanOrEqual(2);
+        });
+
+        await waitFor(() => {
+            expect(screen.getByLabelText('Asignatura del profesor')).toHaveValue('202');
+        });
+
+        window.history.pushState({}, '', '/professor');
     });
 });

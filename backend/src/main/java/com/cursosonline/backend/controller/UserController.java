@@ -17,6 +17,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.Map;
 import java.time.Instant;
@@ -195,20 +196,78 @@ public class UserController {
      * Endpoint para recuperar la lista de cursos activos del alumno autenticado.
      * Extrae la identidad mediante las credenciales del token JWT activo.
      * 
-     * @param username El nombre de usuario del alumno autenticado.
+     * @param principal El principal autenticado de la sesión/token.
+     * @param username  Fallback legacy opcional por compatibilidad de clientes.
      * @return Una respuesta con la lista de cursos activos del alumno.
      */
     @GetMapping("/my-active-courses")
-    public ResponseEntity<List<Enrollment>> getMyActiveCourses(@RequestParam("username") String username) {
-        if (username == null || username.trim().isEmpty()) {
+    public ResponseEntity<List<Enrollment>> getMyActiveCourses(
+            HttpServletRequest request,
+            Principal principal,
+            @RequestParam(value = "username", required = false) String username,
+            @RequestParam(value = "userId", required = false) Long userId) {
+
+        Long tokenUserId = extractUserIdFromAuthorizationHeader(request);
+        if (tokenUserId != null && tokenUserId > 0) {
+            List<Enrollment> enrollmentsByToken = userService
+                    .getStudentActiveCoursesWithCalculatedProgress(tokenUserId);
+            if (!enrollmentsByToken.isEmpty()) {
+                return ResponseEntity.ok(enrollmentsByToken);
+            }
+        }
+
+        String explicitUsername = username != null ? username.trim() : "";
+        if (!explicitUsername.isEmpty()) {
+            Users explicitUser = userService.findByUsername(explicitUsername)
+                    .orElseThrow(
+                            () -> new ServicesException("Usuario no encontrado para el nombre: " + explicitUsername));
+            List<Enrollment> enrollmentsByExplicitUsername = userService
+                    .getStudentActiveCoursesWithCalculatedProgress(explicitUser.getUser_id());
+            if (!enrollmentsByExplicitUsername.isEmpty()) {
+                return ResponseEntity.ok(enrollmentsByExplicitUsername);
+            }
+        }
+
+        if (userId != null && userId > 0) {
+            List<Enrollment> enrollmentsByUserId = userService
+                    .getStudentActiveCoursesWithCalculatedProgress(userId);
+            if (!enrollmentsByUserId.isEmpty()) {
+                return ResponseEntity.ok(enrollmentsByUserId);
+            }
+        }
+
+        String principalName = principal != null ? principal.getName() : null;
+        String normalizedIdentity = principalName != null && !principalName.trim().isEmpty()
+                ? principalName.trim()
+                : explicitUsername;
+
+        if (normalizedIdentity.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-        String normalizedUsername = username.trim();
-        Users user = userService.findByUsername(normalizedUsername)
+
+        Users user = userService.findByUsername(normalizedIdentity)
                 .orElseThrow(
-                        () -> new ServicesException("Usuario no encontrado para el nombre: " + normalizedUsername));
+                        () -> new ServicesException("Usuario no encontrado para el nombre: " + normalizedIdentity));
         List<Enrollment> enrollments = userService.getStudentActiveCoursesWithCalculatedProgress(user.getUser_id());
         return ResponseEntity.ok(enrollments);
+    }
+
+    private Long extractUserIdFromAuthorizationHeader(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
+
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return null;
+        }
+
+        String token = authHeader.substring(7);
+        try {
+            return jwtService.extractUserId(token);
+        } catch (RuntimeException ex) {
+            return null;
+        }
     }
 
     /**

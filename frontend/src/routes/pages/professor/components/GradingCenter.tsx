@@ -10,17 +10,24 @@ interface GradingCenterProps {
     courseId: number | null;
     availableCourses: TaughtCourse[];
     onCourseChange: (courseId: number | null) => void;
+    autoFocusDocuments?: boolean;
+    focusStudentUserId?: number | null;
+    focusDocumentId?: number | null;
 }
 
 export const GradingCenter: React.FC<GradingCenterProps> = ({
     courseId,
     availableCourses,
-    onCourseChange
+    onCourseChange,
+    autoFocusDocuments = false,
+    focusStudentUserId = null,
+    focusDocumentId = null,
 }) => {
     const {
         students,
         selectedStudent,
         studentDocuments,
+        documentsLoadedFromCourseFallback,
         loadingData,
         loadingDocs,
         isSubmitting,
@@ -39,6 +46,63 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
         handleSelectStudentById,
         handleGradeSubmit
     } = useGradingCenter(courseId);
+
+    const [highlightedDocumentId, setHighlightedDocumentId] = React.useState<number | null>(null);
+    const highlightTimeoutRef = React.useRef<number | null>(null);
+    const rowRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
+
+    React.useEffect(() => {
+        if (!autoFocusDocuments || !courseId || students.length === 0) {
+            return;
+        }
+
+        const preferredStudent =
+            (focusStudentUserId ? students.find((student) => student.userId === focusStudentUserId) : undefined)
+            ?? students[0];
+
+        if (!preferredStudent) {
+            return;
+        }
+
+        if (selectedStudent?.userId === preferredStudent.userId) {
+            return;
+        }
+
+        void handleSelectStudentById(preferredStudent.userId);
+    }, [autoFocusDocuments, courseId, focusStudentUserId, handleSelectStudentById, selectedStudent?.userId, students]);
+
+    React.useEffect(() => {
+        if (!autoFocusDocuments || loadingDocs || studentDocuments.length === 0) {
+            return;
+        }
+
+        const targetDoc =
+            (focusDocumentId ? studentDocuments.find((doc) => doc.documentid === focusDocumentId) : undefined)
+            ?? studentDocuments.find((doc) => !doc.isRead)
+            ?? studentDocuments[0];
+        if (!targetDoc) {
+            return;
+        }
+
+        setHighlightedDocumentId(targetDoc.documentid);
+        rowRefs.current[targetDoc.documentid]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        if (highlightTimeoutRef.current) {
+            window.clearTimeout(highlightTimeoutRef.current);
+        }
+
+        highlightTimeoutRef.current = window.setTimeout(() => {
+            setHighlightedDocumentId((prev) => (prev === targetDoc.documentid ? null : prev));
+        }, 2600);
+    }, [autoFocusDocuments, focusDocumentId, loadingDocs, studentDocuments]);
+
+    React.useEffect(() => {
+        return () => {
+            if (highlightTimeoutRef.current) {
+                window.clearTimeout(highlightTimeoutRef.current);
+            }
+        };
+    }, []);
 
     const selectedCourseValue = courseId ? String(courseId) : '';
     const selectedStudentValue = selectedStudent ? String(selectedStudent.userId) : '';
@@ -160,6 +224,11 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                 Recepcion de entregas del alumno seleccionado
                             </p>
+                            {documentsLoadedFromCourseFallback && !loadingDocs && (
+                                <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                    Vista recuperada por verificacion de asignatura para evitar perdida de entregas en datos legacy.
+                                </p>
+                            )}
                             <div className="max-h-36 overflow-y-auto pr-1 bg-white border border-slate-200 rounded-lg p-1.5 space-y-1.5">
                                 {loadingDocs ? (
                                     <div className="flex items-center gap-1.5 justify-center py-2 text-slate-400">
@@ -172,7 +241,17 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
                                     </p>
                                 ) : (
                                     studentDocuments.map((doc) => (
-                                        <div key={doc.documentid} className="flex justify-between items-center p-1.5 bg-slate-50 rounded border border-slate-100 text-[11px]">
+                                        <div
+                                            key={doc.documentid}
+                                            ref={(node) => {
+                                                rowRefs.current[doc.documentid] = node;
+                                            }}
+                                            data-testid={`grading-document-row-${doc.documentid}`}
+                                            className={`flex justify-between items-center p-1.5 rounded border text-[11px] transition-colors ${highlightedDocumentId === doc.documentid
+                                                ? 'bg-amber-50/60 border-amber-300'
+                                                : 'bg-slate-50 border-slate-100'
+                                                }`}
+                                        >
                                             <span className="font-semibold text-slate-600 truncate max-w-[70%]">{doc.originalname}</span>
                                             <GenericButton
                                                 type="button"

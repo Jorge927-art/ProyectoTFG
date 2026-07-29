@@ -29,6 +29,7 @@ import com.cursosonline.backend.exception.ResourceNotFoundException;
 import com.cursosonline.backend.exception.ServicesException;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
+import com.cursosonline.backend.repository.CourseGradeRepository;
 
 /**
  * Clase de pruebas unitarias para UserService. Utiliza Mockito para simular el
@@ -46,6 +47,9 @@ public class UserServiceTest {
 
         @Mock
         private EnrollmentRepository enrollmentRepository;
+
+        @Mock
+        private CourseGradeRepository courseGradeRepository;
 
         @Mock
         private com.cursosonline.backend.repository.InterestRepository interestRepository;
@@ -247,6 +251,8 @@ public class UserServiceTest {
                 // PostgreSQL
                 when(enrollmentRepository.findAllByUserIdWithCourses(mockStudent.getUser_id()))
                                 .thenReturn(listaMatriculasSimuladas);
+                when(courseGradeRepository.findAllByEnrollmentIdsOrderByGradeIdAsc(List.of(2001L)))
+                                .thenReturn(List.of());
 
                 // 2. SIMULACIÓN DEL AVANCE TEMPORAL (ADELANTAMOS EL RELOJ 3 DÍAS EXACTOS / 72
                 // HORAS)
@@ -334,6 +340,26 @@ public class UserServiceTest {
         @Test
         void calculateCurrentProgress_DebeRetornarCero_CuandoEnrollmentEsNulo() {
                 assertEquals(0, userService.calculateCurrentProgress(null));
+        }
+
+        @Test
+        void calculateCurrentProgress_DebeReflejarAvanceEnCursosCortosAntesDeUnaHoraCompleta() {
+                Clock fixedClockNow = Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneId.of("UTC"));
+                userService.setClock(fixedClockNow);
+
+                Users user = new Users(1L, "Luis", "pwd", Role.STUDENT, "luis@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses shortCourse = new Courses();
+                shortCourse.setCourse_id(99L);
+                shortCourse.setDuration(1.0f); // 1 hora
+
+                Clock fixedClockStart = Clock.fixed(Instant.parse("2026-01-01T11:30:00Z"), ZoneId.of("UTC"));
+                Enrollment enrollment = new Enrollment(1004L, user, shortCourse, null, "EN_CURSO", 0,
+                                java.time.LocalDateTime.now(fixedClockStart));
+
+                int progress = userService.calculateCurrentProgress(enrollment);
+
+                assertEquals(50, progress);
         }
 
         @Test

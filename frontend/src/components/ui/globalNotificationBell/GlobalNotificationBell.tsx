@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Bell, FileText, TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useNotifications } from './useNotifications';
 import type { NotificationDTO } from './useNotifications'; // Importamos el tipo estricto para limpiar el any implícito
 import GenericButton from '../genericButton/GenericButton';
@@ -8,6 +9,17 @@ export default function NotificationBell() {
     const { alerts, hasAlerts, hasUnread, dismissNotifications } = useNotifications();
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const navigate = useNavigate();
+
+    const handleAlertClick = (alert: NotificationDTO) => {
+        const target = typeof alert.redirectUrl === 'string' && alert.redirectUrl.trim().length > 0
+            ? alert.redirectUrl.trim()
+            : '/';
+
+        setIsOpen(false);
+        void dismissNotifications();
+        navigate(target);
+    };
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -24,11 +36,7 @@ export default function NotificationBell() {
             <GenericButton
                 variant="search"
                 onClick={() => {
-                    const willOpen = !isOpen;
-                    setIsOpen(willOpen);
-                    if (willOpen && hasUnread) {
-                        void dismissNotifications();
-                    }
+                    setIsOpen(prev => !prev);
                 }}
                 className={`relative p-2.5! transition-all ${hasUnread
                     ? 'bg-red-50! border-red-200! hover:bg-red-100!'
@@ -54,11 +62,22 @@ export default function NotificationBell() {
                 <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-100 flex justify-between items-center">
                         <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Avisos del Sistema</span>
-                        {hasAlerts && (
-                            <span className="px-2 py-0.5 text-[10px] font-bold bg-red-100 text-red-700 rounded-full">
-                                {alerts.length} nuevos
-                            </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                            {hasAlerts && (
+                                <span className="px-2 py-0.5 text-[10px] font-bold bg-red-100 text-red-700 rounded-full">
+                                    {alerts.length} nuevos
+                                </span>
+                            )}
+                            {hasUnread && (
+                                <GenericButton
+                                    type="button"
+                                    variant="text"
+                                    label="Marcar vistas"
+                                    className="text-[10px]! font-bold! text-slate-500! hover:text-slate-700! p-0!"
+                                    onClick={() => void dismissNotifications()}
+                                />
+                            )}
+                        </div>
                     </div>
 
                     <div className="max-h-64 overflow-y-auto divide-y divide-slate-50 custom-scrollbar">
@@ -75,9 +94,11 @@ export default function NotificationBell() {
                                 const IconComponent = isDoc ? FileText : TrendingUp;
 
                                 return (
-                                    <div
+                                    <button
+                                        type="button"
                                         key={index}
-                                        className="p-3 hover:bg-slate-50/80 transition-colors flex gap-3 items-start"
+                                        className="w-full text-left p-3 hover:bg-slate-50/80 transition-colors flex gap-3 items-start"
+                                        onClick={() => handleAlertClick(alert)}
                                     >
                                         <div className={`p-2 rounded-xl shrink-0 ${iconColor}`}>
                                             <IconComponent size={16} />
@@ -86,7 +107,7 @@ export default function NotificationBell() {
                                             <p className="text-xs font-bold text-slate-800 truncate">{alert.title}</p>
                                             <p className="text-[11px] text-slate-500 leading-normal">{alert.message}</p>
                                         </div>
-                                    </div>
+                                    </button>
                                 );
                             })
                         )}

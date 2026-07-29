@@ -7,6 +7,7 @@ import {
 } from '../../../../services/evaluationService';
 import {
     getDocumentsByEnrollment,
+    getReceivedDocumentsByCourse,
     uploadProfessorDocument
 } from '../../../../services/documentService';
 import type { DocumentMetadata } from '../../../../services/documentService';
@@ -20,6 +21,7 @@ vi.mock('../../../../services/evaluationService', () => ({
 
 vi.mock('../../../../services/documentService', () => ({
     getDocumentsByEnrollment: vi.fn(),
+    getReceivedDocumentsByCourse: vi.fn(),
     uploadProfessorDocument: vi.fn()
 }));
 
@@ -65,6 +67,7 @@ describe('useGradingCenter', () => {
         vi.clearAllMocks();
         vi.mocked(getActiveStudentsByCourse).mockResolvedValue(mockStudents);
         vi.mocked(getDocumentsByEnrollment).mockResolvedValue(mockDocuments);
+        vi.mocked(getReceivedDocumentsByCourse).mockResolvedValue(mockDocuments);
         vi.mocked(uploadProfessorDocument).mockResolvedValue({
             message: 'ok',
             filename: 'doc.pdf',
@@ -112,6 +115,7 @@ describe('useGradingCenter', () => {
         expect(result.current.selectedStudent?.userId).toBe(11);
         expect(getDocumentsByEnrollment).toHaveBeenCalledWith(301);
         expect(result.current.studentDocuments).toEqual(mockDocuments);
+        expect(result.current.documentsLoadedFromCourseFallback).toBe(false);
     });
 
     it('vacia seleccion y documentos si el id de alumno no existe', async () => {
@@ -277,7 +281,23 @@ describe('useGradingCenter', () => {
         expect(result.current.loadingDocs).toBe(false);
     });
 
-    it('usa userId como fallback para cargar documentos cuando no hay enrollmentId', async () => {
+    it('hace fallback por curso y filtra por sender cuando no hay enrollmentId', async () => {
+        const studentDocForUser12: DocumentMetadata = {
+            documentid: 2002,
+            filename: 'doc_2002.pdf',
+            originalname: 'actividad-2.pdf',
+            upload_date: '2026-07-25T11:00:00Z',
+            sender: { userId: 12, username: 'luis', email: 'luis@uni.es', role: 'STUDENT' },
+            receiver: { userId: 2, username: 'profesor', email: 'profe@uni.es', role: 'PROFESSOR' },
+            folder_type: 'RECEIVED',
+            isRead: false,
+        };
+
+        vi.mocked(getReceivedDocumentsByCourse).mockResolvedValueOnce([
+            mockDocuments[0],
+            studentDocForUser12,
+        ]);
+
         const { result } = renderHook(() => useGradingCenter(10));
         await waitFor(() => expect(result.current.loadingData).toBe(false));
 
@@ -285,7 +305,10 @@ describe('useGradingCenter', () => {
             await result.current.handleSelectStudentById(12);
         });
 
-        expect(getDocumentsByEnrollment).toHaveBeenCalledWith(12);
+        expect(getDocumentsByEnrollment).not.toHaveBeenCalledWith(12);
+        expect(getReceivedDocumentsByCourse).toHaveBeenCalledWith(10);
+        expect(result.current.studentDocuments).toEqual([studentDocForUser12]);
+        expect(result.current.documentsLoadedFromCourseFallback).toBe(true);
     });
 
     it('permite limpiar archivo seleccionado con valor null', () => {

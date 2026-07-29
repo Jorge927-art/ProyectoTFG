@@ -10,6 +10,21 @@ public interface CourseGradeRepository extends JpaRepository<CourseGrade, Long> 
         // Hereda automáticamente todos los métodos de guardado (save, etc.) de JPA
 
         /**
+         * [DASHBOARD ALUMNO - HIDRATACIÓN DE NOTAS]: Recupera todas las notas de un
+         * conjunto de matrículas para evitar pérdidas parciales por carga diferida.
+         */
+        @Query("SELECT cg FROM CourseGrade cg JOIN FETCH cg.enrollment e WHERE e.enrollmentid IN :enrollmentIds " +
+                        "ORDER BY e.enrollmentid ASC, cg.gradeId ASC")
+        List<CourseGrade> findAllByEnrollmentIdsOrderByGradeIdAsc(@Param("enrollmentIds") List<Long> enrollmentIds);
+
+        /**
+         * [DOCENTE - EDICIÓN CONTROLADA]: Recupera todas las notas de una matrícula
+         * para aplicar reglas de negocio (trabajos múltiples y examen único).
+         */
+        @Query("SELECT cg FROM CourseGrade cg WHERE cg.enrollment.enrollmentid = :enrollmentId ORDER BY cg.gradeId ASC")
+        List<CourseGrade> findAllByEnrollmentIdOrderByGradeIdAsc(@Param("enrollmentId") Long enrollmentId);
+
+        /**
          * [CONSOLA DOCENTE - MEDIA GRUPO]: Calcula la media de calificaciones del curso
          * completo
          * restringiendo la muestra estrictamente a los estudiantes habilitados (enabled

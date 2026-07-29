@@ -77,7 +77,7 @@ describe('TeachingMetricsPanel', () => {
             />
         );
 
-        expect(screen.getByRole('option', { name: 'TODOS' })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: 'TODAS' })).toBeInTheDocument();
         expect(screen.getByRole('option', { name: 'Arquitectura' })).toBeInTheDocument();
 
         fireEvent.change(screen.getByLabelText('Asignatura'), { target: { value: '20' } });

@@ -62,6 +62,21 @@ describe('useCourseManagement - Suite de Pruebas Unitarias de Gestión del Curso
         expect(getActiveStudentsByCourse).toHaveBeenCalledWith(42);
         expect(mockOnSyncCount).toHaveBeenCalledWith(42, 1);
         expect(getCourseManagementMetrics).not.toHaveBeenCalled();
+        expect(result.current.dataError).toBeNull();
+    });
+
+    it('Debe exponer dataError cuando la carga de alumnado falla y mantener la UI estable', async () => {
+        vi.mocked(getActiveStudentsByCourse).mockRejectedValue(new Error('fallo forzado de red'));
+
+        const { result } = renderHook(() => useCourseManagement(42, true, mockOnSyncCount));
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        expect(result.current.students).toEqual([]);
+        expect(result.current.dataError).toBe('No se pudo cargar el alumnado de esta asignatura. Intenta de nuevo.');
+        expect(mockOnSyncCount).not.toHaveBeenCalled();
     });
 
     it('Debe activar la consulta de métricas globales de forma Lazy al conmutar a la pestaña correspondente', async () => {
@@ -176,6 +191,27 @@ describe('useCourseManagement - Suite de Pruebas Unitarias de Gestión del Curso
         expect(result.current.isSubmitting).toBe(false);
     });
 
+    it('Debe bloquear la transmisión masiva cuando la asignatura no tiene alumnos', async () => {
+        vi.mocked(getActiveStudentsByCourse).mockResolvedValue([]);
+
+        const { result } = renderHook(() => useCourseManagement(42, true, mockOnSyncCount));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        const mockFile = new File(['payload'], 'sin_alumnos.pdf', { type: 'application/pdf' });
+        act(() => {
+            result.current.handleFileChange({
+                target: { files: [mockFile], value: 'sin_alumnos.pdf' }
+            } as unknown as ChangeEvent<HTMLInputElement>);
+        });
+
+        await act(async () => {
+            await result.current.handleUploadDocument();
+        });
+
+        expect(result.current.fileError).toBe('No se puede transmitir: esta asignatura no tiene alumnos matriculados.');
+        expect(mockUploadProfessorDocument).not.toHaveBeenCalled();
+    });
+
     it('Debe alternar isSubmitting, invocar el servicio dinámico y resetear el archivo tras un envío exitoso', async () => {
         vi.mocked(getActiveStudentsByCourse).mockResolvedValue(mockStudentsData);
         mockUploadProfessorDocument.mockResolvedValue({ message: 'Documento oficial publicado con éxito' });
@@ -232,6 +268,33 @@ describe('useCourseManagement - Suite de Pruebas Unitarias de Gestión del Curso
         expect(result.current.fileError).toBe('El alumno destino no se encuentra matriculado en este bloque académico.');
         expect(result.current.isSubmitting).toBe(false);
         expect(result.current.uploadSuccessMessage).toBeNull();
+    });
+
+    it('Debe mapear mensaje backend desde el campo message cuando no existe error', async () => {
+        vi.mocked(getActiveStudentsByCourse).mockResolvedValue(mockStudentsData);
+
+        const mockAxiosError = {
+            response: {
+                data: { message: 'Credenciales de acceso inválidas.' }
+            }
+        };
+        mockUploadProfessorDocument.mockRejectedValue(mockAxiosError);
+
+        const { result } = renderHook(() => useCourseManagement(42, true, mockOnSyncCount));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => {
+            result.current.handleFileChange({
+                target: { files: [new File([''], 'doc.pdf', { type: 'application/pdf' })], value: 'doc.pdf' }
+            } as unknown as ChangeEvent<HTMLInputElement>);
+            result.current.setSelectedStudentId('201');
+        });
+
+        await act(async () => {
+            await result.current.handleUploadDocument();
+        });
+
+        expect(result.current.fileError).toBe('Credenciales de acceso inválidas.');
     });
 });
 

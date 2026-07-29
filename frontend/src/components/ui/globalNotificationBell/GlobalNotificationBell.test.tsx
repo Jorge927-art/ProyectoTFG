@@ -4,6 +4,12 @@ import { describe, test, it, expect, vi, beforeEach } from 'vitest';
 import NotificationBell from './GlobalNotificationBell';
 import * as notificationsHook from './useNotifications';
 
+const mockNavigate = vi.fn();
+
+vi.mock('react-router-dom', () => ({
+    useNavigate: () => mockNavigate
+}));
+
 describe('NotificationBell - Suite de Alertas Académicas', () => {
     const mockRefresh = vi.fn();
     const mockDismiss = vi.fn();
@@ -107,7 +113,7 @@ describe('NotificationBell - Suite de Alertas Académicas', () => {
         expect(pulseIndicator).toBeNull();
     });
 
-    it('debe marcar notificaciones como vistas al abrir si hay no leidas', () => {
+    it('no debe marcar notificaciones como vistas automáticamente al abrir', () => {
         useNotificationsSpy.mockReturnValue({
             alerts: [
                 { type: 'DOCUMENT_INBOX', title: 'Bandeja', message: '1 doc', redirectUrl: '/docs' }
@@ -124,6 +130,28 @@ describe('NotificationBell - Suite de Alertas Académicas', () => {
         render(<NotificationBell />);
 
         fireEvent.click(screen.getByRole('button', { name: 'Campana de notificaciones' }));
+
+        expect(mockDismiss).not.toHaveBeenCalled();
+    });
+
+    it('debe permitir marcar como vistas desde el botón explícito del panel', () => {
+        useNotificationsSpy.mockReturnValue({
+            alerts: [
+                { type: 'DOCUMENT_INBOX', title: 'Bandeja', message: '1 doc', redirectUrl: '/docs' }
+            ],
+            documents: [],
+            hasAlerts: true,
+            hasUnread: true,
+            refreshAlerts: mockRefresh,
+            refreshNotifications: mockRefresh,
+            dismissNotifications: mockDismiss,
+            loading: false
+        });
+
+        render(<NotificationBell />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Campana de notificaciones' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Marcar vistas' }));
 
         expect(mockDismiss).toHaveBeenCalledTimes(1);
     });
@@ -145,6 +173,66 @@ describe('NotificationBell - Suite de Alertas Académicas', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Campana de notificaciones' }));
 
         expect(mockDismiss).not.toHaveBeenCalled();
+    });
+
+    it('debe redirigir a la ruta del aviso al hacer clic sobre una notificación', async () => {
+        useNotificationsSpy.mockReturnValue({
+            alerts: [
+                {
+                    type: 'COURSE_PROGRESS',
+                    title: 'Asignatura por finalizar',
+                    message: 'Tu curso está al 95%',
+                    redirectUrl: '/student'
+                }
+            ],
+            documents: [],
+            hasAlerts: true,
+            hasUnread: true,
+            refreshAlerts: mockRefresh,
+            refreshNotifications: mockRefresh,
+            dismissNotifications: mockDismiss,
+            loading: false
+        });
+
+        render(<NotificationBell />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Campana de notificaciones' }));
+        fireEvent.click(screen.getByRole('button', { name: /Asignatura por finalizar/i }));
+
+        await waitFor(() => {
+            expect(mockNavigate).toHaveBeenCalledWith('/student');
+            expect(mockDismiss).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    it('debe redirigir al panel de documentos cuando el aviso es DOCUMENT_INBOX', async () => {
+        useNotificationsSpy.mockReturnValue({
+            alerts: [
+                {
+                    type: 'DOCUMENT_INBOX',
+                    title: 'Bandeja de Entrada',
+                    message: 'Tienes 2 documentos pendientes',
+                    redirectUrl: '/student?focus=documents'
+                }
+            ],
+            documents: [],
+            hasAlerts: true,
+            hasUnread: true,
+            refreshAlerts: mockRefresh,
+            refreshNotifications: mockRefresh,
+            dismissNotifications: mockDismiss,
+            loading: false
+        });
+
+        render(<NotificationBell />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Campana de notificaciones' }));
+        fireEvent.click(screen.getByRole('button', { name: /Bandeja de Entrada/i }));
+
+        await waitFor(() => {
+            expect(mockNavigate).toHaveBeenCalledWith('/student?focus=documents');
+            expect(mockDismiss).toHaveBeenCalledTimes(1);
+        });
     });
 });
 

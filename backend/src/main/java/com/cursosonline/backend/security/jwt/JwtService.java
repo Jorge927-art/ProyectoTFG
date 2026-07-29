@@ -68,6 +68,10 @@ public class JwtService {
         return exp == null ? null : Instant.ofEpochSecond(exp);
     }
 
+    public Long extractUserId(String token) {
+        return getClaim(token, "userId", Long.class);
+    }
+
     public boolean isTokenValid(String token) {
         try {
             Map<String, Object> claims = parseAndVerify(token);

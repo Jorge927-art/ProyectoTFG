@@ -43,6 +43,9 @@ class TeachingMetricsServiceTest {
     @Mock
     private AcademicEvaluationRepository academicEvaluationRepository;
 
+    @Mock
+    private UserService userService;
+
     @InjectMocks
     private TeachingMetricsService teachingMetricsService;
 
@@ -72,10 +75,15 @@ class TeachingMetricsServiceTest {
     @Test
     @DisplayName("Debe agregar todas las asignaturas asignadas cuando el selector llega en null")
     void getSummary_WhenCourseIdIsNull_ShouldAggregateAllAssignedCourses() {
+        Enrollment firstEnrollment = enrollment(1L, "alumno1", "alumno1@uni.es", 10L, "Arquitectura", 0);
+        Enrollment secondEnrollment = enrollment(2L, "alumno2", "alumno2@uni.es", 20L, "Bases", 0);
+
         when(coursesRepository.findAllAssignedToProfessor("profesor"))
                 .thenReturn(Arrays.asList(course(10L, "Arquitectura"), null, course(20L, "Bases")));
-        when(enrollmentRepository.getAverageProgressByCourseIds(List.of(10L, 20L))).thenReturn(80.0);
-        when(enrollmentRepository.getCompletionRateByCourseIds(List.of(10L, 20L))).thenReturn(50.0);
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseIds(List.of(10L, 20L)))
+                .thenReturn(List.of(firstEnrollment, secondEnrollment));
+        when(userService.calculateCurrentProgress(firstEnrollment)).thenReturn(60);
+        when(userService.calculateCurrentProgress(secondEnrollment)).thenReturn(100);
         when(courseGradeRepository.getGroupAverageScoreByCourseIds(List.of(10L, 20L))).thenReturn(null);
         when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(List.of(10L, 20L))).thenReturn(4.3);
         when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(List.of(10L, 20L))).thenReturn(4.8);
@@ -88,7 +96,7 @@ class TeachingMetricsServiceTest {
         assertEquals(0.0, summary.averageGrade());
         assertEquals(4.3, summary.courseRating());
         assertEquals(4.8, summary.instructorRating());
-        verify(enrollmentRepository).getAverageProgressByCourseIds(List.of(10L, 20L));
+        verify(enrollmentRepository).findActiveStudentEnrollmentsByCourseIds(List.of(10L, 20L));
     }
 
     @Test
@@ -127,6 +135,8 @@ class TeachingMetricsServiceTest {
                 .thenReturn(List.of(course(10L, "Arquitectura"), course(20L, "Bases")));
         when(enrollmentRepository.findActiveStudentEnrollmentsByCourseIds(List.of(10L, 20L)))
                 .thenReturn(List.of(firstEnrollment, secondEnrollment));
+        when(userService.calculateCurrentProgress(firstEnrollment)).thenReturn(90);
+        when(userService.calculateCurrentProgress(secondEnrollment)).thenReturn(70);
         when(courseGradeRepository.getIndividualStudentAverageScore(10L, 1L)).thenReturn(8.7);
         when(courseGradeRepository.getIndividualStudentAverageScore(20L, 2L)).thenReturn(null);
 
@@ -135,7 +145,9 @@ class TeachingMetricsServiceTest {
         assertEquals(2, breakdown.size());
         assertEquals("alumno1", breakdown.get(0).username());
         assertEquals("Arquitectura", breakdown.get(0).courseTitle());
+        assertEquals(90, breakdown.get(0).progressPercentage());
         assertEquals(8.7, breakdown.get(0).averageGrade());
+        assertEquals(70, breakdown.get(1).progressPercentage());
         assertEquals(0.0, breakdown.get(1).averageGrade());
         verify(courseGradeRepository).getIndividualStudentAverageScore(10L, 1L);
         verify(courseGradeRepository).getIndividualStudentAverageScore(20L, 2L);

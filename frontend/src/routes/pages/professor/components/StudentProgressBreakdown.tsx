@@ -5,21 +5,21 @@ import type { StudentMetricBreakdown } from '../../../../services/teachingMetric
 
 interface StudentProgressBreakdownProps {
     students: StudentMetricBreakdown[];
-    showCourseColumn: boolean; // true cuando el ámbito del selector es TODOS
+    showCourseColumn: boolean; // true cuando el ámbito del selector es TODAS
 }
 
 /**
  * Desglose individual de progreso por alumno para el panel "Métricas de
- * Docencia" [nueva funcionalidad]. Cuando el selector está en TODOS, muestra
+ * Docencia" [nueva funcionalidad]. Cuando el selector está en TODAS, muestra
  * además la asignatura de cada fila para distinguir el origen del dato.
  */
 export const StudentProgressBreakdown = ({ students, showCourseColumn }: StudentProgressBreakdownProps) => (
     <GenericCard className="space-y-2">
         <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
             <Users size={16} className="text-blue-600" />
-            Progreso Alumno
+            Alumnos matriculados
         </h3>
-        <div className="max-h-48 overflow-y-auto pr-1 space-y-1.5">
+        <div className="max-h-52 overflow-y-auto pr-1 space-y-1.5 custom-scrollbar">
             {students.length === 0 ? (
                 <p className="text-[11px] text-slate-400 italic text-center py-3">
                     Sin alumnos matriculados en el ámbito seleccionado.

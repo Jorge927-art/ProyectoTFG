@@ -17,6 +17,9 @@ public interface UserRepository extends JpaRepository<Users, Long> {
         // Método para buscar por nombre de usuario
         Optional<Users> findByUsername(String username);
 
+        // Fallback para casos con diferencia de mayúsculas/minúsculas en el principal
+        Optional<Users> findByUsernameIgnoreCase(String username);
+
         // Fallback para casos donde el principal de seguridad llega como email
         Optional<Users> findByEmailIgnoreCase(String email);
 

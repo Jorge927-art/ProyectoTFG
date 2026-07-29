@@ -64,6 +64,43 @@ describe('AuthStorage - Suite de Pruebas Unitarias de Almacenamiento Local', () 
         expect(token).toBe('jwt-valido-secreto-123');
     });
 
+    it('Debería usar el token embebido en auth_user cuando accessToken no existe', () => {
+        localStorageMockStore[USER_KEY] = JSON.stringify({
+            ...sampleValidUser,
+            token: 'jwt-desde-auth-user'
+        });
+
+        const token = readStoredToken();
+
+        expect(token).toBe('jwt-desde-auth-user');
+        expect(localStorage.setItem).toHaveBeenCalledWith(TOKEN_KEY, 'jwt-desde-auth-user');
+    });
+
+    it('Debería usar token legacy desde auth_user.accessToken si no existe auth_user.token', () => {
+        localStorageMockStore[USER_KEY] = JSON.stringify({
+            ...sampleValidUser,
+            accessToken: 'jwt-legacy-access-token'
+        });
+
+        const token = readStoredToken();
+
+        expect(token).toBe('jwt-legacy-access-token');
+        expect(localStorage.setItem).toHaveBeenCalledWith(TOKEN_KEY, 'jwt-legacy-access-token');
+    });
+
+    it('Debería sincronizar accessToken si difiere del token embebido en auth_user', () => {
+        localStorageMockStore[TOKEN_KEY] = 'jwt-antiguo';
+        localStorageMockStore[USER_KEY] = JSON.stringify({
+            ...sampleValidUser,
+            token: 'jwt-actual'
+        });
+
+        const token = readStoredToken();
+
+        expect(token).toBe('jwt-actual');
+        expect(localStorage.setItem).toHaveBeenCalledWith(TOKEN_KEY, 'jwt-actual');
+    });
+
     /* =========================================================================
        3. CONTROL DE MIGRACIÓN Y PURGA DE SESIÓN (USER_KEY & LEGACY_KEY)
        ========================================================================= */
@@ -72,6 +109,16 @@ describe('AuthStorage - Suite de Pruebas Unitarias de Almacenamiento Local', () 
 
         expect(localStorage.setItem).toHaveBeenCalledWith(USER_KEY, JSON.stringify(sampleValidUser));
         expect(localStorageMockStore[LEGACY_KEY]).toBeUndefined();
+    });
+
+    it('Debería sincronizar accessToken al guardar un usuario con token embebido', () => {
+        writeStoredAuthUser({
+            ...sampleValidUser,
+            token: 'jwt-sincronizado'
+        });
+
+        expect(localStorage.setItem).toHaveBeenCalledWith(USER_KEY, expect.any(String));
+        expect(localStorage.setItem).toHaveBeenCalledWith(TOKEN_KEY, 'jwt-sincronizado');
     });
 
     it('Debería ser capaz de leer de la clave legacy "user" si la clave unificada oficial no está inicializada', () => {
@@ -123,6 +170,24 @@ describe('AuthStorage - Suite de Pruebas Unitarias de Almacenamiento Local', () 
 
         expect(retrievedUser).not.toBeNull();
         expect(retrievedUser!.username).toBe('juan_tfg');
+    });
+
+    it('Debería invalidar sesión si el JWT activo pertenece a otra identidad', () => {
+        const tokenPayload = btoa(JSON.stringify({ sub: 'otro_usuario', role: 'STUDENT' }))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+        localStorageMockStore[TOKEN_KEY] = `x.${tokenPayload}.y`;
+        localStorageMockStore[USER_KEY] = JSON.stringify({
+            ...sampleValidUser,
+            username: 'juan_tfg'
+        });
+
+        const retrievedUser = readStoredAuthUser();
+
+        expect(retrievedUser).toBeNull();
+        expect(localStorageMockStore[USER_KEY]).toBeUndefined();
+        expect(localStorageMockStore[TOKEN_KEY]).toBeUndefined();
     });
 
         /* =========================================================================

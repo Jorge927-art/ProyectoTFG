@@ -10,7 +10,15 @@ import { markDocumentAsRead } from '../../../../services/documentService'; // <-
  * Componente para gestionar la subida, descarga y visualización de documentos académicos.
  * @returns JSX.Element
  */
-export const DocumentManager = () => {
+interface DocumentManagerProps {
+    autoFocusDocuments?: boolean;
+    focusDocumentId?: number | null;
+}
+
+export const DocumentManager = ({
+    autoFocusDocuments = false,
+    focusDocumentId = null,
+}: DocumentManagerProps) => {
     const {
         documentList,
         activeTab,
@@ -32,6 +40,53 @@ export const DocumentManager = () => {
     //estado local para controlar la descarga en curso y evitar descargas simultáneas
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
+    const [highlightedDocumentId, setHighlightedDocumentId] = useState<number | null>(null);
+    const highlightTimeoutRef = useRef<number | null>(null);
+    const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
+
+    React.useEffect(() => {
+        if (!autoFocusDocuments) {
+            return;
+        }
+
+        if (activeTab !== 'RECEIVED') {
+            setActiveTab('RECEIVED');
+        }
+    }, [activeTab, autoFocusDocuments, setActiveTab]);
+
+    React.useEffect(() => {
+        if (!autoFocusDocuments || activeTab !== 'RECEIVED' || loadingDocuments || documentList.length === 0) {
+            return;
+        }
+
+        const targetDocument =
+            (focusDocumentId ? documentList.find((doc) => doc.documentid === focusDocumentId) : undefined)
+            ?? documentList.find((doc) => !doc.isRead)
+            ?? documentList[0];
+
+        if (!targetDocument) {
+            return;
+        }
+
+        setHighlightedDocumentId(targetDocument.documentid);
+        rowRefs.current[targetDocument.documentid]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        if (highlightTimeoutRef.current) {
+            window.clearTimeout(highlightTimeoutRef.current);
+        }
+
+        highlightTimeoutRef.current = window.setTimeout(() => {
+            setHighlightedDocumentId((prev) => (prev === targetDocument.documentid ? null : prev));
+        }, 2600);
+    }, [activeTab, autoFocusDocuments, documentList, focusDocumentId, loadingDocuments]);
+
+    React.useEffect(() => {
+        return () => {
+            if (highlightTimeoutRef.current) {
+                window.clearTimeout(highlightTimeoutRef.current);
+            }
+        };
+    }, []);
 
     /**
      * Maneja el cambio de archivo en el input de subida.
@@ -227,7 +282,14 @@ export const DocumentManager = () => {
                         documentList.map((doc) => (
                             <div
                                 key={doc.documentid}
-                                className="flex justify-between items-center p-2.5 bg-white border border-slate-100 hover:border-slate-200 rounded-lg shadow-sm transition-all"
+                                ref={(node) => {
+                                    rowRefs.current[doc.documentid] = node;
+                                }}
+                                data-testid={`document-row-${doc.documentid}`}
+                                className={`flex justify-between items-center p-2.5 bg-white border hover:border-slate-200 rounded-lg shadow-sm transition-all ${highlightedDocumentId === doc.documentid
+                                    ? 'border-amber-300 bg-amber-50/60'
+                                    : 'border-slate-100'
+                                    }`}
                             >
                                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                     {/* DETALLE VISUAL EXTRA: Opacidad atenuada si el archivo ya fue leído */}

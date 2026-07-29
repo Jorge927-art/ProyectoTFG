@@ -19,29 +19,36 @@ const buildDoc = (isRead: boolean): DocumentMetadata => ({
     isRead,
 });
 
-// Componente Wrapper para inyectar de forma controlada la sesión del alumno en las pruebas
-// Componente Wrapper para inyectar de forma controlada la sesión del alumno en las pruebas
-const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
-    const mockAuthValue = {
-        user: {
-            userId: 1,
-            username: 'alumno',
-            email: 'alumno@tfg.com',
-            role: 'STUDENT' as const // SOLUCIÓN: Usamos 'as const' para que TypeScript infiera el literal exacto sin usar 'any'
-        },
-        isAuthenticated: true,
-        isLoading: false,
-        login: () => { },
-        updateUser: () => { },
-        logout: () => { },
-    };
+const buildAuthWrapper = (role: 'STUDENT' | 'PROFESSOR' | 'ADMIN') => {
+    const usernameByRole = role === 'PROFESSOR' ? 'profesor' : role === 'ADMIN' ? 'admin' : 'alumno';
+    const emailByRole = `${usernameByRole}@tfg.com`;
 
-    return (
-        <AuthContext.Provider value={mockAuthValue as unknown as typeof AuthContext extends React.Context<infer U> ? U : never}>
-            {children}
-        </AuthContext.Provider>
-    );
+    return ({ children }: { children: React.ReactNode }) => {
+        const mockAuthValue = {
+            user: {
+                userId: 1,
+                username: usernameByRole,
+                email: emailByRole,
+                role
+            },
+            isAuthenticated: true,
+            isLoading: false,
+            login: () => { },
+            updateUser: () => { },
+            logout: () => { },
+        };
+
+        return (
+            <AuthContext.Provider value={mockAuthValue as unknown as typeof AuthContext extends React.Context<infer U> ? U : never}>
+                {children}
+            </AuthContext.Provider>
+        );
+    };
 };
+
+const AuthWrapper = buildAuthWrapper('STUDENT');
+const ProfessorAuthWrapper = buildAuthWrapper('PROFESSOR');
+const AdminAuthWrapper = buildAuthWrapper('ADMIN');
 
 const NoAuthWrapper = ({ children }: { children: React.ReactNode }) => {
     const mockAuthValue = {
@@ -159,5 +166,64 @@ describe('useNotifications', () => {
         expect(hook.result.current.alerts).toEqual([]);
         expect(hook.result.current.documents).toEqual([]);
         expect(hook.result.current.hasUnread).toBe(false);
+    });
+
+    it('construye alerta de bandeja desde documentos no leídos si /notifications llega vacío', async () => {
+        currentAlerts = [];
+        currentDocuments = [buildDoc(false), { ...buildDoc(false), documentid: 2 }];
+
+        const hook = renderHook(() => useNotifications(), { wrapper: AuthWrapper });
+
+        await waitFor(() => {
+            expect(hook.result.current.loading).toBe(false);
+        });
+
+        expect(hook.result.current.hasUnread).toBe(true);
+        expect(hook.result.current.alerts).toHaveLength(1);
+        expect(hook.result.current.alerts[0].type).toBe('DOCUMENT_INBOX');
+        expect(hook.result.current.alerts[0].message).toContain('2 documento(s)');
+        expect(hook.result.current.alerts[0].redirectUrl).toContain('/student?focus=documents');
+        expect(hook.result.current.alerts[0].redirectUrl).toContain('documentId=1');
+    });
+
+    it('normaliza redirectUrl de DOCUMENT_INBOX para profesor hacia su zona de documentos', async () => {
+        currentAlerts = [
+            {
+                type: 'DOCUMENT_INBOX',
+                title: 'Bandeja',
+                message: 'Tienes un documento pendiente',
+                redirectUrl: '/professor'
+            }
+        ];
+
+        const hook = renderHook(() => useNotifications(), { wrapper: ProfessorAuthWrapper });
+
+        await waitFor(() => {
+            expect(hook.result.current.loading).toBe(false);
+        });
+
+        expect(hook.result.current.alerts[0].redirectUrl).toContain('/professor?focus=documents');
+        expect(hook.result.current.alerts[0].redirectUrl).toContain('documentId=1');
+        expect(hook.result.current.alerts[0].redirectUrl).toContain('senderId=2');
+    });
+
+    it('normaliza redirectUrl de DOCUMENT_INBOX para admin hacia su zona de documentos', async () => {
+        currentAlerts = [
+            {
+                type: 'DOCUMENT_INBOX',
+                title: 'Bandeja',
+                message: 'Tienes un documento pendiente',
+                redirectUrl: '/admin'
+            }
+        ];
+
+        const hook = renderHook(() => useNotifications(), { wrapper: AdminAuthWrapper });
+
+        await waitFor(() => {
+            expect(hook.result.current.loading).toBe(false);
+        });
+
+        expect(hook.result.current.alerts[0].redirectUrl).toContain('/admin?focus=documents');
+        expect(hook.result.current.alerts[0].redirectUrl).toContain('documentId=1');
     });
 });

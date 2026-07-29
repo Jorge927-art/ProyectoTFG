@@ -30,6 +30,10 @@ vi.mock('./components/UserSearchPanel', () => ({
     )
 }));
 
+vi.mock('./components/AdminDocumentInbox', () => ({
+    AdminDocumentInbox: () => <div data-testid="mock-admin-document-inbox" />
+}));
+
 describe('AdminDashboard - Orquestación de paneles', () => {
     it('renderiza la cabecera institucional y ambos paneles', () => {
         render(<AdminDashboard />);
@@ -39,6 +43,7 @@ describe('AdminDashboard - Orquestación de paneles', () => {
         expect(screen.getByText('Panel de Administración')).toBeInTheDocument();
         expect(screen.getByTestId('mock-user-search-panel')).toBeInTheDocument();
         expect(screen.getByTestId('mock-user-scroll-list')).toBeInTheDocument();
+        expect(screen.getByTestId('mock-admin-document-inbox')).toBeInTheDocument();
     });
 
     it('inyecta el username del administrador autenticado en UserSearchPanel', () => {

@@ -20,6 +20,7 @@ import { TeachingMetricsPanel } from './components/TeachingMetricsPanel';
 // IMPORTACIÓN CENTRALIZADA DE DOMINIOS [DRY]
 import type { TaughtCourse } from '../../../services/userDomains';
 import type { DBModelCourse } from '../../../services/courseTypes';
+import type { StudentPerformanceDTO } from '../../../services/evaluationService';
 
 // 2. Importamos el servicio para contar los alumnos de raíz
 import { getActiveStudentsByCourse, getProfessorAssignedCourses } from '../../../services/evaluationService';
@@ -55,14 +56,55 @@ const ProfessorDashboard = () => {
         .map((value) => value.trim())
         .filter((value) => value.length > 0);
 
-    // Estado reactivo unificado plano (NotebookLM) para controlar el modal
+    // Estado compartido entre Centro de Calificación y Métricas de Docencia.
     const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+    // Estado exclusivo del modal operativo de Gestión de Curso.
+    const [managedCourseId, setManagedCourseId] = useState<number | null>(null);
 
     // 1. ESTADO DE ASIGNATURAS IMPARTIDAS POR EL PROFESOR
     const [myCourses, setMyCourses] = useState<TaughtCourse[]>([]);
     const [metricsColumnMinHeight, setMetricsColumnMinHeight] = useState<number>(0);
+    const focusSearch = typeof window !== 'undefined' ? window.location.search : '';
+    const focusParams = new URLSearchParams(focusSearch);
+    const shouldFocusDocuments = focusParams.get('focus') === 'documents';
+    const focusStudentIdParam = Number(focusParams.get('senderId'));
+    const focusStudentUserId = Number.isFinite(focusStudentIdParam) && focusStudentIdParam > 0
+        ? focusStudentIdParam
+        : null;
+    const focusDocumentIdParam = Number(focusParams.get('documentId'));
+    const focusDocumentId = Number.isFinite(focusDocumentIdParam) && focusDocumentIdParam > 0
+        ? focusDocumentIdParam
+        : null;
 
     const leftColumnRef = useRef<HTMLDivElement | null>(null);
+    const gradingCenterRef = useRef<HTMLElement | null>(null);
+    const senderCourseResolutionDoneRef = useRef(false);
+    const studentsByCourseCacheRef = useRef<Map<number, StudentPerformanceDTO[]>>(new Map());
+    const studentsByCoursePendingRef = useRef<Map<number, Promise<StudentPerformanceDTO[]>>>(new Map());
+
+    const getStudentsForCourse = useCallback(async (courseId: number): Promise<StudentPerformanceDTO[]> => {
+        const cached = studentsByCourseCacheRef.current.get(courseId);
+        if (cached) {
+            return cached;
+        }
+
+        const pending = studentsByCoursePendingRef.current.get(courseId);
+        if (pending) {
+            return pending;
+        }
+
+        const request = getActiveStudentsByCourse(courseId)
+            .then((studentsData) => {
+                studentsByCourseCacheRef.current.set(courseId, studentsData);
+                return studentsData;
+            })
+            .finally(() => {
+                studentsByCoursePendingRef.current.delete(courseId);
+            });
+
+        studentsByCoursePendingRef.current.set(courseId, request);
+        return request;
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -76,7 +118,7 @@ const ProfessorDashboard = () => {
                         let studentsCount = 0;
 
                         try {
-                            const studentsData = await getActiveStudentsByCourse(course.course_id);
+                            const studentsData = await getStudentsForCourse(course.course_id);
                             studentsCount = studentsData.length;
                         } catch (error) {
                             console.error(`Error cargando el conteo de alumnos para el curso ${course.course_id}:`, error);
@@ -130,6 +172,97 @@ const ProfessorDashboard = () => {
         };
     }, [myCourses, selectedCourseId]);
 
+    useEffect(() => {
+        if (!shouldFocusDocuments) {
+            return;
+        }
+
+        gradingCenterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, [shouldFocusDocuments]);
+
+    useEffect(() => {
+        senderCourseResolutionDoneRef.current = false;
+    }, [shouldFocusDocuments, focusStudentUserId]);
+
+    useEffect(() => {
+        if (!shouldFocusDocuments) {
+            return;
+        }
+
+        if (selectedCourseId !== null || myCourses.length === 0) {
+            return;
+        }
+
+        setSelectedCourseId(myCourses[0].id);
+    }, [myCourses, selectedCourseId, shouldFocusDocuments]);
+
+    useEffect(() => {
+        if (!shouldFocusDocuments || !focusStudentUserId || myCourses.length === 0 || senderCourseResolutionDoneRef.current) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const resolveCourseBySender = async () => {
+            const prioritizedCourses = selectedCourseId
+                ? [
+                    ...myCourses.filter((course) => course.id === selectedCourseId),
+                    ...myCourses.filter((course) => course.id !== selectedCourseId)
+                ]
+                : myCourses;
+
+            const cachedMatch = prioritizedCourses.find((course) => {
+                const students = studentsByCourseCacheRef.current.get(course.id);
+                return Array.isArray(students) && students.some((student) => student.userId === focusStudentUserId);
+            });
+
+            if (cachedMatch) {
+                if (selectedCourseId !== cachedMatch.id) {
+                    setSelectedCourseId(cachedMatch.id);
+                }
+                senderCourseResolutionDoneRef.current = true;
+                return;
+            }
+
+            const uncachedCourses = prioritizedCourses.filter((course) => !studentsByCourseCacheRef.current.has(course.id));
+
+            if (uncachedCourses.length > 0) {
+                const results = await Promise.allSettled(
+                    uncachedCourses.map((course) => getStudentsForCourse(course.id))
+                );
+
+                if (cancelled) return;
+
+                results.forEach((result, index) => {
+                    if (result.status === 'rejected') {
+                        const failedCourse = uncachedCourses[index];
+                        console.error(
+                            `Error resolviendo asignatura para senderId ${focusStudentUserId} en curso ${failedCourse.id}:`,
+                            result.reason
+                        );
+                    }
+                });
+            }
+
+            const resolvedMatch = prioritizedCourses.find((course) => {
+                const students = studentsByCourseCacheRef.current.get(course.id);
+                return Array.isArray(students) && students.some((student) => student.userId === focusStudentUserId);
+            });
+
+            if (resolvedMatch && selectedCourseId !== resolvedMatch.id) {
+                setSelectedCourseId(resolvedMatch.id);
+            }
+
+            senderCourseResolutionDoneRef.current = true;
+        };
+
+        void resolveCourseBySender();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [focusStudentUserId, getStudentsForCourse, myCourses, selectedCourseId, shouldFocusDocuments]);
+
     // Función intermedia para actualizar el contador real enviado desde el modal (mantiene sincronía si hay cambios dentro)
     const handleSyncCount = useCallback((courseId: number, realCount: number) => {
         setMyCourses(prevCourses => {
@@ -157,7 +290,7 @@ const ProfessorDashboard = () => {
         let studentsCount = 0;
 
         try {
-            const studentsData = await getActiveStudentsByCourse(newCourse.course_id);
+            const studentsData = await getStudentsForCourse(newCourse.course_id);
             studentsCount = studentsData.length;
         } catch (error) {
             console.error("Error cargando el conteo inicial de alumnos para el curso asignado:", error);
@@ -176,7 +309,7 @@ const ProfessorDashboard = () => {
             if (prevCourses.some(c => c.id === adaptedCourse.id)) return prevCourses;
             return [...prevCourses, adaptedCourse];
         });
-    }, []);
+    }, [getStudentsForCourse]);
 
     return (
         <ProfessorLayout>
@@ -223,12 +356,12 @@ const ProfessorDashboard = () => {
                         {/* Rejilla interna modularizada de asignaturas */}
                         <TaughtCoursesGrid
                             courses={myCourses}
-                            onManageCourse={(id: number) => setSelectedCourseId(id)}
+                            onManageCourse={(id: number) => setManagedCourseId(id)}
                             actionIcon={<ArrowRight size={14} />}
                         />
                     </section>
 
-                    <section>
+                    <section ref={gradingCenterRef} id="grading-center">
                         <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                             <GraduationCap size={20} className="text-blue-600" />
                             <span>Centro de Calificación</span>
@@ -238,6 +371,9 @@ const ProfessorDashboard = () => {
                             courseId={selectedCourseId}
                             availableCourses={myCourses}
                             onCourseChange={setSelectedCourseId}
+                            autoFocusDocuments={shouldFocusDocuments}
+                            focusStudentUserId={focusStudentUserId}
+                            focusDocumentId={focusDocumentId}
                         />
                     </section>
                 </div>
@@ -257,9 +393,9 @@ const ProfessorDashboard = () => {
 
             {/* Inyección operativa del modal con sincronía reactiva de alumnos */}
             <CourseManagementModal
-                courseId={selectedCourseId}
-                isOpen={selectedCourseId !== null}
-                onClose={() => setSelectedCourseId(null)}
+                courseId={managedCourseId}
+                isOpen={managedCourseId !== null}
+                onClose={() => setManagedCourseId(null)}
                 onSyncCount={handleSyncCount}
             />
         </ProfessorLayout>

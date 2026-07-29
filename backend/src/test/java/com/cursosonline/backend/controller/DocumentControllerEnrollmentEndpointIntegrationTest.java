@@ -38,98 +38,101 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("DocumentController - Integracion endpoint /course/enrollment/{enrollmentId}")
 class DocumentControllerEnrollmentEndpointIntegrationTest {
 
-    private MockMvc mockMvc;
+        private MockMvc mockMvc;
 
-    @Autowired
-    private WebApplicationContext webApplicationContext;
+        @Autowired
+        private WebApplicationContext webApplicationContext;
 
-    @MockitoBean
-    private DocumentMetadataRepository documentMetadataRepository;
+        @MockitoBean
+        private DocumentMetadataRepository documentMetadataRepository;
 
-    @MockitoBean
-    private EnrollmentRepository enrollmentRepository;
+        @MockitoBean
+        private EnrollmentRepository enrollmentRepository;
 
-    @MockitoBean
-    private UserRepository userRepository;
+        @MockitoBean
+        private UserRepository userRepository;
 
-    @MockitoBean
-    private FileStorageService fileStorageService;
+        @MockitoBean
+        private FileStorageService fileStorageService;
 
-    @BeforeEach
-    void setUp() {
-        this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
-                .apply(SecurityMockMvcConfigurers.springSecurity())
-                .build();
-    }
+        @BeforeEach
+        void setUp() {
+                this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                                .apply(SecurityMockMvcConfigurers.springSecurity())
+                                .build();
+        }
 
-    @Test
-    @WithMockUser(username = "profesor_juan", authorities = { "PROFESSOR" })
-    @DisplayName("debe devolver 200 y lista de documentos para profesor autorizado")
-    void shouldReturnDocumentsForAuthorizedProfessor() throws Exception {
-        Long enrollmentId = 2001L;
+        @Test
+        @WithMockUser(username = "profesor_juan", authorities = { "PROFESSOR" })
+        @DisplayName("debe devolver 200 y lista de documentos para profesor autorizado")
+        void shouldReturnDocumentsForAuthorizedProfessor() throws Exception {
+                Long enrollmentId = 2001L;
 
-        Users sender = new Users();
-        sender.setUser_id(1L);
-        sender.setUsername("student_luis");
-        sender.setEmail("luis@correo.com");
-        sender.setRole(Role.STUDENT);
+                Users sender = new Users();
+                sender.setUser_id(1L);
+                sender.setUsername("student_luis");
+                sender.setEmail("luis@correo.com");
+                sender.setRole(Role.STUDENT);
 
-        Users receiver = new Users();
-        receiver.setUser_id(2L);
-        receiver.setUsername("profesor_juan");
-        receiver.setEmail("juan@correo.com");
-        receiver.setRole(Role.PROFESSOR);
+                Users receiver = new Users();
+                receiver.setUser_id(2L);
+                receiver.setUsername("profesor_juan");
+                receiver.setEmail("juan@correo.com");
+                receiver.setRole(Role.PROFESSOR);
 
-        DocumentMetadata doc = new DocumentMetadata();
-        doc.setDocumentid(99L);
-        doc.setFilename("documents/uuid_entrega.pdf");
-        doc.setOriginalname("Entrega_Final.pdf");
-        doc.setSender(sender);
-        doc.setReceiver(receiver);
-        doc.setFolder_type(FolderType.RECEIVED);
-        doc.setRead(false);
+                DocumentMetadata doc = new DocumentMetadata();
+                doc.setDocumentid(99L);
+                doc.setFilename("documents/uuid_entrega.pdf");
+                doc.setOriginalname("Entrega_Final.pdf");
+                doc.setSender(sender);
+                doc.setReceiver(receiver);
+                doc.setFolder_type(FolderType.RECEIVED);
+                doc.setRead(false);
 
-        when(enrollmentRepository.isInstructorAuthorizedForEnrollment(enrollmentId, "profesor_juan"))
-                .thenReturn(true);
-        when(documentMetadataRepository.findDocumentsByEnrollmentId(enrollmentId))
-                .thenReturn(List.of(doc));
+                when(enrollmentRepository.isInstructorAuthorizedForEnrollment(enrollmentId, "profesor_juan"))
+                                .thenReturn(true);
+                when(documentMetadataRepository.findReceivedDocumentsByEnrollmentIdForInstructor(enrollmentId,
+                                "profesor_juan"))
+                                .thenReturn(List.of(doc));
 
-        mockMvc.perform(get("/api/v1/documents/course/enrollment/{enrollmentId}", enrollmentId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].documentid").value(99))
-                .andExpect(jsonPath("$[0].originalname").value("Entrega_Final.pdf"))
-                .andExpect(jsonPath("$[0].sender.username").value("student_luis"));
+                mockMvc.perform(get("/api/v1/documents/course/enrollment/{enrollmentId}", enrollmentId))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].documentid").value(99))
+                                .andExpect(jsonPath("$[0].originalname").value("Entrega_Final.pdf"))
+                                .andExpect(jsonPath("$[0].sender.username").value("student_luis"));
 
-        verify(enrollmentRepository, times(1))
-                .isInstructorAuthorizedForEnrollment(enrollmentId, "profesor_juan");
-        verify(documentMetadataRepository, times(1)).findDocumentsByEnrollmentId(enrollmentId);
-    }
+                verify(enrollmentRepository, times(1))
+                                .isInstructorAuthorizedForEnrollment(enrollmentId, "profesor_juan");
+                verify(documentMetadataRepository, times(1))
+                                .findReceivedDocumentsByEnrollmentIdForInstructor(enrollmentId, "profesor_juan");
+        }
 
-    @Test
-    @WithMockUser(username = "alumno_luis", roles = { "STUDENT" })
-    @DisplayName("debe devolver 403 para usuario autenticado sin rol de profesor")
-    void shouldReturnForbiddenForAuthenticatedNonProfessor() throws Exception {
-        Long enrollmentId = 2001L;
+        @Test
+        @WithMockUser(username = "alumno_luis", roles = { "STUDENT" })
+        @DisplayName("debe devolver 403 para usuario autenticado sin rol de profesor")
+        void shouldReturnForbiddenForAuthenticatedNonProfessor() throws Exception {
+                Long enrollmentId = 2001L;
 
-        mockMvc.perform(get("/api/v1/documents/course/enrollment/{enrollmentId}", enrollmentId))
-                .andExpect(status().isForbidden());
+                mockMvc.perform(get("/api/v1/documents/course/enrollment/{enrollmentId}", enrollmentId))
+                                .andExpect(status().isForbidden());
 
-        verify(enrollmentRepository, never()).isInstructorAuthorizedForEnrollment(enrollmentId, "alumno_luis");
-        verifyNoInteractions(documentMetadataRepository);
-    }
+                verify(enrollmentRepository, never()).isInstructorAuthorizedForEnrollment(enrollmentId, "alumno_luis");
+                verifyNoInteractions(documentMetadataRepository);
+        }
 
-    @Test
-    @DisplayName("debe devolver 401 o 403 para usuario anonimo")
-    void shouldReturnUnauthorizedOrForbiddenForAnonymousUser() throws Exception {
-        Long enrollmentId = 2001L;
+        @Test
+        @DisplayName("debe devolver 401 o 403 para usuario anonimo")
+        void shouldReturnUnauthorizedOrForbiddenForAnonymousUser() throws Exception {
+                Long enrollmentId = 2001L;
 
-        int statusCode = mockMvc.perform(get("/api/v1/documents/course/enrollment/{enrollmentId}", enrollmentId))
-                .andReturn()
-                .getResponse()
-                .getStatus();
+                int statusCode = mockMvc
+                                .perform(get("/api/v1/documents/course/enrollment/{enrollmentId}", enrollmentId))
+                                .andReturn()
+                                .getResponse()
+                                .getStatus();
 
-        assertTrue(statusCode == 401 || statusCode == 403);
-        verifyNoInteractions(enrollmentRepository);
-        verifyNoInteractions(documentMetadataRepository);
-    }
+                assertTrue(statusCode == 401 || statusCode == 403);
+                verifyNoInteractions(enrollmentRepository);
+                verifyNoInteractions(documentMetadataRepository);
+        }
 }

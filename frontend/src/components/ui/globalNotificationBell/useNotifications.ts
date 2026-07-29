@@ -15,6 +15,53 @@ export interface NotificationDTO {
     redirectUrl: string;
 }
 
+const getDocumentsRouteByRole = (role: string): string => {
+    if (role === 'PROFESSOR') return '/professor?focus=documents';
+    if (role === 'ADMIN') return '/admin?focus=documents';
+    return '/student?focus=documents';
+};
+
+const buildDocumentRedirectWithContext = (role: string, document?: DocumentMetadata): string => {
+    const rolePath = role === 'PROFESSOR' ? '/professor' : role === 'ADMIN' ? '/admin' : '/student';
+    const params = new URLSearchParams();
+    params.set('focus', 'documents');
+
+    if (document?.documentid) {
+        params.set('documentId', String(document.documentid));
+    }
+
+    if (role === 'PROFESSOR' && document?.sender?.userId) {
+        params.set('senderId', String(document.sender.userId));
+    }
+
+    return `${rolePath}?${params.toString()}`;
+};
+
+type NotificationApiPayload =
+    | NotificationDTO[]
+    | {
+        notifications?: NotificationDTO[];
+        data?: NotificationDTO[];
+        items?: NotificationDTO[];
+        content?: NotificationDTO[];
+    };
+
+const normalizeNotificationPayload = (payload: NotificationApiPayload | null | undefined): NotificationDTO[] => {
+    if (Array.isArray(payload)) {
+        return payload;
+    }
+
+    if (payload && typeof payload === 'object') {
+        const candidates = [payload.notifications, payload.data, payload.items, payload.content];
+        const resolved = candidates.find(Array.isArray);
+        if (resolved) {
+            return resolved;
+        }
+    }
+
+    return [];
+};
+
 /**
  * Constante que define el nombre del evento personalizado para refrescar las notificaciones globales.
  */
@@ -38,6 +85,14 @@ export const useNotifications = () => {
     const userId = user?.userId ?? null;
     const normalizedRole = typeof user?.role === 'string' ? user.role.toUpperCase() : '';
 
+    const buildDocumentsRedirect = useCallback(() => {
+        return getDocumentsRouteByRole(normalizedRole);
+    }, [normalizedRole]);
+
+    const buildDocumentContextRedirect = useCallback((document?: DocumentMetadata) => {
+        return buildDocumentRedirectWithContext(normalizedRole, document);
+    }, [normalizedRole]);
+
     const fetchAlerts = useCallback(async () => {
         // Cortocircuito defensivo: si no hay usuario autenticado o carece de rol, no hacemos peticiones
         if (!userId || !normalizedRole) {
@@ -55,12 +110,51 @@ export const useNotifications = () => {
         try {
             isFetchingRef.current = true;
             setLoading(true);
-            const [alertsResponse, docsResponse] = await Promise.all([
-                apiClient.get<NotificationDTO[]>('/api/auth/notifications'),
+            const [alertsResponse, docsResponse] = await Promise.allSettled([
+                apiClient.get<NotificationApiPayload>('/api/auth/notifications'),
                 getUserDocuments()
             ]);
-            setAlerts(alertsResponse.data || []);
-            setDocuments(docsResponse || []);
+
+            const rawAlerts = alertsResponse.status === 'fulfilled'
+                ? normalizeNotificationPayload(alertsResponse.value.data)
+                : [];
+            const normalizedAlerts = rawAlerts.map((alert) => {
+                if (alert.type !== 'DOCUMENT_INBOX') {
+                    return alert;
+                }
+
+                return {
+                    ...alert,
+                    redirectUrl: buildDocumentsRedirect(),
+                };
+            });
+            const receivedDocuments = docsResponse.status === 'fulfilled' ? (docsResponse.value || []) : [];
+            const unreadDocuments = receivedDocuments.filter(doc => !doc.isRead);
+            const firstUnreadDocument = unreadDocuments[0];
+
+            const contextualizedAlerts = normalizedAlerts.map((alert) => {
+                if (alert.type !== 'DOCUMENT_INBOX') {
+                    return alert;
+                }
+
+                return {
+                    ...alert,
+                    redirectUrl: buildDocumentContextRedirect(firstUnreadDocument),
+                };
+            });
+
+            const hasDocumentAlert = contextualizedAlerts.some(alert => alert.type === 'DOCUMENT_INBOX');
+            const computedDocumentAlert = unreadDocuments.length > 0 && !hasDocumentAlert
+                ? [{
+                    type: 'DOCUMENT_INBOX' as const,
+                    title: 'Bandeja de Entrada',
+                    message: `Tienes ${unreadDocuments.length} documento(s) pendiente(s) en tu bandeja.`,
+                    redirectUrl: buildDocumentContextRedirect(firstUnreadDocument),
+                }]
+                : [];
+
+            setAlerts([...computedDocumentAlert, ...contextualizedAlerts]);
+            setDocuments(receivedDocuments);
             
         } catch (err) {
             console.error("Error al sincronizar el canal de alarmas académicas o documentos por rol:", err);
@@ -70,7 +164,7 @@ export const useNotifications = () => {
             isFetchingRef.current = false;
             setLoading(false);
         }
-    }, [normalizedRole, userId]);
+    }, [buildDocumentContextRedirect, buildDocumentsRedirect, normalizedRole, userId]);
 
     // Sincronización inicial y escucha de refrescos globales
     useEffect(() => {

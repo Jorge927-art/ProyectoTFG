@@ -8,7 +8,7 @@ import { StudentGradeBreakdown } from './StudentGradeBreakdown';
 import type { TaughtCourse } from '../../../../services/userDomains';
 
 interface TeachingMetricsPanelProps {
-    selectedCourseId: number | null; // null = TODOS
+    selectedCourseId: number | null; // null = TODAS
     onCourseChange: (courseId: number | null) => void;
     availableCourses: TaughtCourse[];
 }
@@ -18,7 +18,7 @@ const formatDecimal = (val: number | undefined): string => (val ? val.toFixed(1)
 /**
  * Panel "Métricas de Docencia" [nueva funcionalidad].
  * Sustituye al bloque estático anterior de ProfessorDashboard. Apila de
- * arriba a abajo: título, selector (TODOS + asignaturas del profesor) y las
+ * arriba a abajo: título, selector (TODAS + asignaturas del profesor) y las
  * estadísticas: progreso alumno, nota alumno, progreso colectivo, tasa de
  * finalización, nota media, valoraciones del curso y valoraciones del
  * profesor.
@@ -37,7 +37,7 @@ export const TeachingMetricsPanel = ({
                 <span>Métricas de Docencia</span>
             </h2>
 
-            {/* SELECTOR: TODOS + asignaturas del profesor, mismo criterio que GradingCenter */}
+            {/* SELECTOR: TODAS + asignaturas del profesor, mismo criterio que GradingCenter */}
             <div className="space-y-1">
                 <label
                     htmlFor="teaching-metrics-selector"
@@ -54,7 +54,7 @@ export const TeachingMetricsPanel = ({
                     }}
                     className="w-full text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg p-2 focus:outline-none focus:border-blue-400"
                 >
-                    <option value="">TODOS</option>
+                    <option value="">TODAS</option>
                     {availableCourses.map((course) => (
                         <option key={course.id} value={course.id}>
                             {course.title}
@@ -128,11 +128,11 @@ export const TeachingMetricsPanel = ({
                     {/* 7. Valoraciones del profesor */}
                     <MetricStatCard
                         icon={<Star size={16} className="text-indigo-500 fill-indigo-400" />}
-                        title="Valoraciones del profesor"
+                        title="Valoración del profesor"
                         value={
                             summary?.instructorRating ? `${formatDecimal(summary.instructorRating)} ★` : 'Sin valoraciones'
                         }
-                        description="Media de valoraciones de alumnos sobre el docente"
+                        description="Media de valoraciones del profesor por parte de los alumnos de la asignatura"
                         badgeLabel="Valoración"
                         badgeClassName="bg-indigo-50 text-indigo-700"
                     />

@@ -18,6 +18,7 @@ import java.security.Principal;
 import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Locale;
 
 /**
  * Controlador REST para gestionar las evaluaciones de los estudiantes por parte
@@ -70,17 +71,73 @@ public class TeacherEvaluationController {
         Enrollment enrollment = enrollmentRepository.findById(request.enrollmentId())
                 .orElseThrow(() -> new IllegalArgumentException("Matrícula no encontrada"));
 
+        List<CourseGrade> existingGrades = courseGradeRepository
+                .findAllByEnrollmentIdOrderByGradeIdAsc(request.enrollmentId());
+
+        String requestedTitle = request.title() != null ? request.title().trim() : "";
+        if (requestedTitle.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "El título de la calificación es obligatorio."));
+        }
+
+        boolean incomingIsExam = isExamGradeTitle(requestedTitle);
+
+        if (incomingIsExam) {
+            CourseGrade existingExam = existingGrades.stream()
+                    .filter(grade -> grade.getTitle() != null && isExamGradeTitle(grade.getTitle()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (existingExam != null) {
+                existingExam.setTitle(requestedTitle);
+                existingExam.setScore(request.score());
+                existingExam.setFeedback(request.feedback());
+                courseGradeRepository.save(existingExam);
+
+                return ResponseEntity.ok(Map.of(
+                        "success", true,
+                        "message", "Calificación de examen actualizada con éxito por el docente autorizado."));
+            }
+        }
+
+        long sameTitleCount = existingGrades.stream()
+                .filter(grade -> grade.getTitle() != null && grade.getTitle().trim().equalsIgnoreCase(requestedTitle))
+                .count();
+
+        String resolvedTitle = requestedTitle;
+        if (!incomingIsExam && sameTitleCount > 0) {
+            resolvedTitle = requestedTitle + " (" + (sameTitleCount + 1) + ")";
+        }
+
         CourseGrade newGrade = new CourseGrade();
-        newGrade.setTitle(request.title());
+        newGrade.setTitle(resolvedTitle);
         newGrade.setScore(request.score());
         newGrade.setFeedback(request.feedback());
         newGrade.setEnrollment(enrollment);
 
+        // enrollment.addGrade(newGrade);
         courseGradeRepository.save(newGrade);
+        // enrollmentRepository.save(enrollment);
 
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Calificación registrada con éxito por el docente autorizado."));
+    }
+
+    private boolean isExamGradeTitle(String title) {
+        String normalized = title.toLowerCase(Locale.ROOT);
+
+        if (normalized.contains("trabajo")
+                || normalized.contains("proyecto")
+                || normalized.contains("actividad")
+                || normalized.contains("práctica")
+                || normalized.contains("practica")) {
+            return false;
+        }
+
+        return normalized.contains("examen")
+                || normalized.contains("evaluación final")
+                || normalized.contains("evaluacion final")
+                || normalized.equals("final");
     }
 
     /**

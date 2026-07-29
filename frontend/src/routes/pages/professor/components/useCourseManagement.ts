@@ -7,6 +7,35 @@ import {
 } from '../../../../services/evaluationService';
 import { uploadProfessorDocument } from '../../../../services/documentService';
 
+type AxiosLikeError = {
+    response?: {
+        data?: {
+            error?: string;
+            message?: string;
+            detalles?: string;
+        };
+    };
+};
+
+const resolveUploadErrorMessage = (error: unknown): string => {
+    const axiosError = error as AxiosLikeError;
+    const payload = axiosError.response?.data;
+
+    if (payload?.error && payload.error.trim().length > 0) {
+        return payload.error;
+    }
+
+    if (payload?.message && payload.message.trim().length > 0) {
+        return payload.message;
+    }
+
+    if (payload?.detalles && payload.detalles.trim().length > 0) {
+        return payload.detalles;
+    }
+
+    return 'Error crítico en el servidor al transmitir el documento.';
+};
+
 export type TabType = 'alumnado' | 'trabajos' | 'metricas';
 
 export const useCourseManagement = (
@@ -16,6 +45,7 @@ export const useCourseManagement = (
     const [students, setStudents] = useState<StudentPerformanceDTO[]>([]);
     const [metrics, setMetrics] = useState<CourseMetricsDTO | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
+    const [dataError, setDataError] = useState<string | null>(null);
     
     // Nueva variable de control para evitar re-consultar si el curso tiene 0 alumnos
     const [hasLoadedAlumnado, setHasLoadedAlumnado] = useState<boolean>(false);
@@ -26,6 +56,7 @@ export const useCourseManagement = (
             setActiveTab('alumnado');
             setStudents([]);
             setMetrics(null);
+            setDataError(null);
             setHasLoadedAlumnado(false);
             setSelectedFile(null);
             setFileError(null);
@@ -48,6 +79,7 @@ export const useCourseManagement = (
 
         const fetchData = async () => {
             setLoading(true);
+            setDataError(null);
             try {
                 if (shouldLoadStudents) {
                     const data = await getActiveStudentsByCourse(courseId);
@@ -63,6 +95,13 @@ export const useCourseManagement = (
                 }
             } catch (error) {
                 console.error("Error asíncrono en useCourseManagement:", error);
+                if (shouldLoadStudents) {
+                    setStudents([]);
+                    setDataError('No se pudo cargar el alumnado de esta asignatura. Intenta de nuevo.');
+                } else if (shouldLoadMetrics) {
+                    setMetrics(null);
+                    setDataError('No se pudieron cargar las métricas de gestión del curso.');
+                }
             } finally {
                 setLoading(false);
             }
@@ -104,13 +143,18 @@ export const useCourseManagement = (
             return;
         }
 
+        const receiverIdNum = parseInt(selectedStudentId, 10);
+        const isBulkSend = receiverIdNum === 0;
+        if (isBulkSend && students.length === 0) {
+            setFileError('No se puede transmitir: esta asignatura no tiene alumnos matriculados.');
+            return;
+        }
+
         setIsSubmitting(true);
         setFileError(null);
         setUploadSuccessMessage(null);
 
         try {
-            const receiverIdNum = parseInt(selectedStudentId, 10);
-            
             const response = await uploadProfessorDocument(selectedFile, courseId, receiverIdNum);
             
             setUploadSuccessMessage(response.message || 'Documento transmitido con éxito.');
@@ -118,10 +162,8 @@ export const useCourseManagement = (
             
      } catch (error: unknown) { // Cambiado a 'unknown' de forma estricta
         console.error("Error en la transmisión del profesor:", error);
-        
-        // Moldeamos la referencia de forma segura para leer la respuesta de Axios
-        const axiosError = error as { response?: { data?: { error?: string } } };
-        setFileError(axiosError.response?.data?.error || 'Error crítico en el servidor al transmitir el documento.');
+
+        setFileError(resolveUploadErrorMessage(error));
     } finally {
             setIsSubmitting(false);
         }
@@ -133,6 +175,7 @@ export const useCourseManagement = (
         students,
         metrics,
         loading,
+        dataError,
         fileError,
         handleFileChange,
         selectedStudentId,

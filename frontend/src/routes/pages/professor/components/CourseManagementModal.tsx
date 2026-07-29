@@ -118,6 +118,12 @@ export const CourseManagementModal = ({
                     </button>
                 </div>
 
+                {management.dataError && (
+                    <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+                        ⚠ {management.dataError}
+                    </p>
+                )}
+
                 {management.activeTab === 'alumnado' && (
                     <div>
                         <table className="min-w-full border-collapse">

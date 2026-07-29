@@ -19,6 +19,8 @@ export const EvaluationPanel = () => {
         submitEvaluation
     } = useActiveEvaluations();
 
+    const safePendingList = Array.isArray(pendingList) ? pendingList : [];
+
     // Estado local para gestionar el formulario activo de cada tarjeta
     const [formStates, setFormStates] = useState<Record<number, Partial<EvaluationInput>>>({});
 
@@ -66,13 +68,13 @@ export const EvaluationPanel = () => {
                         <Loader2 className="animate-spin mb-2" size={24} />
                         <p className="text-xs font-bold">Consultando red académica...</p>
                     </div>
-                ) : pendingList.length === 0 && !evaluationError ? (
+                ) : safePendingList.length === 0 && !evaluationError ? (
                     <div className="bg-slate-50 border-2 border-dashed border-slate-100 rounded-2xl p-8 text-center">
                         <CheckCircle2 className="mx-auto text-emerald-400 mb-2" size={32} />
                         <p className="text-slate-500 text-xs font-bold">¡Todo al día! No tienes evaluaciones pendientes.</p>
                     </div>
                 ) : (
-                    pendingList.map((item) => {
+                    safePendingList.map((item) => {
                         // DIRECTION NOTEBOOKLM: Definición estricta del rango exigido en la recomendación
                         const RATING_RANGE = Array.from({ length: 5 }, (_, i) => i + 1);
                         const state = formStates[item.enrollmentid] || {};

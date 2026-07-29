@@ -72,8 +72,11 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
          *                 activas de alumnos.
          * @return Lista de matrículas activas de alumnos para el curso especificado.
          */
-        @Query("SELECT e FROM Enrollment e WHERE e.course.course_id = :courseId " +
-                        "AND e.user.enabled = true AND e.user.role = 'STUDENT' ORDER BY e.enrollmentid ASC")
+        @Query("SELECT e FROM Enrollment e " +
+                        "JOIN FETCH e.user u " +
+                        "JOIN FETCH e.course c " +
+                        "WHERE c.course_id = :courseId " +
+                        "AND u.enabled = true AND u.role = 'STUDENT' ORDER BY e.enrollmentid ASC")
         List<Enrollment> findActiveStudentEnrollmentsByCourseId(@Param("courseId") Long courseId);
 
         /**
@@ -128,9 +131,12 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
          *                  obtener las matrículas activas de alumnos.
          * @return Lista de matrículas activas de alumnos para los cursos especificados.
          */
-        @Query("SELECT e FROM Enrollment e JOIN FETCH e.course WHERE e.course.course_id IN :courseIds " +
-                        "AND e.user.enabled = true AND e.user.role = 'STUDENT' " +
-                        "ORDER BY e.course.title ASC, e.user.username ASC")
+        @Query("SELECT e FROM Enrollment e " +
+                        "JOIN FETCH e.course c " +
+                        "JOIN FETCH e.user u " +
+                        "WHERE c.course_id IN :courseIds " +
+                        "AND u.enabled = true AND u.role = 'STUDENT' " +
+                        "ORDER BY c.title ASC, u.username ASC")
         List<Enrollment> findActiveStudentEnrollmentsByCourseIds(@Param("courseIds") List<Long> courseIds);
 
         /**

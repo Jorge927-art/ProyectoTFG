@@ -1,12 +1,25 @@
+import { useEffect, useRef } from 'react';
 import { useAuth } from '../../../auth/useAuth';
 import AdminLayout from '../../layouts/DashboardLayout';
 import { UserScrollList } from '../../../components/admin/UserScrollList';
 import { UserSearchPanel } from './components/UserSearchPanel';
 import GenericHeader from '../../../components/ui/genericHeader/GenericHeader';
 import { CourseInsightPanel } from './components/CourseInsightPanel';
+import { AdminDocumentInbox } from './components/AdminDocumentInbox';
 
 const AdminDashboard = () => {
     const { user } = useAuth();
+    const documentsPanelRef = useRef<HTMLDivElement | null>(null);
+    const focusSearch = typeof window !== 'undefined' ? window.location.search : '';
+    const shouldFocusDocuments = new URLSearchParams(focusSearch).get('focus') === 'documents';
+
+    useEffect(() => {
+        if (!shouldFocusDocuments) {
+            return;
+        }
+
+        documentsPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, [shouldFocusDocuments]);
 
     return (
         <AdminLayout>
@@ -35,6 +48,10 @@ const AdminDashboard = () => {
 
             <div className="w-full mt-6">
                 <CourseInsightPanel />
+            </div>
+
+            <div ref={documentsPanelRef} id="admin-documents-panel" className="w-full mt-6">
+                <AdminDocumentInbox autoFocusUnread={shouldFocusDocuments} />
             </div>
         </AdminLayout>
     );

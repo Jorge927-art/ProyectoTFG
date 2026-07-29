@@ -27,6 +27,7 @@ describe('GradingCenter', () => {
     const mockSetEvaluationTitle = vi.fn();
     const mockSetScore = vi.fn();
     const mockSetFeedback = vi.fn();
+    const scrollIntoViewSpy = vi.fn();
 
     const availableCourses: TaughtCourse[] = [
         { id: 1, title: 'Backend Avanzado', category: 'Programacion', studentsCount: 20, averageProgress: 78 },
@@ -67,6 +68,7 @@ describe('GradingCenter', () => {
         students: [],
         selectedStudent: null,
         studentDocuments: [],
+        documentsLoadedFromCourseFallback: false,
         loadingData: false,
         loadingDocs: false,
         isSubmitting: false,
@@ -89,6 +91,10 @@ describe('GradingCenter', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+            configurable: true,
+            value: scrollIntoViewSpy,
+        });
         vi.mocked(useGradingCenter).mockReturnValue(baseHookReturn as ReturnType<typeof useGradingCenter>);
     });
 
@@ -221,6 +227,19 @@ describe('GradingCenter', () => {
         expect(screen.getByText('Cargando archivos...')).toBeInTheDocument();
     });
 
+    it('muestra aviso contextual cuando la recepcion se obtiene por fallback de asignatura', () => {
+        vi.mocked(useGradingCenter).mockReturnValue({
+            ...baseHookReturn,
+            selectedStudent: mockStudent,
+            documentsLoadedFromCourseFallback: true,
+            studentDocuments: [mockStudentDocument],
+        } as ReturnType<typeof useGradingCenter>);
+
+        render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
+
+        expect(screen.getByText('Vista recuperada por verificacion de asignatura para evitar perdida de entregas en datos legacy.')).toBeInTheDocument();
+    });
+
     it('deshabilita envio de documento cuando esta subiendo archivo', () => {
         vi.mocked(useGradingCenter).mockReturnValue({
             ...baseHookReturn,
@@ -263,5 +282,46 @@ describe('GradingCenter', () => {
         expect(mockSetEvaluationTitle).toHaveBeenCalledWith('Examen Final');
         expect(mockSetScore).toHaveBeenCalledWith('9.2');
         expect(mockSetFeedback).toHaveBeenCalledWith('Excelente nivel');
+    });
+
+    it('en modo autoFocusDocuments resalta y centra la primera entrega disponible', async () => {
+        vi.mocked(useGradingCenter).mockReturnValue({
+            ...baseHookReturn,
+            selectedStudent: mockStudent,
+            studentDocuments: [mockStudentDocument]
+        } as ReturnType<typeof useGradingCenter>);
+
+        render(
+            <GradingCenter
+                courseId={1}
+                availableCourses={availableCourses}
+                onCourseChange={mockOnCourseChange}
+                autoFocusDocuments={true}
+            />
+        );
+
+        const row = await screen.findByTestId('grading-document-row-777');
+        expect(row.className).toContain('border-amber-300');
+        expect(scrollIntoViewSpy).toHaveBeenCalled();
+    });
+
+    it('preselecciona alumno objetivo cuando llega focusStudentUserId', async () => {
+        vi.mocked(useGradingCenter).mockReturnValue({
+            ...baseHookReturn,
+            students: [mockStudent],
+            selectedStudent: null
+        } as ReturnType<typeof useGradingCenter>);
+
+        render(
+            <GradingCenter
+                courseId={1}
+                availableCourses={availableCourses}
+                onCourseChange={mockOnCourseChange}
+                autoFocusDocuments={true}
+                focusStudentUserId={10}
+            />
+        );
+
+        expect(mockHandleSelectStudentById).toHaveBeenCalledWith(10);
     });
 });

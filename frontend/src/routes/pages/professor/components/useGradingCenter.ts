@@ -9,7 +9,7 @@ import {
     getActiveStudentsByCourse, 
     submitStudentGrade 
 } from '../../../../services/evaluationService';
-import { getDocumentsByEnrollment, uploadProfessorDocument } from '../../../../services/documentService';
+import { getDocumentsByEnrollment, getReceivedDocumentsByCourse, uploadProfessorDocument } from '../../../../services/documentService';
 import { useNotifications } from '../../../../components/ui/globalNotificationBell/useNotifications';
 
 const ERROR_MESSAGE_AUTO_DISMISS_MS = 6000;
@@ -19,6 +19,7 @@ export const useGradingCenter = (courseId: number | null) => {
     const [students, setStudents] = useState<StudentPerformanceDTO[]>([]);
     const [selectedStudent, setSelectedStudent] = useState<StudentPerformanceDTO | null>(null);
     const [studentDocuments, setStudentDocuments] = useState<DocumentMetadata[]>([]);
+    const [documentsLoadedFromCourseFallback, setDocumentsLoadedFromCourseFallback] = useState<boolean>(false);
     
     // Estados de carga de la API
     const [loadingData, setLoadingData] = useState<boolean>(false);
@@ -57,6 +58,7 @@ export const useGradingCenter = (courseId: number | null) => {
             setStudents([]);
             setSelectedStudent(null);
             setStudentDocuments([]);
+            setDocumentsLoadedFromCourseFallback(false);
             return;
         }
 
@@ -75,6 +77,7 @@ export const useGradingCenter = (courseId: number | null) => {
 
             setSelectedStudent(null); // Resetear selección al cambiar de asignatura
             setStudentDocuments([]);
+            setDocumentsLoadedFromCourseFallback(false);
             setSelectedFile(null);
         };
 
@@ -83,15 +86,37 @@ export const useGradingCenter = (courseId: number | null) => {
 
     const fetchStudentDocuments = async (student: StudentPerformanceDTO) => {
         setStudentDocuments([]);
+        setDocumentsLoadedFromCourseFallback(false);
         setErrorMessage('');
 
         try {
             setLoadingDocs(true);
-            // El endpoint espera enrollmentId; usamos fallback a userId en datasets legacy.
-            const targetEnrollmentId = student.enrollmentId ?? student.userId;
-            const docs = await getDocumentsByEnrollment(targetEnrollmentId);
-            setStudentDocuments(docs);
+
+            // Camino principal: resolver por enrollmentId cuando el dataset del curso lo expone.
+            if (typeof student.enrollmentId === 'number') {
+                const docsByEnrollment = await getDocumentsByEnrollment(student.enrollmentId);
+
+                // Si el endpoint no devuelve datos, hacemos fallback por asignatura para evitar falsos vacíos.
+                if (docsByEnrollment.length > 0 || !courseId) {
+                    setDocumentsLoadedFromCourseFallback(false);
+                    setStudentDocuments(docsByEnrollment);
+                    return;
+                }
+            }
+
+            // Fallback robusto: cargar recibidos por asignatura y filtrar por el alumno emisor.
+            if (!courseId) {
+                setDocumentsLoadedFromCourseFallback(false);
+                setStudentDocuments([]);
+                return;
+            }
+
+            const docsByCourse = await getReceivedDocumentsByCourse(courseId);
+            const docsForStudent = docsByCourse.filter((doc) => doc.sender.userId === student.userId);
+            setDocumentsLoadedFromCourseFallback(true);
+            setStudentDocuments(docsForStudent);
         } catch {
+            setDocumentsLoadedFromCourseFallback(false);
             setErrorMessage('No se pudieron recuperar las entregas físicas de este estudiante.');
         } finally {
             setLoadingDocs(false);
@@ -113,6 +138,7 @@ export const useGradingCenter = (courseId: number | null) => {
         if (!student) {
             setSelectedStudent(null);
             setStudentDocuments([]);
+            setDocumentsLoadedFromCourseFallback(false);
             return;
         }
         await handleSelectStudent(student);
@@ -214,6 +240,7 @@ export const useGradingCenter = (courseId: number | null) => {
         students,
         selectedStudent,
         studentDocuments,
+        documentsLoadedFromCourseFallback,
         loadingData,
         loadingDocs,
         isSubmitting,

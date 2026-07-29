@@ -57,18 +57,24 @@ public interface DocumentMetadataRepository extends JpaRepository<DocumentMetada
                         @Param("courseId") Long courseId);
 
         /**
-         * Recupera los documentos RECIBIDOS por el usuario (alumno) específicos de una
-         * asignatura, filtrando estrictamente por FolderType.RECEIVED y basándose en la
-         * matrícula.
+         * Recupera las entregas RECIBIDAS por un profesor para una matrícula concreta.
+         * Tolera registros legacy sin curso asociado (d.course IS NULL) pero mantiene
+         * aislamiento por profesor receptor para evitar mezclar entregas de otros
+         * flujos.
          * 
-         * @param enrollmentId El ID de la matrícula.
-         * @return Lista de documentos recibidos asociados a la matrícula.
+         * @param enrollmentId       El ID de la matrícula.
+         * @param instructorUsername El username del profesor autenticado.
+         * @return Lista de entregas asociadas a la matrícula y al profesor receptor.
          */
-        @Query("SELECT d FROM DocumentMetadata d JOIN Enrollment e ON e.user = d.sender AND e.course = d.course " +
+        @Query("SELECT d FROM DocumentMetadata d JOIN Enrollment e ON e.user = d.sender " +
                         "WHERE e.enrollmentid = :enrollmentId " +
+                        "AND d.receiver.username = :instructorUsername " +
                         "AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED " +
+                        "AND (d.course IS NULL OR e.course = d.course) " +
                         "ORDER BY d.documentid DESC")
-        List<DocumentMetadata> findDocumentsByEnrollmentId(@Param("enrollmentId") Long enrollmentId);
+        List<DocumentMetadata> findReceivedDocumentsByEnrollmentIdForInstructor(
+                        @Param("enrollmentId") Long enrollmentId,
+                        @Param("instructorUsername") String instructorUsername);
 
         /**
          * Recupera los documentos RECIBIDOS no leídos por el usuario (alumno),

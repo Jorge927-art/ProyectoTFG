@@ -33,6 +33,7 @@ describe('CourseManagementModal - Suite de Pruebas de Alta Fidelidad Funcional',
         students: mockStudentsData,
         metrics: mockMetricsData,
         loading: false,
+        dataError: null,
         fileError: null,
         handleFileChange: vi.fn(),
         selectedStudentId: '101',
@@ -98,6 +99,22 @@ describe('CourseManagementModal - Suite de Pruebas de Alta Fidelidad Funcional',
         render(<CourseManagementModal courseId={42} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
 
         expect(screen.getByText('No hay alumnos activos registrados en esta asignatura.')).toBeInTheDocument();
+    });
+
+    it('Debe mostrar alerta operativa cuando falla la hidratación de alumnado o métricas', () => {
+        const customHookReturn = {
+            ...defaultHookReturn,
+            students: [],
+            dataError: 'No se pudo cargar el alumnado de esta asignatura. Intenta de nuevo.'
+        };
+        const mockReturn = customHookReturn as unknown;
+        vi.mocked(useCourseManagement).mockReturnValue(
+            mockReturn as ReturnType<typeof useCourseManagement>
+        );
+
+        render(<CourseManagementModal courseId={42} isOpen={true} onClose={mockOnClose} onSyncCount={mockOnSyncCount} />);
+
+        expect(screen.getByText('⚠ No se pudo cargar el alumnado de esta asignatura. Intenta de nuevo.')).toBeInTheDocument();
     });
 
     it('Debe priorizar progressPercentage y redondearlo cuando está disponible', () => {

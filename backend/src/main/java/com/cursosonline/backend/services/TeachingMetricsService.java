@@ -29,6 +29,7 @@ public class TeachingMetricsService {
     private final EnrollmentRepository enrollmentRepository;
     private final CourseGradeRepository courseGradeRepository;
     private final AcademicEvaluationRepository academicEvaluationRepository;
+    private final UserService userService;
 
     /**
      * Resuelve el ámbito de asignaturas para el profesor autenticado:
@@ -68,16 +69,36 @@ public class TeachingMetricsService {
             return new TeachingMetricsSummaryDTO(courseId, 0.0, 0.0, 0.0, 0.0, 0.0);
         }
 
-        Double collectiveProgress = enrollmentRepository.getAverageProgressByCourseIds(courseIds);
-        Double completionRate = enrollmentRepository.getCompletionRateByCourseIds(courseIds);
+        List<Enrollment> enrollments = enrollmentRepository.findActiveStudentEnrollmentsByCourseIds(courseIds);
+
+        double collectiveProgress = 0.0;
+        double completionRate = 0.0;
+
+        if (!enrollments.isEmpty()) {
+            int totalStudents = enrollments.size();
+            int accumulatedProgress = 0;
+            int completedStudents = 0;
+
+            for (Enrollment enrollment : enrollments) {
+                int dynamicProgress = userService.calculateCurrentProgress(enrollment);
+                accumulatedProgress += dynamicProgress;
+                if (dynamicProgress >= 100) {
+                    completedStudents++;
+                }
+            }
+
+            collectiveProgress = (double) accumulatedProgress / totalStudents;
+            completionRate = (completedStudents * 100.0) / totalStudents;
+        }
+
         Double averageGrade = courseGradeRepository.getGroupAverageScoreByCourseIds(courseIds);
         Double courseRating = academicEvaluationRepository.getAverageCourseScoreByCourseIds(courseIds);
         Double instructorRating = academicEvaluationRepository.getAverageInstructorScoreByCourseIds(courseIds);
 
         return new TeachingMetricsSummaryDTO(
                 courseId,
-                collectiveProgress != null ? collectiveProgress : 0.0,
-                completionRate != null ? completionRate : 0.0,
+                collectiveProgress,
+                completionRate,
                 averageGrade != null ? averageGrade : 0.0,
                 courseRating != null ? courseRating : 0.0,
                 instructorRating != null ? instructorRating : 0.0);
@@ -108,7 +129,7 @@ public class TeachingMetricsService {
                     enrollment.getUser().getEmail(),
                     enrollmentCourseId,
                     enrollment.getCourse().getTitle(),
-                    enrollment.getProgress_percentage(),
+                    userService.calculateCurrentProgress(enrollment),
                     individualGrade != null ? individualGrade : 0.0);
         }).toList();
     }

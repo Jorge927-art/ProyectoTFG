@@ -11,9 +11,14 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
     const mockSetActiveTab = vi.fn();
     const mockSetSelectedReceiverId = vi.fn();
     let useDocumentsSpy: ReturnType<typeof vi.spyOn>;
+    const scrollIntoViewSpy = vi.fn();
 
     beforeEach(() => {
         vi.clearAllMocks();
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+            configurable: true,
+            value: scrollIntoViewSpy,
+        });
         useDocumentsSpy = vi.spyOn(useDocumentsHook, 'useDocuments');
 
         // AUDITORÍA DE CONTRATO: Configuración inicial que refleja fielmente las nuevas propiedades del hook
@@ -169,6 +174,54 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
                 "El archivo excede el límite de 5MB configurado por el sistema."
             );
             expect(mockHandleUpload).not.toHaveBeenCalled();
+        });
+    });
+
+    it('en modo autoFocusDocuments resalta y centra el primer documento no leído', async () => {
+        const docs = [
+            {
+                documentid: 9,
+                filename: 'old.pdf',
+                originalname: 'old.pdf',
+                upload_date: '2026-07-06T10:00:00.000Z',
+                sender: { userId: 2, username: 'profesor_juan', email: 'juan@tfg.com', role: 'PROFESSOR' },
+                receiver: { userId: 1, username: 'luis_student', email: 'luis@tfg.com', role: 'STUDENT' },
+                folder_type: 'RECEIVED' as const,
+                isRead: true
+            },
+            {
+                documentid: 10,
+                filename: 'new.pdf',
+                originalname: 'new.pdf',
+                upload_date: '2026-07-06T10:00:00.000Z',
+                sender: { userId: 2, username: 'profesor_juan', email: 'juan@tfg.com', role: 'PROFESSOR' },
+                receiver: { userId: 1, username: 'luis_student', email: 'luis@tfg.com', role: 'STUDENT' },
+                folder_type: 'RECEIVED' as const,
+                isRead: false
+            }
+        ];
+
+        useDocumentsSpy.mockReturnValue({
+            documentList: docs,
+            activeTab: 'RECEIVED',
+            setActiveTab: mockSetActiveTab,
+            loadingDocuments: false,
+            isUploading: false,
+            documentError: '',
+            setDocumentError: mockSetDocumentError,
+            directory: [],
+            loadingDirectory: false,
+            selectedReceiverId: '',
+            setSelectedReceiverId: mockSetSelectedReceiverId,
+            handleUpload: mockHandleUpload,
+            handleSecureDownload: mockHandleSecureDownload
+        });
+
+        render(<DocumentManager autoFocusDocuments={true} />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('document-row-10').className).toContain('border-amber-300');
+            expect(scrollIntoViewSpy).toHaveBeenCalled();
         });
     });
 });

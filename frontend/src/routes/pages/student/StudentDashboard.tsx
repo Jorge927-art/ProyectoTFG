@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Sparkles, SlidersHorizontal, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import GenericButton from '../../../components/ui/genericButton/GenericButton';
 
@@ -24,12 +24,22 @@ import { StudentStatsPanel } from './components/StudentStatsPanel';
 import { useActiveEvaluations } from './components/useActiveEvaluations';
 import { CourseAssignmentPanel } from './components/CourseAssignmentPanel';
 
+const ENROLLMENTS_AUTO_REFRESH_MS = 45000;
+
 
 const StudentDashboard = () => {
     // --- ESTADOS DE UI Y FEEDBACK ---
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
     const [successMessage, setSuccessMessage] = useState<string>('');
+    const documentsPanelRef = useRef<HTMLDivElement | null>(null);
+    const focusSearch = typeof window !== 'undefined' ? window.location.search : '';
+    const focusParams = new URLSearchParams(focusSearch);
+    const shouldFocusDocuments = focusParams.get('focus') === 'documents';
+    const focusDocumentIdParam = Number(focusParams.get('documentId'));
+    const focusDocumentId = Number.isFinite(focusDocumentIdParam) && focusDocumentIdParam > 0
+        ? focusDocumentIdParam
+        : null;
 
     /** 
      * HOOK DE ASIGNATURAS MATRICULADAS:
@@ -42,6 +52,46 @@ const StudentDashboard = () => {
             refreshPending();
         }
     }, [enrolledList?.length, refreshPending]);
+
+    useEffect(() => {
+        const handleWindowFocus = () => {
+            fetchStudentEnrollments();
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                fetchStudentEnrollments();
+            }
+        };
+
+        window.addEventListener('focus', handleWindowFocus);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            window.removeEventListener('focus', handleWindowFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [fetchStudentEnrollments]);
+
+    useEffect(() => {
+        const intervalId = window.setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                fetchStudentEnrollments();
+            }
+        }, ENROLLMENTS_AUTO_REFRESH_MS);
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, [fetchStudentEnrollments]);
+
+    useEffect(() => {
+        if (!shouldFocusDocuments) {
+            return;
+        }
+
+        documentsPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, [shouldFocusDocuments]);
 
     /** 
      * HOOK DE RECOMENDACIONES ALGORÍTMICAS:
@@ -188,8 +238,15 @@ const StudentDashboard = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start pt-2">
 
                     {/* REAJUSTE: "Gestión de Documentos Académicos" recupera el ancho estrecho de arriba (1 columna) */}
-                    <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm h-108 overflow-y-auto scrollbar-thin lg:col-span-1">
-                        <DocumentManager />
+                    <div
+                        ref={documentsPanelRef}
+                        id="documents-panel"
+                        className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm h-108 overflow-y-auto scrollbar-thin lg:col-span-1"
+                    >
+                        <DocumentManager
+                            autoFocusDocuments={shouldFocusDocuments}
+                            focusDocumentId={focusDocumentId}
+                        />
                     </div>
 
                     {/* REAJUSTE: "ASIGNATURAS" gana el espacio panorámico de la derecha (2 columnas) */}

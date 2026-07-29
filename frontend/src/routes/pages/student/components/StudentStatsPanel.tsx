@@ -1,8 +1,8 @@
 // frontend/src/routes/pages/student/components/StudentStatsPanel.tsx
 
-import { Trophy, Users, Star, Globe, Tags, Loader2, AlertCircle } from 'lucide-react';
+import { Trophy, Globe, Tags, Loader2, AlertCircle, FileText } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { EnrollmentInfo } from '../../../../services/courseTypes';
 import { useCourseStats } from './useCourseStats';
 
@@ -13,19 +13,50 @@ interface StudentStatsPanelProps {
 
 /**
  * Panel Estadístico Académico del Alumno [ADR-41].
- * Renderiza micro-indicadores analíticos agregados de PostgreSQL.
- * Dividido en dos sub-cajas con tamaños amplios, scrolls naturales y títulos unificados en rojo.
+ * Prioriza la nota individual del examen y el listado de trabajos de la matrícula seleccionada.
  */
 export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStatsPanelProps) => {
     // Estado interno para almacenar de forma reactiva la asignatura seleccionada [ADR-41]
     const [localSelectedId, setLocalSelectedId] = useState<number | null>(null);
-    const { stats, loadingStats, statsError } = useCourseStats(localSelectedId || activeCourseId);
+    const selectedCourseId = localSelectedId ?? activeCourseId ?? null;
+    const selectedEnrollments = useMemo(
+        () => enrolledList.filter((enrollment) => enrollment.course?.course_id === selectedCourseId),
+        [enrolledList, selectedCourseId]
+    );
+    const selectedGrades = useMemo(
+        () => selectedEnrollments.flatMap((enrollment) => enrollment.grades ?? []),
+        [selectedEnrollments]
+    );
+    const { stats, loadingStats, statsError } = useCourseStats(selectedCourseId);
 
     // Formateador defensivo para la maquetación visual [Manejo de Nulidad Pedagógica]
     const formatDecimal = (val: number | null | undefined): string => {
         if (val === null || val === undefined || val === 0) return '---';
-        return val.toFixed(1);
+        return Number(val).toFixed(1);
     };
+
+    const isExamGrade = (title: string): boolean => {
+        const normalized = title.toLowerCase();
+
+        // Si el título describe un trabajo/actividad, jamás debe tratarse como examen.
+        if (
+            normalized.includes('trabajo')
+            || normalized.includes('proyecto')
+            || normalized.includes('actividad')
+            || normalized.includes('práctica')
+            || normalized.includes('practica')
+        ) {
+            return false;
+        }
+
+        return /\bexamen\b/.test(normalized)
+            || /\bevaluaci[oó]n final\b/.test(normalized)
+            || /^\s*final\s*$/.test(normalized);
+    };
+
+    const examGrade = selectedGrades.find((grade) => isExamGrade(grade.title)) ?? null;
+    const workGrades = selectedGrades.filter((grade) => !isExamGrade(grade.title));
+    const shouldShowScrollHint = workGrades.length >= 3;
 
     return (
         <GenericCard className="flex flex-col flex-1 min-h-0">
@@ -53,7 +84,7 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
                             ASIGNATURA
                         </span>
                         <select
-                            value={localSelectedId || activeCourseId || ''}
+                            value={selectedCourseId || ''}
                             onChange={(e) => setLocalSelectedId(Number(e.target.value))}
                             className="text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-slate-700 outline-hidden cursor-pointer hover:bg-slate-100 transition-colors max-w-45 truncate shrink-0"
                         >
@@ -87,64 +118,88 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
                 )}
 
                 {/* 3. Estado de Asignatura No Seleccionada */}
-                {!activeCourseId && !localSelectedId && !loadingStats && !statsError && (
+                {!selectedCourseId && !loadingStats && !statsError && (
                     <div className="text-center p-8 bg-slate-50 border border-dashed border-slate-200 rounded-xl my-auto">
                         <p className="text-[11px] text-slate-400 font-medium italic">
-                            Selecciona una asignatura activa para proyectar sus indicadores analíticos.
+                            Selecciona una asignatura activa para ver tu nota del examen y tus trabajos.
                         </p>
                     </div>
                 )}
                 {/* 4. Renderizado Seguro de las Cajas cuando los datos están listos */}
-                {!loadingStats && !statsError && (activeCourseId || localSelectedId) && (
+                {!loadingStats && !statsError && selectedCourseId && (
                     <div className="flex flex-col gap-4 flex-1 min-h-0">
 
-                        {/* CAJA A: MÉTRICAS DE TU CAMPUS (DATOS LOCALES) */}
+                        {/* CAJA A: RENDIMIENTO ACADÉMICO INDIVIDUAL */}
                         <div className="bg-slate-50/40 border border-slate-100 rounded-xl p-4 flex flex-col min-h-0">
                             <p className="text-[10px] font-black text-slate-900 uppercase tracking-wider mb-3 shrink-0">
-                                Métricas de tu Campus (Datos Locales)
+                                Rendimiento Académico
                             </p>
 
-                            {/* Contenedor de desborde natural para la Caja A */}
-                            <div className="overflow-y-auto custom-scrollbar pr-1 space-y-3 min-h-0">
-                                <div className="grid grid-cols-2 gap-3">
+                            <div className="pr-1 space-y-3 min-h-0">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     <div className="p-3 bg-white border border-slate-100 rounded-xl flex items-center gap-2.5 min-w-0 shadow-xs">
-                                        <Users size={16} className="text-blue-500 shrink-0" />
+                                        <Trophy size={16} className="text-green-500 shrink-0" />
                                         <div className="min-w-0">
-                                            <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight truncate">Comunidad</p>
-                                            <p className="text-xs font-black text-slate-700 mt-0.5 truncate">{stats?.localEnrollments || 0} inscritos</p>
+                                            <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight truncate">Nota del examen</p>
+                                            <p className="text-xs font-black text-slate-700 mt-0.5 truncate">
+                                                {examGrade ? `${formatDecimal(Number(examGrade.score))} / 10` : 'Pendiente de calificar'}
+                                            </p>
                                         </div>
                                     </div>
 
                                     <div className="p-3 bg-white border border-slate-100 rounded-xl flex items-center gap-2.5 min-w-0 shadow-xs">
-                                        <Trophy size={16} className="text-green-500 shrink-0" />
+                                        <FileText size={16} className="text-blue-500 shrink-0" />
                                         <div className="min-w-0">
-                                            <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight truncate">Nota Media</p>
+                                            <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight truncate">Trabajos registrados</p>
                                             <p className="text-xs font-black text-slate-700 mt-0.5 truncate">
-                                                {stats?.averageGrade ? `${formatDecimal(stats.averageGrade)} / 10` : '--- / 10'}
+                                                {workGrades.length} entregas
                                             </p>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="p-3 bg-white border border-slate-100 rounded-xl flex items-center gap-2.5 min-w-0 shadow-xs">
-                                        <Star size={16} className="text-amber-500 fill-amber-400 shrink-0" />
-                                        <div className="min-w-0">
-                                            <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight truncate">Rating Curso</p>
-                                            <p className="text-xs font-black text-slate-700 mt-0.5 truncate">
-                                                {stats?.communityRating ? `${formatDecimal(stats.communityRating)} ★` : 'Sin valoraciones'}
-                                            </p>
-                                        </div>
+                                <div className="bg-white border border-slate-100 rounded-xl p-3 shadow-xs">
+                                    <div className="flex items-center justify-between gap-3 mb-2">
+                                        <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight">
+                                            Trabajos y actividades
+                                        </p>
+                                        {shouldShowScrollHint ? (
+                                            <span className="text-[10px] font-semibold text-slate-500">
+                                                Scroll para ver más
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] font-semibold text-slate-500">
+                                                Lista completa
+                                            </span>
+                                        )}
                                     </div>
 
-                                    <div className="p-3 bg-white border border-slate-100 rounded-xl flex items-center gap-2.5 min-w-0 shadow-xs">
-                                        <Star size={16} className="text-indigo-500 fill-indigo-400 shrink-0" />
-                                        <div className="min-w-0">
-                                            <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight truncate">Rating Docente</p>
-                                            <p className="text-xs font-black text-slate-700 mt-0.5 truncate">
-                                                {stats?.instructorRating ? `${formatDecimal(stats.instructorRating)} ★` : 'Sin valoraciones'}
+                                    <div
+                                        className={`custom-scrollbar pr-1 space-y-2 overscroll-contain ${shouldShowScrollHint
+                                                ? 'h-32 overflow-y-scroll'
+                                                : 'overflow-y-visible'
+                                            }`}
+                                    >
+                                        {workGrades.length === 0 ? (
+                                            <p className="text-xs text-slate-400 italic">
+                                                No hay trabajos registrados para esta asignatura.
                                             </p>
-                                        </div>
+                                        ) : (
+                                            workGrades.map((grade, index) => (
+                                                <div
+                                                    key={`${grade.title}-${index}`}
+                                                    className="flex items-center justify-between gap-3 p-2 rounded-lg border border-slate-100 bg-slate-50"
+                                                >
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs font-bold text-slate-700 truncate">{grade.title}</p>
+                                                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">Trabajo</p>
+                                                    </div>
+                                                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md font-black text-[10px] shrink-0">
+                                                        {formatDecimal(Number(grade.score))} / 10
+                                                    </span>
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
                                 </div>
                             </div>

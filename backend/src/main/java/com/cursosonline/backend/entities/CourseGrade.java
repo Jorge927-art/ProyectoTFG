@@ -1,9 +1,11 @@
 package com.cursosonline.backend.entities; // <- AJUSTADO A TU PAQUETE REAL
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 
@@ -15,7 +17,8 @@ import java.math.BigDecimal;
  */
 @Entity
 @Table(name = "course_grades")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class CourseGrade {
@@ -34,6 +37,7 @@ public class CourseGrade {
     @Column(name = "feedback", columnDefinition = "TEXT")
     private String feedback;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "enrollment_id", nullable = false)
     private Enrollment enrollment; // Vinculación física con la matrícula del alumno

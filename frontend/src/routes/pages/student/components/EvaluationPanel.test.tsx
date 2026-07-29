@@ -127,4 +127,19 @@ describe('EvaluationPanel Component [TFG Test Suite]', () => {
         const submitButton = screen.getByRole('button', { name: /ENVIAR EVALUACIÓN/i });
         expect(submitButton).toBeDisabled();
     });
+
+    it('debe degradar con seguridad al estado vacío si pendingList llega con formato no-array', () => {
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: { pending: [] } as unknown as never[],
+            loadingPending: false,
+            isSubmitting: false,
+            evaluationError: '',
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
+        });
+
+        render(<EvaluationPanel />);
+
+        expect(screen.getByText('¡Todo al día! No tienes evaluaciones pendientes.')).toBeInTheDocument();
+    });
 });

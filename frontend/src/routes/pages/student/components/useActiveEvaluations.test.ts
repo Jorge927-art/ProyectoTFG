@@ -155,6 +155,21 @@ describe('useActiveEvaluations - Suite de Pruebas Unitarias del Hook de Evaluaci
         
         expect(getPendingEvaluations).toHaveBeenCalledTimes(2);
     });
+
+    it('Debe normalizar payload con envoltorio y evitar colapso si no llega un array directo', async () => {
+        vi.mocked(getPendingEvaluations).mockResolvedValue({
+            pending: mockPendingData
+        } as unknown as PendingEvaluationDTO[]);
+
+        const { result } = renderHook(() => useActiveEvaluations());
+
+        await waitFor(() => {
+            expect(result.current.loadingPending).toBe(false);
+        });
+
+        expect(result.current.pendingList).toHaveLength(2);
+        expect(result.current.evaluationError).toBe('');
+    });
 });
 
 

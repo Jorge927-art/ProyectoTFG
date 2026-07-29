@@ -333,7 +333,8 @@ public class DocumentControllerTest {
                 doc.setCourse(course);
                 doc.setFolder_type(FolderType.RECEIVED);
 
-                Mockito.when(documentMetadataRepository.findDocumentsByEnrollmentId(enrollmentId))
+                Mockito.when(documentMetadataRepository
+                                .findReceivedDocumentsByEnrollmentIdForInstructor(enrollmentId, "profesor_juan"))
                                 .thenReturn(List.of(doc));
 
                 ResponseEntity<?> response = documentController.getDocumentsByEnrollmentId(authentication,
@@ -346,6 +347,103 @@ public class DocumentControllerTest {
                 assertEquals(1, payload.size());
                 Map<?, ?> first = (Map<?, ?>) payload.get(0);
                 assertEquals("Entrega_Final.pdf", first.get("originalname"));
+        }
+
+        @Test
+        @DisplayName("Debe procesar envío masivo del profesor sin violar receiver_id al enviar a toda la clase")
+        void debeProcesarEnvioMasivoProfesorConReceiverIdCero() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "guia_general.pdf",
+                                "application/pdf",
+                                "Contenido para toda la clase".getBytes());
+
+                Users studentA = new Users();
+                studentA.setUser_id(21L);
+                studentA.setUsername("student_a");
+                studentA.setRole(Role.STUDENT);
+
+                Users studentB = new Users();
+                studentB.setUser_id(22L);
+                studentB.setUsername("student_b");
+                studentB.setRole(Role.STUDENT);
+
+                Courses course = new Courses();
+                course.setCourse_id(2958L);
+
+                Enrollment enrollmentA = new Enrollment();
+                enrollmentA.setEnrollmentid(5001L);
+                enrollmentA.setUser(studentA);
+                enrollmentA.setCourse(course);
+
+                Enrollment enrollmentB = new Enrollment();
+                enrollmentB.setEnrollmentid(5002L);
+                enrollmentB.setUser(studentB);
+                enrollmentB.setCourse(course);
+
+                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
+                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
+                                .thenReturn("documents/uuid_bulk.pdf");
+                Mockito.when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(2958L))
+                                .thenReturn(List.of(enrollmentA, enrollmentB));
+
+                ResponseEntity<?> response = documentController.professorUploadDocument(authentication, validFile,
+                                2958L,
+                                0L);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertNotNull(bodyMap);
+                assertEquals("Documento transmitido con éxito de forma masiva a toda la clase", bodyMap.get("message"));
+                assertEquals(2, bodyMap.get("totalStudents"));
+
+                // 2 alumnos => 4 registros (SENT + RECEIVED por alumno)
+                Mockito.verify(documentMetadataRepository, Mockito.times(4)).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("Debe resolver al profesor autenticado por username sin importar mayúsculas/minúsculas")
+        void debeResolverProfesorPorUsernameIgnoreCaseEnProfessorUpload() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "guia_case.pdf",
+                                "application/pdf",
+                                "Contenido con principal en casing distinto".getBytes());
+
+                Mockito.when(authentication.getName()).thenReturn("Laura");
+                Mockito.when(userRepository.findByUsername("Laura")).thenReturn(Optional.empty());
+
+                Users lauraLowercase = new Users();
+                lauraLowercase.setUser_id(30L);
+                lauraLowercase.setUsername("laura");
+                lauraLowercase.setEmail("laura@demo.com");
+                lauraLowercase.setRole(Role.PROFESSOR);
+                Mockito.when(userRepository.findByUsernameIgnoreCase("Laura")).thenReturn(Optional.of(lauraLowercase));
+
+                Users studentA = new Users();
+                studentA.setUser_id(31L);
+                studentA.setUsername("student_case");
+                studentA.setRole(Role.STUDENT);
+
+                Courses course = new Courses();
+                course.setCourse_id(2958L);
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(6001L);
+                enrollment.setUser(studentA);
+                enrollment.setCourse(course);
+
+                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
+                                .thenReturn("documents/uuid_case.pdf");
+                Mockito.when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(2958L))
+                                .thenReturn(List.of(enrollment));
+
+                ResponseEntity<?> response = documentController.professorUploadDocument(authentication, validFile,
+                                2958L,
+                                0L);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                Mockito.verify(documentMetadataRepository, Mockito.times(2)).save(any(DocumentMetadata.class));
         }
 
         @Test

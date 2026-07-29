@@ -7,6 +7,7 @@ import com.cursosonline.backend.entities.AcademicEvaluation;
 import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.DocumentMetadata;
+import com.cursosonline.backend.entities.CourseGrade;
 import com.cursosonline.backend.dto.InterestDTO;
 import com.cursosonline.backend.repository.UserRepository;
 import com.cursosonline.backend.repository.CoursesRepository;
@@ -34,6 +35,8 @@ import java.util.Locale;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,6 +57,7 @@ public class UserService {
     private final InterestRepository interestRepository;
     private final CoursesRepository coursesRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final com.cursosonline.backend.repository.CourseGradeRepository courseGradeRepository;
     private final DocumentMetadataRepository documentMetadataRepository;
     private final com.cursosonline.backend.repository.AcademicEvaluationRepository academicEvaluationRepository;
     private final com.cursosonline.backend.repository.UserProfileRepository userProfileRepository;
@@ -73,7 +77,17 @@ public class UserService {
      */
     @Transactional(readOnly = true)
     public Optional<Users> findByUsername(String username) {
-        return userRepository.findByUsername(username);
+        Optional<Users> exactMatch = userRepository.findByUsername(username);
+        if (exactMatch.isPresent()) {
+            return exactMatch;
+        }
+
+        Optional<Users> caseInsensitiveMatch = userRepository.findByUsernameIgnoreCase(username);
+        if (caseInsensitiveMatch.isPresent()) {
+            return caseInsensitiveMatch;
+        }
+
+        return userRepository.findByEmailIgnoreCase(username);
     }
 
     /**
@@ -595,17 +609,20 @@ public class UserService {
                 || enrollment.getCourse().getDuration() == null)
             return 0;
 
-        // Mapeo seguro .longValue() para evitar problemas de tipos primitivos con Float
-        long totalHours = enrollment.getCourse().getDuration().longValue();
+        // Conservamos precisión de la duración para cursos cortos (ej. 1h, 1.5h).
+        double totalHours = enrollment.getCourse().getDuration().doubleValue();
         if (totalHours <= 0)
             return 0;
 
-        // Cálculo de horas transcurridas preciso usando el reloj inyectado
-        long hoursElapsed = java.time.Duration.between(
+        // Calculamos el progreso en base a minutos para evitar truncar a 0% durante la
+        // primera hora.
+        long minutesElapsed = java.time.Duration.between(
                 enrollment.getStarted_at(),
-                LocalDateTime.now(clock)).toHours();
+                LocalDateTime.now(clock)).toMinutes();
 
-        double progress = (hoursElapsed * 100.0) / totalHours;
+        double totalMinutes = totalHours * 60.0;
+
+        double progress = (minutesElapsed * 100.0) / totalMinutes;
 
         // Acotamiento inmutable estricto entre 0 y 100
         return (int) Math.max(0, Math.min(100, Math.floor(progress)));
@@ -637,16 +654,36 @@ public class UserService {
         // 1. Recuperamos la lista directa desde la relación JOIN FETCH del repositorio
         List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(userId);
 
+        List<Long> enrollmentIds = enrollments.stream()
+                .map(Enrollment::getEnrollmentid)
+                .filter(id -> id != null && id > 0)
+                .toList();
+
+        Map<Long, List<CourseGrade>> gradesByEnrollmentId = new HashMap<>();
+        if (!enrollmentIds.isEmpty()) {
+            List<CourseGrade> persistedGrades = courseGradeRepository
+                    .findAllByEnrollmentIdsOrderByGradeIdAsc(enrollmentIds);
+
+            for (CourseGrade grade : persistedGrades) {
+                if (grade == null || grade.getEnrollment() == null || grade.getEnrollment().getEnrollmentid() == null) {
+                    continue;
+                }
+
+                Long enrollmentId = grade.getEnrollment().getEnrollmentid();
+                gradesByEnrollmentId.computeIfAbsent(enrollmentId, key -> new ArrayList<>()).add(grade);
+            }
+        }
+
         // 2. Recorremos cada matrícula para inyectar proactivamente el progreso
         // dinámico transcurrido e hidratar las notas correspondientes
         for (Enrollment enrollment : enrollments) {
             int currentProgress = calculateCurrentProgress(enrollment);
             enrollment.setProgress_percentage(currentProgress);
 
-            // Forzamos a Hibernate a inicializar la colección de notas desde PostgreSQL
-            if (enrollment.getGrades() != null) {
-                enrollment.getGrades().size();
-            }
+            List<CourseGrade> enrollmentGrades = gradesByEnrollmentId.getOrDefault(
+                    enrollment.getEnrollmentid(),
+                    new ArrayList<>());
+            enrollment.setGrades(enrollmentGrades);
         }
 
         // 3. Devolvemos la lista perfectamente calculada y sincronizada

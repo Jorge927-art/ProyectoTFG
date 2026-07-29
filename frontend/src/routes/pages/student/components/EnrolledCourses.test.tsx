@@ -62,7 +62,7 @@ describe('Auditoría UI: Aislamiento de Estados en EnrolledCourses', () => {
 
         // 2. Validamos que la etiqueta del segundo curso muestra el texto de alta fidelidad inmutable
         expect(screen.getByText('✓ Estudiando asignatura')).toBeInTheDocument();
-        expect(screen.getByText('En curso (24h/día)')).toBeInTheDocument();
+        expect(screen.getByText('En curso')).toBeInTheDocument();
         expect(screen.getByText('15%')).toBeInTheDocument();
     });
 
@@ -80,5 +80,49 @@ describe('Auditoría UI: Aislamiento de Estados en EnrolledCourses', () => {
 
         // Verificamos que la mutación use el identificador de la matrícula y no el del curso.
         expect(vi.mocked(apiClient.post)).toHaveBeenCalledWith('/api/auth/enrollment/101/start');
+    });
+
+    it('debe mostrar la duración en horas cuando el curso dura menos de 24 horas', () => {
+        const shortCourse: EnrollmentInfo[] = [
+            {
+                ...mockEnrolledList[0],
+                course: {
+                    ...mockEnrolledList[0].course,
+                    duration: 1,
+                }
+            }
+        ];
+
+        render(
+            <EnrolledCourses
+                enrolledList={shortCourse}
+                loadingEnrollments={false}
+                onRefresh={mockOnRefresh}
+            />
+        );
+
+        expect(screen.getByText(/Duración: 1 hora \| Prof\./i)).toBeInTheDocument();
+    });
+
+    it('debe mostrar la duración en días cuando el curso dura más de 24 horas', () => {
+        const longCourse: EnrollmentInfo[] = [
+            {
+                ...mockEnrolledList[1],
+                course: {
+                    ...mockEnrolledList[1].course,
+                    duration: 49,
+                }
+            }
+        ];
+
+        render(
+            <EnrolledCourses
+                enrolledList={longCourse}
+                loadingEnrollments={false}
+                onRefresh={mockOnRefresh}
+            />
+        );
+
+        expect(screen.getByText(/Duración: 3 días \| Prof\./i)).toBeInTheDocument();
     });
 });

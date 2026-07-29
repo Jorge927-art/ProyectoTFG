@@ -4,14 +4,17 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty; // Importación obligatoria para el contrato JSON
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List; // Soporte para colecciones relacionales
 
 @Entity
 @Table(name = "enrollment")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class Enrollment {
@@ -59,12 +62,35 @@ public class Enrollment {
     /**
      * Relación bidireccional con las calificaciones del curso [ADR-39].
      * Mapeado por el campo 'enrollment' de la entidad CourseGrade.
-     * Se usa cascade ALL y orphanRemoval para que al borrar una matrícula se
-     * limpien sus notas.
+     * Se mantiene como una colección estable y se evita orphanRemoval para no
+     * corromper la matrícula ni las notas al persistir una evaluación nueva.
      */
     @JsonIgnore
-    @OneToMany(mappedBy = "enrollment", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<CourseGrade> grades;
+    @OneToMany(mappedBy = "enrollment", cascade = { CascadeType.PERSIST, CascadeType.MERGE }, fetch = FetchType.LAZY)
+    private List<CourseGrade> grades = new ArrayList<>();
+
+    public void addGrade(CourseGrade grade) {
+        if (grade == null) {
+            return;
+        }
+        if (this.grades == null) {
+            this.grades = new ArrayList<>();
+        }
+        if (!this.grades.contains(grade)) {
+            this.grades.add(grade);
+        }
+        grade.setEnrollment(this);
+    }
+
+    public void removeGrade(CourseGrade grade) {
+        if (grade == null || this.grades == null) {
+            return;
+        }
+        this.grades.remove(grade);
+        if (grade.getEnrollment() == this) {
+            grade.setEnrollment(null);
+        }
+    }
 
     /**
      * Getter explícito para la salida JSON del frontend de asignaturas en curso
@@ -93,6 +119,6 @@ public class Enrollment {
         this.status = status != null ? status : "EN_PROGRESO";
         this.progress_percentage = progress_percentage;
         this.started_at = started_at;
-        this.grades = null;
+        this.grades = new ArrayList<>();
     }
 }

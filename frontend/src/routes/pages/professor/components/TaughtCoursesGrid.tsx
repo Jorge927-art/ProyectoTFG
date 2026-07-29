@@ -32,7 +32,7 @@ export const TaughtCoursesGrid = ({
     return (
         <div
             data-testid="taught-courses-scroll-container"
-            className={`pr-2 custom-scrollbar balance-scroll ${shouldEnableScroll ? 'max-h-[28rem] overflow-y-auto' : 'overflow-y-visible'
+            className={`pr-2 custom-scrollbar balance-scroll ${shouldEnableScroll ? 'max-h-136 overflow-y-auto' : 'overflow-y-visible'
                 }`}
         >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

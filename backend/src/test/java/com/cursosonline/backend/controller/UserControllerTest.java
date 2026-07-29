@@ -4,7 +4,6 @@ import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Users;
-import com.cursosonline.backend.exception.GlobalExceptionHandler;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserProfileRepository;
 import com.cursosonline.backend.security.jwt.JwtService;
@@ -184,6 +183,63 @@ class UserControllerTest {
                                 .andExpect(jsonPath("$[0].course.course_id").value(101))
                                 .andExpect(jsonPath("$[0].course.title")
                                                 .value("Introduction to Data Science Specialization"));
+        }
+
+        @Test
+        void myActiveCoursesDebePriorizarUsernameExplicitoAunqueExistaPrincipal() throws Exception {
+                Users explicitUser = new Users(10L, "Carlos", "encoded", Role.STUDENT, "carlos@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses course = new Courses();
+                course.setCourse_id(501L);
+                course.setTitle("Arquitectura de Software");
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(999L);
+                enrollment.setUser(explicitUser);
+                enrollment.setCourse(course);
+                enrollment.setStatus("EN_PROGRESO");
+                enrollment.setProgress_percentage(42);
+
+                when(userService.findByUsername("Carlos")).thenReturn(Optional.of(explicitUser));
+                when(userService.getStudentActiveCoursesWithCalculatedProgress(10L)).thenReturn(List.of(enrollment));
+
+                java.security.Principal mismatchedPrincipal = () -> "otro_usuario";
+
+                mockMvc.perform(get("/api/auth/my-active-courses")
+                                .principal(mismatchedPrincipal)
+                                .param("username", "Carlos"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].enrollmentid").value(999))
+                                .andExpect(jsonPath("$[0].course.course_id").value(501))
+                                .andExpect(jsonPath("$[0].course.title").value("Arquitectura de Software"));
+        }
+
+        @Test
+        void myActiveCoursesDebeUsarFallbackPorUserIdExplicitoSiTokenYUsernameNoResuelven() throws Exception {
+                Users user = new Users(77L, "carlos_student", "encoded", Role.STUDENT, "carlos@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses course = new Courses();
+                course.setCourse_id(321L);
+                course.setTitle("Programación Funcional Aplicada");
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(1234L);
+                enrollment.setUser(user);
+                enrollment.setCourse(course);
+                enrollment.setStatus("EN_PROGRESO");
+                enrollment.setProgress_percentage(11);
+
+                when(userService.getStudentActiveCoursesWithCalculatedProgress(77L)).thenReturn(List.of(enrollment));
+
+                java.security.Principal mismatchedPrincipal = () -> "otro_usuario";
+
+                mockMvc.perform(get("/api/auth/my-active-courses")
+                                .principal(mismatchedPrincipal)
+                                .param("userId", "77"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].enrollmentid").value(1234))
+                                .andExpect(jsonPath("$[0].course.course_id").value(321))
+                                .andExpect(jsonPath("$[0].course.title").value("Programación Funcional Aplicada"));
         }
 
         /**
