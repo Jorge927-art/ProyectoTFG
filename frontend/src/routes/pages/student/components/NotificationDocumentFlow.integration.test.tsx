@@ -6,6 +6,7 @@ import * as useDocumentsHook from './useDocuments';
 import { apiClient } from '../../../../services/apiClient';
 import * as documentService from '../../../../services/documentService';
 import type { DocumentMetadata } from '../../../../services/documentService';
+import { MemoryRouter } from 'react-router-dom';
 
 const unreadDocument: DocumentMetadata = {
     documentid: 11,
@@ -73,12 +74,14 @@ describe('Integracion campana + gestor de documentos', () => {
             handleSecureDownload: mockHandleSecureDownload,
         });
 
+
         render(
-            <>
+            <MemoryRouter>
                 <NotificationBell />
                 <DocumentManager />
-            </>
+            </MemoryRouter>
         );
+
 
         const bellButton = screen.getByRole('button', { name: /campana de notificaciones/i });
 
