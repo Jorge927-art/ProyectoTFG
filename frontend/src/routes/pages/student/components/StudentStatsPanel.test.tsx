@@ -158,4 +158,49 @@ describe('StudentStatsPanel - Pruebas de Control [ADR-41]', () => {
         expect(screen.getByText('Trabajo final módulo 2')).toBeInTheDocument();
         expect(screen.getByText('9.0 / 10')).toBeInTheDocument();
     });
+
+    it('debería mostrar la Nota Final de la Asignatura cuando existe', () => {
+        render(
+            <StudentStatsPanel
+                activeCourseId={1}
+                enrolledList={[{
+                    enrollmentid: 10,
+                    enrolled_at: '2026-07-01T10:00:00Z',
+                    started_at: null,
+                    status: 'EN_PROGRESO',
+                    progress_percentage: 40,
+                    course: { course_id: 1, title: 'Migrating to Cloud SQL', category: 'Cloud', instructors: 'Profesor Demo', duration: 20 },
+                    grades: [
+                        { title: 'Trabajo 1', score: '8.0' },
+                        { title: 'Examen final', score: '7.0' },
+                        { title: 'Nota Final Asignatura', score: '7.5' }
+                    ]
+                }]}
+            />
+        );
+
+        expect(screen.getByText('Nota Final de la Asignatura')).toBeInTheDocument();
+        expect(screen.getByText('7.5 / 10')).toBeInTheDocument();
+        // Importante: confirma que NO se cuela en "Trabajos y actividades"
+        expect(screen.getByText('1 entregas')).toBeInTheDocument();
+    });
+
+    it('debería mostrar mensaje de pendiente cuando aún no hay Nota Final', () => {
+        render(
+            <StudentStatsPanel
+                activeCourseId={1}
+                enrolledList={[{
+                    enrollmentid: 10,
+                    enrolled_at: '2026-07-01T10:00:00Z',
+                    started_at: null,
+                    status: 'EN_PROGRESO',
+                    progress_percentage: 40,
+                    course: { course_id: 1, title: 'Migrating to Cloud SQL', category: 'Cloud', instructors: 'Profesor Demo', duration: 20 },
+                    grades: [{ title: 'Trabajo 1', score: '8.0' }]
+                }]}
+            />
+        );
+
+        expect(screen.getByText('Aún no se ha publicado la nota final de esta asignatura.')).toBeInTheDocument();
+    });
 });

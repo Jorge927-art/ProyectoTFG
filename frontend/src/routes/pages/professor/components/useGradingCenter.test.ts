@@ -363,6 +363,37 @@ describe('useGradingCenter', () => {
         expect(result.current.errorMessage).toBe('Por favor, introduce una calificación válida.');
     });
 
+    it('muestra el mensaje de backend cuando submitStudentGrade devuelve error de Axios', async () => {
+        const backendErrorMessage = 'La Nota Final de la Asignatura ya fue enviada. Es definitiva y no puede modificarse.';
+        vi.mocked(submitStudentGrade).mockRejectedValueOnce({
+            isAxiosError: true,
+            response: {
+                data: {
+                    error: backendErrorMessage
+                }
+            }
+        });
+
+        const { result } = renderHook(() => useGradingCenter(10));
+        await waitFor(() => expect(result.current.loadingData).toBe(false));
+
+        await act(async () => {
+            await result.current.handleSelectStudentById(11);
+        });
+
+        act(() => {
+            result.current.setEvaluationTitle('Nota Final Asignatura');
+            result.current.setScore('7.0');
+        });
+
+        await act(async () => {
+            await result.current.handleGradeSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+        });
+
+        expect(result.current.errorMessage).toBe(backendErrorMessage);
+        expect(result.current.isSubmitting).toBe(false);
+    });
+
     it('muestra error perimetral cuando falla submitStudentGrade', async () => {
         vi.mocked(submitStudentGrade).mockRejectedValueOnce(new Error('grade-error'));
 

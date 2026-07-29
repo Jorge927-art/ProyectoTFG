@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -655,7 +656,8 @@ public class UserService {
         List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(userId);
 
         List<Long> enrollmentIds = enrollments.stream()
-                .map(Enrollment::getEnrollmentid)
+                .filter(Objects::nonNull)
+                .map(e -> e.getEnrollmentid())
                 .filter(id -> id != null && id > 0)
                 .toList();
 

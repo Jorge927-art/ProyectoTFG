@@ -298,6 +298,7 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
                                 >
                                     <option value="Trabajo Académico Escrito">Trabajo Escrito</option>
                                     <option value="Examen Final">Examen Final</option>
+                                    <option value="Nota Final Asignatura">Nota Final Asignatura</option>
                                 </select>
                             </div>
 

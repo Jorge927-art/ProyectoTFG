@@ -4,6 +4,7 @@ import type {
     StudentPerformanceDTO
 } from '../../../../services/evaluationService';
 import type { DocumentMetadata } from '../../../../services/documentService';
+import axios from 'axios';
 
 import { 
     getActiveStudentsByCourse, 
@@ -229,8 +230,13 @@ export const useGradingCenter = (courseId: number | null) => {
             // [NotebookLM Punto 5]: Sincronizar campanas del sistema
             refreshNotifications();
 
-        } catch {
-            setErrorMessage('Error crítico perimetral: No tienes autorización o la sesión expiró.');
+        } catch (error) {
+            const backendMessage =
+                axios.isAxiosError(error) && typeof error.response?.data?.error === 'string'
+                    ? error.response.data.error
+                    : null;
+
+            setErrorMessage(backendMessage ?? 'Error crítico perimetral: No tienes autorización o la sesión expiró.');
         } finally {
             setIsSubmitting(false);
         }

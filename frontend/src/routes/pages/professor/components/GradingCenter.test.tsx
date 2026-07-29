@@ -3,6 +3,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { GradingCenter } from './GradingCenter';
 import { useGradingCenter } from './useGradingCenter';
 import { downloadDocumentSecure } from '../../../../services/documentService';
+
 import type { TaughtCourse } from '../../../../services/userDomains';
 import type { StudentPerformanceDTO } from '../../../../services/evaluationService';
 import type { DocumentMetadata } from '../../../../services/documentService';
@@ -14,6 +15,14 @@ vi.mock('./useGradingCenter', () => ({
 vi.mock('../../../../services/documentService', () => ({
     downloadDocumentSecure: vi.fn()
 }));
+
+vi.mock('axios', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('axios')>();
+    return {
+        ...actual,
+        isAxiosError: vi.fn((err: unknown) => Boolean((err as { isAxiosError?: boolean })?.isAxiosError)),
+    };
+});
 
 describe('GradingCenter', () => {
     const mockOnCourseChange = vi.fn();
@@ -324,4 +333,5 @@ describe('GradingCenter', () => {
 
         expect(mockHandleSelectStudentById).toHaveBeenCalledWith(10);
     });
+
 });

@@ -54,9 +54,16 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
             || /^\s*final\s*$/.test(normalized);
     };
 
+    const isFinalCourseGrade = (title: string): boolean => {
+        return title.trim().toLowerCase() === 'nota final asignatura';
+    };
+
     const examGrade = selectedGrades.find((grade) => isExamGrade(grade.title)) ?? null;
-    const workGrades = selectedGrades.filter((grade) => !isExamGrade(grade.title));
-    const shouldShowScrollHint = workGrades.length >= 3;
+    const finalCourseGrade = selectedGrades.find((grade) => isFinalCourseGrade(grade.title)) ?? null;
+    const workGrades = selectedGrades.filter(
+        (grade) => !isExamGrade(grade.title) && !isFinalCourseGrade(grade.title)
+    );
+    const shouldShowScrollHint = workGrades.length > 3;
 
     return (
         <GenericCard className="flex flex-col flex-1 min-h-0">
@@ -176,8 +183,8 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
 
                                     <div
                                         className={`custom-scrollbar pr-1 space-y-2 overscroll-contain ${shouldShowScrollHint
-                                                ? 'h-32 overflow-y-scroll'
-                                                : 'overflow-y-visible'
+                                            ? 'h-32 overflow-y-scroll'
+                                            : 'overflow-y-visible'
                                             }`}
                                     >
                                         {workGrades.length === 0 ? (
@@ -201,6 +208,35 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
                                             ))
                                         )}
                                     </div>
+                                </div>
+
+                                {/* NOTA FINAL DE ASIGNATURA: definitiva, enviada por el profesor */}
+                                <div className="bg-white border border-slate-100 rounded-xl p-3 shadow-xs">
+                                    <div className="flex items-center justify-between gap-3 mb-2">
+                                        <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight">
+                                            Nota Final de la Asignatura
+                                        </p>
+                                        {finalCourseGrade && (
+                                            <span className="text-[10px] font-semibold text-emerald-600">
+                                                Definitiva
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {finalCourseGrade ? (
+                                        <div className="flex items-center justify-between gap-3 p-2 rounded-lg border border-emerald-100 bg-emerald-50">
+                                            <span className="text-xs font-bold text-slate-700">
+                                                Ponderación de trabajos y examen final
+                                            </span>
+                                            <span className="px-2 py-0.5 bg-emerald-600 text-white rounded-md font-black text-[10px] shrink-0">
+                                                {formatDecimal(Number(finalCourseGrade.score))} / 10
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-slate-400 italic">
+                                            Aún no se ha publicado la nota final de esta asignatura.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </div>

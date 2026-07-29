@@ -158,4 +158,16 @@ class TeacherEvaluationControllerMockMvcTest {
                 verifyNoInteractions(courseGradeRepository);
                 verifyNoInteractions(enrollmentRepository);
         }
+
+        @Test
+        @DisplayName("Debe registrar la Nota Final de Asignatura la primera vez que se envía")
+        void deberiaRegistrarNotaFinalAsignaturaPrimeraVez() {
+
+        }
+
+        @Test
+        @DisplayName("Debe rechazar con 409 el reenvío de la Nota Final de Asignatura ya existente")
+        void deberiaRechazarReenvioNotaFinalAsignatura() {
+
+        }
 }

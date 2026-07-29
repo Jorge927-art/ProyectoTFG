@@ -73,10 +73,33 @@ public class TeacherEvaluationController {
 
         List<CourseGrade> existingGrades = courseGradeRepository
                 .findAllByEnrollmentIdOrderByGradeIdAsc(request.enrollmentId());
-
         String requestedTitle = request.title() != null ? request.title().trim() : "";
         if (requestedTitle.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "El título de la calificación es obligatorio."));
+        }
+
+        // Nota Final de Asignatura: nota definitiva, ponderación de trabajos + examen
+        // que el profesor introduce manualmente. Una vez enviada, es inmutable.
+        if (isFinalCourseGradeTitle(requestedTitle)) {
+            boolean alreadySubmitted = existingGrades.stream()
+                    .anyMatch(grade -> grade.getTitle() != null && isFinalCourseGradeTitle(grade.getTitle()));
+
+            if (alreadySubmitted) {
+                return ResponseEntity.status(409).body(Map.of(
+                        "error",
+                        "La Nota Final de la Asignatura ya fue enviada. Es definitiva y no puede modificarse."));
+            }
+
+            CourseGrade finalCourseGrade = new CourseGrade();
+            finalCourseGrade.setTitle(requestedTitle);
+            finalCourseGrade.setScore(request.score());
+            finalCourseGrade.setFeedback(request.feedback());
+            finalCourseGrade.setEnrollment(enrollment);
+            courseGradeRepository.save(finalCourseGrade);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Nota Final de Asignatura registrada con éxito. Es definitiva."));
         }
 
         boolean incomingIsExam = isExamGradeTitle(requestedTitle);
@@ -138,6 +161,10 @@ public class TeacherEvaluationController {
                 || normalized.contains("evaluación final")
                 || normalized.contains("evaluacion final")
                 || normalized.equals("final");
+    }
+
+    private boolean isFinalCourseGradeTitle(String title) {
+        return title.trim().equalsIgnoreCase("Nota Final Asignatura");
     }
 
     /**
