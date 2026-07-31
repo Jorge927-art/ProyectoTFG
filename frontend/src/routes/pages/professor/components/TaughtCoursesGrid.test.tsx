@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { TaughtCoursesGrid } from './TaughtCoursesGrid';
 import type { Course } from './TaughtCoursesGrid';
 
@@ -12,18 +12,7 @@ vi.mock('../../../../components/ui/genericCard/GenericCard', () => ({
     )
 }));
 
-vi.mock('../../../../components/ui/genericButton/GenericButton', () => ({
-    default: ({ label = '', onClick, icon }: { label?: string; onClick?: () => void; icon?: React.ReactNode }) => (
-        <button data-testid={`btn-${label.replace(/\s+/g, '-').toLowerCase()}`} onClick={onClick}>
-            {label}
-            {icon}
-        </button>
-    )
-}));
-
 describe('TaughtCoursesGrid - Suite de Pruebas Unitarias de la Cuadrícula del Profesor', () => {
-    const mockOnManageCourse = vi.fn();
-
     // Colección de asignaturas de prueba inmutables bajo el contrato oficial Course
     const sampleCoursesList: readonly Course[] = [
         {
@@ -51,7 +40,6 @@ describe('TaughtCoursesGrid - Suite de Pruebas Unitarias de la Cuadrícula del P
         render(
             <TaughtCoursesGrid
                 courses={sampleCoursesList}
-                onManageCourse={mockOnManageCourse}
             />
         );
 
@@ -74,7 +62,6 @@ describe('TaughtCoursesGrid - Suite de Pruebas Unitarias de la Cuadrícula del P
         const { container } = render(
             <TaughtCoursesGrid
                 courses={[]}
-                onManageCourse={mockOnManageCourse}
             />
         );
 
@@ -85,46 +72,16 @@ describe('TaughtCoursesGrid - Suite de Pruebas Unitarias de la Cuadrícula del P
     });
 
     /* =========================================================================
-       2. CONTROL DE INTERACCIÓN, ICONOS DINÁMICOS Y CALLBACKS OPERATIVOS
+       2. CONTROL DE INTERFAZ: SIN CTA DE GESTIÓN REDUNDANTE
        ========================================================================= */
-    it('Debe invocar el callback onManageCourse inyectando el ID inmutable exacto de la asignatura al pulsar el botón', () => {
+    it('No debe renderizar el botón Gestionar Curso porque la gestión ya existe en la página', () => {
         render(
             <TaughtCoursesGrid
                 courses={sampleCoursesList}
-                onManageCourse={mockOnManageCourse}
             />
         );
 
-        // Recuperamos los botones de control de eventos renderizados por tarjeta
-        const botonesGestionar = screen.getAllByTestId('btn-gestionar-curso');
-        expect(botonesGestionar).toHaveLength(2);
-
-        // Disparar clic en el botón de la primera tarjeta (Asignatura ID: 101)
-        fireEvent.click(botonesGestionar[0]);
-        expect(mockOnManageCourse).toHaveBeenCalledTimes(1);
-        expect(mockOnManageCourse).toHaveBeenCalledWith(101);
-
-        // Disparar clic en el botón de la segunda tarjeta (Asignatura ID: 102)
-        fireEvent.click(botonesGestionar[1]);
-        expect(mockOnManageCourse).toHaveBeenCalledTimes(2);
-        expect(mockOnManageCourse).toHaveBeenCalledWith(102);
-    });
-
-    it('Debe inyectar y renderizar correctamente el nodo actionIcon transferido desde el componente padre', () => {
-        const mockIcon = <span data-testid="mock-arrow-icon">➔</span>;
-
-        render(
-            <TaughtCoursesGrid
-                courses={sampleCoursesList}
-                onManageCourse={mockOnManageCourse}
-                actionIcon={mockIcon}
-            />
-        );
-
-        // Validar que el icono descriptivo inyectado se dibuja dentro de los botones de la cuadrícula
-        const iconosRenderizados = screen.getAllByTestId('mock-arrow-icon');
-        expect(iconosRenderizados).toHaveLength(2);
-        expect(iconosRenderizados[0]).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Gestionar Curso' })).not.toBeInTheDocument();
     });
 
     it('Debe mantener la cuadrícula sin scroll cuando hay un máximo de 4 asignaturas', () => {
@@ -137,7 +94,6 @@ describe('TaughtCoursesGrid - Suite de Pruebas Unitarias de la Cuadrícula del P
         render(
             <TaughtCoursesGrid
                 courses={fourCourses}
-                onManageCourse={mockOnManageCourse}
             />
         );
 
@@ -157,7 +113,6 @@ describe('TaughtCoursesGrid - Suite de Pruebas Unitarias de la Cuadrícula del P
         render(
             <TaughtCoursesGrid
                 courses={fiveCourses}
-                onManageCourse={mockOnManageCourse}
             />
         );
 

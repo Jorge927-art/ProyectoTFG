@@ -230,6 +230,7 @@ describe('useGradingCenter', () => {
             feedback: 'Buen rendimiento'
         });
         expect(result.current.successMessage).toContain('Calificación registrada con éxito');
+        expect(result.current.gradeSubmitFeedbackStatus).toBe('success');
         expect(result.current.score).toBe('');
         expect(result.current.feedback).toBe('');
         expect(getActiveStudentsByCourse).toHaveBeenCalledTimes(2);
@@ -391,6 +392,7 @@ describe('useGradingCenter', () => {
         });
 
         expect(result.current.errorMessage).toBe(backendErrorMessage);
+        expect(result.current.gradeSubmitFeedbackStatus).toBe('error');
         expect(result.current.isSubmitting).toBe(false);
     });
 
@@ -413,6 +415,59 @@ describe('useGradingCenter', () => {
         });
 
         expect(result.current.errorMessage).toBe('Error crítico perimetral: No tienes autorización o la sesión expiró.');
+        expect(result.current.gradeSubmitFeedbackStatus).toBe('error');
         expect(result.current.isSubmitting).toBe(false);
     });
+
+    it('limpia automáticamente el feedback visual de éxito en el botón de nota', async () => {
+        const { result } = renderHook(() => useGradingCenter(10));
+        await waitFor(() => expect(result.current.loadingData).toBe(false));
+
+        await act(async () => {
+            await result.current.handleSelectStudentById(11);
+        });
+
+        act(() => {
+            result.current.setScore('9.1');
+        });
+
+        await act(async () => {
+            await result.current.handleGradeSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+        });
+
+        expect(result.current.gradeSubmitFeedbackStatus).toBe('success');
+
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 3600));
+        });
+
+        expect(result.current.gradeSubmitFeedbackStatus).toBeNull();
+    }, 12000);
+
+    it('limpia automáticamente el feedback visual de error en el botón de nota', async () => {
+        vi.mocked(submitStudentGrade).mockRejectedValueOnce(new Error('grade-error'));
+
+        const { result } = renderHook(() => useGradingCenter(10));
+        await waitFor(() => expect(result.current.loadingData).toBe(false));
+
+        await act(async () => {
+            await result.current.handleSelectStudentById(11);
+        });
+
+        act(() => {
+            result.current.setScore('7.4');
+        });
+
+        await act(async () => {
+            await result.current.handleGradeSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+        });
+
+        expect(result.current.gradeSubmitFeedbackStatus).toBe('error');
+
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 3600));
+        });
+
+        expect(result.current.gradeSubmitFeedbackStatus).toBeNull();
+    }, 12000);
 });

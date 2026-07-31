@@ -53,39 +53,6 @@ vi.mock('../../../services/evaluationService', () => ({
     })
 }));
 
-vi.mock('./components/CourseManagementModal', () => ({
-    CourseManagementModal: ({
-        courseId,
-        isOpen,
-        onClose,
-        onSyncCount
-    }: {
-        courseId: number | null;
-        isOpen: boolean;
-        onClose: () => void;
-        onSyncCount?: (courseId: number, count: number) => void;
-    }) => {
-        if (!isOpen || courseId === null) return null;
-        return (
-            <div>
-                <h2>Control operativo y seguimiento del Curso ID: {courseId}</h2>
-                <button type="button" aria-label="Cerrar gestión del curso" onClick={onClose}>
-                    X
-                </button>
-                <button type="button" onClick={() => onSyncCount?.(courseId, 5)}>
-                    Sync count 5
-                </button>
-                <button type="button" onClick={() => onSyncCount?.(courseId, 1)}>
-                    Sync same count
-                </button>
-                <button type="button" onClick={() => onSyncCount?.(9999, 77)}>
-                    Sync unknown course
-                </button>
-            </div>
-        );
-    }
-}));
-
 describe('ProfessorDashboard', () => {
     let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
@@ -100,36 +67,6 @@ describe('ProfessorDashboard', () => {
         consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
         mockedGetProfessorAssignedCourses.mockResolvedValue([]);
         mockedGetActiveStudentsByCourse.mockResolvedValue([]);
-    });
-
-    it('abre el modal de gestión al pulsar Gestionar Curso', async () => {
-        const user = userEvent.setup();
-
-        render(<ProfessorDashboard />);
-
-        await user.click(screen.getByRole('button', { name: 'Simular asignación de curso' }));
-
-        await user.click(screen.getAllByRole('button', { name: 'Gestionar Curso' })[0]);
-
-        expect(screen.getByText('Control operativo y seguimiento del Curso ID: 1')).toBeInTheDocument();
-        expect(screen.getByText(/Curso ID: 1/)).toBeInTheDocument();
-    });
-
-    it('cierra el modal de gestión al pulsar el botón de cierre', async () => {
-        const user = userEvent.setup();
-
-        render(<ProfessorDashboard />);
-
-        await user.click(screen.getByRole('button', { name: 'Simular asignación de curso' }));
-
-        await user.click(screen.getAllByRole('button', { name: 'Gestionar Curso' })[0]);
-
-        expect(screen.getByText('Control operativo y seguimiento del Curso ID: 1')).toBeInTheDocument();
-
-        await user.click(screen.getByRole('button', { name: 'Cerrar gestión del curso' }));
-
-        expect(screen.queryByText('Control operativo y seguimiento del Curso ID: 1')).not.toBeInTheDocument();
-        expect(screen.queryByText(/Curso ID: 1/)).not.toBeInTheDocument();
     });
 
     it('arranca sin cursos visibles hasta que el profesor elige uno', () => {
@@ -182,8 +119,7 @@ describe('ProfessorDashboard', () => {
         await user.click(selectButton);
         await user.click(selectButton);
 
-        const manageButtons = screen.getAllByRole('button', { name: 'Gestionar Curso' });
-        expect(manageButtons).toHaveLength(1);
+        expect(screen.queryByRole('button', { name: 'Gestionar Curso' })).not.toBeInTheDocument();
         expect(screen.getByText('1')).toBeInTheDocument();
     });
 
@@ -261,72 +197,6 @@ describe('ProfessorDashboard', () => {
         expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
-    it('actualiza el conteo del curso cuando el modal sincroniza un valor distinto', async () => {
-        const user = userEvent.setup();
-        mockedGetProfessorAssignedCourses.mockResolvedValue([
-            {
-                course_id: 303,
-                title: 'Curso sincronizable',
-                category: 'Backend'
-            }
-        ]);
-        mockedGetActiveStudentsByCourse.mockResolvedValue([{ studentId: 1 }]);
-
-        render(<ProfessorDashboard />);
-
-        await screen.findByRole('heading', { name: 'Curso sincronizable' });
-        expect(screen.getByText('Total: 1 alumnos matriculados')).toBeInTheDocument();
-
-        await user.click(screen.getByRole('button', { name: 'Gestionar Curso' }));
-        await user.click(screen.getByRole('button', { name: 'Sync count 5' }));
-
-        expect(screen.getByText('Total: 5 alumnos matriculados')).toBeInTheDocument();
-    });
-
-    it('mantiene el conteo si la sincronización informa el mismo valor', async () => {
-        const user = userEvent.setup();
-        mockedGetProfessorAssignedCourses.mockResolvedValue([
-            {
-                course_id: 404,
-                title: 'Curso estable',
-                category: 'Backend'
-            }
-        ]);
-        mockedGetActiveStudentsByCourse.mockResolvedValue([{ studentId: 1 }]);
-
-        render(<ProfessorDashboard />);
-
-        await screen.findByRole('heading', { name: 'Curso estable' });
-        expect(screen.getByText('Total: 1 alumnos matriculados')).toBeInTheDocument();
-
-        await user.click(screen.getByRole('button', { name: 'Gestionar Curso' }));
-        await user.click(screen.getByRole('button', { name: 'Sync same count' }));
-
-        expect(screen.getByText('Total: 1 alumnos matriculados')).toBeInTheDocument();
-    });
-
-    it('ignora sincronización si el courseId no existe en la colección actual', async () => {
-        const user = userEvent.setup();
-        mockedGetProfessorAssignedCourses.mockResolvedValue([
-            {
-                course_id: 505,
-                title: 'Curso filtro por id',
-                category: 'Backend'
-            }
-        ]);
-        mockedGetActiveStudentsByCourse.mockResolvedValue([{ studentId: 1 }]);
-
-        render(<ProfessorDashboard />);
-
-        await screen.findByRole('heading', { name: 'Curso filtro por id' });
-        expect(screen.getByText('Total: 1 alumnos matriculados')).toBeInTheDocument();
-
-        await user.click(screen.getByRole('button', { name: 'Gestionar Curso' }));
-        await user.click(screen.getByRole('button', { name: 'Sync unknown course' }));
-
-        expect(screen.getByText('Total: 1 alumnos matriculados')).toBeInTheDocument();
-    });
-
     it('normaliza categoría usando subCategory cuando category llega vacía', async () => {
         mockedGetProfessorAssignedCourses.mockResolvedValue([
             {
@@ -380,9 +250,7 @@ describe('ProfessorDashboard', () => {
         expect(screen.getByText('Total: 1 alumnos matriculados')).toBeInTheDocument();
     });
 
-    it('no abre el modal de gestión al cambiar la asignatura desde Métricas de Docencia', async () => {
-        const user = userEvent.setup();
-
+    it('no muestra modal ni CTA de gestión al cambiar la asignatura desde Métricas de Docencia', async () => {
         mockedGetProfessorAssignedCourses.mockResolvedValue([
             {
                 course_id: 901,
@@ -400,10 +268,7 @@ describe('ProfessorDashboard', () => {
 
         expect(screen.queryByText('Control operativo y seguimiento del Curso ID: 901')).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Cerrar gestión del curso' })).not.toBeInTheDocument();
-
-        // El modal sigue abriéndose solo con el botón explícito de gestión del curso.
-        await user.click(screen.getByRole('button', { name: 'Gestionar Curso' }));
-        expect(screen.getByText('Control operativo y seguimiento del Curso ID: 901')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Gestionar Curso' })).not.toBeInTheDocument();
     });
 
     it('activa la rama cancelled al desmontar antes de resolver la hidratación', async () => {

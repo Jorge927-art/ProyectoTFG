@@ -14,6 +14,9 @@ import { getDocumentsByEnrollment, getReceivedDocumentsByCourse, uploadProfessor
 import { useNotifications } from '../../../../components/ui/globalNotificationBell/useNotifications';
 
 const ERROR_MESSAGE_AUTO_DISMISS_MS = 6000;
+const GRADE_SUBMIT_FEEDBACK_AUTO_DISMISS_MS = 3500;
+
+type GradeSubmitFeedbackStatus = 'success' | 'error' | null;
 
 export const useGradingCenter = (courseId: number | null) => {
     // Estados de datos encapsulados
@@ -26,6 +29,7 @@ export const useGradingCenter = (courseId: number | null) => {
     const [loadingData, setLoadingData] = useState<boolean>(false);
     const [loadingDocs, setLoadingDocs] = useState<boolean>(false);
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+    const [gradeSubmitFeedbackStatus, setGradeSubmitFeedbackStatus] = useState<GradeSubmitFeedbackStatus>(null);
     
     // Gestión de mensajes de feedback para la UI
     const [errorMessage, setErrorMessage] = useState<string>('');
@@ -52,6 +56,18 @@ export const useGradingCenter = (courseId: number | null) => {
         };
     }, [errorMessage]);
 
+    useEffect(() => {
+        if (!gradeSubmitFeedbackStatus) return;
+
+        const timeoutId = window.setTimeout(() => {
+            setGradeSubmitFeedbackStatus(null);
+        }, GRADE_SUBMIT_FEEDBACK_AUTO_DISMISS_MS);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
+    }, [gradeSubmitFeedbackStatus]);
+
 
     // 1. Cargar alumnos y métricas globales del curso seleccionado
     useEffect(() => {
@@ -60,6 +76,7 @@ export const useGradingCenter = (courseId: number | null) => {
             setSelectedStudent(null);
             setStudentDocuments([]);
             setDocumentsLoadedFromCourseFallback(false);
+            setGradeSubmitFeedbackStatus(null);
             return;
         }
 
@@ -129,6 +146,7 @@ export const useGradingCenter = (courseId: number | null) => {
         setSelectedStudent(student);
         setErrorMessage('');
         setSuccessMessage('');
+        setGradeSubmitFeedbackStatus(null);
         setScore('');
         setFeedback('');
         await fetchStudentDocuments(student);
@@ -190,12 +208,14 @@ export const useGradingCenter = (courseId: number | null) => {
         e.preventDefault();
         if (!selectedStudent || !score) {
             setErrorMessage('Por favor, introduce una calificación válida.');
+            setGradeSubmitFeedbackStatus('error');
             return;
         }
 
         const parsedScore = parseFloat(score);
         if (isNaN(parsedScore) || parsedScore < 0 || parsedScore > 10) {
             setErrorMessage('La nota debe ser un valor numérico entre 0 y 10.');
+            setGradeSubmitFeedbackStatus('error');
             return;
         }
 
@@ -203,6 +223,7 @@ export const useGradingCenter = (courseId: number | null) => {
             setIsSubmitting(true);
             setErrorMessage('');
             setSuccessMessage('');
+            setGradeSubmitFeedbackStatus(null);
 
             // Enviamos payload seguro con el nuevo campo de feedback habilitado en backend
             const targetEnrollmentId = selectedStudent.enrollmentId ?? selectedStudent.userId;
@@ -214,6 +235,7 @@ export const useGradingCenter = (courseId: number | null) => {
             });
 
             setSuccessMessage(`Calificación registrada con éxito. Notificación enviada a la campana del alumno.`);
+            setGradeSubmitFeedbackStatus('success');
             setScore('');
             setFeedback('');
             
@@ -237,6 +259,7 @@ export const useGradingCenter = (courseId: number | null) => {
                     : null;
 
             setErrorMessage(backendMessage ?? 'Error crítico perimetral: No tienes autorización o la sesión expiró.');
+            setGradeSubmitFeedbackStatus('error');
         } finally {
             setIsSubmitting(false);
         }
@@ -250,6 +273,7 @@ export const useGradingCenter = (courseId: number | null) => {
         loadingData,
         loadingDocs,
         isSubmitting,
+        gradeSubmitFeedbackStatus,
         errorMessage,
         successMessage,
         evaluationTitle,

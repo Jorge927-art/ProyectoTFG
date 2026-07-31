@@ -1,7 +1,5 @@
 // src/routes/pages/professor/components/TaughtCoursesGrid.tsx
-import type { ReactNode } from 'react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
-import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 
 /** Interface inmutable que representa la estructura limpia de una asignatura. */
 export interface Course {
@@ -14,8 +12,6 @@ export interface Course {
 /** Props del componente TaughtCoursesGrid bajo tipado estricto. */
 interface TaughtCoursesGridProps {
     readonly courses: readonly Course[];
-    readonly onManageCourse: (courseId: number) => void;
-    readonly actionIcon?: ReactNode; // Permite inyectar ArrowRight desde el padre
 }
 
 /**
@@ -23,9 +19,7 @@ interface TaughtCoursesGridProps {
  * Implementa de forma exclusiva los componentes transversales GenericCard y GenericButton.
  */
 export const TaughtCoursesGrid = ({
-    courses,
-    onManageCourse,
-    actionIcon
+    courses
 }: TaughtCoursesGridProps) => {
     const shouldEnableScroll = courses.length > 4;
 
@@ -51,16 +45,6 @@ export const TaughtCoursesGrid = ({
                             </p>
                         </div>
 
-                        {/* Control de Eventos - Sin barra de progreso */}
-                        <div className="mt-4 pt-3 border-t border-slate-100">
-                            <GenericButton
-                                variant="primary"
-                                label="Gestionar Curso"
-                                icon={actionIcon}
-                                className="w-full flex-row-reverse! gap-1! text-xs! font-bold! py-2! px-3! rounded-lg! justify-center"
-                                onClick={() => onManageCourse(course.id)}
-                            />
-                        </div>
                     </GenericCard>
                 ))}
             </div>

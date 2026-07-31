@@ -31,6 +31,7 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
         loadingData,
         loadingDocs,
         isSubmitting,
+        gradeSubmitFeedbackStatus,
         errorMessage,
         successMessage,
         evaluationTitle,
@@ -106,6 +107,11 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
 
     const selectedCourseValue = courseId ? String(courseId) : '';
     const selectedStudentValue = selectedStudent ? String(selectedStudent.userId) : '';
+    const gradeSubmitButtonFeedbackClass = gradeSubmitFeedbackStatus === 'success'
+        ? '!bg-emerald-600 hover:!bg-emerald-700'
+        : gradeSubmitFeedbackStatus === 'error'
+            ? '!bg-red-600 hover:!bg-red-700'
+            : '';
 
     return (
         <div className="space-y-4">
@@ -338,7 +344,7 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
                             variant="primary"
                             label={isSubmitting ? 'Enviando nota...' : 'Enviar calificacion'}
                             icon={isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <GraduationCap size={14} />}
-                            className="w-full justify-center text-xs! font-bold! py-2!"
+                            className={`w-full justify-center text-xs! font-bold! py-2! ${gradeSubmitButtonFeedbackClass}`}
                         />
                     </form>
                 )}

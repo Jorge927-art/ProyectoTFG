@@ -1,14 +1,11 @@
 import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
-import { BookOpen, ArrowRight, GraduationCap } from 'lucide-react';
+import { BookOpen, GraduationCap } from 'lucide-react';
 import { useAuth } from '../../../auth/useAuth';
 import ProfessorLayout from '../../layouts/DashboardLayout';
 import TaughtCoursesGrid from './components/TaughtCoursesGrid';
 
 // Importación del componente core unificado según [ADR-13]
 import GenericHeader from '../../../components/ui/genericHeader/GenericHeader';
-
-// Importación del modal local corregido
-import { CourseManagementModal } from './components/CourseManagementModal';
 
 // 1. Importación del nuevo buscador común adaptado al docente
 import { ProfessorCoursePicker } from './components/ProfessorCoursePicker';
@@ -58,9 +55,6 @@ const ProfessorDashboard = () => {
 
     // Estado compartido entre Centro de Calificación y Métricas de Docencia.
     const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
-    // Estado exclusivo del modal operativo de Gestión de Curso.
-    const [managedCourseId, setManagedCourseId] = useState<number | null>(null);
-
     // 1. ESTADO DE ASIGNATURAS IMPARTIDAS POR EL PROFESOR
     const [myCourses, setMyCourses] = useState<TaughtCourse[]>([]);
     const [metricsColumnMinHeight, setMetricsColumnMinHeight] = useState<number>(0);
@@ -253,24 +247,6 @@ const ProfessorDashboard = () => {
         };
     }, [focusStudentUserId, getStudentsForCourse, myCourses, selectedCourseId, shouldFocusDocuments]);
 
-    // Función intermedia para actualizar el contador real enviado desde el modal (mantiene sincronía si hay cambios dentro)
-    const handleSyncCount = useCallback((courseId: number, realCount: number) => {
-        setMyCourses(prevCourses => {
-            let changed = false;
-
-            const nextCourses = prevCourses.map(course => {
-                if (course.id !== courseId) return course;
-                if (course.studentsCount === realCount) return course;
-
-                changed = true;
-                return { ...course, studentsCount: realCount };
-            });
-
-            return changed ? nextCourses : prevCourses;
-        });
-
-    }, []);
-
     /**
      * Maneja la selección de un nuevo curso desde el buscador y lo agrega a la lista de cursos impartidos.
      * @param newCourse Curso seleccionado del buscador
@@ -346,8 +322,6 @@ const ProfessorDashboard = () => {
                         {/* Rejilla interna modularizada de asignaturas */}
                         <TaughtCoursesGrid
                             courses={myCourses}
-                            onManageCourse={(id: number) => setManagedCourseId(id)}
-                            actionIcon={<ArrowRight size={14} />}
                         />
                     </section>
 
@@ -381,13 +355,6 @@ const ProfessorDashboard = () => {
                 </div>
             </div>
 
-            {/* Inyección operativa del modal con sincronía reactiva de alumnos */}
-            <CourseManagementModal
-                courseId={managedCourseId}
-                isOpen={managedCourseId !== null}
-                onClose={() => setManagedCourseId(null)}
-                onSyncCount={handleSyncCount}
-            />
         </ProfessorLayout>
     );
 };

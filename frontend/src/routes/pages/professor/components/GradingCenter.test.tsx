@@ -81,6 +81,7 @@ describe('GradingCenter', () => {
         loadingData: false,
         loadingDocs: false,
         isSubmitting: false,
+        gradeSubmitFeedbackStatus: null,
         errorMessage: '',
         successMessage: '',
         evaluationTitle: 'Trabajo Académico Escrito',
@@ -274,6 +275,32 @@ describe('GradingCenter', () => {
 
         const submitButton = screen.getByRole('button', { name: 'Enviando nota...' });
         expect(submitButton).toBeDisabled();
+    });
+
+    it('pinta el boton de enviar calificacion en verde tras envio exitoso', () => {
+        vi.mocked(useGradingCenter).mockReturnValue({
+            ...baseHookReturn,
+            selectedStudent: mockStudent,
+            gradeSubmitFeedbackStatus: 'success'
+        } as ReturnType<typeof useGradingCenter>);
+
+        render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
+
+        const submitButton = screen.getByRole('button', { name: 'Enviar calificacion' });
+        expect(submitButton.className).toContain('bg-emerald-600');
+    });
+
+    it('pinta el boton de enviar calificacion en rojo cuando falla el envio', () => {
+        vi.mocked(useGradingCenter).mockReturnValue({
+            ...baseHookReturn,
+            selectedStudent: mockStudent,
+            gradeSubmitFeedbackStatus: 'error'
+        } as ReturnType<typeof useGradingCenter>);
+
+        render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
+
+        const submitButton = screen.getByRole('button', { name: 'Enviar calificacion' });
+        expect(submitButton.className).toContain('bg-red-600');
     });
 
     it('propaga cambios de campos de evaluacion al hook', () => {
