@@ -2092,6 +2092,70 @@ Diferenciar el tratamiento por tipo de relación en lugar de aplicar un borrado 
 
 ---
 
+# ADR-059: Auto-calificación definitiva para cursos ficticios con exclusión estricta de profesores registrados
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Agosto 2026
+
+## Contexto
+
+El panel de "Rendimiento y Métricas del Curso" requiere disponer de calificaciones para alimentar indicadores estadísticos incluso en cursos que no están gestionados por profesorado registrado en la plataforma. En estos casos, el alumno no recibirá calificaciones manuales de trabajos ni examen por parte de un docente real.
+
+Sin embargo, coexistían dos realidades de datos en la entidad de cursos:
+
+1. Cursos realmente impartidos por un profesor registrado (vínculo relacional o correspondencia con cuentas `PROFESSOR`).
+2. Cursos legacy/ficticios con profesorado solo textual en el campo `instructors`.
+
+Era obligatorio evitar falsos positivos: **si un curso pertenece a un profesor registrado, no debe auto-generarse ninguna nota**, aunque el alumno alcance el 95% y aún no tenga calificación.
+
+## Decisión
+
+Se adopta una estrategia de auto-calificación programada e idempotente en backend con estas reglas:
+
+1. **Umbral de disparo:** la generación se evalúa cuando la matrícula alcanza progreso dinámico `>= 95%`.
+2. **Ámbito de aplicación:** solo cursos ficticios.
+3. **Exclusión dura de profesorado real:** si el curso tiene profesor registrado, se cancela la generación de forma absoluta.
+4. **Notas generadas:**
+
+* `Examen final`.
+* `Nota Final Asignatura` con variación ligera dependiente de la nota de examen.
+
+5. **Distribución estadística:** las notas se muestrean con **Beta(α, β)** escalada al rango [0, 10], evitando uniformidad plana.
+2. **Idempotencia y definitividad:** una vez persistidas, no se regeneran ni se sobreescriben.
+3. **Neutralidad de presentación:** las notas se muestran como cualquier otra calificación del sistema, sin marcar origen automático en la UI.
+
+Implementación aplicada:
+
+* Habilitación de tareas programadas en la aplicación principal (`@EnableScheduling`).
+* Servicio dedicado de generación automática en backend (`FictitiousCourseGradeGenerationService`).
+* Consulta de candidatas en repositorio de matrículas para cursos sin `assignedUser` y con `instructors` informado.
+* Verificación adicional contra `UserRepository.findByRole(PROFESSOR)` para impedir generar notas cuando el docente textual corresponde a un usuario profesor registrado.
+* Comprobaciones de existencia en `CourseGradeRepository` para garantizar idempotencia.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* Se evita sesgar métricas globales por ausencia de calificaciones en cursos ficticios.
+* Se preserva la integridad funcional del flujo docente real: ningún profesor registrado queda sustituido por notas sintéticas.
+* Se mantiene consistencia estadística al usar una distribución Beta en lugar de una aleatoriedad uniforme.
+* La lógica queda desacoplada del frontend y reutilizable para futuros paneles analíticos (incluido Admin).
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Riesgo de clasificación ambigua de "curso ficticio" en datos legacy:** el campo `instructors` puede contener variaciones de alias o formato.
+* *Mitigación:* normalización de alias del profesor y regla de exclusión conservadora: ante coincidencia con cuenta `PROFESSOR`, no se auto-genera.
+
+* **Riesgo de carga periódica por scheduler:** la tarea consulta candidatas de forma recurrente.
+* *Mitigación:* ejecución idempotente y consulta acotada al subconjunto de matrículas activas elegibles.
+
+---
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026

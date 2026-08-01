@@ -8,6 +8,7 @@ import com.cursosonline.backend.repository.DocumentMetadataRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
 import com.cursosonline.backend.services.FileStorageService;
+import com.cursosonline.backend.services.FictitiousCourseGradeGenerationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,7 +34,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = "spring.task.scheduling.enabled=false")
 @ActiveProfiles("test")
 @DisplayName("DocumentController - Integracion endpoint /course/enrollment/{enrollmentId}")
 class DocumentControllerEnrollmentEndpointIntegrationTest {
@@ -54,6 +55,9 @@ class DocumentControllerEnrollmentEndpointIntegrationTest {
 
         @MockitoBean
         private FileStorageService fileStorageService;
+
+        @MockitoBean
+        private FictitiousCourseGradeGenerationService fictitiousCourseGradeGenerationService;
 
         @BeforeEach
         void setUp() {

@@ -10,6 +10,19 @@ public interface CourseGradeRepository extends JpaRepository<CourseGrade, Long> 
         // Hereda automáticamente todos los métodos de guardado (save, etc.) de JPA
 
         /**
+         * Verifica si una matrícula ya tiene una calificación con el título exacto
+         * indicado, usado para mantener la generación automática idempotente.
+         */
+        boolean existsByEnrollment_EnrollmentidAndTitleIgnoreCase(Long enrollmentId, String title);
+
+        /**
+         * Recupera la primera calificación que coincida con el título indicado para
+         * una matrícula concreta.
+         */
+        java.util.Optional<CourseGrade> findFirstByEnrollment_EnrollmentidAndTitleIgnoreCase(Long enrollmentId,
+                        String title);
+
+        /**
          * [DASHBOARD ALUMNO - HIDRATACIÓN DE NOTAS]: Recupera todas las notas de un
          * conjunto de matrículas para evitar pérdidas parciales por carga diferida.
          */

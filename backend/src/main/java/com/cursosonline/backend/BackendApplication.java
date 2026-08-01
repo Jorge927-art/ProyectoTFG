@@ -2,6 +2,7 @@ package com.cursosonline.backend;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Clase principal de la aplicación Spring Boot. Anotada
@@ -10,6 +11,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * método main que inicia la aplicación.
  */
 @SpringBootApplication
+@EnableScheduling
 public class BackendApplication {
 
 	/**

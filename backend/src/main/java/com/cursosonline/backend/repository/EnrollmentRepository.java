@@ -178,4 +178,18 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
                         "ORDER BY e.user.username ASC")
         List<Enrollment> findAllByCourseId(@Param("courseId") Long courseId);
 
+        /**
+         * Recupera las matrículas activas de cursos ficticios, es decir, cursos sin
+         * profesor registrado de forma relacional pero con el campo legacy
+         * instructors informado.
+         */
+        @Query("SELECT e FROM Enrollment e " +
+                        "JOIN FETCH e.user u " +
+                        "JOIN FETCH e.course c " +
+                        "WHERE u.enabled = true AND u.role = 'STUDENT' " +
+                        "AND c.assignedUser IS NULL " +
+                        "AND c.instructors IS NOT NULL " +
+                        "AND TRIM(c.instructors) <> ''")
+        List<Enrollment> findActiveStudentEnrollmentsForFictitiousCourses();
+
 }
