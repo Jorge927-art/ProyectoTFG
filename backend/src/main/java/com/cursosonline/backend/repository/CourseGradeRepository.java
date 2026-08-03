@@ -48,6 +48,13 @@ public interface CourseGradeRepository extends JpaRepository<CourseGrade, Long> 
         Double getGroupAverageScore(@Param("courseId") Long courseId);
 
         /**
+         * Recupera todas las calificaciones de alumnos activos para un curso.
+         */
+        @Query("SELECT cg FROM CourseGrade cg WHERE cg.enrollment.course.course_id = :courseId " +
+                        "AND cg.enrollment.user.enabled = true")
+        List<CourseGrade> findAllByCourseIdAndEnabledStudent(@Param("courseId") Long courseId);
+
+        /**
          * [CONSOLA DOCENTE - NOTA INDIVIDUAL]: Obtiene la nota media de un estudiante
          * específico
          * en la asignatura dada para alimentar la gráfica dual del frontend.

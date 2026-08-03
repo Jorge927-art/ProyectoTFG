@@ -46,12 +46,12 @@ const AdminDashboard = () => {
                 </div>
             </div>
 
-            <div className="w-full mt-6">
-                <CourseInsightPanel />
-            </div>
-
             <div ref={documentsPanelRef} id="admin-documents-panel" className="w-full mt-6">
                 <AdminDocumentInbox autoFocusUnread={shouldFocusDocuments} />
+            </div>
+
+            <div className="w-full mt-6">
+                <CourseInsightPanel />
             </div>
         </AdminLayout>
     );

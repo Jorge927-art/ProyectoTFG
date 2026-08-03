@@ -1,6 +1,7 @@
 package com.cursosonline.backend.controller;
 
 import com.cursosonline.backend.dto.AdminCourseDetailDTO;
+import com.cursosonline.backend.dto.AdminCourseCollectiveStatsDTO;
 import com.cursosonline.backend.dto.AdminCourseSearchResultDTO;
 import com.cursosonline.backend.dto.AdminCourseUserStatsDTO;
 import com.cursosonline.backend.services.AdminCourseInsightService;
@@ -47,6 +48,18 @@ public class AdminCourseInsightController {
     @GetMapping("/{courseId}")
     public ResponseEntity<AdminCourseDetailDTO> getCourseDetail(@PathVariable Long courseId) {
         return ResponseEntity.ok(adminCourseInsightService.getCourseDetail(courseId));
+    }
+
+    /**
+     * Endpoint para obtener las estadísticas colectivas del curso en el panel de
+     * administración.
+     *
+     * @param courseId El ID del curso.
+     * @return ResponseEntity con las estadísticas colectivas del curso.
+     */
+    @GetMapping("/{courseId}/collective-stats")
+    public ResponseEntity<AdminCourseCollectiveStatsDTO> getCourseCollectiveStats(@PathVariable Long courseId) {
+        return ResponseEntity.ok(adminCourseInsightService.getCourseCollectiveStats(courseId));
     }
 
     /**

@@ -34,6 +34,10 @@ vi.mock('./components/AdminDocumentInbox', () => ({
     AdminDocumentInbox: () => <div data-testid="mock-admin-document-inbox" />
 }));
 
+vi.mock('./components/CourseInsightPanel', () => ({
+    CourseInsightPanel: () => <div data-testid="mock-course-insight-panel" />
+}));
+
 describe('AdminDashboard - Orquestación de paneles', () => {
     it('renderiza la cabecera institucional y ambos paneles', () => {
         render(<AdminDashboard />);
@@ -50,5 +54,15 @@ describe('AdminDashboard - Orquestación de paneles', () => {
         render(<AdminDashboard />);
 
         expect(screen.getByTestId('mock-user-search-panel')).toHaveTextContent('root_admin');
+    });
+
+    it('renderiza la bandeja de documentos antes que el panel estadístico de cursos', () => {
+        render(<AdminDashboard />);
+
+        const inbox = screen.getByTestId('mock-admin-document-inbox');
+        const courseInsight = screen.getByTestId('mock-course-insight-panel');
+
+        const position = inbox.compareDocumentPosition(courseInsight);
+        expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 });

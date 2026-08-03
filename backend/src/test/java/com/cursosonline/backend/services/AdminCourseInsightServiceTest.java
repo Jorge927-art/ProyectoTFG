@@ -1,6 +1,7 @@
 package com.cursosonline.backend.services;
 
 import com.cursosonline.backend.dto.AdminCourseDetailDTO;
+import com.cursosonline.backend.dto.AdminCourseCollectiveStatsDTO;
 import com.cursosonline.backend.dto.AdminCourseSearchResultDTO;
 import com.cursosonline.backend.dto.AdminCourseUserStatsDTO;
 import com.cursosonline.backend.entities.*;
@@ -255,5 +256,45 @@ class AdminCourseInsightServiceTest {
         assertEquals(0, stats.courseAverageProgressPercentage());
         org.mockito.Mockito.verify(courseGradeRepository, org.mockito.Mockito.never())
                 .countStudentsWithPassingGradeByCourseId(anyLong());
+    }
+
+    @Test
+    @DisplayName("getCourseCollectiveStats debe incluir valoraciones, progreso medio y notas medias")
+    void getCourseCollectiveStats_DebeCalcularMetricasColectivas() {
+        when(coursesRepository.existsById(300L)).thenReturn(true);
+
+        Enrollment enrollmentA = new Enrollment();
+        Enrollment enrollmentB = new Enrollment();
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(300L))
+                .thenReturn(List.of(enrollmentA, enrollmentB));
+        when(userService.calculateCurrentProgress(enrollmentA)).thenReturn(40);
+        when(userService.calculateCurrentProgress(enrollmentB)).thenReturn(80);
+
+        when(enrollmentRepository.findAllByCourseId(300L)).thenReturn(List.of(new Enrollment(), new Enrollment()));
+        when(courseGradeRepository.countStudentsWithPassingGradeByCourseId(300L)).thenReturn(1L);
+        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(List.of(300L))).thenReturn(4.4);
+        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(List.of(300L))).thenReturn(4.7);
+
+        CourseGrade work = new CourseGrade();
+        work.setTitle("Trabajo 1");
+        work.setScore(new BigDecimal("8.0"));
+        CourseGrade exam = new CourseGrade();
+        exam.setTitle("Examen final");
+        exam.setScore(new BigDecimal("6.0"));
+        CourseGrade extra = new CourseGrade();
+        extra.setTitle("Actividad práctica");
+        extra.setScore(new BigDecimal("7.0"));
+        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(300L)).thenReturn(List.of(work, exam, extra));
+
+        AdminCourseCollectiveStatsDTO stats = adminCourseInsightService.getCourseCollectiveStats(300L);
+
+        assertEquals(2, stats.activeStudentsInCourse());
+        assertEquals(60, stats.courseAverageProgressPercentage());
+        assertEquals(50, stats.completionRatePercentage());
+        assertEquals(4.4, stats.averageCourseRating());
+        assertEquals(4.7, stats.averageInstructorRating());
+        assertEquals(7.0, stats.averageGrade());
+        assertEquals(7.5, stats.averageWorkGrade());
+        assertEquals(6.0, stats.averageFinalExamGrade());
     }
 }

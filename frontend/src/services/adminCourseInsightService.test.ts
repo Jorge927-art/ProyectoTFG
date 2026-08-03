@@ -3,6 +3,7 @@ import {
     searchCourses,
     getCourseDetail,
     getCourseUserStats,
+    getCourseCollectiveStats,
     resolveCourseInsightErrorMessage
 } from './adminCourseInsightService';
 import { apiClient } from './apiClient';
@@ -69,6 +70,25 @@ describe('adminCourseInsightService', () => {
 
         expect(apiClient.get).toHaveBeenCalledWith('/api/admin/courses/300/users/10/stats');
         expect(result).toEqual(stats);
+    });
+
+    it('getCourseCollectiveStats consulta las estadísticas colectivas del curso', async () => {
+        const collectiveStats = {
+            activeStudentsInCourse: 12,
+            courseAverageProgressPercentage: 60,
+            completionRatePercentage: 75,
+            averageCourseRating: 4.2,
+            averageInstructorRating: 4.6,
+            averageGrade: 7.8,
+            averageWorkGrade: 7.4,
+            averageFinalExamGrade: 8.1
+        };
+        vi.mocked(apiClient.get).mockResolvedValue({ data: collectiveStats });
+
+        const result = await getCourseCollectiveStats(300);
+
+        expect(apiClient.get).toHaveBeenCalledWith('/api/admin/courses/300/collective-stats');
+        expect(result).toEqual(collectiveStats);
     });
 
     it('resolveCourseInsightErrorMessage devuelve el error del backend si existe', () => {

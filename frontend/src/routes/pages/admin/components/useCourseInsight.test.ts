@@ -5,6 +5,7 @@ import {
     searchCourses,
     getCourseDetail,
     getCourseUserStats,
+    getCourseCollectiveStats,
     resolveCourseInsightErrorMessage
 } from '../../../../services/adminCourseInsightService';
 
@@ -12,6 +13,7 @@ vi.mock('../../../../services/adminCourseInsightService', () => ({
     searchCourses: vi.fn(),
     getCourseDetail: vi.fn(),
     getCourseUserStats: vi.fn(),
+    getCourseCollectiveStats: vi.fn(),
     resolveCourseInsightErrorMessage: vi.fn()
 }));
 
@@ -34,6 +36,17 @@ const sampleStats = {
     completionRatePercentage: 100,
     averageCourseRating: 4.2,
     averageInstructorRating: 4.6
+};
+
+const sampleCollectiveStats = {
+    activeStudentsInCourse: 12,
+    courseAverageProgressPercentage: 60,
+    completionRatePercentage: 75,
+    averageCourseRating: 4.2,
+    averageInstructorRating: 4.6,
+    averageGrade: 7.8,
+    averageWorkGrade: 7.4,
+    averageFinalExamGrade: 8.1
 };
 
 describe('useCourseInsight', () => {
@@ -89,6 +102,7 @@ describe('useCourseInsight', () => {
 
     it('handleSelectCourse carga el detalle del curso seleccionado', async () => {
         vi.mocked(getCourseDetail).mockResolvedValue(sampleDetail);
+        vi.mocked(getCourseCollectiveStats).mockResolvedValue(sampleCollectiveStats);
 
         const { result } = renderHook(() => useCourseInsight());
 
@@ -97,7 +111,9 @@ describe('useCourseInsight', () => {
         });
 
         expect(getCourseDetail).toHaveBeenCalledWith(300);
+        expect(getCourseCollectiveStats).toHaveBeenCalledWith(300);
         expect(result.current.selectedCourse).toEqual(sampleDetail);
+        expect(result.current.collectiveStats).toEqual(sampleCollectiveStats);
         expect(result.current.selectedUser).toBeNull();
         expect(result.current.stats).toBeNull();
     });
@@ -114,6 +130,7 @@ describe('useCourseInsight', () => {
 
     it('handleSelectUser carga las estadísticas del usuario dentro del curso seleccionado', async () => {
         vi.mocked(getCourseDetail).mockResolvedValue(sampleDetail);
+        vi.mocked(getCourseCollectiveStats).mockResolvedValue(sampleCollectiveStats);
         vi.mocked(getCourseUserStats).mockResolvedValue(sampleStats);
 
         const { result } = renderHook(() => useCourseInsight());
@@ -133,6 +150,7 @@ describe('useCourseInsight', () => {
 
     it('handleSelectUser captura errores al consultar estadísticas', async () => {
         vi.mocked(getCourseDetail).mockResolvedValue(sampleDetail);
+        vi.mocked(getCourseCollectiveStats).mockResolvedValue(sampleCollectiveStats);
         vi.mocked(getCourseUserStats).mockRejectedValue(new Error('stats-error'));
         vi.mocked(resolveCourseInsightErrorMessage).mockReturnValue('Error al consultar la información estadística del curso.');
 

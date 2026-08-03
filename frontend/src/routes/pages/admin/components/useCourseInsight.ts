@@ -3,9 +3,16 @@ import {
     searchCourses,
     getCourseDetail,
     getCourseUserStats,
+    getCourseCollectiveStats,
     resolveCourseInsightErrorMessage
 } from '../../../../services/adminCourseInsightService';
-import type { CourseSearchResult, CourseDetail, EnrolledUser, CourseUserStats } from '../../../../services/adminCourseInsightService';
+import type {
+    CourseSearchResult,
+    CourseDetail,
+    EnrolledUser,
+    CourseUserStats,
+    CourseCollectiveStats
+} from '../../../../services/adminCourseInsightService';
 
 const MIN_PREDICTIVE_CHARS = 2;
 
@@ -15,9 +22,11 @@ export const useCourseInsight = () => {
     const [selectedCourse, setSelectedCourse] = useState<CourseDetail | null>(null);
     const [selectedUser, setSelectedUser] = useState<EnrolledUser | null>(null);
     const [stats, setStats] = useState<CourseUserStats | null>(null);
+    const [collectiveStats, setCollectiveStats] = useState<CourseCollectiveStats | null>(null);
     const [loadingSearch, setLoadingSearch] = useState<boolean>(false);
     const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
     const [loadingStats, setLoadingStats] = useState<boolean>(false);
+    const [loadingCollectiveStats, setLoadingCollectiveStats] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
     const [highlightedResultIndex, setHighlightedResultIndex] = useState<number>(-1);
     const searchRequestIdRef = useRef(0);
@@ -106,6 +115,7 @@ export const useCourseInsight = () => {
             setSelectedCourse(null);
             setSelectedUser(null);
             setStats(null);
+            setCollectiveStats(null);
             setError('');
             setLoadingSearch(false);
             return;
@@ -123,6 +133,7 @@ export const useCourseInsight = () => {
         setSelectedCourse(null);
         setSelectedUser(null);
         setStats(null);
+        setCollectiveStats(null);
 
         const debounceTimer = window.setTimeout(() => {
             void executePredictiveSearch(normalizedKeyword);
@@ -135,18 +146,25 @@ export const useCourseInsight = () => {
 
     const handleSelectCourse = async (courseId: number) => {
         setLoadingDetail(true);
+        setLoadingCollectiveStats(true);
         setError('');
         setSelectedUser(null);
         setStats(null);
+        setCollectiveStats(null);
 
         try {
-            const detail = await getCourseDetail(courseId);
+            const [detail, collective] = await Promise.all([
+                getCourseDetail(courseId),
+                getCourseCollectiveStats(courseId)
+            ]);
             setSelectedCourse(detail);
+            setCollectiveStats(collective);
         } catch (err) {
             console.error('Error al cargar el detalle del curso:', err);
             setError(resolveCourseInsightErrorMessage(err));
         } finally {
             setLoadingDetail(false);
+            setLoadingCollectiveStats(false);
         }
     };
 
@@ -176,9 +194,11 @@ export const useCourseInsight = () => {
         selectedCourse,
         selectedUser,
         stats,
+        collectiveStats,
         loadingSearch,
         loadingDetail,
         loadingStats,
+        loadingCollectiveStats,
         highlightedResultIndex,
         error,
         handleSearch,

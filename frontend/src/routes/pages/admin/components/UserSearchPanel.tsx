@@ -33,7 +33,7 @@ export const UserSearchPanel = ({ currentAdminUsername }: UserSearchPanelProps) 
                 <div>
                     <h3 className="text-base font-bold text-slate-900">Buscador de Usuarios</h3>
                     <p className="text-xs text-slate-900 font-medium">
-                        Consulta directa y en tiempo real a PostgreSQL
+                        Consulta directa a PostgreSQL
                     </p>
                 </div>
             </div>

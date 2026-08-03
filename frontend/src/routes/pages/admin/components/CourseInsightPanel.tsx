@@ -12,9 +12,11 @@ export const CourseInsightPanel = () => {
         selectedCourse,
         selectedUser,
         stats,
+        collectiveStats,
         loadingSearch,
         loadingDetail,
         loadingStats,
+        loadingCollectiveStats,
         highlightedResultIndex,
         error,
         handleSearch,
@@ -135,21 +137,70 @@ export const CourseInsightPanel = () => {
             )}
 
             {/* ESTADÍSTICAS DEL USUARIO SELECCIONADO */}
-            {loadingStats && (
+            {(loadingStats || loadingCollectiveStats) && (
                 <div className="flex justify-center py-4">
                     <Loader2 size={20} className="animate-spin text-indigo-500" />
                 </div>
             )}
 
-            {stats && selectedUser && !loadingStats && (
-                <div className="space-y-3 pt-3 border-t border-slate-100">
+            {selectedCourse && collectiveStats && !loadingCollectiveStats && (
+                <div className="space-y-2.5 pt-3 border-t border-slate-100">
+                    <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-wide">
+                        Estadísticas colectivas del curso
+                    </h3>
+
                     <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                         <Users size={16} className="text-emerald-600 shrink-0" />
                         <p className="text-xs font-semibold text-slate-700">
-                            Alumnos activos en el curso: <span className="font-black text-emerald-700">{stats.activeStudentsInCourse}</span>
+                            Alumnos activos en el curso:{' '}
+                            <span className="font-black text-emerald-700">{collectiveStats.activeStudentsInCourse}</span>
                         </p>
                     </div>
 
+                    <ProgressBar
+                        label="Progreso medio del curso"
+                        percentage={collectiveStats.courseAverageProgressPercentage}
+                        colorClass="bg-blue-600"
+                    />
+
+                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                        <p className="text-xs font-semibold text-slate-700">
+                            Tasa de finalización (nota &gt; 5):{' '}
+                            <span className="font-black text-emerald-700">{collectiveStats.completionRatePercentage}%</span>
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                        <Star size={16} className="text-amber-500 shrink-0" />
+                        <p className="text-xs font-semibold text-slate-700">
+                            Valoración media del curso:{' '}
+                            <span className="font-black text-amber-600">
+                                {formatRating(collectiveStats.averageCourseRating)}
+                            </span>
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                        <Star size={16} className="text-purple-500 shrink-0" />
+                        <p className="text-xs font-semibold text-slate-700">
+                            Valoración media del profesor:{' '}
+                            <span className="font-black text-purple-600">
+                                {formatRating(collectiveStats.averageInstructorRating)}
+                            </span>
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <CollectiveGradeCard label="Nota media global" score={collectiveStats.averageGrade} accentClass="text-indigo-700 bg-indigo-50" />
+                        <CollectiveGradeCard label="Nota media trabajos" score={collectiveStats.averageWorkGrade} accentClass="text-emerald-700 bg-emerald-50" />
+                        <CollectiveGradeCard label="Nota media examen final" score={collectiveStats.averageFinalExamGrade} accentClass="text-rose-700 bg-rose-50" />
+                    </div>
+                </div>
+            )}
+
+            {stats && selectedUser && !loadingStats && (
+                <div className="space-y-3 pt-3 border-t border-slate-100">
                     {stats.studentProgressPercentage !== null && (
                         <ProgressBar
                             label={`Progreso de ${selectedUser.username}`}
@@ -175,41 +226,6 @@ export const CourseInsightPanel = () => {
                             </div>
                         </div>
                     )}
-
-                    {/* ESTADÍSTICAS COLECTIVAS DEL CURSO */}
-                    <div className="space-y-2 pt-3 border-t border-slate-100">
-                        <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-wide">
-                            Estadísticas colectivas del curso
-                        </h3>
-
-                        <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                            <p className="text-xs font-semibold text-slate-700">
-                                Tasa de finalización (nota &gt; 5):{' '}
-                                <span className="font-black text-emerald-700">{stats.completionRatePercentage}%</span>
-                            </p>
-                        </div>
-
-                        <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                            <Star size={16} className="text-amber-500 shrink-0" />
-                            <p className="text-xs font-semibold text-slate-700">
-                                Valoración media del curso:{' '}
-                                <span className="font-black text-amber-600">
-                                    {stats.averageCourseRating !== null ? `${stats.averageCourseRating.toFixed(1)} / 5` : 'Sin valoraciones aún'}
-                                </span>
-                            </p>
-                        </div>
-
-                        <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                            <Star size={16} className="text-purple-500 shrink-0" />
-                            <p className="text-xs font-semibold text-slate-700">
-                                Valoración media del profesor:{' '}
-                                <span className="font-black text-purple-600">
-                                    {stats.averageInstructorRating !== null ? `${stats.averageInstructorRating.toFixed(1)} / 5` : 'Sin valoraciones aún'}
-                                </span>
-                            </p>
-                        </div>
-                    </div>
                 </div>
             )}
         </GenericCard>
@@ -263,4 +279,25 @@ const GradeRow = ({ label, score }: { label: string; score: number | null }) => 
             {score !== null ? score : 'Sin calificar'}
         </span>
     </div>
+);
+
+const CollectiveGradeCard = ({
+    label,
+    score,
+    accentClass
+}: {
+    label: string;
+    score: number | null;
+    accentClass: string;
+}) => (
+    <div className="rounded-lg border border-slate-100 bg-white p-2">
+        <p className="text-[10px] font-black uppercase tracking-wide text-slate-500 mb-1">{label}</p>
+        <span className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-black ${accentClass}`}>
+            {score !== null ? score.toFixed(1) : 'Sin notas aún'}
+        </span>
+    </div>
+);
+
+const formatRating = (rating: number | null) => (
+    rating !== null ? `${rating.toFixed(1)} / 5` : 'Sin valoraciones aún'
 );

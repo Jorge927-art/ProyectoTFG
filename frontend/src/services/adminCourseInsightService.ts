@@ -38,6 +38,17 @@ export interface CourseUserStats {
     averageInstructorRating: number | null;
 }
 
+export interface CourseCollectiveStats {
+    activeStudentsInCourse: number;
+    courseAverageProgressPercentage: number;
+    completionRatePercentage: number;
+    averageCourseRating: number | null;
+    averageInstructorRating: number | null;
+    averageGrade: number | null;
+    averageWorkGrade: number | null;
+    averageFinalExamGrade: number | null;
+}
+
 export const searchCourses = async (keyword: string): Promise<CourseSearchResult[]> => {
     const response = await apiClient.get<CourseSearchResult[]>('/api/admin/courses/search', {
         params: { keyword }
@@ -52,6 +63,11 @@ export const getCourseDetail = async (courseId: number): Promise<CourseDetail> =
 
 export const getCourseUserStats = async (courseId: number, userId: number): Promise<CourseUserStats> => {
     const response = await apiClient.get<CourseUserStats>(`/api/admin/courses/${courseId}/users/${userId}/stats`);
+    return response.data;
+};
+
+export const getCourseCollectiveStats = async (courseId: number): Promise<CourseCollectiveStats> => {
+    const response = await apiClient.get<CourseCollectiveStats>(`/api/admin/courses/${courseId}/collective-stats`);
     return response.data;
 };
 

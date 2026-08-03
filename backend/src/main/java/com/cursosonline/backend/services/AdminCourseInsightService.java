@@ -27,6 +27,10 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class AdminCourseInsightService {
 
+    private static final String[] WORK_GRADE_KEYWORDS = { "trabajo", "proyecto", "practica", "práctica", "actividad",
+            "tarea" };
+    private static final String[] FINAL_EXAM_KEYWORDS = { "examen final", "final", "examen" };
+
     private final CoursesRepository coursesRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
@@ -109,20 +113,20 @@ public class AdminCourseInsightService {
         Users user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con id: " + userId));
 
-        List<Enrollment> activeEnrollments = enrollmentRepository.findActiveStudentEnrollmentsByCourseId(courseId);
-        int activeStudents = activeEnrollments.size();
-        int courseAverageProgress = activeEnrollments.isEmpty()
-                ? 0
-                : (int) Math.round(activeEnrollments.stream()
-                        .mapToInt(userService::calculateCurrentProgress)
-                        .average()
-                        .orElse(0.0));
+        CourseCollectiveMetrics collectiveMetrics = resolveCourseCollectiveMetrics(courseId);
 
         // El profesor no está matriculado: sin progreso individual ni notas.
         if (user.getRole() == Role.PROFESSOR) {
-            return new AdminCourseUserStatsDTO(activeStudents, null, courseAverageProgress, List.of(), null, null,
-                    completionRatePercentage(courseId), averageCourseRating(courseId),
-                    averageInstructorRating(courseId));
+            return new AdminCourseUserStatsDTO(
+                    collectiveMetrics.activeStudentsInCourse(),
+                    null,
+                    collectiveMetrics.courseAverageProgressPercentage(),
+                    List.of(),
+                    null,
+                    null,
+                    collectiveMetrics.completionRatePercentage(),
+                    collectiveMetrics.averageCourseRating(),
+                    collectiveMetrics.averageInstructorRating());
         }
 
         Enrollment enrollment = enrollmentRepository.findByUserIdAndCourseId(userId, courseId)
@@ -136,12 +140,114 @@ public class AdminCourseInsightService {
                 .map(g -> new AdminCourseUserStatsDTO.GradeItem(g.getTitle(), g.getScore()))
                 .toList();
 
-        Double workGrade = resolveGradeByKeywords(enrollmentGrades, "trabajo", "proyecto", "practica", "práctica");
-        Double finalExamGrade = resolveGradeByKeywords(enrollmentGrades, "examen final", "final", "examen");
+        Double workGrade = resolveGradeByKeywords(enrollmentGrades, WORK_GRADE_KEYWORDS);
+        Double finalExamGrade = resolveGradeByKeywords(enrollmentGrades, FINAL_EXAM_KEYWORDS);
 
-        return new AdminCourseUserStatsDTO(activeStudents, studentProgress, courseAverageProgress, grades,
-                workGrade, finalExamGrade, completionRatePercentage(courseId), averageCourseRating(courseId),
-                averageInstructorRating(courseId));
+        return new AdminCourseUserStatsDTO(
+                collectiveMetrics.activeStudentsInCourse(),
+                studentProgress,
+                collectiveMetrics.courseAverageProgressPercentage(),
+                grades,
+                workGrade,
+                finalExamGrade,
+                collectiveMetrics.completionRatePercentage(),
+                collectiveMetrics.averageCourseRating(),
+                collectiveMetrics.averageInstructorRating());
+    }
+
+    @Transactional(readOnly = true)
+    public AdminCourseCollectiveStatsDTO getCourseCollectiveStats(Long courseId) {
+        if (!coursesRepository.existsById(courseId)) {
+            throw new ResourceNotFoundException("Curso no encontrado con id: " + courseId);
+        }
+
+        CourseCollectiveMetrics metrics = resolveCourseCollectiveMetrics(courseId);
+        return new AdminCourseCollectiveStatsDTO(
+                metrics.activeStudentsInCourse(),
+                metrics.courseAverageProgressPercentage(),
+                metrics.completionRatePercentage(),
+                metrics.averageCourseRating(),
+                metrics.averageInstructorRating(),
+                metrics.averageGrade(),
+                metrics.averageWorkGrade(),
+                metrics.averageFinalExamGrade());
+    }
+
+    private CourseCollectiveMetrics resolveCourseCollectiveMetrics(Long courseId) {
+        List<Enrollment> activeEnrollments = enrollmentRepository.findActiveStudentEnrollmentsByCourseId(courseId);
+        int activeStudents = activeEnrollments.size();
+        int courseAverageProgress = activeEnrollments.isEmpty()
+                ? 0
+                : (int) Math.round(activeEnrollments.stream()
+                        .mapToInt(userService::calculateCurrentProgress)
+                        .average()
+                        .orElse(0.0));
+
+        List<CourseGrade> courseGrades = courseGradeRepository.findAllByCourseIdAndEnabledStudent(courseId);
+
+        return new CourseCollectiveMetrics(
+                activeStudents,
+                courseAverageProgress,
+                completionRatePercentage(courseId),
+                averageCourseRating(courseId),
+                averageInstructorRating(courseId),
+                averageScore(courseGrades),
+                averageScoreByKeywords(courseGrades, WORK_GRADE_KEYWORDS),
+                averageScoreByKeywords(courseGrades, FINAL_EXAM_KEYWORDS));
+    }
+
+    private Double averageScore(List<CourseGrade> grades) {
+        if (grades == null || grades.isEmpty()) {
+            return null;
+        }
+
+        double average = grades.stream()
+                .filter(grade -> grade != null && grade.getScore() != null)
+                .mapToDouble(grade -> grade.getScore().doubleValue())
+                .average()
+                .orElse(Double.NaN);
+
+        return Double.isNaN(average) ? null : average;
+    }
+
+    private Double averageScoreByKeywords(List<CourseGrade> grades, String... keywords) {
+        if (grades == null || grades.isEmpty()) {
+            return null;
+        }
+
+        double average = grades.stream()
+                .filter(Objects::nonNull)
+                .filter(grade -> grade.getScore() != null && matchesAnyKeyword(grade.getTitle(), keywords))
+                .mapToDouble(grade -> grade.getScore().doubleValue())
+                .average()
+                .orElse(Double.NaN);
+
+        return Double.isNaN(average) ? null : average;
+    }
+
+    private boolean matchesAnyKeyword(String title, String... keywords) {
+        if (title == null || keywords == null || keywords.length == 0) {
+            return false;
+        }
+
+        String normalizedTitle = title.toLowerCase(Locale.ROOT);
+        for (String keyword : keywords) {
+            if (normalizedTitle.contains(keyword.toLowerCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private record CourseCollectiveMetrics(
+            int activeStudentsInCourse,
+            int courseAverageProgressPercentage,
+            int completionRatePercentage,
+            Double averageCourseRating,
+            Double averageInstructorRating,
+            Double averageGrade,
+            Double averageWorkGrade,
+            Double averageFinalExamGrade) {
     }
 
     private Double resolveGradeByKeywords(List<CourseGrade> grades, String... keywords) {
