@@ -1,5 +1,5 @@
 // frontend/src/routes/pages/professor/components/TeachingMetricsPanel.tsx
-import { Activity, TrendingUp, CheckCircle2, Trophy, Star, Loader2, AlertCircle } from 'lucide-react';
+import { Activity, TrendingUp, CheckCircle2, Trophy, Loader2, AlertCircle } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import { useTeachingMetrics } from './useTeachingMetrics';
 import { MetricStatCard } from './MetricStatCard';
@@ -20,8 +20,7 @@ const formatDecimal = (val: number | undefined): string => (val ? val.toFixed(1)
  * Sustituye al bloque estático anterior de ProfessorDashboard. Apila de
  * arriba a abajo: título, selector (TODAS + asignaturas del profesor) y las
  * estadísticas: progreso alumno, nota alumno, progreso colectivo, tasa de
- * finalización, nota media, valoraciones del curso y valoraciones del
- * profesor.
+ * finalización y nota media.
  */
 export const TeachingMetricsPanel = ({
     selectedCourseId,
@@ -31,7 +30,7 @@ export const TeachingMetricsPanel = ({
     const { summary, students, loading, error } = useTeachingMetrics(selectedCourseId);
 
     return (
-        <GenericCard className="h-full flex-1 space-y-4">
+        <GenericCard className="w-full self-start space-y-4">
             <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                 <Activity size={18} className="text-blue-600" />
                 <span>Métricas de Docencia</span>
@@ -113,28 +112,6 @@ export const TeachingMetricsPanel = ({
                         description="Media de calificaciones registradas"
                         badgeLabel="Calificación"
                         badgeClassName="bg-blue-50 text-blue-700"
-                    />
-
-                    {/* 6. Valoraciones del curso */}
-                    <MetricStatCard
-                        icon={<Star size={16} className="text-amber-500 fill-amber-400" />}
-                        title="Valoraciones del curso"
-                        value={summary?.courseRating ? `${formatDecimal(summary.courseRating)} ★` : 'Sin valoraciones'}
-                        description="Media de valoraciones de alumnos sobre la asignatura"
-                        badgeLabel="Valoración"
-                        badgeClassName="bg-purple-50 text-purple-700"
-                    />
-
-                    {/* 7. Valoraciones del profesor */}
-                    <MetricStatCard
-                        icon={<Star size={16} className="text-indigo-500 fill-indigo-400" />}
-                        title="Valoración del profesor"
-                        value={
-                            summary?.instructorRating ? `${formatDecimal(summary.instructorRating)} ★` : 'Sin valoraciones'
-                        }
-                        description="Media de valoraciones del profesor por parte de los alumnos de la asignatura"
-                        badgeLabel="Valoración"
-                        badgeClassName="bg-indigo-50 text-indigo-700"
                     />
                 </div>
             )}

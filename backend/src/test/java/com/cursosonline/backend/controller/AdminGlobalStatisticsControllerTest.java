@@ -74,4 +74,28 @@ class AdminGlobalStatisticsControllerTest {
                 .andExpect(jsonPath("$.message").value("Histórico anual consolidado correctamente."))
                 .andExpect(jsonPath("$.finalizedYear").value(2025));
     }
+
+    @Test
+    @DisplayName("GET /api/admin/statistics/global debe devolver 500 si el servicio falla")
+    void getGlobalStatistics_ServicioFalla_DebeDevolver500() throws Exception {
+        when(adminGlobalStatisticsService.getGlobalStatistics())
+                .thenThrow(new RuntimeException("fallo inesperado"));
+
+        mockMvc.perform(get("/api/admin/statistics/global"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message").value("Error interno en el servidor."));
+    }
+
+    @Test
+    @DisplayName("POST /api/admin/statistics/global/finalize-previous-year debe devolver 500 si el servicio falla")
+    void finalizePreviousYearSnapshot_ServicioFalla_DebeDevolver500() throws Exception {
+        when(adminGlobalStatisticsService.finalizePreviousYearSnapshotNow())
+                .thenThrow(new RuntimeException("fallo inesperado"));
+
+        mockMvc.perform(post("/api/admin/statistics/global/finalize-previous-year"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message").value("Error interno en el servidor."));
+    }
 }

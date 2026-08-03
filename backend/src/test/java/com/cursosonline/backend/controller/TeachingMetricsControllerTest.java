@@ -55,7 +55,7 @@ class TeachingMetricsControllerTest {
         void getSummary_WithValidSession_ShouldReturnOk() throws Exception {
                 when(mockPrincipal.getName()).thenReturn("profesor");
                 when(teachingMetricsService.getSummary(eq(7L), eq("profesor")))
-                                .thenReturn(new TeachingMetricsSummaryDTO(7L, 83.5, 71.2, 8.4, 4.6, 4.8));
+                                .thenReturn(new TeachingMetricsSummaryDTO(7L, 83.5, 71.2, 8.4));
 
                 mockMvc.perform(get("/api/v1/teacher/metrics/summary")
                                 .param("courseId", "7")
@@ -96,7 +96,7 @@ class TeachingMetricsControllerTest {
         void getSummary_WithoutCourseId_ShouldPassNullToService() throws Exception {
                 when(mockPrincipal.getName()).thenReturn("profesor");
                 when(teachingMetricsService.getSummary(isNull(), eq("profesor")))
-                                .thenReturn(new TeachingMetricsSummaryDTO(null, 10.0, 20.0, 30.0, 40.0, 50.0));
+                                .thenReturn(new TeachingMetricsSummaryDTO(null, 10.0, 20.0, 30.0));
 
                 mockMvc.perform(get("/api/v1/teacher/metrics/summary")
                                 .principal(mockPrincipal)

@@ -5,7 +5,6 @@ import com.cursosonline.backend.dto.TeachingMetricsSummaryDTO;
 import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Users;
-import com.cursosonline.backend.repository.AcademicEvaluationRepository;
 import com.cursosonline.backend.repository.CourseGradeRepository;
 import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
@@ -39,9 +38,6 @@ class TeachingMetricsServiceTest {
 
     @Mock
     private CourseGradeRepository courseGradeRepository;
-
-    @Mock
-    private AcademicEvaluationRepository academicEvaluationRepository;
 
     @Mock
     private UserService userService;
@@ -85,8 +81,6 @@ class TeachingMetricsServiceTest {
         when(userService.calculateCurrentProgress(firstEnrollment)).thenReturn(60);
         when(userService.calculateCurrentProgress(secondEnrollment)).thenReturn(100);
         when(courseGradeRepository.getGroupAverageScoreByCourseIds(List.of(10L, 20L))).thenReturn(null);
-        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(List.of(10L, 20L))).thenReturn(4.3);
-        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(List.of(10L, 20L))).thenReturn(4.8);
 
         TeachingMetricsSummaryDTO summary = teachingMetricsService.getSummary(null, "profesor");
 
@@ -94,8 +88,6 @@ class TeachingMetricsServiceTest {
         assertEquals(80.0, summary.collectiveProgress());
         assertEquals(50.0, summary.completionRate());
         assertEquals(0.0, summary.averageGrade());
-        assertEquals(4.3, summary.courseRating());
-        assertEquals(4.8, summary.instructorRating());
         verify(enrollmentRepository).findActiveStudentEnrollmentsByCourseIds(List.of(10L, 20L));
     }
 
@@ -106,7 +98,7 @@ class TeachingMetricsServiceTest {
                 .thenReturn(List.of(course(10L, "Arquitectura")));
 
         assertThrows(AccessDeniedException.class, () -> teachingMetricsService.getSummary(99L, "profesor"));
-        verifyNoInteractions(enrollmentRepository, courseGradeRepository, academicEvaluationRepository);
+        verifyNoInteractions(enrollmentRepository, courseGradeRepository);
     }
 
     @Test
@@ -120,9 +112,7 @@ class TeachingMetricsServiceTest {
         assertEquals(0.0, summary.collectiveProgress());
         assertEquals(0.0, summary.completionRate());
         assertEquals(0.0, summary.averageGrade());
-        assertEquals(0.0, summary.courseRating());
-        assertEquals(0.0, summary.instructorRating());
-        verifyNoInteractions(enrollmentRepository, courseGradeRepository, academicEvaluationRepository);
+        verifyNoInteractions(enrollmentRepository, courseGradeRepository);
     }
 
     @Test
@@ -161,6 +151,6 @@ class TeachingMetricsServiceTest {
         List<StudentMetricBreakdownDTO> breakdown = teachingMetricsService.getStudentBreakdown(null, "profesor");
 
         assertEquals(List.of(), breakdown);
-        verifyNoInteractions(enrollmentRepository, courseGradeRepository, academicEvaluationRepository);
+        verifyNoInteractions(enrollmentRepository, courseGradeRepository);
     }
 }

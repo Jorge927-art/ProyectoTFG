@@ -24,9 +24,7 @@ describe('teachingMetricsService', () => {
             courseId: null,
             collectiveProgress: 81.5,
             completionRate: 33.3,
-            averageGrade: 8.9,
-            courseRating: 4.6,
-            instructorRating: 4.8
+            averageGrade: 8.9
         };
         mockedApi.get.mockResolvedValueOnce({ data: payload });
 

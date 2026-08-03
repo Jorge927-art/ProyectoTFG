@@ -41,9 +41,7 @@ describe('TeachingMetricsPanel', () => {
             courseId: 10,
             collectiveProgress: 80,
             completionRate: 50,
-            averageGrade: 8.5,
-            courseRating: 4.7,
-            instructorRating: 4.9
+            averageGrade: 8.5
         },
         students: [
             {

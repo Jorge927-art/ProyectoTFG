@@ -4,7 +4,6 @@ import com.cursosonline.backend.dto.StudentMetricBreakdownDTO;
 import com.cursosonline.backend.dto.TeachingMetricsSummaryDTO;
 import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
-import com.cursosonline.backend.repository.AcademicEvaluationRepository;
 import com.cursosonline.backend.repository.CourseGradeRepository;
 import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
@@ -28,7 +27,6 @@ public class TeachingMetricsService {
     private final CoursesRepository coursesRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final CourseGradeRepository courseGradeRepository;
-    private final AcademicEvaluationRepository academicEvaluationRepository;
     private final UserService userService;
 
     /**
@@ -59,14 +57,14 @@ public class TeachingMetricsService {
 
     /**
      * Calcula el resumen agregado (progreso colectivo, tasa de finalización,
-     * nota media, valoraciones del curso y del profesor) para el ámbito
+     * nota media) para el ámbito
      * resuelto.
      */
     public TeachingMetricsSummaryDTO getSummary(Long courseId, String professorUsername) {
         List<Long> courseIds = resolveCourseIds(courseId, professorUsername);
 
         if (courseIds.isEmpty()) {
-            return new TeachingMetricsSummaryDTO(courseId, 0.0, 0.0, 0.0, 0.0, 0.0);
+            return new TeachingMetricsSummaryDTO(courseId, 0.0, 0.0, 0.0);
         }
 
         List<Enrollment> enrollments = enrollmentRepository.findActiveStudentEnrollmentsByCourseIds(courseIds);
@@ -92,16 +90,12 @@ public class TeachingMetricsService {
         }
 
         Double averageGrade = courseGradeRepository.getGroupAverageScoreByCourseIds(courseIds);
-        Double courseRating = academicEvaluationRepository.getAverageCourseScoreByCourseIds(courseIds);
-        Double instructorRating = academicEvaluationRepository.getAverageInstructorScoreByCourseIds(courseIds);
 
         return new TeachingMetricsSummaryDTO(
                 courseId,
                 collectiveProgress,
                 completionRate,
-                averageGrade != null ? averageGrade : 0.0,
-                courseRating != null ? courseRating : 0.0,
-                instructorRating != null ? instructorRating : 0.0);
+                averageGrade != null ? averageGrade : 0.0);
     }
 
     /**

@@ -25,8 +25,10 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -112,5 +114,26 @@ class AdminGlobalStatisticsServiceTest {
         assertNotNull(saved.getTopCourses());
         assertFalse(saved.getTopCourses().isEmpty());
         assertEquals("Fisica", saved.getTopCourses().get(0).getCourseTitle());
+    }
+
+    @Test
+    @DisplayName("getGlobalStatistics debe propagar excepción si falla la consulta de usuarios")
+    void getGlobalStatistics_FalloRepositorioUsuarios_DebePropagarExcepcion() {
+        when(userRepository.countByRoleAndEnabledTrue(Role.STUDENT))
+                .thenThrow(new RuntimeException("db error"));
+
+        assertThrows(RuntimeException.class, () -> service.getGlobalStatistics());
+    }
+
+    @Test
+    @DisplayName("finalizePreviousYearSnapshotNow debe propagar excepción y no persistir si falla ranking")
+    void finalizePreviousYearSnapshotNow_FalloRanking_DebePropagarExcepcion() {
+        when(userRepository.countByRoleAndEnabledTrue(Role.STUDENT)).thenReturn(100L);
+        when(userRepository.countByRoleAndEnabledTrue(Role.PROFESSOR)).thenReturn(7L);
+        when(enrollmentRepository.findTopCoursesByActiveStudentCount(any()))
+                .thenThrow(new RuntimeException("db error"));
+
+        assertThrows(RuntimeException.class, () -> service.finalizePreviousYearSnapshotNow());
+        verify(historyRepository, never()).save(any(AdminGlobalStatsHistory.class));
     }
 }

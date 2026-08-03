@@ -28,6 +28,28 @@ const students: StudentMetricBreakdown[] = [
     }
 ];
 
+const manyStudents: StudentMetricBreakdown[] = [
+    ...students,
+    {
+        userId: 3,
+        username: 'alumno3',
+        email: 'alumno3@uni.es',
+        courseId: 30,
+        courseTitle: 'Sistemas',
+        progressPercentage: 65,
+        averageGrade: 7.2
+    },
+    {
+        userId: 4,
+        username: 'alumno4',
+        email: 'alumno4@uni.es',
+        courseId: 40,
+        courseTitle: 'Compiladores',
+        progressPercentage: 88,
+        averageGrade: 8.8
+    }
+];
+
 describe('StudentGradeBreakdown', () => {
     it('debe mostrar el estado vacío cuando no hay calificaciones', () => {
         render(<StudentGradeBreakdown students={[]} showCourseColumn={true} />);
@@ -49,5 +71,21 @@ describe('StudentGradeBreakdown', () => {
 
         expect(screen.getByText('alumno2')).toBeInTheDocument();
         expect(screen.queryByText('Arquitectura')).not.toBeInTheDocument();
+    });
+
+    it('debe habilitar scroll interno cuando hay más de tres alumnos', () => {
+        render(<StudentGradeBreakdown students={manyStudents} showCourseColumn={false} />);
+
+        const list = screen.getByTestId('student-grade-list');
+        expect(list.className).toContain('overflow-y-scroll');
+        expect(list.className).toContain('max-h-56');
+    });
+
+    it('debe mantener la altura fija del listado cuando hay tres o menos alumnos', () => {
+        render(<StudentGradeBreakdown students={students} showCourseColumn={false} />);
+
+        const list = screen.getByTestId('student-grade-list');
+        expect(list.className).toContain('overflow-y-scroll');
+        expect(list.className).toContain('max-h-56');
     });
 });

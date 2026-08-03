@@ -11,8 +11,6 @@ export interface TeachingMetricsSummary {
     collectiveProgress: number;
     completionRate: number;
     averageGrade: number;
-    courseRating: number;
-    instructorRating: number;
 }
 
 /**
