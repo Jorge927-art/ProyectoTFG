@@ -4,6 +4,7 @@ import com.cursosonline.backend.entities.Enrollment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Pageable;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,6 +16,16 @@ import java.util.Optional;
  * EnrollmentRepository
  */
 public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
+
+        /**
+         * Ranking de cursos por número de alumnos activos inscritos.
+         */
+        @Query("SELECT c.course_id, c.title, COUNT(DISTINCT u.user_id) " +
+                        "FROM Enrollment e JOIN e.course c JOIN e.user u " +
+                        "WHERE u.role = 'STUDENT' AND u.enabled = true " +
+                        "GROUP BY c.course_id, c.title " +
+                        "ORDER BY COUNT(DISTINCT u.user_id) DESC, c.title ASC")
+        List<Object[]> findTopCoursesByActiveStudentCount(Pageable pageable);
 
         /**
          * [PANEL DOCENTE - LISTADO CURSOS DEL ALUMNO]: Recupera los IDs de los cursos

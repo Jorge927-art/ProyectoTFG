@@ -38,6 +38,10 @@ vi.mock('./components/CourseInsightPanel', () => ({
     CourseInsightPanel: () => <div data-testid="mock-course-insight-panel" />
 }));
 
+vi.mock('./components/GlobalStatisticsPanel', () => ({
+    GlobalStatisticsPanel: () => <div data-testid="mock-global-statistics-panel" />
+}));
+
 describe('AdminDashboard - Orquestación de paneles', () => {
     it('renderiza la cabecera institucional y ambos paneles', () => {
         render(<AdminDashboard />);
@@ -48,6 +52,7 @@ describe('AdminDashboard - Orquestación de paneles', () => {
         expect(screen.getByTestId('mock-user-search-panel')).toBeInTheDocument();
         expect(screen.getByTestId('mock-user-scroll-list')).toBeInTheDocument();
         expect(screen.getByTestId('mock-admin-document-inbox')).toBeInTheDocument();
+        expect(screen.getByTestId('mock-global-statistics-panel')).toBeInTheDocument();
     });
 
     it('inyecta el username del administrador autenticado en UserSearchPanel', () => {
@@ -63,6 +68,16 @@ describe('AdminDashboard - Orquestación de paneles', () => {
         const courseInsight = screen.getByTestId('mock-course-insight-panel');
 
         const position = inbox.compareDocumentPosition(courseInsight);
+        expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('renderiza el panel estadístico global debajo del panel estadístico de cursos', () => {
+        render(<AdminDashboard />);
+
+        const courseInsight = screen.getByTestId('mock-course-insight-panel');
+        const globalStats = screen.getByTestId('mock-global-statistics-panel');
+
+        const position = courseInsight.compareDocumentPosition(globalStats);
         expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 });

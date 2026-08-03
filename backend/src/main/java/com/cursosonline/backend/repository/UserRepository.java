@@ -30,6 +30,11 @@ public interface UserRepository extends JpaRepository<Users, Long> {
         List<Users> findByRole(Role role);
 
         /**
+         * Cuenta usuarios activos por rol para paneles agregados.
+         */
+        long countByRoleAndEnabledTrue(Role role);
+
+        /**
          * [FILTRADO COMPAÑEROS DE CLASE]: Obtiene los estudiantes matriculados en los
          * mismos cursos
          * que el alumno autenticado, excluyendo al propio alumno emisor para evitar el

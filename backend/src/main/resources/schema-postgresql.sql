@@ -33,3 +33,29 @@ ALTER TABLE IF EXISTS enrollment
 
 ALTER TABLE IF EXISTS enrollment
     ALTER COLUMN progress_alert_professor_ack SET NOT NULL;
+
+-- -----------------------------------------------------------------------------
+-- Histórico anual del panel estadístico global de administración
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS admin_global_stats_history (
+    id BIGSERIAL PRIMARY KEY,
+    snapshot_year INTEGER NOT NULL UNIQUE,
+    total_students INTEGER NOT NULL,
+    total_professors INTEGER NOT NULL,
+    top_course_enrollment INTEGER NOT NULL,
+    real_data BOOLEAN NOT NULL DEFAULT FALSE,
+    generated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS admin_global_top_course_history (
+    id BIGSERIAL PRIMARY KEY,
+    history_id BIGINT NOT NULL,
+    rank_position INTEGER NOT NULL,
+    course_id BIGINT,
+    course_title VARCHAR(255) NOT NULL,
+    enrolled_students INTEGER NOT NULL,
+    CONSTRAINT fk_admin_global_top_course_history_history
+        FOREIGN KEY (history_id)
+        REFERENCES admin_global_stats_history(id)
+        ON DELETE CASCADE
+);

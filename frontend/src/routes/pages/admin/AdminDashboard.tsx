@@ -6,6 +6,7 @@ import { UserSearchPanel } from './components/UserSearchPanel';
 import GenericHeader from '../../../components/ui/genericHeader/GenericHeader';
 import { CourseInsightPanel } from './components/CourseInsightPanel';
 import { AdminDocumentInbox } from './components/AdminDocumentInbox';
+import { GlobalStatisticsPanel } from './components/GlobalStatisticsPanel';
 
 const AdminDashboard = () => {
     const { user } = useAuth();
@@ -52,6 +53,10 @@ const AdminDashboard = () => {
 
             <div className="w-full mt-6">
                 <CourseInsightPanel />
+            </div>
+
+            <div className="w-full mt-6">
+                <GlobalStatisticsPanel />
             </div>
         </AdminLayout>
     );
