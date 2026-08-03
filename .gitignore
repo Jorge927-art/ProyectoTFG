@@ -19,3 +19,7 @@ repomix-output.txt
 repomix-output.md
 # Carpeta de subidas local para fotos y documentos
 /uploads/
+
+# Artefactos generados frontend
+frontend/coverage/
+frontend/docs/
