@@ -81,7 +81,7 @@ describe('UserSearchPanel', () => {
         render(<UserSearchPanel currentAdminUsername="root_admin" />);
 
         expect(screen.getByText('Buscador de Usuarios')).toBeInTheDocument();
-        expect(screen.getByText('Consulta directa y en tiempo real a PostgreSQL')).toBeInTheDocument();
+        expect(screen.getByText('Consulta directa a PostgreSQL')).toBeInTheDocument();
         expect(screen.getByTestId('mock-text-input')).toBeInTheDocument();
     });
 
