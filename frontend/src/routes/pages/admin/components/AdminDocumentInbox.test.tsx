@@ -6,9 +6,14 @@ import * as notificationsHook from '../../../../components/ui/globalNotification
 import type { DocumentMetadata } from '../../../../services/documentService';
 
 vi.mock('../../../../services/documentService', () => ({
+    getAdminDocumentRecipients: vi.fn(),
+    getAdminDocumentCourses: vi.fn(),
+    getSentDocuments: vi.fn(),
     getUserDocuments: vi.fn(),
     downloadDocumentSecure: vi.fn(),
     markDocumentAsRead: vi.fn(),
+    uploadStudentDocument: vi.fn(),
+    uploadAdminDocumentToCourse: vi.fn(),
 }));
 
 vi.mock('../../../../components/ui/globalNotificationBell/useNotifications', () => ({
@@ -22,6 +27,7 @@ const docUnread: DocumentMetadata = {
     upload_date: '2026-07-28T00:00:00.000Z',
     sender: { userId: 7, username: 'profesor', email: 'prof@tfg.com', role: 'PROFESSOR' },
     receiver: { userId: 1, username: 'admin', email: 'admin@tfg.com', role: 'ADMIN' },
+    course: null,
     folder_type: 'RECEIVED',
     isRead: false,
 };
@@ -36,6 +42,9 @@ describe('AdminDocumentInbox', () => {
             configurable: true,
             value: scrollIntoViewSpy,
         });
+        vi.mocked(documentService.getAdminDocumentRecipients).mockResolvedValue([]);
+        vi.mocked(documentService.getAdminDocumentCourses).mockResolvedValue([]);
+        vi.mocked(documentService.getSentDocuments).mockResolvedValue([]);
         vi.mocked(notificationsHook.useNotifications).mockReturnValue({
             alerts: [],
             documents: [],
@@ -56,6 +65,89 @@ describe('AdminDocumentInbox', () => {
         await waitFor(() => {
             expect(screen.getByText('evaluacion.pdf')).toBeInTheDocument();
             expect(screen.getByText('De: profesor')).toBeInTheDocument();
+        });
+    });
+
+    it('muestra el historial de enviados en un bloque separado con su destinatario', async () => {
+        const sentDoc: DocumentMetadata = {
+            ...docUnread,
+            documentid: 99,
+            originalname: 'circular.pdf',
+            course: { courseId: 101, title: 'Álgebra', category: 'Matemáticas' },
+            folder_type: 'SENT',
+            isRead: true,
+            receiver: { userId: 12, username: 'laura_student', email: 'laura@tfg.com', role: 'STUDENT' },
+        };
+
+        vi.mocked(documentService.getUserDocuments).mockResolvedValue([docUnread]);
+        vi.mocked(documentService.getSentDocuments).mockResolvedValue([sentDoc]);
+
+        render(<AdminDocumentInbox />);
+
+        await waitFor(() => {
+            expect(screen.getByText('circular.pdf')).toBeInTheDocument();
+            expect(screen.getByText('Para: laura_student')).toBeInTheDocument();
+        });
+    });
+
+    it('filtra la pestaña de enviados por destinatario y por curso', async () => {
+        const sentDocA: DocumentMetadata = {
+            ...docUnread,
+            documentid: 90,
+            originalname: 'circular-algebra.pdf',
+            folder_type: 'SENT',
+            isRead: true,
+            course: { courseId: 101, title: 'Álgebra', category: 'Matemáticas' },
+            receiver: { userId: 12, username: 'laura_student', email: 'laura@tfg.com', role: 'STUDENT' },
+        };
+
+        const sentDocB: DocumentMetadata = {
+            ...docUnread,
+            documentid: 91,
+            originalname: 'circular-historia.pdf',
+            folder_type: 'SENT',
+            isRead: true,
+            course: { courseId: 202, title: 'Historia', category: 'Humanidades' },
+            receiver: { userId: 15, username: 'mario_student', email: 'mario@tfg.com', role: 'STUDENT' },
+        };
+
+        vi.mocked(documentService.getUserDocuments).mockResolvedValue([]);
+        vi.mocked(documentService.getSentDocuments).mockResolvedValue([sentDocA, sentDocB]);
+        vi.mocked(documentService.getAdminDocumentRecipients).mockResolvedValue([
+            { userId: 12, username: 'laura_student', role: 'STUDENT', enabled: true },
+            { userId: 15, username: 'mario_student', role: 'STUDENT', enabled: true },
+        ]);
+        vi.mocked(documentService.getAdminDocumentCourses).mockResolvedValue([
+            { courseId: 101, title: 'Álgebra', category: 'Matemáticas' },
+            { courseId: 202, title: 'Historia', category: 'Humanidades' },
+        ]);
+
+        render(<AdminDocumentInbox />);
+
+        await waitFor(() => {
+            expect(screen.getByText('circular-algebra.pdf')).toBeInTheDocument();
+            expect(screen.getByText('circular-historia.pdf')).toBeInTheDocument();
+        });
+
+        fireEvent.change(screen.getByLabelText('Filtrar enviados por destinatario'), {
+            target: { value: '12' },
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText('circular-algebra.pdf')).toBeInTheDocument();
+            expect(screen.queryByText('circular-historia.pdf')).not.toBeInTheDocument();
+        });
+
+        fireEvent.change(screen.getByLabelText('Filtrar enviados por destinatario'), {
+            target: { value: '' },
+        });
+        fireEvent.change(screen.getByLabelText('Filtrar enviados por curso'), {
+            target: { value: '202' },
+        });
+
+        await waitFor(() => {
+            expect(screen.queryByText('circular-algebra.pdf')).not.toBeInTheDocument();
+            expect(screen.getByText('circular-historia.pdf')).toBeInTheDocument();
         });
     });
 
@@ -104,6 +196,72 @@ describe('AdminDocumentInbox', () => {
         await waitFor(() => {
             expect(screen.getByTestId('admin-doc-row-33').className).toContain('border-amber-300');
             expect(scrollIntoViewSpy).toHaveBeenCalled();
+        });
+    });
+
+    it('envía un documento a un usuario concreto desde el panel admin', async () => {
+        const sentFile = new File(['contenido'], 'aviso.pdf', { type: 'application/pdf' });
+        vi.mocked(documentService.getUserDocuments).mockResolvedValue([]);
+        vi.mocked(documentService.getAdminDocumentRecipients).mockResolvedValue([
+            { userId: 9, username: 'laura', role: 'STUDENT', enabled: true },
+        ]);
+        vi.mocked(documentService.uploadStudentDocument).mockResolvedValue({
+            message: 'Documento enviado con éxito al destinatario',
+            filename: 'documents/uuid.pdf',
+            originalname: 'aviso.pdf',
+        });
+
+        render(<AdminDocumentInbox />);
+
+        await waitFor(() => {
+            expect(screen.getByLabelText('Seleccionar usuario destinatario')).toBeInTheDocument();
+        });
+
+        fireEvent.change(screen.getByLabelText('Seleccionar usuario destinatario'), {
+            target: { value: '9' },
+        });
+        fireEvent.change(screen.getByLabelText('Archivo para envío individual'), {
+            target: { files: [sentFile] },
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Enviar a usuario' }));
+
+        await waitFor(() => {
+            expect(documentService.uploadStudentDocument).toHaveBeenCalledWith(sentFile, 9);
+            expect(screen.getByText('Documento enviado con éxito al destinatario')).toBeInTheDocument();
+        });
+    });
+
+    it('envía un documento a todos los alumnos de un curso desde el panel admin', async () => {
+        const sentFile = new File(['contenido'], 'guia.pdf', { type: 'application/pdf' });
+        vi.mocked(documentService.getUserDocuments).mockResolvedValue([]);
+        vi.mocked(documentService.getAdminDocumentCourses).mockResolvedValue([
+            { courseId: 101, title: 'Álgebra', category: 'Matemáticas' },
+        ]);
+        vi.mocked(documentService.uploadAdminDocumentToCourse).mockResolvedValue({
+            message: 'Documento transmitido con éxito al grupo de alumnos de la asignatura',
+            filename: 'documents/uuid-guia.pdf',
+            originalname: 'guia.pdf',
+        });
+
+        render(<AdminDocumentInbox />);
+
+        await waitFor(() => {
+            expect(screen.getByLabelText('Seleccionar curso destinatario')).toBeInTheDocument();
+        });
+
+        fireEvent.change(screen.getByLabelText('Seleccionar curso destinatario'), {
+            target: { value: '101' },
+        });
+        fireEvent.change(screen.getByLabelText('Archivo para envío colectivo'), {
+            target: { files: [sentFile] },
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Enviar a curso' }));
+
+        await waitFor(() => {
+            expect(documentService.uploadAdminDocumentToCourse).toHaveBeenCalledWith(sentFile, 101);
+            expect(screen.getByText('Documento transmitido con éxito al grupo de alumnos de la asignatura')).toBeInTheDocument();
         });
     });
 });

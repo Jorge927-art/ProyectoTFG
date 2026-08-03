@@ -6,6 +6,7 @@ import com.cursosonline.backend.entities.FolderType;
 import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.DocumentMetadataRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
@@ -55,6 +56,9 @@ public class DocumentControllerTest {
 
         @Mock
         private DocumentMetadataRepository documentMetadataRepository;
+
+        @Mock
+        private CoursesRepository coursesRepository;
 
         @Mock
         private UserRepository userRepository;
@@ -398,6 +402,112 @@ public class DocumentControllerTest {
                 assertEquals(2, bodyMap.get("totalStudents"));
 
                 // 2 alumnos => 4 registros (SENT + RECEIVED por alumno)
+                Mockito.verify(documentMetadataRepository, Mockito.times(4)).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("Debe devolver el directorio administrativo de usuarios para poblar el selector del panel")
+        void debeDevolverDirectorioAdministrativoDeUsuarios() {
+                Users admin = new Users();
+                admin.setUser_id(90L);
+                admin.setUsername("root_admin");
+                admin.setRole(Role.ADMIN);
+                admin.setEnabled(true);
+
+                Users student = new Users();
+                student.setUser_id(91L);
+                student.setUsername("laura_student");
+                student.setRole(Role.STUDENT);
+                student.setEnabled(true);
+
+                Mockito.when(userRepository.findAll()).thenReturn(List.of(admin, student));
+
+                ResponseEntity<?> response = documentController.getAdminUsersDirectory(authentication);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertTrue(response.getBody() instanceof List);
+                List<?> payload = (List<?>) response.getBody();
+                assertEquals(2, payload.size());
+                Map<?, ?> first = (Map<?, ?>) payload.get(0);
+                assertEquals("root_admin", first.get("username"));
+        }
+
+        @Test
+        @DisplayName("Debe devolver el directorio administrativo de cursos para poblar el selector colectivo")
+        void debeDevolverDirectorioAdministrativoDeCursos() {
+                Courses course = new Courses();
+                course.setCourse_id(77L);
+                course.setTitle("Álgebra");
+                course.setCategory("Matemáticas");
+
+                Mockito.when(coursesRepository.findAll(any(org.springframework.data.domain.Sort.class)))
+                                .thenReturn(List.of(course));
+
+                ResponseEntity<?> response = documentController.getAdminCoursesDirectory(authentication);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertTrue(response.getBody() instanceof List);
+                List<?> payload = (List<?>) response.getBody();
+                Map<?, ?> first = (Map<?, ?>) payload.get(0);
+                assertEquals(77L, first.get("courseId"));
+                assertEquals("Álgebra", first.get("title"));
+        }
+
+        @Test
+        @DisplayName("Debe permitir al admin enviar un documento colectivo a todos los alumnos activos de un curso")
+        void debePermitirEnvioColectivoAdminPorCurso() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "circular.pdf",
+                                "application/pdf",
+                                "Circular administrativa".getBytes());
+
+                Users admin = new Users();
+                admin.setUser_id(90L);
+                admin.setUsername("root_admin");
+                admin.setRole(Role.ADMIN);
+
+                Users studentA = new Users();
+                studentA.setUser_id(31L);
+                studentA.setUsername("student_a");
+                studentA.setRole(Role.STUDENT);
+
+                Users studentB = new Users();
+                studentB.setUser_id(32L);
+                studentB.setUsername("student_b");
+                studentB.setRole(Role.STUDENT);
+
+                Courses course = new Courses();
+                course.setCourse_id(501L);
+                course.setTitle("Programación I");
+
+                Enrollment enrollmentA = new Enrollment();
+                enrollmentA.setEnrollmentid(7001L);
+                enrollmentA.setUser(studentA);
+                enrollmentA.setCourse(course);
+
+                Enrollment enrollmentB = new Enrollment();
+                enrollmentB.setEnrollmentid(7002L);
+                enrollmentB.setUser(studentB);
+                enrollmentB.setCourse(course);
+
+                Mockito.when(authentication.getName()).thenReturn("root_admin");
+                Mockito.when(userRepository.findByUsername("root_admin")).thenReturn(Optional.of(admin));
+                Mockito.when(coursesRepository.findById(501L)).thenReturn(Optional.of(course));
+                Mockito.when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(501L))
+                                .thenReturn(List.of(enrollmentA, enrollmentB));
+                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
+                                .thenReturn("documents/uuid_circular.pdf");
+
+                ResponseEntity<?> response = documentController.uploadDocumentToCourseByAdmin(authentication, validFile,
+                                501L);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertNotNull(bodyMap);
+                assertEquals("Documento transmitido con éxito al grupo de alumnos de la asignatura",
+                                bodyMap.get("message"));
+                assertEquals(2, bodyMap.get("totalStudents"));
                 Mockito.verify(documentMetadataRepository, Mockito.times(4)).save(any(DocumentMetadata.class));
         }
 

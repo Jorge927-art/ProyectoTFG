@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { 
+    getAdminDocumentCourses,
+    getAdminDocumentRecipients,
     getUserDocuments, 
     getSentDocuments, 
     uploadStudentDocument, 
@@ -11,7 +13,8 @@ import {
     getSentDocumentsByCourse, 
     uploadAssignmentDocument, 
     markDocumentAsRead, 
-    uploadProfessorDocument 
+    uploadProfessorDocument,
+    uploadAdminDocumentToCourse 
 } from './documentService';
 import { apiClient } from './apiClient';
 import type { UserDirectoryDTO, UploadDocumentResponse } from './documentService';
@@ -48,6 +51,7 @@ describe('documentService - Suite de Pruebas Unitarias de Alta Fidelidad', () =>
             upload_date: '2026-03-01T10:00:00Z',
             sender: { userId: 10, username: 'Juan Docente', email: 'juan@uni.es', role: 'TEACHER' },
             receiver: { userId: 20, username: 'Ana Alumno', email: 'ana@uni.es', role: 'STUDENT' },
+            course: { courseId: 77, title: 'Álgebra', category: 'Matemáticas' },
             folder_type: 'SENT' as const,
             isRead: true
         }
@@ -80,6 +84,7 @@ describe('documentService - Suite de Pruebas Unitarias de Alta Fidelidad', () =>
         expect(result[0].documentid).toBe(501);
         expect(result[0].isRead).toBe(true);
         expect(result[0].sender.userId).toBe(10);
+        expect(result[0].course?.courseId).toBe(77);
     });
 
     it('debe aplicar fallbacks defensivos ante payloads corruptos, nulos o con snake_case', async () => {
@@ -114,6 +119,20 @@ describe('documentService - Suite de Pruebas Unitarias de Alta Fidelidad', () =>
 
         expect(result).toEqual(mockDirectory);
         expect(mockedApi.get).toHaveBeenCalledWith(expectedUrl);
+    });
+
+    it('debe consultar el directorio administrativo de destinatarios y cursos', async () => {
+        mockedApi.get
+            .mockResolvedValueOnce({ data: [{ userId: 1, username: 'laura', role: 'STUDENT', enabled: true }] })
+            .mockResolvedValueOnce({ data: [{ courseId: 77, title: 'Álgebra', category: 'Matemáticas' }] });
+
+        const recipients = await getAdminDocumentRecipients();
+        const courses = await getAdminDocumentCourses();
+
+        expect(recipients).toEqual([{ userId: 1, username: 'laura', role: 'STUDENT', enabled: true }]);
+        expect(courses).toEqual([{ courseId: 77, title: 'Álgebra', category: 'Matemáticas' }]);
+        expect(mockedApi.get).toHaveBeenNthCalledWith(1, '/api/v1/documents/admin/users');
+        expect(mockedApi.get).toHaveBeenNthCalledWith(2, '/api/v1/documents/admin/courses');
     });
 
     // --- BLOQUE 3: VALIDACIÓN DE SUBIDA MULTIPART/FORM-DATA (UPLOADS) ---
@@ -160,6 +179,20 @@ describe('documentService - Suite de Pruebas Unitarias de Alta Fidelidad', () =>
         expect(url).toBe('/api/v1/documents/professor-upload');
         expect(formData.get('courseId')).toBe('202');
         expect(formData.get('receiverId')).toBe('0');
+    });
+
+    it('debe transmitir un documento administrativo al grupo de alumnos de un curso', async () => {
+        const mockResponse: UploadDocumentResponse = { message: 'Ok', filename: 'mass.pdf', originalname: 'guia.pdf' };
+        mockedApi.post.mockResolvedValueOnce({ data: mockResponse });
+        const dummyFile = new File([new Uint8Array()], 'guia.pdf', { type: 'application/pdf' });
+
+        await uploadAdminDocumentToCourse(dummyFile, 909);
+
+        const [url, formData, config] = mockedApi.post.mock.calls[0] as [string, FormData, undefined];
+        expect(url).toBe('/api/v1/documents/admin/upload/course');
+        expect(formData.get('file')).toBe(dummyFile);
+        expect(formData.get('courseId')).toBe('909');
+        expect(config).toBeUndefined();
     });
     // --- BLOQUE 4: DESCARGAS SEGURAS DE FLUJO DE BYTES (DOM SIMULATION) ---
     it('debe orquestar la descarga simulando los elementos nativos y revocación de URL en downloadDocumentSecure', async () => {

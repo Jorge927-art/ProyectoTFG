@@ -61,7 +61,7 @@ export const CourseInsightPanel = () => {
 
             {/* RESULTADOS DE BÚSQUEDA */}
             {results.length > 0 && !selectedCourse && (
-                <div className="space-y-1.5">
+                <div className="max-h-52 overflow-y-auto pr-1 space-y-1.5">
                     {results.map((course, index) => (
                         <button
                             key={course.courseId}

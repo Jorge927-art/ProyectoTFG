@@ -6,6 +6,8 @@ import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.FolderType;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.DocumentMetadataRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
@@ -35,6 +37,7 @@ public class DocumentController {
 
     private final FileStorageService fileStorageService;
     private final DocumentMetadataRepository documentMetadataRepository;
+    private final CoursesRepository coursesRepository;
     private final UserRepository userRepository;
     private final EnrollmentRepository enrollmentRepository;
 
@@ -50,12 +53,66 @@ public class DocumentController {
      */
     public DocumentController(FileStorageService fileStorageService,
             DocumentMetadataRepository documentMetadataRepository,
+            CoursesRepository coursesRepository,
             UserRepository userRepository,
             EnrollmentRepository enrollmentRepository) {
         this.fileStorageService = fileStorageService;
         this.documentMetadataRepository = documentMetadataRepository;
+        this.coursesRepository = coursesRepository;
         this.userRepository = userRepository;
         this.enrollmentRepository = enrollmentRepository;
+    }
+
+    @GetMapping("/admin/users")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<?> getAdminUsersDirectory(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            List<Map<String, Object>> users = userRepository.findAll().stream()
+                    .map(user -> Map.<String, Object>of(
+                            "userId", user.getUser_id(),
+                            "username", user.getUsername(),
+                            "role", user.getRole() != null ? user.getRole().name() : "UNKNOWN",
+                            "enabled", user.isEnabled()))
+                    .toList();
+
+            return ResponseEntity.ok(users);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error al recuperar el directorio administrativo de usuarios",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
+    @GetMapping("/admin/courses")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<?> getAdminCoursesDirectory(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            List<Map<String, Object>> courses = coursesRepository
+                    .findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC,
+                            "title"))
+                    .stream()
+                    .map(course -> Map.<String, Object>of(
+                            "courseId", course.getCourse_id(),
+                            "title", course.getTitle() != null ? course.getTitle() : "Curso sin título",
+                            "category", course.getCategory() != null ? course.getCategory() : "Sin categoría"))
+                    .toList();
+
+            return ResponseEntity.ok(courses);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error al recuperar el directorio administrativo de cursos",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
     }
 
     /**
@@ -259,21 +316,7 @@ public class DocumentController {
             String relativePath = fileStorageService.storeFile(file, "documents");
             String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
 
-            DocumentMetadata sentMetadata = new DocumentMetadata();
-            sentMetadata.setFilename(relativePath);
-            sentMetadata.setOriginalname(cleanOriginalName);
-            sentMetadata.setSender(currentUser);
-            sentMetadata.setReceiver(receiverUser);
-            sentMetadata.setFolder_type(FolderType.SENT);
-            documentMetadataRepository.save(sentMetadata);
-
-            DocumentMetadata receivedMetadata = new DocumentMetadata();
-            receivedMetadata.setFilename(relativePath);
-            receivedMetadata.setOriginalname(cleanOriginalName);
-            receivedMetadata.setSender(currentUser);
-            receivedMetadata.setReceiver(receiverUser);
-            receivedMetadata.setFolder_type(FolderType.RECEIVED);
-            documentMetadataRepository.save(receivedMetadata);
+            persistDirectedDocumentPair(relativePath, cleanOriginalName, currentUser, receiverUser, null);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Documento enviado con éxito al destinatario",
@@ -285,6 +328,63 @@ public class DocumentController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                     "error", "Error crítico al procesar el intercambio del documento",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
+    @PostMapping("/admin/upload/course")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<?> uploadDocumentToCourseByAdmin(
+            Authentication authentication,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("courseId") Long courseId) {
+
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            if (file == null || file.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "El archivo transmitido está vacío o es inválido."));
+            }
+
+            Users currentUser = resolveAuthenticatedUser(authentication.getName(),
+                    "Usuario administrador emisor no encontrado.");
+
+            Courses course = coursesRepository.findById(courseId)
+                    .orElseThrow(() -> new RuntimeException("La asignatura seleccionada no existe."));
+
+            List<Enrollment> classEnrollments = enrollmentRepository.findActiveStudentEnrollmentsByCourseId(courseId);
+            if (classEnrollments.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error",
+                                "No se puede realizar el envío colectivo porque no hay alumnos activos matriculados en la asignatura."));
+            }
+
+            String relativePath = fileStorageService.storeFile(file, "documents");
+            String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
+
+            for (Enrollment enrollment : classEnrollments) {
+                if (enrollment.getUser() != null) {
+                    persistDirectedDocumentPair(relativePath, cleanOriginalName, currentUser, enrollment.getUser(),
+                            course);
+                }
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Documento transmitido con éxito al grupo de alumnos de la asignatura",
+                    "courseId", courseId,
+                    "totalStudents", classEnrollments.size(),
+                    "filename", relativePath,
+                    "originalname", cleanOriginalName));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error crítico al procesar el envío colectivo administrativo",
                     "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
         }
     }
@@ -627,6 +727,7 @@ public class DocumentController {
         payload.put("isRead", document.isRead());
         payload.put("sender", toUserSummary(document.getSender()));
         payload.put("receiver", toUserSummary(document.getReceiver()));
+        payload.put("course", toCourseSummary(document.getCourse()));
         return payload;
     }
 
@@ -646,6 +747,17 @@ public class DocumentController {
                 "username", user.getUsername(),
                 "email", user.getEmail() != null ? user.getEmail() : "",
                 "role", user.getRole() != null ? user.getRole().name() : "UNKNOWN");
+    }
+
+    private Map<String, Object> toCourseSummary(Courses course) {
+        if (course == null) {
+            return null;
+        }
+
+        return Map.of(
+                "courseId", course.getCourse_id(),
+                "title", course.getTitle() != null ? course.getTitle() : "Curso sin título",
+                "category", course.getCategory() != null ? course.getCategory() : "Sin categoría");
     }
 
     /**
@@ -779,6 +891,30 @@ public class DocumentController {
 
         return userRepository.findByEmailIgnoreCase(principalName)
                 .orElseThrow(() -> new RuntimeException(notFoundMessage));
+    }
+
+    private void persistDirectedDocumentPair(String relativePath, String cleanOriginalName, Users sender,
+            Users receiver,
+            Courses course) {
+        DocumentMetadata sentMetadata = new DocumentMetadata();
+        sentMetadata.setFilename(relativePath);
+        sentMetadata.setOriginalname(cleanOriginalName);
+        sentMetadata.setSender(sender);
+        sentMetadata.setReceiver(receiver);
+        sentMetadata.setCourse(course);
+        sentMetadata.setFolder_type(FolderType.SENT);
+        sentMetadata.setRead(true);
+        documentMetadataRepository.save(sentMetadata);
+
+        DocumentMetadata receivedMetadata = new DocumentMetadata();
+        receivedMetadata.setFilename(relativePath);
+        receivedMetadata.setOriginalname(cleanOriginalName);
+        receivedMetadata.setSender(sender);
+        receivedMetadata.setReceiver(receiver);
+        receivedMetadata.setCourse(course);
+        receivedMetadata.setFolder_type(FolderType.RECEIVED);
+        receivedMetadata.setRead(false);
+        documentMetadataRepository.save(receivedMetadata);
     }
 
 }

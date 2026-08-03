@@ -8,6 +8,12 @@ export interface UserDocumentMinDTO {
     role: string;
 }
 
+export interface CourseDocumentMinDTO {
+    courseId: number;
+    title: string;
+    category: string;
+}
+
 type RawUserDocumentMinDTO = Partial<UserDocumentMinDTO> & {
     user_id?: number;
 };
@@ -20,6 +26,7 @@ export interface DocumentMetadata {
     upload_date: string;
     sender: UserDocumentMinDTO;
     receiver: UserDocumentMinDTO;
+    course?: CourseDocumentMinDTO | null;
     folder_type: 'SENT' | 'RECEIVED';
     isRead: boolean;
 }
@@ -29,6 +36,7 @@ type RawDocumentMetadata = Partial<DocumentMetadata> & {
     read?: boolean;
     sender?: RawUserDocumentMinDTO | null;
     receiver?: RawUserDocumentMinDTO | null;
+    course?: Partial<CourseDocumentMinDTO> | null;
 };
 
 const EMPTY_USER_DOCUMENT: UserDocumentMinDTO = {
@@ -52,6 +60,18 @@ const normalizeUserDocument = (value?: RawUserDocumentMinDTO | null): UserDocume
     role: typeof value?.role === 'string' && value.role.trim().length > 0 ? value.role : EMPTY_USER_DOCUMENT.role,
 });
 
+const normalizeCourseDocument = (value?: Partial<CourseDocumentMinDTO> | null): CourseDocumentMinDTO | null => {
+    if (!value || typeof value.courseId !== 'number') {
+        return null;
+    }
+
+    return {
+        courseId: value.courseId,
+        title: typeof value.title === 'string' && value.title.trim().length > 0 ? value.title : 'Curso sin título',
+        category: typeof value.category === 'string' && value.category.trim().length > 0 ? value.category : 'Sin categoría',
+    };
+};
+
 const normalizeDocumentMetadata = (value: RawDocumentMetadata): DocumentMetadata => ({
     documentid: typeof value.documentid === 'number' ? value.documentid : 0,
     filename: typeof value.filename === 'string' ? value.filename : '',
@@ -59,6 +79,7 @@ const normalizeDocumentMetadata = (value: RawDocumentMetadata): DocumentMetadata
     upload_date: typeof value.upload_date === 'string' ? value.upload_date : '',
     sender: normalizeUserDocument(value.sender),
     receiver: normalizeUserDocument(value.receiver),
+    course: normalizeCourseDocument(value.course),
     folder_type: value.folder_type === 'SENT' ? 'SENT' : 'RECEIVED',
     isRead:
         typeof value.isRead === 'boolean'
@@ -86,6 +107,19 @@ export interface UploadDocumentResponse {
     originalname: string;
 }
 
+export interface AdminDocumentRecipient {
+    userId: number;
+    username: string;
+    role: string;
+    enabled: boolean;
+}
+
+export interface AdminDocumentCourseOption {
+    courseId: number;
+    title: string;
+    category: string;
+}
+
 /**
  * [SERVICIO MULTI-ROL]: Recupera los documentos RECIBIDOS (Bandeja de Entrada)
  * asociados a la cuenta del usuario autenticado.
@@ -102,6 +136,16 @@ export const getUserDocuments = async (): Promise<DocumentMetadata[]> => {
 export const getSentDocuments = async (): Promise<DocumentMetadata[]> => {
     const response = await apiClient.get<RawDocumentMetadata[]>('/api/v1/documents/sent');
     return normalizeDocumentList(response.data);
+};
+
+export const getAdminDocumentRecipients = async (): Promise<AdminDocumentRecipient[]> => {
+    const response = await apiClient.get<AdminDocumentRecipient[]>('/api/v1/documents/admin/users');
+    return Array.isArray(response.data) ? response.data : [];
+};
+
+export const getAdminDocumentCourses = async (): Promise<AdminDocumentCourseOption[]> => {
+    const response = await apiClient.get<AdminDocumentCourseOption[]>('/api/v1/documents/admin/courses');
+    return Array.isArray(response.data) ? response.data : [];
 };
 /**
  * [SERVICIO DE CARGA DIRIGIDO]: Envía el archivo físico y asocia el ID del destinatario
@@ -237,6 +281,21 @@ export const uploadProfessorDocument = async (
 
     const response = await apiClient.post<UploadDocumentResponse>(
         '/api/v1/documents/professor-upload',
+        formData
+    );
+    return response.data;
+};
+
+export const uploadAdminDocumentToCourse = async (
+    file: File,
+    courseId: number
+): Promise<UploadDocumentResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('courseId', courseId.toString());
+
+    const response = await apiClient.post<UploadDocumentResponse>(
+        '/api/v1/documents/admin/upload/course',
         formData
     );
     return response.data;
