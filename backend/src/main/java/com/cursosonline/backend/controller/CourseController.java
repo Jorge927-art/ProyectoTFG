@@ -11,6 +11,7 @@ import com.cursosonline.backend.services.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -139,6 +140,7 @@ public class CourseController {
      * @return ResponseEntity con el resultado de la operación de asignación.
      */
     @PostMapping("/{courseId}/assign-teacher")
+    @PreAuthorize("hasAuthority('PROFESSOR')")
     public ResponseEntity<?> assignTeacherToCourse(@PathVariable Long courseId, Principal principal) {
         if (principal == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));

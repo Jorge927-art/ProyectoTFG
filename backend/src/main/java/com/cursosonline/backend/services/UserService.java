@@ -14,6 +14,7 @@ import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.DocumentMetadataRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.InterestRepository;
+import com.cursosonline.backend.repository.UserSystemNotificationRepository;
 import com.cursosonline.backend.exception.ServicesException;
 import com.cursosonline.backend.exception.UserAlreadyExistsException;
 import com.cursosonline.backend.exception.ResourceNotFoundException; // Auditoría: Importación semántica para errores 404
@@ -60,6 +61,7 @@ public class UserService {
     private final EnrollmentRepository enrollmentRepository;
     private final com.cursosonline.backend.repository.CourseGradeRepository courseGradeRepository;
     private final DocumentMetadataRepository documentMetadataRepository;
+    private final UserSystemNotificationRepository userSystemNotificationRepository;
     private final com.cursosonline.backend.repository.AcademicEvaluationRepository academicEvaluationRepository;
     private final com.cursosonline.backend.repository.UserProfileRepository userProfileRepository;
     private final JdbcTemplate jdbcTemplate;
@@ -210,6 +212,7 @@ public class UserService {
         try {
             // 1. Documentos enviados o recibidos por el usuario
             documentMetadataRepository.deleteAllBySenderOrReceiver(userId);
+            userSystemNotificationRepository.deleteAllByReceiverUserId(userId);
 
             // 2. Si es PROFESSOR: desasignar (no borrar) sus cursos
             if (user.getRole() == Role.PROFESSOR) {
@@ -743,6 +746,18 @@ public class UserService {
                     "/" + user.getRole().name().toLowerCase()));
         }
 
+        List<com.cursosonline.backend.entities.UserSystemNotification> unreadSystemNotifications = userSystemNotificationRepository
+                .findUnreadByUsername(username);
+        if (unreadSystemNotifications != null) {
+            for (com.cursosonline.backend.entities.UserSystemNotification notification : unreadSystemNotifications) {
+                alerts.add(new com.cursosonline.backend.dto.NotificationDTO(
+                        notification.getType(),
+                        notification.getTitle(),
+                        notification.getMessage(),
+                        notification.getRedirectUrl()));
+            }
+        }
+
         if (hasProgressAlertColumns()) {
             appendProgressNotificationsSafely(user, username, alerts);
         } else {
@@ -766,6 +781,7 @@ public class UserService {
     @Transactional
     public void dismissUserNotifications(String username) {
         markAllReceivedAsReadSafely(username);
+        userSystemNotificationRepository.markAllAsReadByUsername(username);
 
         Users user = userRepository.findByUsername(username).orElse(null);
         if (user == null) {
@@ -944,6 +960,11 @@ public class UserService {
         Users user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
 
+        if (user.getRole() != Role.PROFESSOR) {
+            throw new ServicesException(
+                    "Acción inválida: solo las cuentas PROFESSOR pueden autoasignarse asignaturas.");
+        }
+
         // 2. Validar la existencia del curso en el catálogo de PostgreSQL
         Courses course = coursesRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -953,7 +974,7 @@ public class UserService {
         // otro usuario
         if (course.getAssignedUser() != null) {
             throw new ServicesException(
-                    "Acción inválida: Este curso ya cuenta con un usuario titular asignado de forma relacional.");
+                    "Este curso está gestionado por Administración. La asignación solo puede modificarse por un administrador.");
         }
 
         // 4. Establecer la vinculación relacional fuerte (JPA mapeará la clave

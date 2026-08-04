@@ -9,7 +9,7 @@ import type { DocumentMetadata } from '../../../services/documentService';
  * Contiene información sobre el tipo de notificación, título, mensaje y URL de redirección.
  */
 export interface NotificationDTO {
-    type: 'DOCUMENT_INBOX' | 'COURSE_PROGRESS' | 'STUDENT_NEAR_COMPLETION';
+    type: 'DOCUMENT_INBOX' | 'COURSE_PROGRESS' | 'STUDENT_NEAR_COMPLETION' | 'COURSE_ASSIGNMENT_CHANGE';
     title: string;
     message: string;
     redirectUrl: string;

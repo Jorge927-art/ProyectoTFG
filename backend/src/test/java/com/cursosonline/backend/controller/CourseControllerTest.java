@@ -267,6 +267,22 @@ class CourseControllerTest {
         }
 
         @Test
+        @DisplayName("Debe propagar el mensaje de bloqueo cuando la asignación está reservada a administración")
+        void assignTeacherToCourse_AdminManagedMessage_ShouldReturnBadRequest() throws Exception {
+                when(mockPrincipal.getName()).thenReturn("mockUser");
+                when(userService.assignUserToCourse(anyString(), anyLong()))
+                                .thenThrow(new ServicesException(
+                                                "Este curso está gestionado por Administración. La asignación solo puede modificarse por un administrador."));
+
+                mockMvc.perform(post("/api/courses/101/assign-teacher")
+                                .principal(mockPrincipal)
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.error")
+                                                .value("Este curso está gestionado por Administración. La asignación solo puede modificarse por un administrador."));
+        }
+
+        @Test
         @DisplayName("Debe retornar 500 Internal Server Error ante un fallo inesperado no controlado")
         void assignTeacherToCourse_GeneralException_ShouldReturnServerError() throws Exception {
                 when(mockPrincipal.getName()).thenReturn("mockUser");

@@ -30,6 +30,10 @@ vi.mock('./components/UserSearchPanel', () => ({
     )
 }));
 
+vi.mock('./components/AdminCourseProfessorReassignmentPanel', () => ({
+    AdminCourseProfessorReassignmentPanel: () => <div data-testid="mock-admin-course-reassignment-panel" />
+}));
+
 vi.mock('./components/AdminDocumentInbox', () => ({
     AdminDocumentInbox: () => <div data-testid="mock-admin-document-inbox" />
 }));
@@ -51,6 +55,7 @@ describe('AdminDashboard - Orquestación de paneles', () => {
         expect(screen.getByText('Panel de Administración')).toBeInTheDocument();
         expect(screen.getByTestId('mock-user-search-panel')).toBeInTheDocument();
         expect(screen.getByTestId('mock-user-scroll-list')).toBeInTheDocument();
+        expect(screen.getByTestId('mock-admin-course-reassignment-panel')).toBeInTheDocument();
         expect(screen.getByTestId('mock-admin-document-inbox')).toBeInTheDocument();
         expect(screen.getByTestId('mock-global-statistics-panel')).toBeInTheDocument();
     });
@@ -59,6 +64,16 @@ describe('AdminDashboard - Orquestación de paneles', () => {
         render(<AdminDashboard />);
 
         expect(screen.getByTestId('mock-user-search-panel')).toHaveTextContent('root_admin');
+    });
+
+    it('renderiza el panel de reasignación antes que la bandeja de documentos', () => {
+        render(<AdminDashboard />);
+
+        const reassignment = screen.getByTestId('mock-admin-course-reassignment-panel');
+        const inbox = screen.getByTestId('mock-admin-document-inbox');
+
+        const position = reassignment.compareDocumentPosition(inbox);
+        expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it('renderiza la bandeja de documentos antes que el panel estadístico de cursos', () => {

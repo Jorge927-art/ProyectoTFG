@@ -11,6 +11,13 @@ import java.util.List;
 public interface CoursesRepository extends JpaRepository<Courses, Long> {
 
         /**
+         * Recupera todos los cursos cuyo profesor titular coincide con el usuario
+         * indicado, ordenados alfabéticamente por título.
+         */
+        @Query("SELECT c FROM Courses c WHERE c.assignedUser.user_id = :userId ORDER BY c.title ASC")
+        List<Courses> findAllByAssignedUser_UserIdOrderByTitleAsc(@Param("userId") Long userId);
+
+        /**
          * Recupera las asignaturas asignadas al profesor autenticado tanto por la
          * relación fuerte assigned_user_id como por el campo legacy instructors.
          */

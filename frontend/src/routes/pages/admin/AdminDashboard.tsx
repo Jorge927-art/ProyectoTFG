@@ -7,6 +7,7 @@ import GenericHeader from '../../../components/ui/genericHeader/GenericHeader';
 import { CourseInsightPanel } from './components/CourseInsightPanel';
 import { AdminDocumentInbox } from './components/AdminDocumentInbox';
 import { GlobalStatisticsPanel } from './components/GlobalStatisticsPanel';
+import { AdminCourseProfessorReassignmentPanel } from './components/AdminCourseProfessorReassignmentPanel';
 
 const AdminDashboard = () => {
     const { user } = useAuth();
@@ -45,6 +46,10 @@ const AdminDashboard = () => {
                 <div className="h-full">
                     <UserScrollList />
                 </div>
+            </div>
+
+            <div className="w-full mt-6">
+                <AdminCourseProfessorReassignmentPanel />
             </div>
 
             <div ref={documentsPanelRef} id="admin-documents-panel" className="w-full mt-6">

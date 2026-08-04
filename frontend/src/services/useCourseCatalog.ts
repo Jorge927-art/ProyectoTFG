@@ -58,8 +58,9 @@ export const useCourseCatalog = (onActionSuccess?: (course: DBModelCourse) => vo
         } catch (err) {
             console.error("Error al ejecutar la acción operativa sobre el curso:", err);
             let message = "Ocurrió un error inesperado al procesar la solicitud del curso.";
-            if (axios.isAxiosError(err) && err.response?.data?.message) {
-                message = err.response.data.message;
+            if (axios.isAxiosError(err)) {
+                const payload = err.response?.data as { message?: string; error?: string } | undefined;
+                message = payload?.message ?? payload?.error ?? message;
             }
             setCatalogError(message);
         } finally {

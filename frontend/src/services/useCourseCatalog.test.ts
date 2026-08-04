@@ -125,4 +125,24 @@ describe('useCourseCatalog - Suite de Pruebas Unitarias del Hook de Catálogo', 
         expect(result.current.catalogError).toBe('El alumno ya cuenta con una matrícula activa en este periodo curricular.');
     });
 
+        it('Debe capturar el campo `error` del backend cuando no existe `message` en la respuesta Axios', async () => {
+            const axiosError = {
+                isAxiosError: true,
+                response: {
+                    data: { error: 'Este curso está gestionado por Administración. La asignación solo puede modificarse por un administrador.' }
+                }
+            };
+            vi.spyOn(axios, 'isAxiosError').mockReturnValue(true);
+            vi.mocked(apiClient.post).mockRejectedValue(axiosError);
+
+            const { result } = renderHook(() => useCourseCatalog(mockOnActionSuccess));
+
+            await act(async () => {
+                await result.current.executeCourseAction(101, '/api/courses/101/assign-teacher', 'post');
+            });
+
+            expect(result.current.catalogError)
+                .toBe('Este curso está gestionado por Administración. La asignación solo puede modificarse por un administrador.');
+        });
+
 });

@@ -69,6 +69,9 @@ public class UserServiceTest {
         @Mock
         private com.cursosonline.backend.repository.UserProfileRepository userProfileRepository;
 
+        @Mock
+        private com.cursosonline.backend.repository.UserSystemNotificationRepository userSystemNotificationRepository;
+
         @InjectMocks
         private UserService userService;
 
@@ -408,6 +411,31 @@ public class UserServiceTest {
         }
 
         @Test
+        void getUserNotifications_DebeIncluirNotificacionesDeSistemaNoLeidas() {
+                Users professor = new Users(12L, "profesor_alertado", "pwd", Role.PROFESSOR, "profe@example.com", true,
+                                new java.util.ArrayList<>());
+
+                when(userRepository.findByUsername("profesor_alertado")).thenReturn(Optional.of(professor));
+                when(documentMetadataRepository.findUnreadReceivedDocumentsByUsername("profesor_alertado"))
+                                .thenReturn(java.util.List.of());
+                when(userSystemNotificationRepository.findUnreadByUsername("profesor_alertado"))
+                                .thenReturn(java.util.List.of(buildSystemNotification(
+                                                professor,
+                                                "Cambio de titularidad",
+                                                "Has sido desvinculado de una asignatura.",
+                                                false)));
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(0);
+
+                java.util.List<com.cursosonline.backend.dto.NotificationDTO> alerts = userService
+                                .getUserNotifications("profesor_alertado");
+
+                assertEquals(1, alerts.size());
+                assertEquals("COURSE_ASSIGNMENT_CHANGE", alerts.get(0).type());
+                assertEquals("Cambio de titularidad", alerts.get(0).title());
+                assertEquals("/professor", alerts.get(0).redirectUrl());
+        }
+
+        @Test
         void dismissUserNotifications_DebeAplicarFallbackSiFallaBulkUpdate() {
                 Users student = new Users(1L, "Luis", "pwd", Role.STUDENT, "luis@example.com", true,
                                 new java.util.ArrayList<>());
@@ -433,6 +461,7 @@ public class UserServiceTest {
                 verify(doc1).setRead(true);
                 verify(doc2).setRead(true);
                 verify(documentMetadataRepository).saveAll(anyList());
+                verify(userSystemNotificationRepository).markAllAsReadByUsername("Luis");
         }
 
         /*
@@ -487,6 +516,7 @@ public class UserServiceTest {
 
                 // 1. Documentos enviados/recibidos borrados
                 verify(documentMetadataRepository, times(1)).deleteAllBySenderOrReceiver(10L);
+                verify(userSystemNotificationRepository, times(1)).deleteAllByReceiverUserId(10L);
 
                 // 2. Evaluación anonimizada (NO borrada), no eliminada de la tabla
                 assertNull(evaluation.getUser(), "La evaluación debe quedar anonimizada, no borrada");
@@ -519,6 +549,7 @@ public class UserServiceTest {
 
                 // 1. Documentos borrados igual que para cualquier rol
                 verify(documentMetadataRepository, times(1)).deleteAllBySenderOrReceiver(20L);
+                verify(userSystemNotificationRepository, times(1)).deleteAllByReceiverUserId(20L);
 
                 // 2. El curso se desasigna, pero NUNCA se borra
                 assertNull(course.getAssignedUser(), "El curso debe quedar sin profesor asignado");
@@ -559,6 +590,22 @@ public class UserServiceTest {
                 assertEquals(
                                 "No se pudo eliminar permanentemente al usuario por dependencias activas en la base de datos.",
                                 exception.getMessage());
+        }
+
+        private com.cursosonline.backend.entities.UserSystemNotification buildSystemNotification(
+                        Users receiver,
+                        String title,
+                        String message,
+                        boolean read) {
+                com.cursosonline.backend.entities.UserSystemNotification notification = new com.cursosonline.backend.entities.UserSystemNotification();
+                notification.setReceiver(receiver);
+                notification.setType("COURSE_ASSIGNMENT_CHANGE");
+                notification.setTitle(title);
+                notification.setMessage(message);
+                notification.setRedirectUrl("/professor");
+                notification.setRead(read);
+                notification.setCreatedAt(java.time.LocalDateTime.now());
+                return notification;
         }
 
 }
