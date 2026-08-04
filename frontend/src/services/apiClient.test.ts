@@ -213,7 +213,9 @@ describe('apiClient - Suite de Pruebas Unitarias de Interceptores de Red', () =>
             resolveRefresh = resolve;
         });
 
-        const axiosPostSpy = vi.spyOn(axios, 'post').mockReturnValue(pendingRefreshPromise as Promise<any>);
+        const axiosPostSpy = vi.spyOn(axios, 'post').mockReturnValue(
+            pendingRefreshPromise as unknown as Promise<AxiosResponse<{ accessToken: string; refreshToken: string; expiresIn: number }>>
+        );
         const requestSpy = vi.spyOn(apiClient, 'request')
             .mockResolvedValueOnce({ status: 200, data: { id: 1 } } as AxiosResponse)
             .mockResolvedValueOnce({ status: 200, data: { id: 2 } } as AxiosResponse);
