@@ -69,7 +69,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         // Endpoints de autenticación pública (login y registro)
-                        .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/refresh",
+                                "/api/auth/logout")
+                        .permitAll()
 
                         // Healthcheck público para diagnóstico local y monitorización básica
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()

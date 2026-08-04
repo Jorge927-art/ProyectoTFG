@@ -59,3 +59,29 @@ CREATE TABLE IF NOT EXISTS admin_global_top_course_history (
         REFERENCES admin_global_stats_history(id)
         ON DELETE CASCADE
 );
+
+-- -----------------------------------------------------------------------------
+-- Persistencia de refresh tokens JWT con rotación y revocación
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS auth_refresh_tokens (
+    token_id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    token_hash VARCHAR(128) NOT NULL UNIQUE,
+    jti VARCHAR(64) NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    is_revoked BOOLEAN NOT NULL DEFAULT FALSE,
+    replaced_by_token_id BIGINT,
+    last_used_at TIMESTAMP,
+    revoked_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_auth_refresh_tokens_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(user_id)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_refresh_tokens_user_id
+    ON auth_refresh_tokens (user_id);
+
+CREATE INDEX IF NOT EXISTS idx_auth_refresh_tokens_expires_at
+    ON auth_refresh_tokens (expires_at);

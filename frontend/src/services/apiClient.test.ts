@@ -6,7 +6,13 @@ import * as authStorageModule from '../auth/authStorage';
 
 // Aislar el helper de almacenamiento antes de instanciar el cliente centralizado
 vi.mock('../auth/authStorage', () => ({
-    readStoredToken: vi.fn()
+    clearStoredAuth: vi.fn(),
+    readStoredAuthUser: vi.fn(),
+    readStoredRefreshToken: vi.fn(),
+    readStoredToken: vi.fn(),
+    writeStoredAuthUser: vi.fn(),
+    writeStoredRefreshToken: vi.fn(),
+    writeStoredToken: vi.fn()
 }));
 
 describe('apiClient - Suite de Pruebas Unitarias de Interceptores de Red', () => {
@@ -87,10 +93,28 @@ describe('apiClient - Suite de Pruebas Unitarias de Interceptores de Red', () =>
 
     it('Debe capturar un error HTTP 401 de Axios y emitir el evento global auth-session-expired en el DOM', async () => {
         const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
+        const requestSpy = vi.spyOn(apiClient, 'request').mockResolvedValue({ status: 200 } as AxiosResponse);
+        const axiosPostSpy = vi.spyOn(axios, 'post').mockResolvedValue({
+            data: {
+                accessToken: 'access_nuevo_123',
+                refreshToken: 'refresh_nuevo_123',
+                expiresIn: 900
+            }
+        });
+
         vi.spyOn(axios, 'isAxiosError').mockReturnValue(true);
+        vi.mocked(authStorageModule.readStoredRefreshToken).mockReturnValue('refresh_antiguo_123');
+        vi.mocked(authStorageModule.readStoredAuthUser).mockReturnValue({
+            username: 'alumno_test',
+            token: 'access_antiguo_123'
+        });
 
         const mockAxiosError = {
             isAxiosError: true,
+            config: {
+                url: '/api/protegido/estadisticas',
+                headers: {}
+            },
             response: {
                 status: 401,
                 data: { message: 'Token JWT Caducado' }
@@ -103,22 +127,35 @@ describe('apiClient - Suite de Pruebas Unitarias de Interceptores de Red', () =>
         
         const responseErrorHandler = responseInterceptor.rejected;
 
-        await expect(responseErrorHandler(mockAxiosError)).rejects.toBe(mockAxiosError);
+        await expect(responseErrorHandler(mockAxiosError)).resolves.toEqual({ status: 200 });
 
-        expect(dispatchEventSpy).toHaveBeenCalledWith(
+        expect(axiosPostSpy).toHaveBeenCalledWith(
+            expect.stringContaining('/api/auth/refresh'),
+            { refreshToken: 'refresh_antiguo_123' },
+            expect.any(Object)
+        );
+        expect(authStorageModule.writeStoredToken).toHaveBeenCalledWith('access_nuevo_123');
+        expect(authStorageModule.writeStoredRefreshToken).toHaveBeenCalledWith('refresh_nuevo_123');
+        expect(requestSpy).toHaveBeenCalled();
+        expect(dispatchEventSpy).not.toHaveBeenCalledWith(
             expect.objectContaining({ type: 'auth-session-expired' })
         );
     });
 
-    it('Debe rechazar la promesa sin emitir eventos globales si el error HTTP es distinto a un estatus 401', async () => {
+    it('Debe emitir auth-session-expired y rechazar si no existe refresh token para renovar la sesión', async () => {
         const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
         vi.spyOn(axios, 'isAxiosError').mockReturnValue(true);
+        vi.mocked(authStorageModule.readStoredRefreshToken).mockReturnValue(null);
 
         const mockAxiosError = {
             isAxiosError: true,
+            config: {
+                url: '/api/admin/courses/search',
+                headers: {}
+            },
             response: {
-                status: 500,
-                data: { message: 'Internal Server Error' }
+                status: 401,
+                data: { message: 'Unauthorized' }
             }
         };
 
@@ -130,7 +167,113 @@ describe('apiClient - Suite de Pruebas Unitarias de Interceptores de Red', () =>
 
         await expect(responseErrorHandler(mockAxiosError)).rejects.toBe(mockAxiosError);
 
-        expect(dispatchEventSpy).not.toHaveBeenCalled();
+        expect(authStorageModule.clearStoredAuth).toHaveBeenCalled();
+        expect(dispatchEventSpy).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'auth-session-expired' })
+        );
+    });
+
+    it('No debe intentar refresh en endpoints de autenticación y debe propagar 401 directo', async () => {
+        vi.spyOn(axios, 'isAxiosError').mockReturnValue(true);
+        const axiosPostSpy = vi.spyOn(axios, 'post');
+
+        const mockAxiosError = {
+            isAxiosError: true,
+            config: {
+                url: '/api/auth/login',
+                headers: {}
+            },
+            response: {
+                status: 401,
+                data: { message: 'Credenciales inválidas' }
+            }
+        };
+
+        const responseInterceptor = (apiClient.interceptors.response as unknown as {
+            handlers: Array<{ rejected: (error: unknown) => Promise<unknown> }>
+        }).handlers[0];
+
+        const responseErrorHandler = responseInterceptor.rejected;
+
+        await expect(responseErrorHandler(mockAxiosError)).rejects.toBe(mockAxiosError);
+        expect(axiosPostSpy).not.toHaveBeenCalled();
+    });
+
+    it('Debe compartir una sola llamada de refresh entre dos errores 401 concurrentes', async () => {
+        vi.spyOn(axios, 'isAxiosError').mockReturnValue(true);
+        vi.mocked(authStorageModule.readStoredRefreshToken).mockReturnValue('refresh_concurrente');
+        vi.mocked(authStorageModule.readStoredAuthUser).mockReturnValue({
+            username: 'usuario_concurrente',
+            token: 'token_antiguo'
+        });
+
+        let resolveRefresh: ((value: { data: { accessToken: string; refreshToken: string; expiresIn: number } }) => void)
+            | null = null;
+        const pendingRefreshPromise = new Promise<{ data: { accessToken: string; refreshToken: string; expiresIn: number } }>((resolve) => {
+            resolveRefresh = resolve;
+        });
+
+        const axiosPostSpy = vi.spyOn(axios, 'post').mockReturnValue(pendingRefreshPromise as Promise<any>);
+        const requestSpy = vi.spyOn(apiClient, 'request')
+            .mockResolvedValueOnce({ status: 200, data: { id: 1 } } as AxiosResponse)
+            .mockResolvedValueOnce({ status: 200, data: { id: 2 } } as AxiosResponse);
+
+        const responseInterceptor = (apiClient.interceptors.response as unknown as {
+            handlers: Array<{ rejected: (error: unknown) => Promise<unknown> }>
+        }).handlers[0];
+
+        const errorA = {
+            isAxiosError: true,
+            config: { url: '/api/protected/a', headers: {} },
+            response: { status: 401 }
+        };
+
+        const errorB = {
+            isAxiosError: true,
+            config: { url: '/api/protected/b', headers: {} },
+            response: { status: 401 }
+        };
+
+        const promiseA = responseInterceptor.rejected(errorA);
+        const promiseB = responseInterceptor.rejected(errorB);
+
+        resolveRefresh?.({
+            data: {
+                accessToken: 'access_concurrente_nuevo',
+                refreshToken: 'refresh_concurrente_nuevo',
+                expiresIn: 900
+            }
+        });
+
+        await expect(promiseA).resolves.toEqual({ status: 200, data: { id: 1 } });
+        await expect(promiseB).resolves.toEqual({ status: 200, data: { id: 2 } });
+
+        expect(axiosPostSpy).toHaveBeenCalledTimes(1);
+        expect(requestSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('Debe cortar reintento cuando la request ya fue marcada con _retry', async () => {
+        vi.spyOn(axios, 'isAxiosError').mockReturnValue(true);
+        const axiosPostSpy = vi.spyOn(axios, 'post');
+
+        const responseInterceptor = (apiClient.interceptors.response as unknown as {
+            handlers: Array<{ rejected: (error: unknown) => Promise<unknown> }>
+        }).handlers[0];
+
+        const retriedError = {
+            isAxiosError: true,
+            config: {
+                url: '/api/protected/resource',
+                headers: {},
+                _retry: true
+            },
+            response: {
+                status: 401
+            }
+        };
+
+        await expect(responseInterceptor.rejected(retriedError)).rejects.toBe(retriedError);
+        expect(axiosPostSpy).not.toHaveBeenCalled();
     });
 });
 

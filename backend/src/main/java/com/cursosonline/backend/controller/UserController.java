@@ -3,11 +3,14 @@ package com.cursosonline.backend.controller;
 import com.cursosonline.backend.dto.AuthTokenResponse;
 import com.cursosonline.backend.dto.InterestDTO;
 import com.cursosonline.backend.dto.LoginRequest;
+import com.cursosonline.backend.dto.RefreshTokenRequest;
+import com.cursosonline.backend.dto.RefreshTokenResponse;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.exception.ServicesException;
 import com.cursosonline.backend.security.jwt.JwtService;
+import com.cursosonline.backend.services.RefreshTokenService;
 import com.cursosonline.backend.services.UserService;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserProfileRepository;
@@ -40,6 +43,7 @@ public class UserController {
 
     private final UserService userService;
     private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
     private final EnrollmentRepository enrollmentRepository;
     private final UserProfileRepository userProfileRepository;
 
@@ -84,14 +88,34 @@ public class UserController {
                 (org.springframework.security.core.userdetails.UserDetails) user,
                 user.getUser_id(),
                 user.getEmail());
+        String refreshToken = refreshTokenService.issueRefreshToken(user);
 
         Instant expirationInstant = jwtService.extractExpiration(jwtToken);
         long expiresInSeconds = expirationInstant != null
                 ? (expirationInstant.getEpochSecond() - Instant.now().getEpochSecond())
                 : 0;
 
-        return ResponseEntity.ok(AuthTokenResponse.from(user, jwtToken, expiresInSeconds, enrolledCourseIds,
-                avatarPath, interests));
+        return ResponseEntity
+                .ok(AuthTokenResponse.from(user, jwtToken, refreshToken, expiresInSeconds, enrolledCourseIds,
+                        avatarPath, interests));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestBody RefreshTokenRequest request) {
+        try {
+            String refreshToken = request != null ? request.refreshToken() : null;
+            RefreshTokenResponse response = refreshTokenService.rotate(refreshToken);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(401).body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestBody(required = false) RefreshTokenRequest request) {
+        String refreshToken = request != null ? request.refreshToken() : null;
+        refreshTokenService.revokeIfPresent(refreshToken);
+        return ResponseEntity.ok(Map.of("success", true));
     }
 
     /**

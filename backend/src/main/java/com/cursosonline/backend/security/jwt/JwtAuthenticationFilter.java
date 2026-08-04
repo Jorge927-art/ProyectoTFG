@@ -23,6 +23,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final String ACCESS_TOKEN_TYPE = "access";
+
     private final JwtService jwtService;
 
     /**
@@ -66,6 +68,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 response.getWriter().write("{\"error\": \"Token expirado o inválido. Acceso denegado.\"}");
                 return;
             }
+
+            String tokenType = jwtService.extractTokenTypeOrNull(jwt);
+            if (!ACCESS_TOKEN_TYPE.equals(tokenType)) {
+                SecurityContextHolder.clearContext();
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\": \"Tipo de token no permitido para autorización.\"}");
+                return;
+            }
+
             // Extraemos el nombre de usuario del token JWT
             username = jwtService.extractUsername(jwt);
 

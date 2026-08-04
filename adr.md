@@ -443,8 +443,7 @@ Deprecar y eliminar del sistema los tres archivos redundantes de diseño por rol
 
   # [ADR-13] Mitigación de Desincronización Temporal mediante Margen de Tolerancia (Clock Skew) en JWT
 
-## Estado
-
+## Estatus
 Aceptado
 
 ## Contexto
@@ -813,8 +812,7 @@ Implementar una reestructuración de alcance y una purga de infraestructura en t
 
 # ADR-22: Refactorización del Panel del Estudiante mediante Controladores Distribuidos
 
-## Estado
-
+## Estatus
 Aceptado
 
 ## Contexto
@@ -1352,10 +1350,9 @@ Rediseñar de forma quirúrgica la capa de servicios e infraestructura de persis
 
 ---
 
-# [ADR-36] Implementación del Motor de Recomendaciones mediante Algoritmo de Ponderación
+# ADR-36: Implementación del Motor de Recomendaciones mediante Algoritmo de Ponderación
 
-## Estado
-
+## Estatus
 Aceptado
 
 ## Contexto
@@ -1387,10 +1384,9 @@ Finalmente, el valor `undefined` se propagaba a la pasarela HTTP (Axios), mutand
 
 ---
 
-# [ADR-37] Gestión de Sesión por Inactividad frente a Expiración Absoluta
+# ADR-37: Gestión de Sesión por Inactividad frente a Expiración Absoluta
 
-## Estado
-
+## Estatus
 Aceptado
 
 ## Contexto
@@ -1412,10 +1408,9 @@ El Tiempo de Vida (TTL) del token JWT está configurado en 15 minutos (900 segun
 
 ---
 
-# [ADR-38] Módulo de Intercambio Bidireccional y Dirigido de Documentos Académicos
+# ADR-38: Módulo de Intercambio Bidireccional y Dirigido de Documentos Académicos
 
-## Estado
-
+## Estatus
 Aceptado
 
 ## Contexto
@@ -1440,10 +1435,9 @@ Permitir la incorporación de formatos de procesamiento de palabras como Microso
 
 ---
 
-# [ADR-39] Sistema de Evaluación Académica y Arquitectura de Rating Dual
+# ADR-39: Sistema de Evaluación Académica y Arquitectura de Rating Dual
 
-## Estado
-
+## Estatus
 Aceptado
 
 ## Contexto
@@ -1470,10 +1464,9 @@ Adicionalmente, bajo las políticas de seguridad perimetral por tokens distribui
 
 ---
 
-# [ADR-40] Descarga Segura de Documentos Académicos y Control de Acceso Anti-IDOR
+# ADR-40: Descarga Segura de Documentos Académicos y Control de Acceso Anti-IDOR
 
-## Estado
-
+## Estatus
 Aceptado
 
 ## Contexto
@@ -1499,10 +1492,9 @@ Para consolidar las directrices de privacidad y control de acceso en el módulo 
 
 ---
 
-# [ADR-41] Diseño de Contrato Anticipado para la Integración Desacoplada de Calificaciones Académicas
+# ADR-41: Diseño de Contrato Anticipado para la Integración Desacoplada de Calificaciones Académicas
 
-## Estado
-
+## Estatus
 Aceptado
 
 ## Contexto
@@ -1529,10 +1521,9 @@ No obstante, debido a que el módulo de inserción de calificaciones por parte d
 
 ---
 
-# [ADR-42] Persistencia Relacional e Hidratación de Calificaciones con Aislamiento Deserializador READ_ONLY
+# ADR-42: Persistencia Relacional e Hidratación de Calificaciones con Aislamiento Deserializador READ_ONLY
 
-## Estado
-
+## Estatus
 Aceptado
 
 ## Contexto
@@ -1559,10 +1550,9 @@ Específicamente, se debían mitigar dos vectores de riesgo críticos:
 
 ---
 
-# [ADR-43] Arquitectura de Agregación Analítica Inmutable y Casteo Dinámico para Métricas de Catálogo
+# ADR-43: Arquitectura de Agregación Analítica Inmutable y Casteo Dinámico para Métricas de Catálogo
 
-## Estado
-
+## Estatus
 Pospuesto
 
 ## Contexto
@@ -1594,7 +1584,7 @@ Se determina **posponer e inactivar temporalmente la integración del componente
 
 ---
 
-# [ADR-44]: Tipado Defensivo y Gestión de Precisión en el Progreso Académico
+# ADR-44: Tipado Defensivo y Gestión de Precisión en el Progreso Académico
 
 ### Estado
 
@@ -1618,7 +1608,7 @@ Se decide mantener el uso del tipo `Long` para almacenar y procesar el total de 
 
 ---
 
-# [ADR-45]: Abstracción de Infraestructura y Purificación Semántica de la Interfaz (UX)
+# ADR-45: Abstracción de Infraestructura y Purificación Semántica de la Interfaz (UX)
 
 ### Estado
 
@@ -1641,7 +1631,7 @@ Se establece un principio estricto de **Purificación Semántica y Abstracción 
 
 ---
 
-# [ADR-46] Arquitectura de Agregación Analítica Disociada y Micro-indicadores
+# ADR-46: Arquitectura de Agregación Analítica Disociada y Micro-indicadores
 
 **Fecha:** Julio 2026  
 **Estatus:** Aceptado  
@@ -1672,7 +1662,7 @@ Los principales desafíos son:
 
 ---
 
-# [ADR-47]: Canal de Alarmas Académicas Dinámicas en Barra de Navegación
+# ADR-47: Canal de Alarmas Académicas Dinámicas en Barra de Navegación
 
 ### Estatus
 
@@ -1696,7 +1686,7 @@ El estudiante requería avisos visuales inmediatos sobre la llegada de nuevos do
 
 ---
 
-# [ADR-48]: Purificación del Sistema de Contingencia y Control de Permisos
+# ADR-48: Purificación del Sistema de Contingencia y Control de Permisos
 
 ### Estatus
 
@@ -1719,7 +1709,7 @@ La vista de error por falta de privilegios (`AccessDenied.tsx`) utilizaba etique
 
 ---
 
-# [ADR-49]: Purificación Visual de Dashboards y Centralización de Componentes de Enrutamiento
+# ADR-49: Purificación Visual de Dashboards y Centralización de Componentes de Enrutamiento
 
 ### Estado
 
@@ -1767,7 +1757,7 @@ Se completa la limpieza final y el endurecimiento de seguridad asociado al cierr
 
 ---
 
-# [ADR-50]: Implementación de Comunicación Bidireccional de Documentos Académicos
+# ADR-50: Implementación de Comunicación Bidireccional de Documentos Académicos
 
 ## Estatus
 
@@ -1791,7 +1781,7 @@ Se ha modificado la entidad `DocumentMetadata.java` para incluir relaciones de p
 
 ---
 
-# [ADR-51]: Arquitectura de Layout Responsivo mediante Grid System en Dashboards
+# ADR-51: Arquitectura de Layout Responsivo mediante Grid System en Dashboards
 
 ## Estatus
 
@@ -1815,7 +1805,7 @@ Implementar un sistema de distribución basado en **CSS Grid de Tailwind** en el
 
 ---
 
-# [ADR-52]: Sincronización del Estado de Notificaciones mediante Atributo de Lectura (isRead)
+# ADR-52: Sincronización del Estado de Notificaciones mediante Atributo de Lectura (isRead)
 
 ## Estatus
 
@@ -1844,7 +1834,7 @@ Para resolver este comportamiento y asegurar que la interfaz refleje fielmente e
 
 ---
 
-# [ADR-53]: Unificación del Sistema de Notificaciones mediante Componente Global de Alerta
+# ADR-53: Unificación del Sistema de Notificaciones mediante Componente Global de Alerta
 
 ## Estatus
 
@@ -1877,7 +1867,7 @@ Se ha decidido refactorizar el sistema de notificaciones bajo un modelo de compo
 
 ---
 
-# [ADR-054]: Estrategia de Testing en Pirámide y Validación de Flujos de Integración
+# ADR-054: Estrategia de Testing en Pirámide y Validación de Flujos de Integración
 
 ## Estatus
 
@@ -2125,7 +2115,7 @@ Se adopta una estrategia de auto-calificación programada e idempotente en backe
 * `Examen final`.
 * `Nota Final Asignatura` con variación ligera dependiente de la nota de examen.
 
-5. **Distribución estadística:** las notas se muestrean con **Beta(α, β)** escalada al rango [0, 10], evitando uniformidad plana.
+1. **Distribución estadística:** las notas se muestrean con **Beta(α, β)** escalada al rango [0, 10], evitando uniformidad plana.
 2. **Idempotencia y definitividad:** una vez persistidas, no se regeneran ni se sobreescriben.
 3. **Neutralidad de presentación:** las notas se muestran como cualquier otra calificación del sistema, sin marcar origen automático en la UI.
 
@@ -2293,3 +2283,65 @@ Esta guía de ejecución permite avanzar de forma incremental, garantizando que 
 * 🟢 **Verde (GO):** El proyecto compila sin advertencias, los flujos previos de sesión se mantienen totalmente operativos, los componentes de seguridad JWT se integran de forma incremental, los roles operan bajo la política definida y las excepciones HTTP conservan su semántica técnica.
 * 🟡 **Amarillo (GO CONDICIONADO):** El sistema compila y opera de forma funcional, pero se identifican de uno a dos riesgos menores de integración no bloqueantes. Se requiere documentar el plan de mitigación inmediato antes de continuar con la siguiente actividad.
 * 🔴 **Rojo (NO-GO):** Se detecta una regresión en los endpoints core existentes (`login`, `/me`), inconsistencia en la aplicación de roles, alteración del filtro global de Spring Security o vulnerabilidades expuestas en la configuración del token. Se detiene el avance hasta solventar el conflicto.
+
+---
+
+# ADR-060: Refresh Token con Rotación de 7 Días y Reintento Controlado en Cliente
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Agosto 2026
+
+## Contexto
+
+La arquitectura JWT con token de acceso de vida corta permitió consolidar el desacoplamiento stateless del backend, pero introdujo cierres de sesión frecuentes cuando el `accessToken` expiraba durante navegación activa. El objetivo técnico fue mantener continuidad de sesión sin degradar las garantías de seguridad del modelo distribuido.
+
+En la auditoría funcional se identificaron tres riesgos críticos:
+
+1. Reutilización de refresh token comprometido.
+2. Bucles de reintento en cliente ante respuestas HTTP 401.
+3. Ausencia de revocación explícita al cerrar sesión.
+
+## Decisión
+
+Se adopta un modelo de refresh token persistido con rotación obligatoria y vencimiento de 7 días, complementado con refresco automático en cliente y reintento único por petición.
+
+* **Backend:**
+  * Persistir refresh tokens en `auth_refresh_tokens` con hash SHA-256, `jti`, expiración, revocación y referencia de reemplazo.
+  * Extender `POST /api/auth/login` para devolver `refreshToken` junto a `accessToken`.
+  * Implementar `POST /api/auth/refresh` para revocar el token anterior y emitir una nueva pareja access/refresh.
+  * Implementar `POST /api/auth/logout` para revocación explícita del refresh token vigente.
+  * Endurecer `JwtAuthenticationFilter` para aceptar únicamente `tokenType=access` en `Authorization`.
+* **Frontend:**
+  * Interceptor global de respuesta que, ante 401 en rutas protegidas, invoca `POST /api/auth/refresh`.
+  * Reintento único de la request original mediante marca `_retry`.
+  * Exclusión de bucles en rutas `/api/auth/login`, `/api/auth/register`, `/api/auth/refresh` y `/api/auth/logout`.
+  * Coordinación de concurrencia con single-flight para múltiples 401 simultáneos.
+  * Si falla refresh: limpieza de sesión local y emisión de evento `auth-session-expired`.
+* **Configuración:**
+  * `app.jwt.refresh-token-expiration-days=7` en perfil local y perfil `test-ci`.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* Continuidad de sesión transparente con token de acceso corto.
+* Reducción de ventana de ataque gracias a rotación obligatoria.
+* Capacidad de revocación por token y trazabilidad de sustitución en backend.
+* Mayor resiliencia del cliente ante expiraciones y concurrencia.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* Aumento de complejidad técnica en backend y frontend.
+* Incremento de escrituras en base de datos por rotación y revocación.
+* Mayor superficie de pruebas para escenarios de expiración, revocación y carrera.
+
+Mitigación aplicada:
+
+* Suites backend para emisión, rotación, expiración y revocación.
+* Suites frontend para 401 -> refresh -> retry, anti-bucle y concurrencia.
+* Validación estricta del `tokenType` en la cadena de seguridad.

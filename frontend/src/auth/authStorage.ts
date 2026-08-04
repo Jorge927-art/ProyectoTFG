@@ -3,6 +3,7 @@ import type { AuthUser } from './authTypes';
 // [CORRECCIÓN CRÍTICA DE AUDITORÍA]: Unificamos bajo una única clave oficial eliminando la duplicidad física
 const USER_KEY = 'auth_user'; 
 const TOKEN_KEY = 'accessToken'; 
+const REFRESH_TOKEN_KEY = 'refreshToken';
 
 const EMPTY_INTERESTS = {
     categories: [] as string[],
@@ -114,6 +115,31 @@ function extractTokenFromStoredUser(): string | null {
     }
 }
 
+function extractRefreshTokenFromStoredUser(): string | null {
+    if (!canUseBrowserStorage()) {
+        return null;
+    }
+
+    const rawValue = window.localStorage.getItem(USER_KEY) ?? window.localStorage.getItem('user');
+    if (!rawValue) {
+        return null;
+    }
+
+    try {
+        const parsedValue = JSON.parse(rawValue) as Record<string, unknown>;
+        const tokenCandidate =
+            typeof parsedValue.refreshToken === 'string'
+                ? parsedValue.refreshToken
+                : typeof parsedValue.refresh_token === 'string'
+                    ? parsedValue.refresh_token
+                    : '';
+        const token = tokenCandidate.trim();
+        return token.length > 0 ? token : null;
+    } catch {
+        return null;
+    }
+}
+
 /**
  * Lee el token JWT guardado en el navegador de forma aislada.
  */
@@ -152,6 +178,44 @@ export function writeStoredToken(token: string) {
         return;
     }
     window.localStorage.setItem(TOKEN_KEY, token);
+}
+
+/**
+ * Lee el refresh token guardado en el navegador.
+ */
+export function readStoredRefreshToken(): string | null {
+    if (!canUseBrowserStorage()) {
+        return null;
+    }
+
+    const persistedRefreshToken = window.localStorage.getItem(REFRESH_TOKEN_KEY);
+    const userEmbeddedRefreshToken = extractRefreshTokenFromStoredUser();
+
+    if (userEmbeddedRefreshToken && userEmbeddedRefreshToken !== persistedRefreshToken) {
+        window.localStorage.setItem(REFRESH_TOKEN_KEY, userEmbeddedRefreshToken);
+        return userEmbeddedRefreshToken;
+    }
+
+    if (persistedRefreshToken && persistedRefreshToken.trim().length > 0) {
+        return persistedRefreshToken;
+    }
+
+    if (userEmbeddedRefreshToken) {
+        window.localStorage.setItem(REFRESH_TOKEN_KEY, userEmbeddedRefreshToken);
+        return userEmbeddedRefreshToken;
+    }
+
+    return null;
+}
+
+/**
+ * Persiste el refresh token JWT en el navegador.
+ */
+export function writeStoredRefreshToken(token: string) {
+    if (!canUseBrowserStorage()) {
+        return;
+    }
+    window.localStorage.setItem(REFRESH_TOKEN_KEY, token);
 }
 
 /**
@@ -215,6 +279,10 @@ export function writeStoredAuthUser(user: AuthUser) {
     if (typeof user.token === 'string' && user.token.trim().length > 0) {
         window.localStorage.setItem(TOKEN_KEY, user.token);
     }
+
+    if (typeof user.refreshToken === 'string' && user.refreshToken.trim().length > 0) {
+        window.localStorage.setItem(REFRESH_TOKEN_KEY, user.refreshToken);
+    }
 }
 
 /**
@@ -227,5 +295,6 @@ export function clearStoredAuth() {
     // Borra la clave oficial, la del token y ejecuta la purga reactiva de la clave antigua legacy
     window.localStorage.removeItem(USER_KEY);
     window.localStorage.removeItem(TOKEN_KEY); 
+    window.localStorage.removeItem(REFRESH_TOKEN_KEY);
     window.localStorage.removeItem('user'); // <── Purga preventiva de la clave legacy 'user'
 }

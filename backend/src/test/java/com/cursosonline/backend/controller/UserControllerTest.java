@@ -7,6 +7,7 @@ import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserProfileRepository;
 import com.cursosonline.backend.security.jwt.JwtService;
+import com.cursosonline.backend.services.RefreshTokenService;
 import com.cursosonline.backend.services.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,9 @@ class UserControllerTest {
         private JwtService jwtService;
 
         @Mock
+        private RefreshTokenService refreshTokenService;
+
+        @Mock
         private EnrollmentRepository enrollmentRepository;
 
         @Mock // ✅ Inyección del mock que faltaba para evitar el NullPointerException
@@ -77,6 +81,7 @@ class UserControllerTest {
                 when(userProfileRepository.findById(1L)).thenReturn(Optional.empty());
 
                 when(jwtService.generateAccessToken(user, 1L, "luis@example.com")).thenReturn("jwt-token");
+                when(refreshTokenService.issueRefreshToken(user)).thenReturn("refresh-token");
                 when(jwtService.extractExpiration("jwt-token")).thenReturn(Instant.now().plusSeconds(900));
 
                 mockMvc.perform(post("/api/auth/login")
@@ -84,7 +89,8 @@ class UserControllerTest {
                                 .content("{\"username\":\"Luis\",\"password\":\"secret123\"}"))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.username").value("Luis"))
-                                .andExpect(jsonPath("$.enrolledCourseIds[0]").value(101));
+                                .andExpect(jsonPath("$.enrolledCourseIds[0]").value(101))
+                                .andExpect(jsonPath("$.refreshToken").value("refresh-token"));
         }
 
         @Test
@@ -98,6 +104,7 @@ class UserControllerTest {
                 when(userProfileRepository.findById(1L)).thenReturn(Optional.empty());
 
                 when(jwtService.generateAccessToken(user, 1L, "luis@example.com")).thenReturn("jwt-token");
+                when(refreshTokenService.issueRefreshToken(user)).thenReturn("refresh-token");
                 when(jwtService.extractExpiration("jwt-token")).thenReturn(Instant.now().plusSeconds(900));
 
                 mockMvc.perform(post("/api/auth/login")
@@ -135,6 +142,7 @@ class UserControllerTest {
                 when(userProfileRepository.findById(1L)).thenReturn(Optional.empty());
 
                 when(jwtService.generateAccessToken(user, 1L, "luis@example.com")).thenReturn("jwt-token");
+                when(refreshTokenService.issueRefreshToken(user)).thenReturn("refresh-token");
                 when(jwtService.extractExpiration("jwt-token")).thenReturn(Instant.now().plusSeconds(900));
 
                 mockMvc.perform(post("/api/auth/login")
@@ -148,7 +156,52 @@ class UserControllerTest {
                                 .andExpect(jsonPath("$.interests.languages[0]").value("Español"))
                                 .andExpect(jsonPath("$.interests.subtitles[0]").value("Subtítulos en Español"))
                                 .andExpect(jsonPath("$.enrolledCourseIds[0]").value(101))
-                                .andExpect(jsonPath("$.enrolledCourseIds[1]").value(202));
+                                .andExpect(jsonPath("$.enrolledCourseIds[1]").value(202))
+                                .andExpect(jsonPath("$.refreshToken").value("refresh-token"));
+        }
+
+        @Test
+        void refreshDebeRetornarNuevosTokensCuandoRefreshTokenEsValido() throws Exception {
+                when(refreshTokenService.rotate("refresh-viejo")).thenReturn(
+                                new com.cursosonline.backend.dto.RefreshTokenResponse(
+                                                "access-nuevo",
+                                                "refresh-nuevo",
+                                                "Bearer",
+                                                900L));
+
+                mockMvc.perform(post("/api/auth/refresh")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"refreshToken\":\"refresh-viejo\"}"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.accessToken").value("access-nuevo"))
+                                .andExpect(jsonPath("$.refreshToken").value("refresh-nuevo"))
+                                .andExpect(jsonPath("$.tokenType").value("Bearer"));
+        }
+
+        @Test
+        void refreshDebeRetornar401CuandoElTokenNoEsValido() throws Exception {
+                when(refreshTokenService.rotate("refresh-invalido"))
+                                .thenThrow(new com.cursosonline.backend.exception.ServicesException(
+                                                "Refresh token inválido o expirado."));
+
+                mockMvc.perform(post("/api/auth/refresh")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"refreshToken\":\"refresh-invalido\"}"))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.error").value("Refresh token inválido o expirado."));
+        }
+
+        @Test
+        void logoutDebeRevoCarRefreshTokenYResponderOk() throws Exception {
+                doNothing().when(refreshTokenService).revokeIfPresent("refresh-vigente");
+
+                mockMvc.perform(post("/api/auth/logout")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"refreshToken\":\"refresh-vigente\"}"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true));
+
+                verify(refreshTokenService).revokeIfPresent("refresh-vigente");
         }
 
         @Test

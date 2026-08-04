@@ -1,10 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { readStoredToken, writeStoredToken, readStoredAuthUser, writeStoredAuthUser, clearStoredAuth } from './authStorage';
+import {
+    clearStoredAuth,
+    readStoredAuthUser,
+    readStoredRefreshToken,
+    readStoredToken,
+    writeStoredAuthUser,
+    writeStoredRefreshToken,
+    writeStoredToken
+} from './authStorage';
 import type { AuthUser } from './authTypes';
 
 describe('AuthStorage - Suite de Pruebas Unitarias de Almacenamiento Local', () => {
     const USER_KEY = 'auth_user';
     const TOKEN_KEY = 'accessToken';
+    const REFRESH_TOKEN_KEY = 'refreshToken';
     const LEGACY_KEY = 'user';
 
     let localStorageMockStore: Record<string, string> = {};
@@ -64,6 +73,14 @@ describe('AuthStorage - Suite de Pruebas Unitarias de Almacenamiento Local', () 
         expect(token).toBe('jwt-valido-secreto-123');
     });
 
+    it('Debería leer y escribir correctamente el refresh token dedicado', () => {
+        writeStoredRefreshToken('refresh-valido-secreto-123');
+        expect(localStorage.setItem).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, 'refresh-valido-secreto-123');
+
+        const token = readStoredRefreshToken();
+        expect(token).toBe('refresh-valido-secreto-123');
+    });
+
     it('Debería usar el token embebido en auth_user cuando accessToken no existe', () => {
         localStorageMockStore[USER_KEY] = JSON.stringify({
             ...sampleValidUser,
@@ -86,6 +103,18 @@ describe('AuthStorage - Suite de Pruebas Unitarias de Almacenamiento Local', () 
 
         expect(token).toBe('jwt-legacy-access-token');
         expect(localStorage.setItem).toHaveBeenCalledWith(TOKEN_KEY, 'jwt-legacy-access-token');
+    });
+
+    it('Debería usar refresh token embebido en auth_user si la clave dedicada no existe', () => {
+        localStorageMockStore[USER_KEY] = JSON.stringify({
+            ...sampleValidUser,
+            refreshToken: 'refresh-legacy-auth-user'
+        });
+
+        const token = readStoredRefreshToken();
+
+        expect(token).toBe('refresh-legacy-auth-user');
+        expect(localStorage.setItem).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, 'refresh-legacy-auth-user');
     });
 
     it('Debería sincronizar accessToken si difiere del token embebido en auth_user', () => {
@@ -114,11 +143,13 @@ describe('AuthStorage - Suite de Pruebas Unitarias de Almacenamiento Local', () 
     it('Debería sincronizar accessToken al guardar un usuario con token embebido', () => {
         writeStoredAuthUser({
             ...sampleValidUser,
-            token: 'jwt-sincronizado'
+            token: 'jwt-sincronizado',
+            refreshToken: 'refresh-sincronizado'
         });
 
         expect(localStorage.setItem).toHaveBeenCalledWith(USER_KEY, expect.any(String));
         expect(localStorage.setItem).toHaveBeenCalledWith(TOKEN_KEY, 'jwt-sincronizado');
+        expect(localStorage.setItem).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, 'refresh-sincronizado');
     });
 
     it('Debería ser capaz de leer de la clave legacy "user" si la clave unificada oficial no está inicializada', () => {
@@ -244,16 +275,19 @@ describe('AuthStorage - Suite de Pruebas Unitarias de Almacenamiento Local', () 
     it('Debería borrar la clave oficial, la de token y ejecutar la purga reactiva preventiva de la clave legacy user', () => {
         localStorageMockStore[USER_KEY] = JSON.stringify(sampleValidUser);
         localStorageMockStore[TOKEN_KEY] = 'jwt-activo';
+        localStorageMockStore[REFRESH_TOKEN_KEY] = 'refresh-activo';
         localStorageMockStore[LEGACY_KEY] = 'datos-antiguos-de-sesion';
 
         clearStoredAuth();
 
         expect(localStorage.removeItem).toHaveBeenCalledWith(USER_KEY);
         expect(localStorage.removeItem).toHaveBeenCalledWith(TOKEN_KEY);
+        expect(localStorage.removeItem).toHaveBeenCalledWith(REFRESH_TOKEN_KEY);
         expect(localStorage.removeItem).toHaveBeenCalledWith(LEGACY_KEY);
 
         expect(localStorageMockStore[USER_KEY]).toBeUndefined();
         expect(localStorageMockStore[TOKEN_KEY]).toBeUndefined();
+        expect(localStorageMockStore[REFRESH_TOKEN_KEY]).toBeUndefined();
         expect(localStorageMockStore[LEGACY_KEY]).toBeUndefined();
     });
 });

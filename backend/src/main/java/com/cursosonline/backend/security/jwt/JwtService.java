@@ -72,6 +72,10 @@ public class JwtService {
         return getClaim(token, "userId", Long.class);
     }
 
+    public String extractJti(String token) {
+        return getClaim(token, "jti", String.class);
+    }
+
     public boolean isTokenValid(String token) {
         try {
             Map<String, Object> claims = parseAndVerify(token);

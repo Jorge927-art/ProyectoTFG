@@ -111,6 +111,7 @@ class JwtAuthenticationFilterTest {
     void doFilterInternal_ValidToken_ShouldAuthenticateAndPopulateContext() throws Exception {
         request.addHeader("Authorization", "Bearer token-valido-xyz");
         when(jwtService.isTokenValid("token-valido-xyz")).thenReturn(true);
+        when(jwtService.extractTokenTypeOrNull("token-valido-xyz")).thenReturn("access");
         when(jwtService.extractUsername("token-valido-xyz")).thenReturn("alumno_tfg");
         when(jwtService.extractRole("token-valido-xyz")).thenReturn("ROLE_STUDENT");
 
@@ -133,6 +134,31 @@ class JwtAuthenticationFilterTest {
         assertEquals("alumno_tfg", authentication.getName());
         assertTrue(authentication.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_STUDENT")), "Debe poseer la autoridad asignada en el JWT");
+    }
+
+    @Test
+    @DisplayName("Debe retornar 401 si se intenta autenticar con un refresh token en Authorization")
+    void doFilterInternal_RefreshTokenInAuthorization_ShouldReturn401() throws Exception {
+        request.addHeader("Authorization", "Bearer token-refresh-xyz");
+        when(jwtService.isTokenValid("token-refresh-xyz")).thenReturn(true);
+        when(jwtService.extractTokenTypeOrNull("token-refresh-xyz")).thenReturn("refresh");
+
+        try {
+            java.lang.reflect.Method method = JwtAuthenticationFilter.class.getDeclaredMethod(
+                    "doFilterInternal",
+                    jakarta.servlet.http.HttpServletRequest.class,
+                    jakarta.servlet.http.HttpServletResponse.class,
+                    jakarta.servlet.FilterChain.class);
+            method.setAccessible(true);
+            method.invoke(jwtAuthenticationFilter, request, response, mockFilterChain);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        assertEquals(HttpServletResponse.SC_UNAUTHORIZED, response.getStatus());
+        assertTrue(response.getContentAsString().contains("Tipo de token no permitido"));
+        verify(mockFilterChain, never()).doFilter(request, response);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
 
     /*

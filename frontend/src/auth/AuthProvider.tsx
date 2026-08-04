@@ -2,7 +2,13 @@ import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthUser, AuthTokenResponse } from './authTypes';
 import { AuthContext } from './AuthContext';
-import { clearStoredAuth, readStoredAuthUser, writeStoredAuthUser, writeStoredToken } from './authStorage';
+import {
+    clearStoredAuth,
+    readStoredAuthUser,
+    writeStoredAuthUser,
+    writeStoredRefreshToken,
+    writeStoredToken
+} from './authStorage';
 import { resolveAvatarUrl } from './avatarUrl';
 
 interface AuthProviderProps {
@@ -108,6 +114,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             interests: normalizeInterests(tokenData.interests),
             photo: resolveAvatarUrl(tokenData.avatarPath),
             token: tokenData.accessToken,
+            refreshToken: tokenData.refreshToken,
             expiresAt: expiresAt
         };
 
@@ -115,6 +122,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setUser(nextUser);
         writeStoredAuthUser(nextUser);
         writeStoredToken(tokenData.accessToken);
+        if (typeof tokenData.refreshToken === 'string' && tokenData.refreshToken.trim().length > 0) {
+            writeStoredRefreshToken(tokenData.refreshToken);
+        }
     };
 
     /**

@@ -7,6 +7,7 @@ import java.util.List;
 // Definición canónica del Record con sus campos correctamente separados por comas
 public record AuthTokenResponse(
         String accessToken,
+        String refreshToken,
         String tokenType,
         long expiresIn,
         Long userId,
@@ -31,8 +32,15 @@ public record AuthTokenResponse(
      */
     public static AuthTokenResponse from(Users user, String token, long expirationTime, List<Long> enrolledCourseIds,
             String avatarPath, InterestDTO interests) {
+        return from(user, token, null, expirationTime, enrolledCourseIds, avatarPath, interests);
+    }
+
+    public static AuthTokenResponse from(Users user, String token, String refreshToken, long expirationTime,
+            List<Long> enrolledCourseIds,
+            String avatarPath, InterestDTO interests) {
         return new AuthTokenResponse(
                 token,
+                refreshToken,
                 "Bearer",
                 expirationTime,
                 user.getUser_id(),
