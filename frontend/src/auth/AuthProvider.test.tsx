@@ -143,4 +143,58 @@ describe('Auditoría de Calidad Frontend: Blindaje de Sesión y Activity Tracker
         // Confirmamos que el sistema escribió la actualización en caliente en el almacenamiento local
         expect(spyWrite).toHaveBeenCalled();
     });
+
+    it('debe invalidar sesión al montar si el token almacenado ya está expirado', async () => {
+        const now = Date.now();
+        const expiredSessionUser = {
+            userId: 77,
+            username: 'token_expirado',
+            role: ROLES.STUDENT,
+            email: 'expirado@tfg.com',
+            token: 'jwt_expired',
+            expiresAt: now - 1000
+        };
+
+        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(expiredSessionUser);
+
+        render(
+            <AuthProvider>
+                <TestComponent />
+            </AuthProvider>
+        );
+
+        act(() => {
+            vi.advanceTimersByTime(1);
+        });
+
+        expect(screen.getByTestId('auth-status').textContent).toBe('NO_AUTENTICADO');
+    });
+
+    it('debe cerrar sesión cuando falla la validación/refresh y se emite auth-session-expired', async () => {
+        const now = Date.now();
+        const validSessionUser = {
+            userId: 42,
+            username: 'luis_refresh',
+            role: ROLES.STUDENT,
+            email: 'luis@tfg.com',
+            token: 'jwt_token_valido',
+            expiresAt: now + 15 * 60 * 1000
+        };
+
+        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(validSessionUser);
+
+        render(
+            <AuthProvider>
+                <TestComponent />
+            </AuthProvider>
+        );
+
+        expect(screen.getByTestId('auth-status').textContent).toBe('AUTENTICADO');
+
+        act(() => {
+            window.dispatchEvent(new Event('auth-session-expired'));
+        });
+
+        expect(screen.getByTestId('auth-status').textContent).toBe('NO_AUTENTICADO');
+    });
 });

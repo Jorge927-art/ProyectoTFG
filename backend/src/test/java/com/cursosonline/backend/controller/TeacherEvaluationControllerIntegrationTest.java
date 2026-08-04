@@ -131,4 +131,46 @@ class TeacherEvaluationControllerIntegrationTest {
         assertEquals(0.0, response.getBody().groupAverageGrade(),
                 "El backend debe estabilizar a 0.0 si el promedio relacional es nulo");
     }
+
+    @Test
+    @WithMockUser(authorities = "PROFESSOR")
+    void debeRetornarListaVaciaSiElCursoNoTieneAlumnosMatriculados() {
+        Long emptyCourseId = 999L;
+
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(emptyCourseId)).thenReturn(List.of());
+        when(courseGradeRepository.getGroupAverageScore(emptyCourseId)).thenReturn(null);
+
+        ResponseEntity<List<StudentPerformanceDTO>> response = teacherEvaluationController
+                .getCourseStudentsPerformance(emptyCourseId);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().isEmpty(),
+                "Si no hay matrículas activas el endpoint debe devolver una colección vacía");
+
+        verify(courseGradeRepository, never()).getIndividualStudentAverageScore(anyLong(), anyLong());
+    }
+
+    @Test
+    @WithMockUser(authorities = "PROFESSOR")
+    void debeRetornarMetricasEnCeroSiElCursoNoTieneAlumnosMatriculados() {
+        Long emptyCourseId = 1000L;
+
+        when(userRepository.findActiveStudentsByCourseId(emptyCourseId)).thenReturn(List.of());
+        when(courseGradeRepository.getGroupAverageScore(emptyCourseId)).thenReturn(null);
+
+        ResponseEntity<CourseMetricsDTO> response = teacherEvaluationController
+                .getCourseManagementMetrics(emptyCourseId);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+
+        CourseMetricsDTO metrics = response.getBody();
+        assertEquals(0, metrics.activeStudentsCount(),
+                "Sin matrículas activas, el contador de alumnos debe permanecer en cero");
+        assertEquals(0.0, metrics.groupAverageGrade(),
+                "Sin calificaciones, la media general debe estabilizarse a 0.0");
+        assertEquals(0L, metrics.pendingSubmissionsCount(),
+                "El número de entregas pendientes se mantiene en cero en este flujo estabilizado");
+    }
 }

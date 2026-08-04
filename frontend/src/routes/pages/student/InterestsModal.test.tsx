@@ -120,4 +120,32 @@ describe('InterestsModal Component - Suite de Pruebas Unitarias Estrictas', () =
             expect(mockOnClose).toHaveBeenCalled();
         });
     });
+
+    it('debe mantener el modal abierto y no disparar onSave/onClose si falla la red al guardar intereses', async () => {
+        vi.mocked(apiClient.post).mockRejectedValueOnce(new Error('network-error'));
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+
+        renderWithAuthProvider();
+
+        fireEvent.click(screen.getByRole('button', { name: /Guardar Preferencias/i }));
+
+        await waitFor(() => {
+            expect(apiClient.post).toHaveBeenCalledWith('/api/auth/my-interests', expect.any(Object));
+        });
+
+        expect(mockOnSave).not.toHaveBeenCalled();
+        expect(mockOnClose).not.toHaveBeenCalled();
+        expect(screen.getByText('Personaliza tu Experiencia')).toBeInTheDocument();
+        expect(errorSpy).toHaveBeenCalled();
+    });
+
+    it('debe cerrar el modal sin persistir cambios cuando el usuario pulsa Cancelar', () => {
+        renderWithAuthProvider();
+
+        fireEvent.click(screen.getByRole('button', { name: /Cancelar/i }));
+
+        expect(mockOnClose).toHaveBeenCalledTimes(1);
+        expect(mockOnSave).not.toHaveBeenCalled();
+        expect(apiClient.post).not.toHaveBeenCalled();
+    });
 });

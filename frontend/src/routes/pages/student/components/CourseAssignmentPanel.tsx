@@ -69,9 +69,10 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                 }
                 setDocumentList(docs);
             } catch (error) {
-                // CORRECCIÓN UX: Registramos el error en consola para depuración, 
-                // pero evitamos alarmar al usuario con un banner rojo al entrar o conmutar.
                 console.error("Error al sincronizar documentos del curso:", error);
+                setDocumentList([]);
+                setPanelError("No se pudieron cargar los documentos. Inténtalo de nuevo.");
+                setTimeout(() => setPanelError(''), 5000);
             } finally {
                 setLoadingDocuments(false);
             }

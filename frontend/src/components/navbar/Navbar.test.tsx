@@ -20,10 +20,18 @@ vi.mock('../ui/authModal/AuthModal', () => {
     };
 });
 
-// Mockeamos también el catálogo por si acaso para aligerar el árbol de renderizado de React
+// Mockeamos también el catálogo para poder validar apertura/cierre del menú de especialidades
 vi.mock('../ui/courseInfoModal/CourseInfoModal', () => {
     return {
-        default: () => null
+        default: ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
+            if (!isOpen) return null;
+            return (
+                <div data-testid="mock-course-info-modal">
+                    <h2>Catálogo de Especialidades</h2>
+                    <button onClick={onClose} aria-label="Cerrar catálogo">X</button>
+                </div>
+            );
+        }
     };
 });
 
@@ -46,6 +54,14 @@ describe('Navbar Component', () => {
     it('debe mostrar los botones de navegación principales', () => {
         renderWithAuthProvider(<Navbar />);
         expect(screen.getByRole('button', { name: /Entrar/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /¿Qué deseas aprender\?/i })).toBeInTheDocument();
+    });
+
+    it('debe exponer estado de usuario no autenticado mostrando acceso a login y sin acciones privadas', () => {
+        renderWithAuthProvider(<Navbar />);
+
+        expect(screen.getByRole('button', { name: /Entrar \/ Registro/i })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Cerrar sesión/i })).not.toBeInTheDocument();
     });
 
     it('debe abrir el modal de login al hacer clic en "Entrar"', () => {
@@ -70,5 +86,19 @@ describe('Navbar Component', () => {
 
         // Verificamos que el componente del formulario se haya desmontado con éxito
         expect(screen.queryByText(/Iniciar Sesión/i)).not.toBeInTheDocument();
+    });
+
+    it('debe abrir y cerrar el menú de catálogo desde el botón de búsqueda', () => {
+        renderWithAuthProvider(<Navbar />);
+
+        const searchButton = screen.getByRole('button', { name: /¿Qué deseas aprender\?/i });
+        fireEvent.click(searchButton);
+
+        expect(screen.getByText(/Catálogo de Especialidades/i)).toBeInTheDocument();
+
+        const closeCatalogButton = screen.getByRole('button', { name: /Cerrar catálogo/i });
+        fireEvent.click(closeCatalogButton);
+
+        expect(screen.queryByText(/Catálogo de Especialidades/i)).not.toBeInTheDocument();
     });
 });

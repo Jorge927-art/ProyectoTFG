@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { EvaluationPanel } from './EvaluationPanel';
 import { useActiveEvaluations } from './useActiveEvaluations';
 
@@ -11,6 +11,20 @@ vi.mock('./useActiveEvaluations', () => ({
 describe('EvaluationPanel Component [TFG Test Suite]', () => {
     const mockSubmitEvaluation = vi.fn();
     const mockRefreshPending = vi.fn();
+    const mockPending = [
+        {
+            enrollmentid: 10,
+            enrolled_at: '2026-07-06T10:00:00.000Z',
+            status: 'EN_PROGRESO',
+            course: {
+                course_id: 101,
+                title: 'Introduction to Data Science',
+                category: 'Data Science',
+                instructors: 'Prof. Andrew Ng',
+                duration: 40
+            }
+        }
+    ];
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -34,21 +48,6 @@ describe('EvaluationPanel Component [TFG Test Suite]', () => {
     });
 
     it('debe renderizar la lista de asignaturas y profesores activos pendientes de calificación', () => {
-        const mockPending = [
-            {
-                enrollmentid: 10,
-                enrolled_at: '2026-07-06T10:00:00.000Z',
-                status: 'EN_PROGRESO',
-                course: {
-                    course_id: 101,
-                    title: 'Introduction to Data Science',
-                    category: 'Data Science',
-                    instructors: 'Prof. Andrew Ng',
-                    duration: 40
-                }
-            }
-        ];
-
         vi.mocked(useActiveEvaluations).mockReturnValue({
             pendingList: mockPending,
             loadingPending: false,
@@ -95,21 +94,6 @@ describe('EvaluationPanel Component [TFG Test Suite]', () => {
     });
 
     it('debe validar la existencia de las estrellas de rating dual e interceptar la acción de envío', async () => {
-        const mockPending = [
-            {
-                enrollmentid: 10,
-                enrolled_at: '2026-07-06T10:00:00.000Z',
-                status: 'EN_PROGRESO',
-                course: {
-                    course_id: 101,
-                    title: 'Introduction to Data Science',
-                    category: 'Data Science',
-                    instructors: 'Prof. Andrew Ng',
-                    duration: 40
-                }
-            }
-        ];
-
         vi.mocked(useActiveEvaluations).mockReturnValue({
             pendingList: mockPending,
             loadingPending: false,
@@ -141,5 +125,59 @@ describe('EvaluationPanel Component [TFG Test Suite]', () => {
         render(<EvaluationPanel />);
 
         expect(screen.getByText('¡Todo al día! No tienes evaluaciones pendientes.')).toBeInTheDocument();
+    });
+
+    it('debe mostrar el error de validación cuando el backend rechaza el envío de la evaluación', () => {
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: mockPending,
+            loadingPending: false,
+            isSubmitting: false,
+            evaluationError: 'Error de validación: la puntuación debe estar entre 1 y 5.',
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
+        });
+
+        render(<EvaluationPanel />);
+
+        expect(screen.getByText('Error de validación: la puntuación debe estar entre 1 y 5.')).toBeInTheDocument();
+        expect(screen.getByText('Introduction to Data Science')).toBeInTheDocument();
+    });
+
+    it('debe bloquear doble envío cuando la evaluación ya se está enviando', () => {
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: mockPending,
+            loadingPending: false,
+            isSubmitting: true,
+            evaluationError: '',
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
+        });
+
+        render(<EvaluationPanel />);
+
+        const submitButton = screen.getByRole('button', { name: /Enviando.../i });
+        expect(submitButton).toBeDisabled();
+
+        fireEvent.click(submitButton);
+        fireEvent.click(submitButton);
+
+        expect(mockSubmitEvaluation).not.toHaveBeenCalled();
+    });
+
+    it('debe reflejar el caso de ya evaluado mostrando alerta y sin habilitar reenvío vacío', () => {
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: mockPending,
+            loadingPending: false,
+            isSubmitting: false,
+            evaluationError: 'Ya has evaluado esta asignatura.',
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
+        });
+
+        render(<EvaluationPanel />);
+
+        expect(screen.getByText('Ya has evaluado esta asignatura.')).toBeInTheDocument();
+        const submitButton = screen.getByRole('button', { name: /ENVIAR EVALUACIÓN/i });
+        expect(submitButton).toBeDisabled();
     });
 });

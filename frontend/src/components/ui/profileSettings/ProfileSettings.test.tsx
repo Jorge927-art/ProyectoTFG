@@ -156,4 +156,43 @@ describe('ProfileSettings Component - Pruebas de Carga e Interacción [ADR-13]',
 
         expect(screen.getByText('No se pudieron cargar los datos del perfil')).toBeInTheDocument();
     });
+
+    test('CASO NEGATIVO: Debe bloquear el guardado cuando el correo es inválido', async () => {
+        vi.mocked(getProfile).mockResolvedValueOnce(mockProfileData);
+
+        render(<ProfileSettings />);
+
+        await waitFor(() => {
+            expect(screen.queryByText('Cargando configuración de perfil...')).not.toBeInTheDocument();
+        });
+
+        const emailInput = screen.getByPlaceholderText('tu-correo@ejemplo.com');
+        fireEvent.change(emailInput, { target: { value: 'correo-invalido' } });
+
+        expect(emailInput).toBeInvalid();
+
+        fireEvent.click(screen.getByText('Guardar Cambios'));
+
+        await waitFor(() => {
+            expect(updateProfileData).not.toHaveBeenCalled();
+        });
+    });
+
+    test('CASO NEGATIVO: Debe mostrar error si el backend falla al guardar los datos del perfil', async () => {
+        vi.mocked(getProfile).mockResolvedValueOnce(mockProfileData);
+        vi.mocked(updateProfileData).mockRejectedValueOnce(new Error('save-error'));
+
+        render(<ProfileSettings />);
+
+        await waitFor(() => {
+            expect(screen.queryByText('Cargando configuración de perfil...')).not.toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByText('Guardar Cambios'));
+
+        await waitFor(() => {
+            expect(updateProfileData).toHaveBeenCalled();
+            expect(screen.getByText('Error al actualizar los datos')).toBeInTheDocument();
+        });
+    });
 });

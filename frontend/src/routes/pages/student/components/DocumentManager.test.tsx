@@ -3,6 +3,19 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { DocumentManager } from './DocumentManager';
 import * as useDocumentsHook from './useDocuments';
 
+const mockRefreshNotifications = vi.fn();
+const mockMarkDocumentAsRead = vi.fn();
+
+vi.mock('../../../../components/ui/globalNotificationBell/useNotifications', () => ({
+    useNotifications: () => ({
+        refreshNotifications: mockRefreshNotifications,
+    }),
+}));
+
+vi.mock('../../../../services/documentService', () => ({
+    markDocumentAsRead: (...args: unknown[]) => mockMarkDocumentAsRead(...args),
+}));
+
 describe('DocumentManager Component [TFG Test Suite]', () => {
     // Definimos variables de mock que satisfacen estrictamente la interfaz del hook
     const mockHandleUpload = vi.fn();
@@ -223,6 +236,83 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
             expect(screen.getByTestId('document-row-10').className).toContain('border-amber-300');
             expect(scrollIntoViewSpy).toHaveBeenCalled();
         });
+    });
+
+    it('debe mostrar error de subida cuando handleUpload lanza excepción', async () => {
+        mockHandleUpload.mockRejectedValueOnce(new Error('upload-failed'));
+
+        useDocumentsSpy.mockReturnValue({
+            documentList: [],
+            activeTab: 'RECEIVED',
+            setActiveTab: mockSetActiveTab,
+            loadingDocuments: false,
+            isUploading: false,
+            documentError: '',
+            setDocumentError: mockSetDocumentError,
+            directory: [{ userId: 2, username: 'profesor_juan', role: 'PROFESSOR', email: 'j@tfg.com' }],
+            loadingDirectory: false,
+            selectedReceiverId: 2,
+            setSelectedReceiverId: mockSetSelectedReceiverId,
+            handleUpload: mockHandleUpload,
+            handleSecureDownload: mockHandleSecureDownload
+        });
+
+        render(<DocumentManager />);
+
+        const fileInput = document.getElementById('doc-upload-input') as HTMLInputElement;
+        const validFile = new File(['contenido'], 'Entrega.txt', { type: 'text/plain' });
+
+        fireEvent.change(fileInput, { target: { files: [validFile] } });
+
+        await waitFor(() => {
+            expect(mockHandleUpload).toHaveBeenCalledTimes(1);
+            expect(mockSetDocumentError).toHaveBeenCalledWith('No se pudo subir el documento. Inténtalo de nuevo.');
+        });
+    });
+
+    it('debe capturar fallo de descarga segura y mostrar mensaje de autorización', async () => {
+        mockHandleSecureDownload.mockRejectedValueOnce(new Error('download-failed'));
+
+        const mockDocuments = [
+            {
+                documentid: 21,
+                filename: 'doc-21.pdf',
+                originalname: 'Entrega_Final.pdf',
+                upload_date: '2026-07-06T10:00:00.000Z',
+                sender: { userId: 2, username: 'profesor_juan', email: 'juan@tfg.com', role: 'PROFESSOR' },
+                receiver: { userId: 1, username: 'luis_student', email: 'luis@tfg.com', role: 'STUDENT' },
+                folder_type: 'RECEIVED' as const,
+                isRead: false
+            }
+        ];
+
+        useDocumentsSpy.mockReturnValue({
+            documentList: mockDocuments,
+            activeTab: 'RECEIVED',
+            setActiveTab: mockSetActiveTab,
+            loadingDocuments: false,
+            isUploading: false,
+            documentError: '',
+            setDocumentError: mockSetDocumentError,
+            directory: [],
+            loadingDirectory: false,
+            selectedReceiverId: '',
+            setSelectedReceiverId: mockSetSelectedReceiverId,
+            handleUpload: mockHandleUpload,
+            handleSecureDownload: mockHandleSecureDownload
+        });
+
+        render(<DocumentManager />);
+
+        fireEvent.click(screen.getByRole('button', { name: /Descargar documento 21/i }));
+
+        await waitFor(() => {
+            expect(mockHandleSecureDownload).toHaveBeenCalledWith(21, 'Entrega_Final.pdf');
+            expect(mockSetDocumentError).toHaveBeenCalledWith('No tienes autorización legítima para procesar este documento.');
+        });
+
+        expect(mockMarkDocumentAsRead).not.toHaveBeenCalled();
+        expect(mockRefreshNotifications).not.toHaveBeenCalled();
     });
 });
 

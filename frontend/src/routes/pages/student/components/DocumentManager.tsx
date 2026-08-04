@@ -109,9 +109,14 @@ export const DocumentManager = ({
                 return;
             }
 
-            const success = await handleUpload(file);
-            if (success && fileInputRef.current) {
-                fileInputRef.current.value = ''; // Limpia el input tras la subida exitosa
+            try {
+                const success = await handleUpload(file);
+                if (success && fileInputRef.current) {
+                    fileInputRef.current.value = ''; // Limpia el input tras la subida exitosa
+                }
+            } catch (error) {
+                console.error('Error al transmitir el documento:', error);
+                setDocumentError('No se pudo subir el documento. Inténtalo de nuevo.');
             }
         }
     };

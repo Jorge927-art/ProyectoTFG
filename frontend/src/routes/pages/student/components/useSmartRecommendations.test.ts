@@ -61,6 +61,19 @@ describe('useSmartRecommendations - Suite de Pruebas Unitarias de Hooks con Esta
         expect(result.current.recommendations).toEqual([]);
     });
 
+    it('debe mantener lista vacía sin error cuando el servicio responde 200 con recomendaciones vacías', async () => {
+        mockedApi.get.mockResolvedValueOnce({ status: 200, data: [] });
+
+        const { result } = renderHook(() => useSmartRecommendations('empty-list'));
+
+        await waitFor(() => {
+            expect(result.current.loadingRecommendations).toBe(false);
+        });
+
+        expect(result.current.recommendations).toEqual([]);
+        expect(result.current.recommendationsError).toBe('');
+    });
+
     it('debe capturar las excepciones de la API y mutar el mensaje de error para el usuario', async () => {
         const errorMock = new Error('Database connection timed out');
         mockedApi.get.mockRejectedValueOnce(errorMock);

@@ -101,9 +101,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
                         .requestMatchers("/api/users/**").hasAuthority("ADMIN")
 
-                        // Exclusivo Profesor y Administrador
-                        .requestMatchers("/api/professor/**").hasAnyAuthority("PROFESSOR", "ADMIN")
-                        .requestMatchers("/api/student/**").hasAnyAuthority("STUDENT", "ADMIN")
+                        // Endpoints docentes reales (defensa en profundidad además de @PreAuthorize)
+                        .requestMatchers("/api/v1/teacher/**").hasAnyAuthority("PROFESSOR", "ADMIN")
 
                         // Cualquier otra solicitud requiere autenticación
                         .anyRequest().authenticated())

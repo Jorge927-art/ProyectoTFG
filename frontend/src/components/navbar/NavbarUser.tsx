@@ -1,6 +1,6 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, User, LogOut, GraduationCap, ShieldAlert, BookOpen } from 'lucide-react';
+import { Home, User, LogOut, GraduationCap, ShieldAlert, BookOpen, ChevronDown } from 'lucide-react';
 import GenericButton from "../ui/genericButton/GenericButton";
 import { useAuth } from '../../auth';
 // Auditoría NotebookLM: Importación de la constante centralizada para mitigar hardcoding de roles.
@@ -25,6 +25,8 @@ const NavbarUser = ({ username, userPhoto, onLogout }: NavbarUserProps) => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const currentRole = user?.role?.toUpperCase().trim() || ROLES.STUDENT;
+    const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const userMenuRef = useRef<HTMLDivElement | null>(null);
 
     // FUNCIÓN DE REDIRECCIÓN INTERNA AUTÓNOMA MULTIRROL OPTIMIZADA
     const handleProfileRedirect = () => {
@@ -55,6 +57,37 @@ const NavbarUser = ({ username, userPhoto, onLogout }: NavbarUserProps) => {
             <User size={18} />
         </div>
     );
+
+    useEffect(() => {
+        if (!isUserMenuOpen) {
+            return;
+        }
+
+        const handleClickOutside = (event: MouseEvent) => {
+            if (!userMenuRef.current) {
+                return;
+            }
+
+            const target = event.target as Node;
+            if (!userMenuRef.current.contains(target)) {
+                setIsUserMenuOpen(false);
+            }
+        };
+
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setIsUserMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleEscape);
+        };
+    }, [isUserMenuOpen]);
 
     return (
         <nav className="fixed top-0 left-0 w-full bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 py-1.5 z-50 flex justify-between items-center h-16">
@@ -102,20 +135,59 @@ const NavbarUser = ({ username, userPhoto, onLogout }: NavbarUserProps) => {
                 {/* ELIMINA LA CONDICIONAL ANTERIOR Y DEJA SOLO LA CAMPANA GLOBAL: */}
                 <NotificationBell />
 
-                <GenericButton
-                    onClick={handleProfileRedirect}
-                    variant="white"
-                    label={username}
-                    icon={avatarIcon}
-                />
+                <div className="relative" ref={userMenuRef}>
+                    <GenericButton
+                        onClick={() => setIsUserMenuOpen((prev) => !prev)}
+                        variant="white"
+                        label={username}
+                        icon={avatarIcon}
+                        ariaLabel={`Menú de usuario de ${username}`}
+                        className="pr-3!"
+                    />
 
-                <GenericButton
-                    onClick={onLogout}
-                    variant="text"
-                    ariaLabel="Cerrar sesión"
-                    icon={<LogOut size={18} />}
-                    className="p-2! text-gray-400! hover:text-red-500! bg-transparent! shadow-none!"
-                />
+                    <button
+                        type="button"
+                        aria-label="Desplegar menú de usuario"
+                        aria-haspopup="menu"
+                        aria-expanded={isUserMenuOpen}
+                        onClick={() => setIsUserMenuOpen((prev) => !prev)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                    >
+                        <ChevronDown size={14} className={`${isUserMenuOpen ? 'rotate-180' : ''} transition-transform`} />
+                    </button>
+
+                    {isUserMenuOpen && (
+                        <div
+                            role="menu"
+                            aria-label="Menú de usuario"
+                            className="absolute right-0 mt-2 w-44 rounded-xl border border-slate-200 bg-white shadow-lg p-1"
+                        >
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                    handleProfileRedirect();
+                                    setIsUserMenuOpen(false);
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-lg"
+                            >
+                                Mi perfil
+                            </button>
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                    setIsUserMenuOpen(false);
+                                    onLogout?.();
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2"
+                            >
+                                <LogOut size={14} />
+                                Cerrar sesión
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
 
         </nav>

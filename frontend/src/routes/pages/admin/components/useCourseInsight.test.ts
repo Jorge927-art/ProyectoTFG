@@ -167,4 +167,61 @@ describe('useCourseInsight', () => {
         expect(result.current.error).toBe('Error al consultar la información estadística del curso.');
         expect(result.current.stats).toBeNull();
     });
+
+    it('handleSearch conserva resultado vacío cuando no hay cursos que empiecen por el prefijo buscado', async () => {
+        vi.mocked(searchCourses).mockResolvedValue([
+            { courseId: 901, title: 'Matemáticas Discretas', category: 'CS' }
+        ]);
+
+        const { result } = renderHook(() => useCourseInsight());
+
+        act(() => {
+            result.current.setKeyword('Ar');
+        });
+
+        await act(async () => {
+            await result.current.handleSearch(fakeFormEvent);
+        });
+
+        expect(result.current.results).toEqual([]);
+        expect(result.current.highlightedResultIndex).toBe(-1);
+        expect(result.current.error).toBe('');
+    });
+
+    it('handleSelectCourse muestra error funcional cuando el curso no existe (404)', async () => {
+        const notFoundError = Object.assign(new Error('Not Found'), { status: 404 });
+        vi.mocked(getCourseDetail).mockRejectedValue(notFoundError);
+        vi.mocked(getCourseCollectiveStats).mockRejectedValue(notFoundError);
+        vi.mocked(resolveCourseInsightErrorMessage).mockReturnValue('No se encontró el curso solicitado.');
+
+        const { result } = renderHook(() => useCourseInsight());
+
+        await act(async () => {
+            await result.current.handleSelectCourse(99999);
+        });
+
+        expect(result.current.selectedCourse).toBeNull();
+        expect(result.current.collectiveStats).toBeNull();
+        expect(result.current.error).toBe('No se encontró el curso solicitado.');
+        expect(result.current.loadingDetail).toBe(false);
+        expect(result.current.loadingCollectiveStats).toBe(false);
+    });
+
+    it('handleSelectCourse captura fallo de red y mantiene estado consistente', async () => {
+        vi.mocked(getCourseDetail).mockRejectedValue(new Error('network-down'));
+        vi.mocked(getCourseCollectiveStats).mockResolvedValue(sampleCollectiveStats);
+        vi.mocked(resolveCourseInsightErrorMessage).mockReturnValue('Error de red al cargar el detalle del curso.');
+
+        const { result } = renderHook(() => useCourseInsight());
+
+        await act(async () => {
+            await result.current.handleSelectCourse(300);
+        });
+
+        expect(result.current.selectedCourse).toBeNull();
+        expect(result.current.collectiveStats).toBeNull();
+        expect(result.current.error).toBe('Error de red al cargar el detalle del curso.');
+        expect(result.current.loadingDetail).toBe(false);
+        expect(result.current.loadingCollectiveStats).toBe(false);
+    });
 });

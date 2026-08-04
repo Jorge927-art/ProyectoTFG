@@ -57,6 +57,15 @@ export default function ProfileSettings() {
         e.preventDefault();
         setUpdatingText(true);
         setMessage(null);
+
+        const formElement = e.currentTarget as HTMLFormElement;
+        if (!formElement.checkValidity()) {
+            setMessage({ text: 'Revisa los campos antes de guardar.', type: 'error' });
+            formElement.reportValidity?.();
+            setUpdatingText(false);
+            return;
+        }
+
         try {
             await updateProfileData(formData);
             setMessage({ text: 'Datos de perfil actualizados correctamente', type: 'success' });
