@@ -78,6 +78,7 @@ describe('GradingCenter', () => {
     const baseHookReturn: ReturnType<typeof useGradingCenter> = {
         students: [],
         selectedStudent: null,
+        studentGrades: [],
         studentDocuments: [],
         documentsLoadedFromCourseFallback: false,
         loadingData: false,
