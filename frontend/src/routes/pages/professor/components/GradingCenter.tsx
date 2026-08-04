@@ -40,11 +40,17 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
         setScore,
         feedback,
         setFeedback,
+        finalExamWeight,
+        setFinalExamWeight,
+        calculatorMessage,
+        calculatorMessageType,
+        calculatorSnapshot,
         selectedFile,
         isUploadingDocument,
         handleFileSelection,
         handleSendDocument,
         handleSelectStudentById,
+        handleCalculateFinalGrade,
         handleGradeSubmit
     } = useGradingCenter(courseId);
 
@@ -112,6 +118,11 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
         : gradeSubmitFeedbackStatus === 'error'
             ? '!bg-red-600 hover:!bg-red-700'
             : '';
+    const calculatorMessageClass = calculatorMessageType === 'success'
+        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+        : calculatorMessageType === 'info'
+            ? 'bg-amber-50 border-amber-200 text-amber-700'
+            : 'bg-red-50 border-red-200 text-red-700';
 
     return (
         <div className="space-y-4">
@@ -347,6 +358,113 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
                             className={`w-full justify-center text-xs! font-bold! py-2! ${gradeSubmitButtonFeedbackClass}`}
                         />
                     </form>
+                )}
+            </GenericCard>
+
+            <GenericCard className="space-y-3">
+                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <Award size={18} className="text-indigo-600" />
+                    Calculadora nota final
+                </h2>
+
+                {!selectedStudent ? (
+                    <div className="border border-dashed border-slate-200 rounded-lg p-4 text-xs text-slate-500 text-center">
+                        Selecciona un alumno para habilitar la calculadora de nota final.
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                            <p className="text-[11px] font-bold text-slate-700">
+                                Cálculo asistido para: <span className="text-indigo-600">{selectedStudent.username}</span>
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="rounded-lg border border-slate-100 bg-white p-2.5">
+                                <p className="text-[10px] font-black uppercase tracking-wide text-slate-500 mb-1">Media trabajos</p>
+                                <span className="text-sm font-black text-slate-800">
+                                    {calculatorSnapshot.workAverage !== null ? `${calculatorSnapshot.workAverage.toFixed(1)} / 10` : 'Sin trabajos'}
+                                </span>
+                            </div>
+
+                            <div className="rounded-lg border border-slate-100 bg-white p-2.5">
+                                <p className="text-[10px] font-black uppercase tracking-wide text-slate-500 mb-1">Examen final</p>
+                                <span className="text-sm font-black text-slate-800">
+                                    {calculatorSnapshot.examGrade !== null ? `${calculatorSnapshot.examGrade.toFixed(1)} / 10` : 'Sin examen'}
+                                </span>
+                            </div>
+
+                            <div className="rounded-lg border border-slate-100 bg-white p-2.5">
+                                <p className="text-[10px] font-black uppercase tracking-wide text-slate-500 mb-1">Trabajos detectados</p>
+                                <span className="text-sm font-black text-slate-800">{calculatorSnapshot.workGrades.length}</span>
+                            </div>
+                        </div>
+
+                        {calculatorMessage && (
+                            <div className={`p-2.5 border rounded-lg text-xs font-semibold ${calculatorMessageClass}`}>
+                                {calculatorMessage}
+                            </div>
+                        )}
+
+                        {calculatorSnapshot.examGrade !== null && (
+                            <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3 space-y-1.5">
+                                <p className="text-[10px] font-black uppercase tracking-wide text-indigo-700">
+                                    Previsualización de la fórmula
+                                </p>
+
+                                {calculatorSnapshot.workAverage !== null ? (
+                                    <p className="text-xs font-semibold text-slate-700">
+                                        Nota final = trabajos {100 - Number(finalExamWeight)}% + examen {Number(finalExamWeight)}%
+                                    </p>
+                                ) : (
+                                    <p className="text-xs font-semibold text-slate-700">
+                                        Nota final = examen 100%
+                                    </p>
+                                )}
+
+                                <p className="text-[11px] text-slate-600">
+                                    {calculatorSnapshot.workAverage !== null
+                                        ? `${calculatorSnapshot.workAverage.toFixed(1)} x ${(100 - Number(finalExamWeight))}% + ${calculatorSnapshot.examGrade.toFixed(1)} x ${Number(finalExamWeight)}%`
+                                        : `${calculatorSnapshot.examGrade.toFixed(1)} x 100%`
+                                    }
+                                </p>
+                            </div>
+                        )}
+
+                        {calculatorSnapshot.workGrades.length > 0 ? (
+                            <div className="space-y-1">
+                                <label htmlFor="final-exam-weight" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                    Peso del examen en la nota final (40%-100%)
+                                </label>
+                                <input
+                                    id="final-exam-weight"
+                                    type="number"
+                                    min="40"
+                                    max="100"
+                                    step="1"
+                                    value={finalExamWeight}
+                                    onChange={(event) => setFinalExamWeight(event.target.value)}
+                                    className="w-full text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-blue-400"
+                                />
+                                <p className="text-[10px] text-slate-400">
+                                    El porcentaje restante hasta 100% se aplicará automáticamente a la media de trabajos.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 p-3 text-[11px] text-slate-500">
+                                Si no hay trabajos registrados, la calculadora utilizará directamente la nota del examen y no pedirá porcentaje.
+                            </div>
+                        )}
+
+                        <GenericButton
+                            type="button"
+                            onClick={handleCalculateFinalGrade}
+                            variant="primary"
+                            label="Calcular nota final"
+                            icon={<GraduationCap size={14} />}
+                            className="w-full justify-center text-xs! font-bold! py-2!"
+                        />
+                    </div>
                 )}
             </GenericCard>
         </div>

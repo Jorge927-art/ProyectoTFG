@@ -36,7 +36,9 @@ describe('GradingCenter', () => {
     const mockSetEvaluationTitle = vi.fn();
     const mockSetScore = vi.fn();
     const mockSetFeedback = vi.fn();
+    const mockSetFinalExamWeight = vi.fn();
     const scrollIntoViewSpy = vi.fn();
+    const mockHandleCalculateFinalGrade = vi.fn();
 
     const availableCourses: TaughtCourse[] = [
         { id: 1, title: 'Backend Avanzado', category: 'Programacion', studentsCount: 20, averageProgress: 78 },
@@ -90,12 +92,23 @@ describe('GradingCenter', () => {
         setScore: mockSetScore,
         feedback: '',
         setFeedback: mockSetFeedback,
+        finalExamWeight: '60',
+        setFinalExamWeight: mockSetFinalExamWeight,
+        calculatorMessage: '',
+        calculatorMessageType: null,
+        calculatorSnapshot: {
+            workGrades: [],
+            workAverage: null,
+            examGrade: null,
+            finalCourseGrade: null,
+        },
         selectedFile: null,
         isUploadingDocument: false,
         handleFileSelection: mockHandleFileSelection,
         handleSendDocument: mockHandleSendDocument,
         handleSelectStudent: mockHandleSelectStudent,
         handleSelectStudentById: mockHandleSelectStudentById,
+        handleCalculateFinalGrade: mockHandleCalculateFinalGrade,
         handleGradeSubmit: mockHandleGradeSubmit
     };
 
@@ -149,6 +162,7 @@ describe('GradingCenter', () => {
 
         expect(screen.getByText('Selecciona una asignatura y un alumno para habilitar el envio y la recepcion de documentos.')).toBeInTheDocument();
         expect(screen.getByText('Selecciona un alumno para habilitar el envio de notas.')).toBeInTheDocument();
+        expect(screen.getByText('Selecciona un alumno para habilitar la calculadora de nota final.')).toBeInTheDocument();
     });
 
     it('procesa seleccion de archivo PDF desde el input', () => {
@@ -318,6 +332,87 @@ describe('GradingCenter', () => {
         expect(mockSetEvaluationTitle).toHaveBeenCalledWith('Examen Final');
         expect(mockSetScore).toHaveBeenCalledWith('9.2');
         expect(mockSetFeedback).toHaveBeenCalledWith('Excelente nivel');
+    });
+
+    it('muestra el subpanel de calculadora con resumen de notas detectadas', () => {
+        vi.mocked(useGradingCenter).mockReturnValue({
+            ...baseHookReturn,
+            selectedStudent: mockStudent,
+            calculatorSnapshot: {
+                workGrades: [{ gradeId: 1, title: 'Trabajo 1', score: '7.0' }],
+                workAverage: 7.0,
+                examGrade: 8.0,
+                finalCourseGrade: null,
+            }
+        } as ReturnType<typeof useGradingCenter>);
+
+        render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
+
+        expect(screen.getByText('Calculadora nota final')).toBeInTheDocument();
+        expect(screen.getByText('7.0 / 10')).toBeInTheDocument();
+        expect(screen.getByText('8.0 / 10')).toBeInTheDocument();
+        expect(screen.getByText('1')).toBeInTheDocument();
+        expect(screen.getByText('Previsualización de la fórmula')).toBeInTheDocument();
+        expect(screen.getByText('Nota final = trabajos 40% + examen 60%')).toBeInTheDocument();
+        expect(screen.getByText('7.0 x 40% + 8.0 x 60%')).toBeInTheDocument();
+    });
+
+    it('propaga cambios del porcentaje y lanza el cálculo explícito al pulsar el botón', () => {
+        vi.mocked(useGradingCenter).mockReturnValue({
+            ...baseHookReturn,
+            selectedStudent: mockStudent,
+            calculatorSnapshot: {
+                workGrades: [{ gradeId: 1, title: 'Trabajo 1', score: '7.0' }],
+                workAverage: 7.0,
+                examGrade: 8.0,
+                finalCourseGrade: null,
+            }
+        } as ReturnType<typeof useGradingCenter>);
+
+        render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
+
+        fireEvent.change(screen.getByLabelText('Peso del examen en la nota final (40%-100%)'), { target: { value: '70' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Calcular nota final' }));
+
+        expect(mockSetFinalExamWeight).toHaveBeenCalledWith('70');
+        expect(mockHandleCalculateFinalGrade).toHaveBeenCalledTimes(1);
+    });
+
+    it('muestra el mensaje informativo de la calculadora cuando el hook lo expone', () => {
+        vi.mocked(useGradingCenter).mockReturnValue({
+            ...baseHookReturn,
+            selectedStudent: mockStudent,
+            calculatorMessage: 'Nota final calculada y trasladada al panel de Calificaciones.',
+            calculatorMessageType: 'success',
+            calculatorSnapshot: {
+                workGrades: [{ gradeId: 1, title: 'Trabajo 1', score: '7.0' }],
+                workAverage: 7.0,
+                examGrade: 8.0,
+                finalCourseGrade: null,
+            }
+        } as ReturnType<typeof useGradingCenter>);
+
+        render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
+
+        expect(screen.getByText('Nota final calculada y trasladada al panel de Calificaciones.')).toBeInTheDocument();
+    });
+
+    it('no permite introducir porcentaje cuando no hay trabajos detectados', () => {
+        vi.mocked(useGradingCenter).mockReturnValue({
+            ...baseHookReturn,
+            selectedStudent: mockStudent,
+            calculatorSnapshot: {
+                workGrades: [],
+                workAverage: null,
+                examGrade: 8.0,
+                finalCourseGrade: null,
+            }
+        } as ReturnType<typeof useGradingCenter>);
+
+        render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
+
+        expect(screen.queryByLabelText('Peso del examen en la nota final (40%-100%)')).not.toBeInTheDocument();
+        expect(screen.getByText('Si no hay trabajos registrados, la calculadora utilizará directamente la nota del examen y no pedirá porcentaje.')).toBeInTheDocument();
     });
 
     it('en modo autoFocusDocuments resalta y centra la primera entrega disponible', async () => {

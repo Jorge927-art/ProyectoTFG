@@ -3,6 +3,7 @@ import {
     getPendingEvaluations, 
     submitAcademicEvaluation, 
     getStudentCourseGrades, 
+    getTeacherEnrollmentGrades,
     getActiveStudentsByCourse, 
     getCourseManagementMetrics,
     getProfessorAssignedCourses,
@@ -99,6 +100,24 @@ describe('evaluationService - Suite de Pruebas Unitarias de Alta Fidelidad', () 
         expect(result).toEqual(mockCourseGrades);
         expect(mockedApi.get).toHaveBeenCalledTimes(1);
         expect(mockedApi.get).toHaveBeenCalledWith(`/api/v1/users/my-courses/${enrollmentId}/grades`);
+    });
+
+    it('debe recuperar las calificaciones visibles para el profesor y normalizar score numérico a string', async () => {
+        const enrollmentId = 202;
+        mockedApi.get.mockResolvedValueOnce({
+            data: [
+                { gradeId: 10, title: 'Trabajo 1', score: 7.5 },
+                { gradeId: 11, title: 'Examen Final', score: 8 }
+            ]
+        });
+
+        const result = await getTeacherEnrollmentGrades(enrollmentId);
+
+        expect(result).toEqual([
+            { gradeId: 10, title: 'Trabajo 1', score: '7.5' },
+            { gradeId: 11, title: 'Examen Final', score: '8' }
+        ]);
+        expect(mockedApi.get).toHaveBeenCalledWith(`/api/v1/teacher/evaluations/enrollments/${enrollmentId}/grades`);
     });
 
     it('debe inyectar el id del curso en la URL para obtener el rendimiento de alumnos [MÓDULO DOCENTE]', async () => {
@@ -234,6 +253,17 @@ describe('evaluationService - Suite de Pruebas Unitarias de Alta Fidelidad', () 
             'Error 404: Registro de matrícula no encontrado'
         );
         expect(mockedApi.get).toHaveBeenCalledWith(`/api/v1/users/my-courses/${invalidEnrollmentId}/grades`);
+    });
+
+    it('debe propagar errores de autorización al consultar calificaciones del alumno desde el panel docente', async () => {
+        const invalidEnrollmentId = 9999;
+        const errorMock = new Error('Error 403: No tienes permisos de docente sobre esta matrícula');
+        mockedApi.get.mockRejectedValueOnce(errorMock);
+
+        await expect(getTeacherEnrollmentGrades(invalidEnrollmentId)).rejects.toThrow(
+            'Error 403: No tienes permisos de docente sobre esta matrícula'
+        );
+        expect(mockedApi.get).toHaveBeenCalledWith(`/api/v1/teacher/evaluations/enrollments/${invalidEnrollmentId}/grades`);
     });
 
     it('debe propagar errores de autorización (403) en el módulo docente al consultar alumnos por curso', async () => {

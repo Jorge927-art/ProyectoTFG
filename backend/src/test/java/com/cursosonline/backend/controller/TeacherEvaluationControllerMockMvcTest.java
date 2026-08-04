@@ -23,12 +23,14 @@ import java.util.Optional;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -157,6 +159,69 @@ class TeacherEvaluationControllerMockMvcTest {
 
                 verifyNoInteractions(courseGradeRepository);
                 verifyNoInteractions(enrollmentRepository);
+        }
+
+        @Test
+        @DisplayName("debe devolver las calificaciones existentes de una matrícula autorizada")
+        void getEnrollmentGrades_shouldReturnPersistedGrades_WhenProfessorIsAuthorized() throws Exception {
+                Long enrollmentId = 301L;
+                String teacherUsername = "profesor_test";
+
+                CourseGrade workGrade = new CourseGrade();
+                workGrade.setGradeId(1L);
+                workGrade.setTitle("Trabajo Académico Escrito");
+                workGrade.setScore(new BigDecimal("7.50"));
+
+                CourseGrade examGrade = new CourseGrade();
+                examGrade.setGradeId(2L);
+                examGrade.setTitle("Examen Final");
+                examGrade.setScore(new BigDecimal("8.00"));
+
+                when(principal.getName()).thenReturn(teacherUsername);
+                when(enrollmentRepository.isInstructorAuthorizedForEnrollment(enrollmentId, teacherUsername))
+                                .thenReturn(true);
+                when(courseGradeRepository.findAllByEnrollmentIdOrderByGradeIdAsc(enrollmentId))
+                                .thenReturn(List.of(workGrade, examGrade));
+
+                mockMvc.perform(get("/api/v1/teacher/evaluations/enrollments/{enrollmentId}/grades", enrollmentId)
+                                .principal(principal)
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].gradeId").value(1))
+                                .andExpect(jsonPath("$[0].title").value("Trabajo Académico Escrito"))
+                                .andExpect(jsonPath("$[0].score").value(7.50))
+                                .andExpect(jsonPath("$[1].title").value("Examen Final"));
+        }
+
+        @Test
+        @DisplayName("debe devolver 403 al consultar calificaciones de una matrícula no autorizada")
+        void getEnrollmentGrades_shouldReturnForbidden_WhenProfessorIsNotAuthorized() throws Exception {
+                Long enrollmentId = 302L;
+                String teacherUsername = "profesor_test";
+
+                when(principal.getName()).thenReturn(teacherUsername);
+                when(enrollmentRepository.isInstructorAuthorizedForEnrollment(enrollmentId, teacherUsername))
+                                .thenReturn(false);
+
+                mockMvc.perform(get("/api/v1/teacher/evaluations/enrollments/{enrollmentId}/grades", enrollmentId)
+                                .principal(principal)
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isForbidden())
+                                .andExpect(jsonPath("$.error").value(
+                                                "Acceso denegado: No eres el instructor asignado a esta asignatura o la matrícula no existe."));
+
+                verify(courseGradeRepository, never()).findAllByEnrollmentIdOrderByGradeIdAsc(anyLong());
+        }
+
+        @Test
+        @DisplayName("debe devolver 401 si falta principal al consultar calificaciones de matrícula")
+        void getEnrollmentGrades_shouldReturnUnauthorized_WhenPrincipalIsMissing() throws Exception {
+                mockMvc.perform(get("/api/v1/teacher/evaluations/enrollments/{enrollmentId}/grades", 303L)
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.error").value("Sesión inválida o expirada."));
+
+                verifyNoInteractions(courseGradeRepository);
         }
 
         @Test

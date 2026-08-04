@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 // Usamos 'import type' para satisfacer las reglas estrictas de TypeScript de tu proyecto
 import type { 
-    StudentPerformanceDTO
+    StudentPerformanceDTO,
+    CourseGradeDTO
 } from '../../../../services/evaluationService';
 import type { DocumentMetadata } from '../../../../services/documentService';
 import axios from 'axios';
 
 import { 
     getActiveStudentsByCourse, 
+    getTeacherEnrollmentGrades,
     submitStudentGrade 
 } from '../../../../services/evaluationService';
 import { getDocumentsByEnrollment, getReceivedDocumentsByCourse, uploadProfessorDocument } from '../../../../services/documentService';
@@ -17,11 +19,61 @@ const ERROR_MESSAGE_AUTO_DISMISS_MS = 6000;
 const GRADE_SUBMIT_FEEDBACK_AUTO_DISMISS_MS = 3500;
 
 type GradeSubmitFeedbackStatus = 'success' | 'error' | null;
+type CalculatorMessageType = 'success' | 'info' | 'error' | null;
+
+const roundToSingleDecimal = (value: number) => Math.round(value * 10) / 10;
+
+const isFinalCourseGradeTitle = (title: string) => title.trim().toLowerCase() === 'nota final asignatura';
+
+const isExamGradeTitle = (title: string) => {
+    const normalized = title.trim().toLowerCase();
+
+    if (
+        normalized.includes('trabajo')
+        || normalized.includes('proyecto')
+        || normalized.includes('actividad')
+        || normalized.includes('práctica')
+        || normalized.includes('practica')
+    ) {
+        return false;
+    }
+
+    return normalized.includes('examen')
+        || normalized.includes('evaluación final')
+        || normalized.includes('evaluacion final')
+        || normalized === 'final';
+};
+
+const buildCalculatorSnapshot = (grades: CourseGradeDTO[]) => {
+    const examGradeCandidates = grades.filter((grade) => isExamGradeTitle(grade.title));
+    const finalCourseGradeCandidates = grades.filter((grade) => isFinalCourseGradeTitle(grade.title));
+    const workGrades = grades.filter((grade) => !isExamGradeTitle(grade.title) && !isFinalCourseGradeTitle(grade.title));
+
+    const examGrade = examGradeCandidates.length > 0
+        ? Number(examGradeCandidates[examGradeCandidates.length - 1].score)
+        : null;
+
+    const finalCourseGrade = finalCourseGradeCandidates.length > 0
+        ? Number(finalCourseGradeCandidates[finalCourseGradeCandidates.length - 1].score)
+        : null;
+
+    const workAverage = workGrades.length > 0
+        ? roundToSingleDecimal(workGrades.reduce((sum, grade) => sum + Number(grade.score), 0) / workGrades.length)
+        : null;
+
+    return {
+        workGrades,
+        examGrade,
+        workAverage,
+        finalCourseGrade,
+    };
+};
 
 export const useGradingCenter = (courseId: number | null) => {
     // Estados de datos encapsulados
     const [students, setStudents] = useState<StudentPerformanceDTO[]>([]);
     const [selectedStudent, setSelectedStudent] = useState<StudentPerformanceDTO | null>(null);
+    const [studentGrades, setStudentGrades] = useState<CourseGradeDTO[]>([]);
     const [studentDocuments, setStudentDocuments] = useState<DocumentMetadata[]>([]);
     const [documentsLoadedFromCourseFallback, setDocumentsLoadedFromCourseFallback] = useState<boolean>(false);
     
@@ -41,6 +93,9 @@ export const useGradingCenter = (courseId: number | null) => {
     const [feedback, setFeedback] = useState<string>('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isUploadingDocument, setIsUploadingDocument] = useState<boolean>(false);
+    const [finalExamWeight, setFinalExamWeight] = useState<string>('60');
+    const [calculatorMessage, setCalculatorMessage] = useState<string>('');
+    const [calculatorMessageType, setCalculatorMessageType] = useState<CalculatorMessageType>(null);
 
     const { refreshNotifications } = useNotifications();
 
@@ -74,9 +129,13 @@ export const useGradingCenter = (courseId: number | null) => {
         if (!courseId) {
             setStudents([]);
             setSelectedStudent(null);
+            setStudentGrades([]);
             setStudentDocuments([]);
             setDocumentsLoadedFromCourseFallback(false);
             setGradeSubmitFeedbackStatus(null);
+            setFinalExamWeight('60');
+            setCalculatorMessage('');
+            setCalculatorMessageType(null);
             return;
         }
 
@@ -94,9 +153,13 @@ export const useGradingCenter = (courseId: number | null) => {
             }
 
             setSelectedStudent(null); // Resetear selección al cambiar de asignatura
+            setStudentGrades([]);
             setStudentDocuments([]);
             setDocumentsLoadedFromCourseFallback(false);
             setSelectedFile(null);
+            setFinalExamWeight('60');
+            setCalculatorMessage('');
+            setCalculatorMessageType(null);
         };
 
         fetchCourseData();
@@ -141,6 +204,21 @@ export const useGradingCenter = (courseId: number | null) => {
         }
     };
 
+    const fetchStudentGrades = async (student: StudentPerformanceDTO) => {
+        if (typeof student.enrollmentId !== 'number') {
+            setStudentGrades([]);
+            return;
+        }
+
+        try {
+            const grades = await getTeacherEnrollmentGrades(student.enrollmentId);
+            setStudentGrades(grades);
+        } catch {
+            setStudentGrades([]);
+            setErrorMessage('No se pudieron recuperar las calificaciones actuales de este estudiante.');
+        }
+    };
+
     // 2. Sincronización [NotebookLM Punto 4]: Cargar documentos al seleccionar un alumno
     const handleSelectStudent = async (student: StudentPerformanceDTO) => {
         setSelectedStudent(student);
@@ -149,7 +227,10 @@ export const useGradingCenter = (courseId: number | null) => {
         setGradeSubmitFeedbackStatus(null);
         setScore('');
         setFeedback('');
-        await fetchStudentDocuments(student);
+        setFinalExamWeight('60');
+        setCalculatorMessage('');
+        setCalculatorMessageType(null);
+        await Promise.all([fetchStudentDocuments(student), fetchStudentGrades(student)]);
     };
 
     const handleSelectStudentById = async (studentId: number) => {
@@ -203,6 +284,51 @@ export const useGradingCenter = (courseId: number | null) => {
         }
     };
 
+    const handleCalculateFinalGrade = () => {
+        const { examGrade, workAverage, workGrades } = buildCalculatorSnapshot(studentGrades);
+
+        if (!selectedStudent) {
+            setCalculatorMessageType('error');
+            setCalculatorMessage('Selecciona un alumno para calcular la nota final.');
+            return;
+        }
+
+        if (examGrade === null || Number.isNaN(examGrade)) {
+            setCalculatorMessageType('error');
+            setCalculatorMessage('No se puede calcular la nota final porque falta la nota de Examen Final.');
+            return;
+        }
+
+        if (workGrades.length === 0 || workAverage === null) {
+            const examScore = roundToSingleDecimal(examGrade);
+            setEvaluationTitle('Nota Final Asignatura');
+            setScore(examScore.toFixed(1));
+            setFeedback(`Sin trabajos registrados. Se toma directamente la nota de examen ${examScore.toFixed(1)} / 10.`);
+            setCalculatorMessageType('info');
+            setCalculatorMessage('No hay trabajos registrados. Se usará directamente la nota del examen.');
+            setErrorMessage('');
+            return;
+        }
+
+        const parsedWeight = Number(finalExamWeight);
+        if (Number.isNaN(parsedWeight) || parsedWeight < 40 || parsedWeight > 100) {
+            setCalculatorMessageType('error');
+            setCalculatorMessage('Introduce un porcentaje de examen válido entre 40% y 100%.');
+            return;
+        }
+
+        const examRatio = parsedWeight / 100;
+        const workRatio = 1 - examRatio;
+        const calculatedFinalGrade = roundToSingleDecimal((workAverage * workRatio) + (examGrade * examRatio));
+
+        setEvaluationTitle('Nota Final Asignatura');
+        setScore(calculatedFinalGrade.toFixed(1));
+        setFeedback(`Media trabajos ${workAverage.toFixed(1)} + examen ${roundToSingleDecimal(examGrade).toFixed(1)} con ponderación ${parsedWeight}%`);
+        setCalculatorMessageType('success');
+        setCalculatorMessage('Nota final calculada y trasladada al panel de Calificaciones.');
+        setErrorMessage('');
+    };
+
     // 3. Envío de Calificación [NotebookLM Puntos 4 y 5]
     const handleGradeSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -249,6 +375,15 @@ export const useGradingCenter = (courseId: number | null) => {
                 }
             }
 
+            if (selectedStudent?.enrollmentId) {
+                try {
+                    const updatedGrades = await getTeacherEnrollmentGrades(selectedStudent.enrollmentId);
+                    setStudentGrades(updatedGrades);
+                } catch {
+                    // Evitamos romper la operación principal si falla solo el refresco auxiliar.
+                }
+            }
+
             // [NotebookLM Punto 5]: Sincronizar campanas del sistema
             refreshNotifications();
 
@@ -265,9 +400,12 @@ export const useGradingCenter = (courseId: number | null) => {
         }
     };
 
+    const calculatorSnapshot = buildCalculatorSnapshot(studentGrades);
+
     return {
         students,
         selectedStudent,
+        studentGrades,
         studentDocuments,
         documentsLoadedFromCourseFallback,
         loadingData,
@@ -282,12 +420,18 @@ export const useGradingCenter = (courseId: number | null) => {
         setScore,
         feedback,
         setFeedback,
+        finalExamWeight,
+        setFinalExamWeight,
+        calculatorMessage,
+        calculatorMessageType,
+        calculatorSnapshot,
         selectedFile,
         isUploadingDocument,
         handleFileSelection,
         handleSendDocument,
         handleSelectStudent,
         handleSelectStudentById,
+        handleCalculateFinalGrade,
         handleGradeSubmit
     };
 };

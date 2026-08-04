@@ -31,6 +31,16 @@ export interface CourseGradeDTO {
     score: string; // Nota Ej: "8.5"
 }
 
+const normalizeCourseGrades = (grades: Array<{
+    gradeId: number;
+    title: string;
+    score: string | number;
+}>): CourseGradeDTO[] => grades.map((grade) => ({
+    gradeId: grade.gradeId,
+    title: grade.title,
+    score: String(grade.score),
+}));
+
 /**
  * [SERVICIO FILTRADO DOCENTE]: Recupera la lista de asignaturas y nombres de instructores 
  * activos en las matrículas del estudiante autenticado que aún no han sido evaluados.
@@ -54,8 +64,15 @@ export const submitAcademicEvaluation = async (data: EvaluationInput): Promise<{
  * de trabajos y exámenes asociadas a una matrícula determinada [CABLEADO ADR-47].
  */
 export const getStudentCourseGrades = async (enrollmentId: number): Promise<CourseGradeDTO[]> => {
-    const response = await apiClient.get<CourseGradeDTO[]>(`/api/v1/users/my-courses/${enrollmentId}/grades`);
-    return response.data;
+    const response = await apiClient.get<Array<{ gradeId: number; title: string; score: string | number }>>(`/api/v1/users/my-courses/${enrollmentId}/grades`);
+    return normalizeCourseGrades(response.data);
+};
+
+export const getTeacherEnrollmentGrades = async (enrollmentId: number): Promise<CourseGradeDTO[]> => {
+    const response = await apiClient.get<Array<{ gradeId: number; title: string; score: string | number }>>(
+        `/api/v1/teacher/evaluations/enrollments/${enrollmentId}/grades`
+    );
+    return normalizeCourseGrades(response.data);
 };
 
 export interface StudentPerformanceDTO {

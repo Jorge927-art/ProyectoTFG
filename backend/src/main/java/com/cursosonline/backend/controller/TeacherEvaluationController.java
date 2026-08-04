@@ -3,6 +3,7 @@ package com.cursosonline.backend.controller;
 import com.cursosonline.backend.dto.TeacherGradeRequest;
 import com.cursosonline.backend.dto.StudentPerformanceDTO;
 import com.cursosonline.backend.dto.CourseMetricsDTO;
+import com.cursosonline.backend.dto.TeacherCourseGradeDTO;
 import com.cursosonline.backend.entities.CourseGrade;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.repository.EnrollmentRepository;
@@ -19,6 +20,7 @@ import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.stream.Collectors;
 
 /**
  * Controlador REST para gestionar las evaluaciones de los estudiantes por parte
@@ -144,6 +146,32 @@ public class TeacherEvaluationController {
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Calificación registrada con éxito por el docente autorizado."));
+    }
+
+    @GetMapping("/enrollments/{enrollmentId}/grades")
+    public ResponseEntity<?> getEnrollmentGrades(@PathVariable Long enrollmentId, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
+        String teacherUsername = principal.getName();
+        boolean isAuthorized = enrollmentRepository.isInstructorAuthorizedForEnrollment(enrollmentId, teacherUsername);
+
+        if (!isAuthorized) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "error",
+                    "Acceso denegado: No eres el instructor asignado a esta asignatura o la matrícula no existe."));
+        }
+
+        List<TeacherCourseGradeDTO> grades = courseGradeRepository.findAllByEnrollmentIdOrderByGradeIdAsc(enrollmentId)
+                .stream()
+                .map(grade -> new TeacherCourseGradeDTO(
+                        grade.getGradeId(),
+                        grade.getTitle(),
+                        grade.getScore()))
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(grades);
     }
 
     private boolean isExamGradeTitle(String title) {

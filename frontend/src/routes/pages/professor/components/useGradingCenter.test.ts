@@ -3,6 +3,7 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { useGradingCenter } from './useGradingCenter';
 import {
     getActiveStudentsByCourse,
+    getTeacherEnrollmentGrades,
     submitStudentGrade
 } from '../../../../services/evaluationService';
 import {
@@ -16,6 +17,7 @@ const mockRefreshNotifications = vi.fn();
 
 vi.mock('../../../../services/evaluationService', () => ({
     getActiveStudentsByCourse: vi.fn(),
+    getTeacherEnrollmentGrades: vi.fn(),
     submitStudentGrade: vi.fn()
 }));
 
@@ -66,6 +68,11 @@ describe('useGradingCenter', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(getActiveStudentsByCourse).mockResolvedValue(mockStudents);
+        vi.mocked(getTeacherEnrollmentGrades).mockResolvedValue([
+            { gradeId: 1, title: 'Trabajo 1', score: '7.0' },
+            { gradeId: 2, title: 'Trabajo 2', score: '9.0' },
+            { gradeId: 3, title: 'Examen Final', score: '8.0' }
+        ]);
         vi.mocked(getDocumentsByEnrollment).mockResolvedValue(mockDocuments);
         vi.mocked(getReceivedDocumentsByCourse).mockResolvedValue(mockDocuments);
         vi.mocked(uploadProfessorDocument).mockResolvedValue({
@@ -114,7 +121,9 @@ describe('useGradingCenter', () => {
 
         expect(result.current.selectedStudent?.userId).toBe(11);
         expect(getDocumentsByEnrollment).toHaveBeenCalledWith(301);
+        expect(getTeacherEnrollmentGrades).toHaveBeenCalledWith(301);
         expect(result.current.studentDocuments).toEqual(mockDocuments);
+        expect(result.current.studentGrades).toHaveLength(3);
         expect(result.current.documentsLoadedFromCourseFallback).toBe(false);
     });
 
@@ -362,6 +371,70 @@ describe('useGradingCenter', () => {
         });
 
         expect(result.current.errorMessage).toBe('Por favor, introduce una calificación válida.');
+    });
+
+    it('calcula la nota final ponderada, redondea a un decimal y la traslada al formulario', async () => {
+        const { result } = renderHook(() => useGradingCenter(10));
+        await waitFor(() => expect(result.current.loadingData).toBe(false));
+
+        await act(async () => {
+            await result.current.handleSelectStudentById(11);
+        });
+
+        act(() => {
+            result.current.setFinalExamWeight('60');
+            result.current.handleCalculateFinalGrade();
+        });
+
+        expect(result.current.evaluationTitle).toBe('Nota Final Asignatura');
+        expect(result.current.score).toBe('8.0');
+        expect(result.current.feedback).toBe('Media trabajos 8.0 + examen 8.0 con ponderación 60%');
+        expect(result.current.calculatorMessage).toBe('Nota final calculada y trasladada al panel de Calificaciones.');
+        expect(result.current.calculatorMessageType).toBe('success');
+    });
+
+    it('usa directamente la nota del examen cuando no hay trabajos registrados', async () => {
+        vi.mocked(getTeacherEnrollmentGrades).mockResolvedValueOnce([
+            { gradeId: 3, title: 'Examen Final', score: '8.0' }
+        ]);
+
+        const { result } = renderHook(() => useGradingCenter(10));
+        await waitFor(() => expect(result.current.loadingData).toBe(false));
+
+        await act(async () => {
+            await result.current.handleSelectStudentById(11);
+        });
+
+        act(() => {
+            result.current.handleCalculateFinalGrade();
+        });
+
+        expect(result.current.evaluationTitle).toBe('Nota Final Asignatura');
+        expect(result.current.score).toBe('8.0');
+        expect(result.current.calculatorMessage).toBe('No hay trabajos registrados. Se usará directamente la nota del examen.');
+        expect(result.current.calculatorMessageType).toBe('info');
+    });
+
+    it('bloquea el cálculo si falta la nota de examen final', async () => {
+        vi.mocked(getTeacherEnrollmentGrades).mockResolvedValueOnce([
+            { gradeId: 1, title: 'Trabajo 1', score: '7.0' },
+            { gradeId: 2, title: 'Trabajo 2', score: '9.0' }
+        ]);
+
+        const { result } = renderHook(() => useGradingCenter(10));
+        await waitFor(() => expect(result.current.loadingData).toBe(false));
+
+        await act(async () => {
+            await result.current.handleSelectStudentById(11);
+        });
+
+        act(() => {
+            result.current.handleCalculateFinalGrade();
+        });
+
+        expect(result.current.calculatorMessage).toBe('No se puede calcular la nota final porque falta la nota de Examen Final.');
+        expect(result.current.calculatorMessageType).toBe('error');
+        expect(result.current.evaluationTitle).not.toBe('Nota Final Asignatura');
     });
 
     it('muestra el mensaje de backend cuando submitStudentGrade devuelve error de Axios', async () => {
