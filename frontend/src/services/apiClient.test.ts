@@ -207,8 +207,10 @@ describe('apiClient - Suite de Pruebas Unitarias de Interceptores de Red', () =>
             token: 'token_antiguo'
         });
 
-        let resolveRefresh: ((value: { data: { accessToken: string; refreshToken: string; expiresIn: number } }) => void)
-            | null = null;
+        let resolveRefresh!: (
+            value: { data: { accessToken: string; refreshToken: string; expiresIn: number } }
+                | PromiseLike<{ data: { accessToken: string; refreshToken: string; expiresIn: number } }>
+        ) => void;
         const pendingRefreshPromise = new Promise<{ data: { accessToken: string; refreshToken: string; expiresIn: number } }>((resolve) => {
             resolveRefresh = resolve;
         });
@@ -239,7 +241,7 @@ describe('apiClient - Suite de Pruebas Unitarias de Interceptores de Red', () =>
         const promiseA = responseInterceptor.rejected(errorA);
         const promiseB = responseInterceptor.rejected(errorB);
 
-        resolveRefresh?.({
+        resolveRefresh({
             data: {
                 accessToken: 'access_concurrente_nuevo',
                 refreshToken: 'refresh_concurrente_nuevo',
