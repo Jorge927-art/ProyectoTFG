@@ -109,6 +109,17 @@ const ProfessorDashboard = () => {
             try {
                 const assignedCourses = await getProfessorAssignedCourses();
 
+                const baseCourses = assignedCourses.map((course) => ({
+                    id: course.course_id,
+                    title: course.title,
+                    category: normalizeCategory(course),
+                    studentsCount: 0,
+                    averageProgress: 0
+                } as TaughtCourse));
+
+                if (cancelled) return;
+                setMyCourses(baseCourses);
+
                 const coursesWithCounts = await Promise.all(
                     assignedCourses.map(async (course) => {
                         let studentsCount = 0;

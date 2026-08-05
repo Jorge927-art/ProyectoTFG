@@ -3,7 +3,7 @@ import { Upload, FileText, Download, Loader2, AlertCircle, FileUp, Inbox, Send, 
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import { useDocuments } from './useDocuments';
-import { useNotifications } from '../../../../components/ui/globalNotificationBell/useNotifications';
+import { emitNotificationsRefresh } from '../../../../components/ui/globalNotificationBell/useNotifications';
 import { markDocumentAsRead } from '../../../../services/documentService'; // <-- RECOMENDACIÓN NOTEBOOKLM: Importación del Servicio
 
 /**
@@ -35,11 +35,10 @@ export const DocumentManager = ({
         handleSecureDownload
     } = useDocuments();
 
-    //refresca las notificaciones de la campana para reflejar cambios en documentos leídos
-    const { refreshNotifications } = useNotifications();
     //estado local para controlar la descarga en curso y evitar descargas simultáneas
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [highlightedDocumentId, setHighlightedDocumentId] = useState<number | null>(null);
     const highlightTimeoutRef = useRef<number | null>(null);
     const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -93,7 +92,7 @@ export const DocumentManager = ({
      * @param e Evento de cambio del input de archivo
      * @returns Promise<void>
      */
-    const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
 
@@ -109,15 +108,31 @@ export const DocumentManager = ({
                 return;
             }
 
-            try {
-                const success = await handleUpload(file);
-                if (success && fileInputRef.current) {
-                    fileInputRef.current.value = ''; // Limpia el input tras la subida exitosa
-                }
-            } catch (error) {
-                console.error('Error al transmitir el documento:', error);
-                setDocumentError('No se pudo subir el documento. Inténtalo de nuevo.');
+            setSelectedFile(file);
+            setDocumentError('');
+        }
+    };
+
+    const handleManualUpload = async () => {
+        if (!selectedFile) {
+            setDocumentError('Selecciona un archivo antes de enviar.');
+            return;
+        }
+
+        if (!selectedReceiverId) {
+            setDocumentError('Por favor, selecciona un destinatario válido del directorio antes de subir el archivo.');
+            return;
+        }
+
+        try {
+            const success = await handleUpload(selectedFile);
+            if (success && fileInputRef.current) {
+                fileInputRef.current.value = '';
+                setSelectedFile(null);
             }
+        } catch (error) {
+            console.error('Error al transmitir el documento:', error);
+            setDocumentError('No se pudo subir el documento. Inténtalo de nuevo.');
         }
     };
 
@@ -141,7 +156,7 @@ export const DocumentManager = ({
                 await markDocumentAsRead(documentId);
 
                 // 3. Forzar al canal de alarmas a re-evaluar el estado rojo/gris de la campana
-                refreshNotifications();
+                emitNotificationsRefresh();
             }
         } catch (error) {
             console.error("Error en la descarga segura o actualización:", error);
@@ -150,6 +165,18 @@ export const DocumentManager = ({
             setDownloadingId(null);
         }
     };
+
+    const handleTabChange = (tab: 'RECEIVED' | 'SENT') => {
+        setActiveTab(tab);
+
+        if (tab === 'RECEIVED') {
+            setSelectedFile(null);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
     return (
         /* ALINEACIÓN GEOMÉTRICA CONSOLIDADA: Mantiene simetría exacta con tus otras tarjetas en h-109 */
         <GenericCard className="flex flex-col h-109">
@@ -168,10 +195,10 @@ export const DocumentManager = ({
             <div className="flex bg-slate-100 p-1 rounded-xl mb-3 shrink-0">
                 <GenericButton
                     type="button"
-                    onClick={() => setActiveTab('RECEIVED')}
+                    onClick={() => handleTabChange('RECEIVED')}
                     variant="white"
                     icon={<Inbox size={14} />}
-                    label="Recibido"
+                    label="Recibidos"
                     className={`flex-1 justify-center gap-2 py-1.5! text-xs! font-bold! rounded-lg! transition-all! cursor-pointer ${activeTab === 'RECEIVED'
                         ? 'bg-white text-blue-600 shadow-sm'
                         : 'text-slate-500 hover:text-slate-800'
@@ -179,10 +206,10 @@ export const DocumentManager = ({
                 />
                 <GenericButton
                     type="button"
-                    onClick={() => setActiveTab('SENT')}
+                    onClick={() => handleTabChange('SENT')}
                     variant="white"
                     icon={<Send size={14} />}
-                    label="Enviar"
+                    label="Enviados"
                     className={`flex-1 justify-center gap-2 py-1.5! text-xs! font-bold! rounded-lg! transition-all! cursor-pointer ${activeTab === 'SENT'
                         ? 'bg-white text-blue-600 shadow-sm'
                         : 'text-slate-500 hover:text-slate-800'
@@ -201,72 +228,91 @@ export const DocumentManager = ({
             {/* CONTENEDOR FLEX PRINCIPAL */}
             <div className="flex-1 flex flex-col space-y-3 min-h-0">
 
-                {/* SELECTOR DE DESTINATARIO Y ZONA DE SUBIDA MULTIPART */}
-                <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-3 space-y-2.5 shrink-0">
-                    <div className="flex items-center gap-2">
-                        <UserCheck size={14} className="text-slate-400 shrink-0" />
-                        <select
-                            value={selectedReceiverId}
-                            aria-label="Seleccionar destinatario"
-                            onChange={(e) => {
-                                setSelectedReceiverId(e.target.value ? Number(e.target.value) : '');
-                                setDocumentError('');
-                            }}
-                            disabled={isUploading || loadingDirectory}
-                            className="w-full text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-blue-400 transition-colors disabled:opacity-60"
-                        >
-                            <option value="">-- Seleccionar Destinatario --</option>
-                            {loadingDirectory ? (
-                                <option disabled>Cargando directorio legítimo...</option>
-                            ) : (
-                                directory?.map((user) => (
-                                    <option key={user.userId} value={user.userId}>
-                                        {user.username} ({user.role})
-                                    </option>
-                                ))
-                            )}
-                        </select>
-                    </div>
+                {activeTab === 'SENT' && (
+                    <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-3 space-y-2.5 shrink-0">
+                        <div className="flex items-center gap-2">
+                            <UserCheck size={14} className="text-slate-400 shrink-0" />
+                            <select
+                                value={selectedReceiverId}
+                                aria-label="Seleccionar destinatario"
+                                onChange={(e) => {
+                                    setSelectedReceiverId(e.target.value ? Number(e.target.value) : '');
+                                    setDocumentError('');
+                                }}
+                                disabled={isUploading || loadingDirectory}
+                                className="w-full text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-blue-400 transition-colors disabled:opacity-60"
+                            >
+                                <option value="">-- Seleccionar Destinatario --</option>
+                                {loadingDirectory ? (
+                                    <option disabled>Cargando directorio legítimo...</option>
+                                ) : (
+                                    directory?.map((user) => (
+                                        <option key={user.userId} value={user.userId}>
+                                            {user.username} ({user.role})
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
 
-                    <div className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-lg p-2.5 text-center transition-all bg-white group">
-                        <input
-                            type="file"
-                            id="doc-upload-input"
-                            ref={fileInputRef}
-                            hidden
-                            onChange={onFileChange}
-                            accept=".pdf,.docx,.txt"
-                            disabled={isUploading || !selectedReceiverId}
+                        <div className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-lg p-2.5 text-center transition-all bg-white group">
+                            <input
+                                type="file"
+                                id="doc-upload-input"
+                                ref={fileInputRef}
+                                hidden
+                                onChange={onFileChange}
+                                accept=".pdf,.docx,.txt"
+                                disabled={isUploading || !selectedReceiverId}
+                            />
+                            <label
+                                htmlFor="doc-upload-input"
+                                className={`flex flex-col items-center gap-1.5 ${isUploading || !selectedReceiverId
+                                    ? 'cursor-not-allowed opacity-50'
+                                    : 'cursor-pointer'
+                                    }`}
+                            >
+                                {isUploading ? (
+                                    <Loader2 className="text-blue-500 animate-spin" size={20} />
+                                ) : (
+                                    <Upload
+                                        className={`transition-colors ${selectedReceiverId
+                                            ? 'text-slate-400 group-hover:text-blue-500'
+                                            : 'text-slate-300'
+                                            }`}
+                                        size={20}
+                                    />
+                                )}
+                                <span className="text-[11px] font-bold text-slate-600">
+                                    {isUploading
+                                        ? "Transmitiendo payload seguro..."
+                                        : !selectedReceiverId
+                                            ? "Elige un destinatario arriba para desbloquear"
+                                            : selectedFile
+                                                ? `Archivo listo: ${selectedFile.name}`
+                                                : "Seleccionar archivo (.pdf, .docx, .txt)"
+                                    }
+                                </span>
+                            </label>
+                        </div>
+
+                        <GenericButton
+                            type="button"
+                            onClick={() => void handleManualUpload()}
+                            disabled={isUploading || !selectedReceiverId || !selectedFile}
+                            variant="primary"
+                            icon={isUploading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                            label={isUploading ? 'Enviando...' : 'Enviar documento'}
+                            className="w-full justify-center gap-2 py-2! text-xs! font-bold! rounded-lg!"
                         />
-                        <label
-                            htmlFor="doc-upload-input"
-                            className={`flex flex-col items-center gap-1.5 ${isUploading || !selectedReceiverId
-                                ? 'cursor-not-allowed opacity-50'
-                                : 'cursor-pointer'
-                                }`}
-                        >
-                            {isUploading ? (
-                                <Loader2 className="text-blue-500 animate-spin" size={20} />
-                            ) : (
-                                <Upload
-                                    className={`transition-colors ${selectedReceiverId
-                                        ? 'text-slate-400 group-hover:text-blue-500'
-                                        : 'text-slate-300'
-                                        }`}
-                                    size={20}
-                                />
-                            )}
-                            <span className="text-[11px] font-bold text-slate-600">
-                                {isUploading
-                                    ? "Transmitiendo payload seguro..."
-                                    : !selectedReceiverId
-                                        ? "Elige un destinatario arriba para desbloquear"
-                                        : "Seleccionar archivo (.pdf, .docx, .txt)"
-                                }
-                            </span>
-                        </label>
                     </div>
-                </div>
+                )}
+
+                {activeTab === 'RECEIVED' && (
+                    <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-2.5 text-[11px] font-semibold text-blue-700 shrink-0">
+                        Mostrando documentos recibidos en tu bandeja.
+                    </div>
+                )}
                 {/* ZONA DE LISTADO CON SCROLL GEOMÉTRICO CONTROLADO [ADR-19] */}
                 <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2 min-h-30">
                     {loadingDocuments ? (
@@ -285,45 +331,66 @@ export const DocumentManager = ({
                         </div>
                     ) : (
                         documentList.map((doc) => (
-                            <div
-                                key={doc.documentid}
-                                ref={(node) => {
-                                    rowRefs.current[doc.documentid] = node;
-                                }}
-                                data-testid={`document-row-${doc.documentid}`}
-                                className={`flex justify-between items-center p-2.5 bg-white border hover:border-slate-200 rounded-lg shadow-sm transition-all ${highlightedDocumentId === doc.documentid
-                                    ? 'border-amber-300 bg-amber-50/60'
-                                    : 'border-slate-100'
-                                    }`}
-                            >
-                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                    {/* DETALLE VISUAL EXTRA: Opacidad atenuada si el archivo ya fue leído */}
-                                    <FileText size={16} className={`shrink-0 ${doc.isRead ? 'text-slate-300' : 'text-slate-500'}`} />
-                                    <div className="min-w-0 flex-1">
-                                        <p className={`text-xs font-bold truncate ${doc.isRead ? 'text-slate-400 font-medium' : 'text-slate-700'}`}>
-                                            {doc.originalname}
-                                        </p>
-                                        <p className="text-[10px] text-slate-400 font-medium truncate">
-                                            {activeTab === 'RECEIVED' ? `De: ${doc.sender.username}` : `Para: ${doc.receiver.username}`}
-                                        </p>
-                                    </div>
-                                </div>
+                            (() => {
+                                const sentView = activeTab === 'SENT';
+                                const fileIconClass = sentView
+                                    ? 'text-slate-400'
+                                    : doc.isRead
+                                        ? 'text-slate-300'
+                                        : 'text-slate-500';
+                                const downloadIconClass = sentView
+                                    ? 'text-slate-400'
+                                    : doc.isRead
+                                        ? 'text-slate-400'
+                                        : 'text-blue-600';
+                                const titleClass = sentView
+                                    ? 'text-slate-500 font-medium'
+                                    : doc.isRead
+                                        ? 'text-slate-400 font-medium'
+                                        : 'text-slate-700';
 
-                                <GenericButton
-                                    type="button"
-                                    ariaLabel={`Descargar documento ${doc.documentid}`}
-                                    testId={`download-document-${doc.documentid}`}
-                                    onClick={() => handleDownload(doc.documentid, doc.originalname)}
-                                    disabled={downloadingId !== null}
-                                    variant="white"
-                                    icon={downloadingId === doc.documentid ? (
-                                        <Loader2 size={14} className="animate-spin text-blue-600" />
-                                    ) : (
-                                        <Download size={14} className={doc.isRead ? 'text-slate-400' : 'text-blue-600'} />
-                                    )}
-                                    className="p-1.5! bg-slate-50 hover:bg-slate-100! border border-slate-200 rounded-lg! transition-colors cursor-pointer"
-                                />
-                            </div>
+                                return (
+                                    <div
+                                        key={doc.documentid}
+                                        ref={(node) => {
+                                            rowRefs.current[doc.documentid] = node;
+                                        }}
+                                        data-testid={`document-row-${doc.documentid}`}
+                                        className={`flex justify-between items-center p-2.5 bg-white border hover:border-slate-200 rounded-lg shadow-sm transition-all ${highlightedDocumentId === doc.documentid
+                                            ? 'border-amber-300 bg-amber-50/60'
+                                            : 'border-slate-100'
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                            {/* DETALLE VISUAL EXTRA: Opacidad atenuada si el archivo ya fue leído */}
+                                            <FileText size={16} className={`shrink-0 ${fileIconClass}`} />
+                                            <div className="min-w-0 flex-1">
+                                                <p className={`text-xs font-bold truncate ${titleClass}`}>
+                                                    {doc.originalname}
+                                                </p>
+                                                <p className="text-[10px] text-slate-400 font-medium truncate">
+                                                    {activeTab === 'RECEIVED' ? `De: ${doc.sender.username}` : `Para: ${doc.receiver.username}`}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <GenericButton
+                                            type="button"
+                                            ariaLabel={`Descargar documento ${doc.documentid}`}
+                                            testId={`download-document-${doc.documentid}`}
+                                            onClick={() => handleDownload(doc.documentid, doc.originalname)}
+                                            disabled={downloadingId !== null}
+                                            variant="white"
+                                            icon={downloadingId === doc.documentid ? (
+                                                <Loader2 size={14} className="animate-spin text-blue-600" />
+                                            ) : (
+                                                <Download size={14} className={downloadIconClass} />
+                                            )}
+                                            className="p-1.5! bg-slate-50 hover:bg-slate-100! border border-slate-200 rounded-lg! transition-colors cursor-pointer"
+                                        />
+                                    </div>
+                                );
+                            })()
                         ))
                     )}
                 </div>

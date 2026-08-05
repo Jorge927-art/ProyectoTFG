@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../auth/useAuth';
 import AdminLayout from '../../layouts/DashboardLayout';
 import { UserScrollList } from '../../../components/admin/UserScrollList';
@@ -14,6 +14,8 @@ const AdminDashboard = () => {
     const documentsPanelRef = useRef<HTMLDivElement | null>(null);
     const focusSearch = typeof window !== 'undefined' ? window.location.search : '';
     const shouldFocusDocuments = new URLSearchParams(focusSearch).get('focus') === 'documents';
+    const [hasDeferredReveal, setHasDeferredReveal] = useState<boolean>(false);
+    const deferHeavySections = shouldFocusDocuments && !hasDeferredReveal;
 
     useEffect(() => {
         if (!shouldFocusDocuments) {
@@ -21,6 +23,14 @@ const AdminDashboard = () => {
         }
 
         documentsPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        const timerId = window.setTimeout(() => {
+            setHasDeferredReveal(true);
+        }, 250);
+
+        return () => {
+            window.clearTimeout(timerId);
+        };
     }, [shouldFocusDocuments]);
 
     return (
@@ -39,30 +49,36 @@ const AdminDashboard = () => {
                 }
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch w-full">
-                <div className="h-full">
-                    <UserSearchPanel currentAdminUsername={user?.username ?? ''} />
+            {!deferHeavySections && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch w-full">
+                    <div className="h-full">
+                        <UserSearchPanel currentAdminUsername={user?.username ?? ''} />
+                    </div>
+                    <div className="h-full">
+                        <UserScrollList />
+                    </div>
                 </div>
-                <div className="h-full">
-                    <UserScrollList />
-                </div>
-            </div>
-
-            <div className="w-full mt-6">
-                <AdminCourseProfessorReassignmentPanel />
-            </div>
+            )}
 
             <div ref={documentsPanelRef} id="admin-documents-panel" className="w-full mt-6">
                 <AdminDocumentInbox autoFocusUnread={shouldFocusDocuments} />
             </div>
 
-            <div className="w-full mt-6">
-                <CourseInsightPanel />
-            </div>
+            {!deferHeavySections && (
+                <>
+                    <div className="w-full mt-6">
+                        <AdminCourseProfessorReassignmentPanel />
+                    </div>
 
-            <div className="w-full mt-6">
-                <GlobalStatisticsPanel />
-            </div>
+                    <div className="w-full mt-6">
+                        <CourseInsightPanel />
+                    </div>
+
+                    <div className="w-full mt-6">
+                        <GlobalStatisticsPanel />
+                    </div>
+                </>
+            )}
         </AdminLayout>
     );
 };

@@ -3,13 +3,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { DocumentManager } from './DocumentManager';
 import * as useDocumentsHook from './useDocuments';
 
-const mockRefreshNotifications = vi.fn();
+const mockEmitNotificationsRefresh = vi.fn();
 const mockMarkDocumentAsRead = vi.fn();
 
 vi.mock('../../../../components/ui/globalNotificationBell/useNotifications', () => ({
-    useNotifications: () => ({
-        refreshNotifications: mockRefreshNotifications,
-    }),
+    emitNotificationsRefresh: () => mockEmitNotificationsRefresh(),
 }));
 
 vi.mock('../../../../services/documentService', () => ({
@@ -62,7 +60,19 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
         render(<DocumentManager />);
 
         expect(screen.getByText('Gestión de Documentos Académicos')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Recibidos/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Enviados/i })).toBeInTheDocument();
         expect(screen.getByText('Tu bandeja de entrada está vacía.')).toBeInTheDocument();
+    });
+
+    it('debe activar el cambio de pestañas a Recibidos/Enviados', () => {
+        render(<DocumentManager />);
+
+        fireEvent.click(screen.getByRole('button', { name: /Enviados/i }));
+        expect(mockSetActiveTab).toHaveBeenCalledWith('SENT');
+
+        fireEvent.click(screen.getByRole('button', { name: /Recibidos/i }));
+        expect(mockSetActiveTab).toHaveBeenCalledWith('RECEIVED');
     });
 
     it('debe renderizar el estado vacío contextualizado en la bandeja de enviados al conmutar la pestaña', () => {
@@ -125,6 +135,52 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
         expect(screen.getByText('1')).toBeInTheDocument(); // Contador de cabecera
     });
 
+    it('debe mostrar todos los documentos enviados con el mismo gris claro sin depender de isRead', () => {
+        const mockDocuments = [
+            {
+                documentid: 11,
+                filename: 'sent-1.pdf',
+                originalname: 'sent-1.pdf',
+                upload_date: '2026-07-06T10:00:00.000Z',
+                sender: { userId: 1, username: 'luis_student', email: 'luis@tfg.com', role: 'STUDENT' },
+                receiver: { userId: 2, username: 'profesor_juan', email: 'juan@tfg.com', role: 'PROFESSOR' },
+                folder_type: 'SENT' as const,
+                isRead: false
+            },
+            {
+                documentid: 12,
+                filename: 'sent-2.pdf',
+                originalname: 'sent-2.pdf',
+                upload_date: '2026-07-06T10:00:00.000Z',
+                sender: { userId: 1, username: 'luis_student', email: 'luis@tfg.com', role: 'STUDENT' },
+                receiver: { userId: 3, username: 'alumno_pedro', email: 'pedro@tfg.com', role: 'STUDENT' },
+                folder_type: 'SENT' as const,
+                isRead: true
+            }
+        ];
+
+        useDocumentsSpy.mockReturnValue({
+            documentList: mockDocuments,
+            activeTab: 'SENT',
+            setActiveTab: mockSetActiveTab,
+            loadingDocuments: false,
+            isUploading: false,
+            documentError: '',
+            setDocumentError: mockSetDocumentError,
+            directory: [],
+            loadingDirectory: false,
+            selectedReceiverId: 2,
+            setSelectedReceiverId: mockSetSelectedReceiverId,
+            handleUpload: mockHandleUpload,
+            handleSecureDownload: mockHandleSecureDownload
+        });
+
+        render(<DocumentManager />);
+
+        expect(screen.getByText('sent-1.pdf').className).toContain('text-slate-500');
+        expect(screen.getByText('sent-2.pdf').className).toContain('text-slate-500');
+    });
+
     it('debe mostrar el indicador de carga asíncrona mientras sincroniza con el backend', () => {
         useDocumentsSpy.mockReturnValue({
             documentList: [],
@@ -148,6 +204,22 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
     });
 
     it('debe bloquear el flujo de subida y advertir visualmente si el alumno no ha elegido un destinatario', () => {
+        useDocumentsSpy.mockReturnValue({
+            documentList: [],
+            activeTab: 'SENT',
+            setActiveTab: mockSetActiveTab,
+            loadingDocuments: false,
+            isUploading: false,
+            documentError: '',
+            setDocumentError: mockSetDocumentError,
+            directory: [],
+            loadingDirectory: false,
+            selectedReceiverId: '',
+            setSelectedReceiverId: mockSetSelectedReceiverId,
+            handleUpload: mockHandleUpload,
+            handleSecureDownload: mockHandleSecureDownload
+        });
+
         render(<DocumentManager />);
 
         // El texto informativo debe invitar al usuario a desbloquear la subida seleccionando un destino
@@ -161,7 +233,7 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
         // Forzamos al hook a simular que el alumno SÍ ha seleccionado previamente un destinatario válido (ID 2)
         useDocumentsSpy.mockReturnValue({
             documentList: [],
-            activeTab: 'RECEIVED',
+            activeTab: 'SENT',
             setActiveTab: mockSetActiveTab,
             loadingDocuments: false,
             isUploading: false,
@@ -243,7 +315,38 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
 
         useDocumentsSpy.mockReturnValue({
             documentList: [],
-            activeTab: 'RECEIVED',
+            activeTab: 'SENT',
+            setActiveTab: mockSetActiveTab,
+            loadingDocuments: false,
+            isUploading: false,
+            documentError: '',
+            setDocumentError: mockSetDocumentError,
+            directory: [{ userId: 2, username: 'profesor_juan', role: 'PROFESSOR', email: 'j@tfg.com' }],
+            loadingDirectory: false,
+            selectedReceiverId: 2,
+            setSelectedReceiverId: mockSetSelectedReceiverId,
+            handleUpload: mockHandleUpload,
+            handleSecureDownload: mockHandleSecureDownload
+        });
+
+        render(<DocumentManager />);
+
+        const fileInput = document.getElementById('doc-upload-input') as HTMLInputElement;
+        const validFile = new File(['contenido'], 'Entrega.txt', { type: 'text/plain' });
+
+        fireEvent.change(fileInput, { target: { files: [validFile] } });
+        fireEvent.click(screen.getByRole('button', { name: /Enviar documento/i }));
+
+        await waitFor(() => {
+            expect(mockHandleUpload).toHaveBeenCalledTimes(1);
+            expect(mockSetDocumentError).toHaveBeenCalledWith('No se pudo subir el documento. Inténtalo de nuevo.');
+        });
+    });
+
+    it('no debe subir automáticamente al seleccionar archivo; debe esperar al botón Enviar documento', async () => {
+        useDocumentsSpy.mockReturnValue({
+            documentList: [],
+            activeTab: 'SENT',
             setActiveTab: mockSetActiveTab,
             loadingDocuments: false,
             isUploading: false,
@@ -264,9 +367,13 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
 
         fireEvent.change(fileInput, { target: { files: [validFile] } });
 
+        expect(mockHandleUpload).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: /Enviar documento/i }));
+
         await waitFor(() => {
             expect(mockHandleUpload).toHaveBeenCalledTimes(1);
-            expect(mockSetDocumentError).toHaveBeenCalledWith('No se pudo subir el documento. Inténtalo de nuevo.');
+            expect(mockHandleUpload).toHaveBeenCalledWith(validFile);
         });
     });
 
@@ -312,7 +419,7 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
         });
 
         expect(mockMarkDocumentAsRead).not.toHaveBeenCalled();
-        expect(mockRefreshNotifications).not.toHaveBeenCalled();
+        expect(mockEmitNotificationsRefresh).not.toHaveBeenCalled();
     });
 });
 

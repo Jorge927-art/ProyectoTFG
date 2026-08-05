@@ -65,7 +65,11 @@ const normalizeNotificationPayload = (payload: NotificationApiPayload | null | u
 /**
  * Constante que define el nombre del evento personalizado para refrescar las notificaciones globales.
  */
-const NOTIFICATIONS_REFRESH_EVENT = 'global-notifications:refresh';
+export const NOTIFICATIONS_REFRESH_EVENT = 'global-notifications:refresh';
+
+export const emitNotificationsRefresh = (): void => {
+    window.dispatchEvent(new Event(NOTIFICATIONS_REFRESH_EVENT));
+};
 
 /**
  *  Hook personalizado para gestionar las notificaciones globales del usuario.
@@ -181,16 +185,18 @@ export const useNotifications = () => {
     }, [fetchAlerts]);
 
     const broadcastRefresh = useCallback(() => {
-        window.dispatchEvent(new Event(NOTIFICATIONS_REFRESH_EVENT));
+        emitNotificationsRefresh();
     }, []);
 
-   const dismissNotifications = useCallback(async () => {
+   const dismissNotifications = useCallback(async (options?: { suppressRefreshBroadcast?: boolean }) => {
         try {
             await apiClient.patch('/api/auth/notifications/dismiss');
         } catch (err) {
             console.error('Error al marcar notificaciones como vistas:', err);
         } finally {
-            broadcastRefresh();
+            if (!options?.suppressRefreshBroadcast) {
+                broadcastRefresh();
+            }
         }
     }, [broadcastRefresh]);
     

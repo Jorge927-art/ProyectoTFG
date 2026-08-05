@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 // SE ACTUALIZAN LOS ICONOS: Añadimos FileText, Download y Loader2 para el listado de documentos recibidos
-import { BookOpen, Upload, CheckCircle, Inbox, FileText, Download, Loader2 } from 'lucide-react';
+import { BookOpen, Upload, CheckCircle, Inbox, FileText, Download, Loader2, Send } from 'lucide-react';
 import type { EnrollmentInfo } from '../../../../services/courseTypes';
 // SE IMPORTAN LOS MÉTODOS REALES DE TU DOCUMENTSERVICE.TS Y EL API CLIENT
 import {
@@ -90,7 +90,7 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
         }
     };
 
-    // CONEXIÓN REAL: Transmite el archivo de forma automática utilizando apiClient
+    // CONEXIÓN REAL: Transmite el archivo seleccionado únicamente al pulsar enviar.
     const handleUploadSubmit = async (fileToSend: File) => {
         if (!fileToSend) {
             setPanelError("Por favor, selecciona un archivo válido.");
@@ -114,9 +114,13 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
             // Llamamos al nuevo endpoint especializado y seguro
             await apiClient.post('/api/v1/documents/upload/assignment', formData);
 
+            setSelectedFile(null);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
             setPanelError('');
         } catch (err: unknown) {
-            console.error("Fallo en la subida automática:", err);
+            console.error("Fallo en la subida del documento:", err);
 
             // CORRECCIÓN UX: Si el servidor rechaza el archivo, lo eliminamos de la memoria local
             setSelectedFile(null);
@@ -140,17 +144,23 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
     };
 
 
-    // Almacena temporalmente el archivo seleccionado por el estudiante y lo envía
+    // Almacena temporalmente el archivo seleccionado por el estudiante.
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const files = event.target.files;
         if (files && files.length > 0) {
             const file = files[0];
             setSelectedFile(file);
             setPanelError('');
-
-            // Dispara la subida inmediata y automática
-            handleUploadSubmit(file);
         }
+    };
+
+    const handleManualSend = async () => {
+        if (!selectedFile) {
+            setPanelError('Selecciona un archivo antes de enviarlo.');
+            return;
+        }
+
+        await handleUploadSubmit(selectedFile);
     };
     // DESCARGA SEGURA ANTI-IDOR REUTILIZADA DE TU DOCUMENTSERVICE.TS
     const handleDownloadSubmit = async (documentId: number, originalName: string) => {
@@ -215,17 +225,29 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                         </div>
                     )}
 
-                    {/* BOTONERA DE PESTAÑAS (TABS) INTERACTIVAS CONMUTABLE */}
-                    <div className="flex flex-col bg-slate-100 p-1 rounded-xl shrink-0 max-w-xs space-y-1">
+                    {/* BOTONERA DE PESTAÑAS (TABS) INTERACTIVAS */}
+                    <div className="flex bg-slate-100 p-1 rounded-xl shrink-0 max-w-xs gap-1">
                         <GenericButton
                             type="button"
-                            // Si el estado es 'SENT', cambia a 'RECEIVED'. Si es 'RECEIVED', regresa a 'SENT'
-                            onClick={() => setActiveTab(activeTab === 'SENT' ? 'RECEIVED' : 'SENT')}
+                            onClick={() => setActiveTab('RECEIVED')}
                             variant="white"
                             icon={<Inbox size={14} />}
-                            // El texto cambia de forma dinámica según la vista en la que se encuentre el alumno
-                            label={activeTab === 'SENT' ? "Ver Trabajo / Examen Recibido" : "Volver a Enviar Trabajo / Examen"}
-                            className="w-full justify-start gap-2 py-1.5 px-3 text-xs! font-bold! rounded-lg! transition-all! cursor-pointer bg-white text-blue-600 shadow-sm"
+                            label="Recibidos"
+                            className={`flex-1 justify-center gap-2 py-1.5 px-3 text-xs! font-bold! rounded-lg! transition-all! cursor-pointer ${activeTab === 'RECEIVED'
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-800'
+                                }`}
+                        />
+                        <GenericButton
+                            type="button"
+                            onClick={() => setActiveTab('SENT')}
+                            variant="white"
+                            icon={<Send size={14} />}
+                            label="Enviados"
+                            className={`flex-1 justify-center gap-2 py-1.5 px-3 text-xs! font-bold! rounded-lg! transition-all! cursor-pointer ${activeTab === 'SENT'
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-800'
+                                }`}
                         />
                     </div>
                     {/* REJILLA DE CONTENIDOS DE DOS COLUMNAS */}
@@ -289,6 +311,16 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                                             </>
                                         )}
                                     </div>
+
+                                    <GenericButton
+                                        type="button"
+                                        onClick={() => void handleManualSend()}
+                                        disabled={isUploading || !selectedFile}
+                                        variant="primary"
+                                        icon={isUploading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                                        label={isUploading ? 'Enviando...' : 'Enviar trabajo / examen'}
+                                        className="w-full justify-center gap-2 py-2.5! text-xs! font-bold! rounded-xl!"
+                                    />
                                 </div>
                             ) : (
 

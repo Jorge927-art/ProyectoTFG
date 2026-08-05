@@ -84,7 +84,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
     it('debe mostrar los bloques de entrega/calificaciones y permitir cambiar de asignatura', async () => {
         render(<CourseAssignmentPanel activeCourseId={101} enrolledList={mockEnrolledList} />);
 
-        expect(screen.getByText(/Enviar Trabajo \/ Examen/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Enviar trabajo \/ examen/i })).toBeInTheDocument();
         expect(screen.getByText(/CALIFICACIONES/i)).toBeInTheDocument();
         expect(screen.getByText(/Nota de Trabajos:/i)).toBeInTheDocument();
         expect(screen.getByText(/Examen Final:/i)).toBeInTheDocument();
@@ -105,7 +105,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
 
         render(<CourseAssignmentPanel activeCourseId={101} enrolledList={mockEnrolledList} />);
 
-        fireEvent.click(screen.getByRole('button', { name: /Ver Trabajo \/ Examen Recibido/i }));
+        fireEvent.click(screen.getByRole('button', { name: /Recibidos/i }));
 
         expect(screen.getByText(/Recuperando expedientes del curso/i)).toBeInTheDocument();
         await waitFor(() => expect(getReceivedDocumentsByCourse).toHaveBeenCalledWith(101));
@@ -114,7 +114,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
         await waitFor(() => {
             expect(screen.getByText(/bandeja de recibidos está vacía/i)).toBeInTheDocument();
         });
-        expect(screen.getByRole('button', { name: /Volver a Enviar Trabajo \/ Examen/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Enviados/i })).toBeInTheDocument();
     });
 
     it('debe descargar documento recibido y marcarlo como leído', async () => {
@@ -133,7 +133,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
 
         render(<CourseAssignmentPanel activeCourseId={101} enrolledList={mockEnrolledList} />);
 
-        fireEvent.click(screen.getByRole('button', { name: /Ver Trabajo \/ Examen Recibido/i }));
+        fireEvent.click(screen.getByRole('button', { name: /Recibidos/i }));
 
         await waitFor(() => expect(screen.getByText('feedback.pdf')).toBeInTheDocument());
         expect(screen.getByText(/De: Profesor/i)).toBeInTheDocument();
@@ -162,7 +162,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
         vi.mocked(downloadDocumentSecure).mockRejectedValueOnce(new Error('denied'));
 
         render(<CourseAssignmentPanel activeCourseId={101} enrolledList={mockEnrolledList} />);
-        fireEvent.click(screen.getByRole('button', { name: /Ver Trabajo \/ Examen Recibido/i }));
+        fireEvent.click(screen.getByRole('button', { name: /Recibidos/i }));
 
         await waitFor(() => expect(screen.getByText('enunciado.pdf')).toBeInTheDocument());
         fireEvent.click(screen.getByRole('button', { name: /Descargar documento seguro/i }));
@@ -178,6 +178,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
 
         const file = new File(['payload'], 'trabajo.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
         fireEvent.change(input, { target: { files: [file] } });
+        fireEvent.click(screen.getByRole('button', { name: /Enviar trabajo \/ examen/i }));
 
         await waitFor(() => expect(apiClient.post).toHaveBeenCalledTimes(1));
 
@@ -201,6 +202,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
         const input = container.querySelector('input[type="file"]') as HTMLInputElement;
         const file = new File(['payload'], 'examen.pdf', { type: 'application/pdf' });
         fireEvent.change(input, { target: { files: [file] } });
+        fireEvent.click(screen.getByRole('button', { name: /Enviar trabajo \/ examen/i }));
 
         await act(async () => {
             await Promise.resolve();
@@ -218,5 +220,21 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
         });
 
         expect(screen.queryByText('Archivo no permitido por política')).not.toBeInTheDocument();
+    });
+
+    it('no debe enviar automáticamente al seleccionar archivo; solo al pulsar Enviar trabajo / examen', async () => {
+        const { container } = render(<CourseAssignmentPanel activeCourseId={101} enrolledList={mockEnrolledList} />);
+        const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+        const file = new File(['payload'], 'trabajo-auto.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        fireEvent.change(input, { target: { files: [file] } });
+
+        expect(apiClient.post).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: /Enviar trabajo \/ examen/i }));
+
+        await waitFor(() => {
+            expect(apiClient.post).toHaveBeenCalledTimes(1);
+        });
     });
 });

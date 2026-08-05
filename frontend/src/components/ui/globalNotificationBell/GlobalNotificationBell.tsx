@@ -17,8 +17,8 @@ export default function NotificationBell() {
             : '/';
 
         setIsOpen(false);
-        void dismissNotifications();
         navigate(target);
+        void dismissNotifications({ suppressRefreshBroadcast: true });
     };
 
     useEffect(() => {

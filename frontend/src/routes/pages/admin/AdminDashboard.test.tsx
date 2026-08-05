@@ -66,13 +66,13 @@ describe('AdminDashboard - Orquestación de paneles', () => {
         expect(screen.getByTestId('mock-user-search-panel')).toHaveTextContent('root_admin');
     });
 
-    it('renderiza el panel de reasignación antes que la bandeja de documentos', () => {
+    it('renderiza la bandeja de documentos antes que el panel de reasignación', () => {
         render(<AdminDashboard />);
 
         const reassignment = screen.getByTestId('mock-admin-course-reassignment-panel');
         const inbox = screen.getByTestId('mock-admin-document-inbox');
 
-        const position = reassignment.compareDocumentPosition(inbox);
+        const position = inbox.compareDocumentPosition(reassignment);
         expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 

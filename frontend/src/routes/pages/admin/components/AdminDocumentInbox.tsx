@@ -14,7 +14,7 @@ import {
     uploadAdminDocumentToCourse,
     uploadStudentDocument,
 } from '../../../../services/documentService';
-import { useNotifications } from '../../../../components/ui/globalNotificationBell/useNotifications';
+import { emitNotificationsRefresh } from '../../../../components/ui/globalNotificationBell/useNotifications';
 
 interface AdminDocumentInboxProps {
     autoFocusUnread?: boolean;
@@ -42,7 +42,6 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
     const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
     const recipientFileInputRef = useRef<HTMLInputElement | null>(null);
     const courseFileInputRef = useRef<HTMLInputElement | null>(null);
-    const { refreshNotifications } = useNotifications();
 
     const loadDocuments = async () => {
         setLoading(true);
@@ -131,7 +130,7 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                 setDocuments((prev) => prev.map((item) =>
                     item.documentid === doc.documentid ? { ...item, isRead: true } : item
                 ));
-                refreshNotifications();
+                emitNotificationsRefresh();
             }
         } catch {
             setError('No se pudo descargar o marcar el documento como leído.');

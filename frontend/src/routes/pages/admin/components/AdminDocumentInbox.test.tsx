@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AdminDocumentInbox } from './AdminDocumentInbox';
 import * as documentService from '../../../../services/documentService';
-import * as notificationsHook from '../../../../components/ui/globalNotificationBell/useNotifications';
 import type { DocumentMetadata } from '../../../../services/documentService';
+
+const mockEmitNotificationsRefresh = vi.fn();
 
 vi.mock('../../../../services/documentService', () => ({
     getAdminDocumentRecipients: vi.fn(),
@@ -17,7 +18,7 @@ vi.mock('../../../../services/documentService', () => ({
 }));
 
 vi.mock('../../../../components/ui/globalNotificationBell/useNotifications', () => ({
-    useNotifications: vi.fn(),
+    emitNotificationsRefresh: () => mockEmitNotificationsRefresh(),
 }));
 
 const docUnread: DocumentMetadata = {
@@ -33,7 +34,6 @@ const docUnread: DocumentMetadata = {
 };
 
 describe('AdminDocumentInbox', () => {
-    const refreshNotifications = vi.fn();
     const scrollIntoViewSpy = vi.fn();
 
     beforeEach(() => {
@@ -45,16 +45,6 @@ describe('AdminDocumentInbox', () => {
         vi.mocked(documentService.getAdminDocumentRecipients).mockResolvedValue([]);
         vi.mocked(documentService.getAdminDocumentCourses).mockResolvedValue([]);
         vi.mocked(documentService.getSentDocuments).mockResolvedValue([]);
-        vi.mocked(notificationsHook.useNotifications).mockReturnValue({
-            alerts: [],
-            documents: [],
-            hasAlerts: false,
-            hasUnread: false,
-            refreshAlerts: vi.fn(),
-            refreshNotifications,
-            dismissNotifications: vi.fn(),
-            loading: false,
-        });
     });
 
     it('muestra los documentos recibidos del admin', async () => {
@@ -151,7 +141,7 @@ describe('AdminDocumentInbox', () => {
         });
     });
 
-    it('descarga y marca como leído un documento no leído, refrescando notificaciones', async () => {
+    it('descarga y marca como leído un documento no leído, emitiendo refresco de notificaciones', async () => {
         vi.mocked(documentService.getUserDocuments).mockResolvedValue([docUnread]);
         vi.mocked(documentService.downloadDocumentSecure).mockResolvedValue();
         vi.mocked(documentService.markDocumentAsRead).mockResolvedValue({
@@ -171,7 +161,7 @@ describe('AdminDocumentInbox', () => {
         await waitFor(() => {
             expect(documentService.downloadDocumentSecure).toHaveBeenCalledWith(20, 'evaluacion.pdf');
             expect(documentService.markDocumentAsRead).toHaveBeenCalledWith(20);
-            expect(refreshNotifications).toHaveBeenCalledTimes(1);
+            expect(mockEmitNotificationsRefresh).toHaveBeenCalledTimes(1);
         });
     });
 
