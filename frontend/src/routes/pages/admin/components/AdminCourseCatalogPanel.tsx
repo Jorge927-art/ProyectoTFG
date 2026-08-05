@@ -70,6 +70,14 @@ const toDraft = (course: AdminCourseCatalogItem): EditableCourseDraft => ({
     duration: course.duration == null ? '' : String(course.duration),
 });
 
+const getCourseDisplayName = (course: Pick<AdminCourseCatalogItem, 'courseId' | 'title'>): string => {
+    const normalizedTitle = course.title?.trim();
+    if (normalizedTitle) {
+        return normalizedTitle;
+    }
+    return `Curso sin título`;
+};
+
 export const AdminCourseCatalogPanel = () => {
     const [courses, setCourses] = useState<AdminCourseCatalogItem[]>([]);
     const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
@@ -272,7 +280,7 @@ export const AdminCourseCatalogPanel = () => {
         }
 
         const confirmed = window.confirm(
-            `¿Deseas eliminar físicamente el curso seleccionado (ID ${selectedCourse.courseId})?`
+            `¿Deseas eliminar físicamente el curso "${getCourseDisplayName(selectedCourse)}"?`
         );
         if (!confirmed) {
             return;
@@ -406,16 +414,26 @@ export const AdminCourseCatalogPanel = () => {
                             {courses.length === 0 && <option value="">Sin cursos cargados</option>}
                             {courses.map((course) => (
                                 <option key={course.courseId} value={course.courseId}>
-                                    Curso ID {course.courseId}
+                                    {getCourseDisplayName(course)}
                                 </option>
                             ))}
                         </select>
                     </label>
 
                     {selectedCourse && (
-                        <div className="text-[11px] text-slate-600 bg-white border border-slate-200 rounded-lg px-2.5 py-2">
-                            Estado de borrado: {selectedCourse.used ? 'Curso activo' : 'Curso no usado'}
-                        </div>
+                        <>
+                            <div className="text-[11px] text-slate-600 bg-white border border-slate-200 rounded-lg px-2.5 py-2">
+                                <p>
+                                    Curso seleccionado: <span className="font-semibold text-slate-800">{getCourseDisplayName(selectedCourse)}</span>
+                                </p>
+                            </div>
+
+                            {isNumericBlocked && (
+                                <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2">
+                                    Este curso ya está en uso y no permite editar Rating, Number of viewers ni Duration.
+                                </div>
+                            )}
+                        </>
                     )}
 
                     <CourseTextField
@@ -517,12 +535,6 @@ export const AdminCourseCatalogPanel = () => {
                             readOnly
                         />
                     </label>
-
-                    {selectedCourse?.used && (
-                        <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2">
-                            Curso activo: Rating, Number of viewers y Duration están bloqueados.
-                        </p>
-                    )}
 
                     <div className="pt-1">
                         <GenericButton

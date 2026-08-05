@@ -96,15 +96,18 @@ describe('AdminCourseCatalogPanel', () => {
         vi.spyOn(catalogService, 'deleteAdminCourse').mockResolvedValue({ message: 'Curso eliminado correctamente.' });
     });
 
-    it('carga el catálogo y muestra el selector de curso por ID', async () => {
+    it('carga el catálogo y muestra el selector de curso por título', async () => {
         render(<AdminCourseCatalogPanel />);
 
         await waitFor(() => {
             expect(catalogService.getAdminCourseCatalog).toHaveBeenCalledTimes(1);
         });
 
-        expect(screen.getByRole('option', { name: 'Curso ID 10' })).toBeInTheDocument();
-        expect(screen.getByRole('option', { name: 'Curso ID 20' })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: 'Arquitectura' })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: 'Matematicas' })).toBeInTheDocument();
+        expect(screen.getByText('Curso seleccionado:')).toBeInTheDocument();
+        expect(screen.getAllByText('Arquitectura')).toHaveLength(2);
+        expect(screen.queryByText(/Estado de borrado:/i)).not.toBeInTheDocument();
     });
 
     it('alta positiva: crea curso al informar título obligatorio', async () => {
@@ -193,7 +196,7 @@ describe('AdminCourseCatalogPanel', () => {
         expect(ratingInput).toBeDisabled();
         expect(viewersInput).toBeDisabled();
         expect(durationInput).toBeDisabled();
-        expect(screen.getByText(/Curso activo: Rating, Number of viewers y Duration están bloqueados\./i)).toBeInTheDocument();
+        expect(screen.getByText(/Este curso ya está en uso y no permite editar Rating, Number of viewers ni Duration\./i)).toBeInTheDocument();
     });
 
     it('borrado negativo: muestra error de backend cuando curso activo no puede borrarse', async () => {
@@ -231,5 +234,6 @@ describe('AdminCourseCatalogPanel', () => {
 
         expect(screen.getByText('Curso eliminado correctamente.')).toBeInTheDocument();
         expect(window.confirm).toHaveBeenCalled();
+        expect(window.confirm).toHaveBeenCalledWith('¿Deseas eliminar físicamente el curso "Arquitectura"?');
     });
 });
