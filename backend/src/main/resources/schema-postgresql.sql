@@ -85,3 +85,38 @@ CREATE INDEX IF NOT EXISTS idx_auth_refresh_tokens_user_id
 
 CREATE INDEX IF NOT EXISTS idx_auth_refresh_tokens_expires_at
     ON auth_refresh_tokens (expires_at);
+
+-- -----------------------------------------------------------------------------
+-- Gestión administrativa de cursos (normalización de título + uso histórico)
+-- -----------------------------------------------------------------------------
+ALTER TABLE IF EXISTS courses
+    ADD COLUMN IF NOT EXISTS title_key VARCHAR(512);
+
+ALTER TABLE IF EXISTS courses
+    ADD COLUMN IF NOT EXISTS ever_used BOOLEAN;
+
+UPDATE courses
+SET title_key = LOWER(REGEXP_REPLACE(COALESCE(title, ''), '\\s+', '', 'g'))
+WHERE title_key IS NULL;
+
+UPDATE courses
+SET ever_used = false
+WHERE ever_used IS NULL;
+
+UPDATE courses c
+SET ever_used = true
+WHERE c.assigned_user_id IS NOT NULL
+   OR EXISTS (
+        SELECT 1
+        FROM enrollment e
+        WHERE e.course_id = c.course_id
+   );
+
+ALTER TABLE IF EXISTS courses
+    ALTER COLUMN ever_used SET DEFAULT false;
+
+ALTER TABLE IF EXISTS courses
+    ALTER COLUMN ever_used SET NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_courses_title_key
+    ON courses (title_key);

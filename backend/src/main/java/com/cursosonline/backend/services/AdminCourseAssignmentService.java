@@ -30,6 +30,7 @@ public class AdminCourseAssignmentService {
     private final UserRepository userRepository;
     private final CoursesRepository coursesRepository;
     private final UserSystemNotificationRepository userSystemNotificationRepository;
+    private final AdminCourseCatalogService adminCourseCatalogService;
 
     @Transactional(readOnly = true)
     public List<AdminProfessorOptionDTO> getEnabledProfessorsAlphabetical() {
@@ -97,6 +98,7 @@ public class AdminCourseAssignmentService {
         course.setAssignedUser(newProfessor);
         course.setInstructors(nextUsername);
         Courses savedCourse = coursesRepository.saveAndFlush(course);
+        adminCourseCatalogService.markCourseAsEverUsed(savedCourse.getCourse_id());
 
         if (currentProfessor != null) {
             userSystemNotificationRepository.save(buildOutNotification(currentProfessor, savedCourse));

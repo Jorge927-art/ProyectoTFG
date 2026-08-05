@@ -8,7 +8,7 @@
 - **Backend**: Java 21, Spring Boot **4.0.6**, Spring Security, Spring Data JPA, Bean Validation, PostgreSQL, Lombok, Maven.
 - **Frontend**: React 19 + TypeScript, Vite 7, React Router 7, Axios, Tailwind CSS 4 (`@tailwindcss/vite`), lucide-react (iconos), Vitest + Testing Library para tests.
 - **CI**: GitHub Actions (`.github/workflows/ci.yml`) — pipeline único para ambas capas.
-- **Documentación de arquitectura**: `adr.md` (36 ADRs numerados) y `tfg-documentacion-tecnica.md` (memoria técnica narrativa, algo desactualizada respecto al código: describe auth por sesión, pero el sistema ya usa JWT en producción).
+- **Documentación de arquitectura**: `adr.md` (61 ADRs numerados) y `tfg-documentacion-tecnica.md` (memoria técnica narrativa, algo desactualizada respecto al código: describe auth por sesión, pero el sistema ya usa JWT en producción).
 
 ## 2. Backend — arquitectura en capas
 
@@ -96,10 +96,10 @@ services/              → apiClient (Axios + interceptores), documentService, e
 
 ## 4. Decisiones de arquitectura relevantes (ADR) a tener en cuenta
 
-El proyecto documenta **36 ADRs** en `adr.md`. Los más relevantes para generar código nuevo consistente:
+El proyecto documenta **61 ADRs** en `adr.md`. Los más relevantes para generar código nuevo consistente:
 
 | ADR | Tema |
-|---|---|
+| --- | --- |
 | ADR-01/02 | React+Spring Boot desacoplados, monorepo |
 | ADR-04/05/06/07 | Migración completa de sesión → JWT stateless (estado **actual**: JWT ya consolidado, pese a que `tfg-documentacion-tecnica.md` describa aún el modelo de sesión antiguo) |
 | ADR-08/09/10/11 | Estado de auth en cliente, interceptores Axios, hidratación de sesión |
@@ -115,12 +115,14 @@ El proyecto documenta **36 ADRs** en `adr.md`. Los más relevantes para generar 
 | ADR-29/30/31 | Resolución de identidad por claims JWT, hidratación de matrículas, Join Fetch vs OSIV |
 | ADR-32/34 | Motor de recomendaciones por filtrado de contenido |
 | ADR-056 | Componentización del motor de búsqueda de cursos |
+| ADR-061 | Estrategia null-safety en streams Java para compatibilidad con análisis estático |
 
 > Cuando pidas una funcionalidad nueva relacionada con alguno de estos temas, dime el número de ADR o el nombre y puedo releerlo entero para no contradecir una decisión ya tomada.
 
 ## 5. Cómo usaré este contexto
 
 Para cada clase o pantalla nueva que pidas:
+
 1. Ubicaré el módulo/dominio equivalente más cercano ya existente (p.ej. si pides algo de "notas", miro `CourseGrade`/`TeacherGradeRequest`/`AcademicEvaluationController`).
 2. Leeré del snapshot original los ficheros concretos de ese dominio (entidad, DTO, repo, controller, servicio, o hook+componente en frontend) para clonar el estilo exacto (nombres, manejo de errores, estructura de respuesta).
 3. Seguiré las convenciones de esta tabla salvo que me indiques lo contrario explícitamente.

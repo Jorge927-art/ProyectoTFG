@@ -10,6 +10,12 @@ import java.util.List;
 
 public interface CoursesRepository extends JpaRepository<Courses, Long> {
 
+        java.util.Optional<Courses> findByTitleKey(String titleKey);
+
+        boolean existsByTitleKey(String titleKey);
+
+        List<Courses> findAllByOrderByTitleAsc();
+
         /**
          * Recupera todos los cursos cuyo profesor titular coincide con el usuario
          * indicado, ordenados alfabéticamente por título.

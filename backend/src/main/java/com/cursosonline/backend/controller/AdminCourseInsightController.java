@@ -2,8 +2,11 @@ package com.cursosonline.backend.controller;
 
 import com.cursosonline.backend.dto.AdminCourseDetailDTO;
 import com.cursosonline.backend.dto.AdminCourseCollectiveStatsDTO;
+import com.cursosonline.backend.dto.AdminCourseCatalogItemDTO;
+import com.cursosonline.backend.dto.AdminCourseCreateRequestDTO;
 import com.cursosonline.backend.dto.AdminCourseSearchResultDTO;
 import com.cursosonline.backend.dto.AdminCourseUserStatsDTO;
+import com.cursosonline.backend.services.AdminCourseCatalogService;
 import com.cursosonline.backend.services.AdminCourseInsightService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Controlador REST para gestionar las operaciones relacionadas con el "Panel
@@ -24,6 +28,29 @@ import java.util.List;
 public class AdminCourseInsightController {
 
     private final AdminCourseInsightService adminCourseInsightService;
+    private final AdminCourseCatalogService adminCourseCatalogService;
+
+    @GetMapping("/catalog")
+    public ResponseEntity<List<AdminCourseCatalogItemDTO>> getCourseCatalog() {
+        return ResponseEntity.ok(adminCourseCatalogService.getAdminCourseCatalog());
+    }
+
+    @PostMapping
+    public ResponseEntity<AdminCourseCatalogItemDTO> createCourse(@RequestBody AdminCourseCreateRequestDTO request) {
+        return ResponseEntity.ok(adminCourseCatalogService.createCourse(request));
+    }
+
+    @PatchMapping("/{courseId}")
+    public ResponseEntity<AdminCourseCatalogItemDTO> patchCourse(@PathVariable Long courseId,
+            @RequestBody Map<String, Object> changes) {
+        return ResponseEntity.ok(adminCourseCatalogService.patchCourse(courseId, changes));
+    }
+
+    @DeleteMapping("/{courseId}")
+    public ResponseEntity<Map<String, String>> deleteCourse(@PathVariable Long courseId) {
+        adminCourseCatalogService.deleteCourse(courseId);
+        return ResponseEntity.ok(Map.of("message", "Curso eliminado correctamente."));
+    }
 
     /**
      * Endpoint para buscar cursos en el panel de administración utilizando un

@@ -2,10 +2,14 @@ package com.cursosonline.backend.controller;
 
 import com.cursosonline.backend.dto.AdminCourseDetailDTO;
 import com.cursosonline.backend.dto.AdminCourseCollectiveStatsDTO;
+import com.cursosonline.backend.dto.AdminCourseCatalogItemDTO;
+import com.cursosonline.backend.dto.AdminCourseCreateRequestDTO;
 import com.cursosonline.backend.dto.AdminCourseSearchResultDTO;
 import com.cursosonline.backend.dto.AdminCourseUserStatsDTO;
 import com.cursosonline.backend.dto.AdminEnrolledUserDTO;
 import com.cursosonline.backend.exception.ResourceNotFoundException;
+import com.cursosonline.backend.exception.ServicesException;
+import com.cursosonline.backend.services.AdminCourseCatalogService;
 import com.cursosonline.backend.services.AdminCourseInsightService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,10 +23,16 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -32,6 +42,9 @@ class AdminCourseInsightControllerTest {
 
         @Mock
         private AdminCourseInsightService adminCourseInsightService;
+
+        @Mock
+        private AdminCourseCatalogService adminCourseCatalogService;
 
         @InjectMocks
         private AdminCourseInsightController adminCourseInsightController;
@@ -43,6 +56,158 @@ class AdminCourseInsightControllerTest {
                 mockMvc = MockMvcBuilders.standaloneSetup(adminCourseInsightController)
                                 .setControllerAdvice(new com.cursosonline.backend.exception.GlobalExceptionHandler())
                                 .build();
+        }
+
+        @Test
+        @DisplayName("GET /api/admin/courses/catalog debe devolver el catálogo administrativo")
+        void getCourseCatalog_DebeDevolverCatalogo() throws Exception {
+                when(adminCourseCatalogService.getAdminCourseCatalog())
+                                .thenReturn(List.of(new AdminCourseCatalogItemDTO(
+                                                99L,
+                                                "Arquitectura",
+                                                "https://x",
+                                                null,
+                                                "Ingenieria",
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                4.2f,
+                                                100,
+                                                20f,
+                                                "COLE",
+                                                true)));
+
+                mockMvc.perform(get("/api/admin/courses/catalog"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].courseId").value(99))
+                                .andExpect(jsonPath("$[0].title").value("Arquitectura"))
+                                .andExpect(jsonPath("$[0].site").value("COLE"))
+                                .andExpect(jsonPath("$[0].used").value(true));
+        }
+
+        @Test
+        @DisplayName("POST /api/admin/courses debe crear curso con payload válido")
+        void createCourse_DebeCrearCurso() throws Exception {
+                when(adminCourseCatalogService.createCourse(new AdminCourseCreateRequestDTO(
+                                "Arquitectura",
+                                "https://x",
+                                null,
+                                "Ingenieria",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                4.5f,
+                                320,
+                                18f)))
+                                .thenReturn(new AdminCourseCatalogItemDTO(
+                                                77L,
+                                                "Arquitectura",
+                                                "https://x",
+                                                null,
+                                                "Ingenieria",
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                4.5f,
+                                                320,
+                                                18f,
+                                                "COLE",
+                                                false));
+
+                mockMvc.perform(post("/api/admin/courses")
+                                .contentType(APPLICATION_JSON)
+                                .content("""
+                                                {
+                                                  "title": "Arquitectura",
+                                                  "url": "https://x",
+                                                  "category": "Ingenieria",
+                                                  "rating": 4.5,
+                                                  "numOfViewers": 320,
+                                                  "duration": 18
+                                                }
+                                                """))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.courseId").value(77))
+                                .andExpect(jsonPath("$.site").value("COLE"));
+        }
+
+        @Test
+        @DisplayName("PATCH /api/admin/courses/{id} debe aplicar actualización parcial")
+        void patchCourse_DebeActualizarParcial() throws Exception {
+                when(adminCourseCatalogService.patchCourse(77L, Map.of("category", "Data")))
+                                .thenReturn(new AdminCourseCatalogItemDTO(
+                                                77L,
+                                                "Arquitectura",
+                                                null,
+                                                null,
+                                                "Data",
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                "COLE",
+                                                false));
+
+                mockMvc.perform(patch("/api/admin/courses/77")
+                                .contentType(APPLICATION_JSON)
+                                .content("""
+                                                { "category": "Data" }
+                                                """))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.courseId").value(77))
+                                .andExpect(jsonPath("$.category").value("Data"));
+        }
+
+        @Test
+        @DisplayName("DELETE /api/admin/courses/{id} debe devolver mensaje de eliminación")
+        void deleteCourse_DebeResponderOk() throws Exception {
+                doNothing().when(adminCourseCatalogService).deleteCourse(77L);
+
+                mockMvc.perform(delete("/api/admin/courses/77"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.message").value("Curso eliminado correctamente."));
+        }
+
+        @Test
+        @DisplayName("POST /api/admin/courses debe mapear ServicesException a HTTP 400")
+        void createCourse_Duplicado_DebeDevolver400() throws Exception {
+                when(adminCourseCatalogService.createCourse(new AdminCourseCreateRequestDTO(
+                                "Arquitectura",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null)))
+                                .thenThrow(new ServicesException("Este curso ya existe."));
+
+                mockMvc.perform(post("/api/admin/courses")
+                                .contentType(APPLICATION_JSON)
+                                .content("""
+                                                { "title": "Arquitectura" }
+                                                """))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.message").value("Este curso ya existe."));
         }
 
         @Test

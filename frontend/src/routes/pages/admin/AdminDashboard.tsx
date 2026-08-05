@@ -8,6 +8,7 @@ import { CourseInsightPanel } from './components/CourseInsightPanel';
 import { AdminDocumentInbox } from './components/AdminDocumentInbox';
 import { GlobalStatisticsPanel } from './components/GlobalStatisticsPanel';
 import { AdminCourseProfessorReassignmentPanel } from './components/AdminCourseProfessorReassignmentPanel';
+import { AdminCourseCatalogPanel } from './components/AdminCourseCatalogPanel';
 
 const AdminDashboard = () => {
     const { user } = useAuth();
@@ -57,6 +58,12 @@ const AdminDashboard = () => {
                     <div className="h-full">
                         <UserScrollList />
                     </div>
+                </div>
+            )}
+
+            {!deferHeavySections && (
+                <div className="w-full mt-6">
+                    <AdminCourseCatalogPanel />
                 </div>
             )}
 

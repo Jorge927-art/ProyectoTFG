@@ -25,6 +25,9 @@ public class Courses {
     @Column(nullable = true)
     private String title;
 
+    @Column(name = "title_key", nullable = true)
+    private String titleKey;
+
     @Column(nullable = true, columnDefinition = "TEXT")
     private String url;
 
@@ -68,4 +71,7 @@ public class Courses {
 
     @Column(nullable = true)
     private String site;
+
+    @Column(name = "ever_used", nullable = false)
+    private boolean everUsed = false;
 }

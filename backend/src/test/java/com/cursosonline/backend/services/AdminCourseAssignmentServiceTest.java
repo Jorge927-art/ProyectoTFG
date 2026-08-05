@@ -41,6 +41,9 @@ class AdminCourseAssignmentServiceTest {
     @Mock
     private UserSystemNotificationRepository userSystemNotificationRepository;
 
+    @Mock
+    private AdminCourseCatalogService adminCourseCatalogService;
+
     @InjectMocks
     private AdminCourseAssignmentService adminCourseAssignmentService;
 
@@ -131,6 +134,7 @@ class AdminCourseAssignmentServiceTest {
         assertTrue(notifications.stream().anyMatch(n -> n.getReceiver().getUser_id().equals(20L)
                 && n.getType().equals("COURSE_ASSIGNMENT_CHANGE")
                 && n.getMessage().contains("asignado")));
+        verify(adminCourseCatalogService).markCourseAsEverUsed(300L);
     }
 
     @Test
@@ -150,6 +154,7 @@ class AdminCourseAssignmentServiceTest {
         assertNull(result.previousProfessorUsername());
 
         verify(userSystemNotificationRepository, times(1)).save(any(UserSystemNotification.class));
+        verify(adminCourseCatalogService).markCourseAsEverUsed(300L);
     }
 
     @Test

@@ -444,6 +444,7 @@ Deprecar y eliminar del sistema los tres archivos redundantes de diseño por rol
   # [ADR-13] Mitigación de Desincronización Temporal mediante Margen de Tolerancia (Clock Skew) en JWT
 
 ## Estatus
+
 Aceptado
 
 ## Contexto
@@ -813,6 +814,7 @@ Implementar una reestructuración de alcance y una purga de infraestructura en t
 # ADR-22: Refactorización del Panel del Estudiante mediante Controladores Distribuidos
 
 ## Estatus
+
 Aceptado
 
 ## Contexto
@@ -1353,6 +1355,7 @@ Rediseñar de forma quirúrgica la capa de servicios e infraestructura de persis
 # ADR-36: Implementación del Motor de Recomendaciones mediante Algoritmo de Ponderación
 
 ## Estatus
+
 Aceptado
 
 ## Contexto
@@ -1387,6 +1390,7 @@ Finalmente, el valor `undefined` se propagaba a la pasarela HTTP (Axios), mutand
 # ADR-37: Gestión de Sesión por Inactividad frente a Expiración Absoluta
 
 ## Estatus
+
 Aceptado
 
 ## Contexto
@@ -1411,6 +1415,7 @@ El Tiempo de Vida (TTL) del token JWT está configurado en 15 minutos (900 segun
 # ADR-38: Módulo de Intercambio Bidireccional y Dirigido de Documentos Académicos
 
 ## Estatus
+
 Aceptado
 
 ## Contexto
@@ -1438,6 +1443,7 @@ Permitir la incorporación de formatos de procesamiento de palabras como Microso
 # ADR-39: Sistema de Evaluación Académica y Arquitectura de Rating Dual
 
 ## Estatus
+
 Aceptado
 
 ## Contexto
@@ -1467,6 +1473,7 @@ Adicionalmente, bajo las políticas de seguridad perimetral por tokens distribui
 # ADR-40: Descarga Segura de Documentos Académicos y Control de Acceso Anti-IDOR
 
 ## Estatus
+
 Aceptado
 
 ## Contexto
@@ -1495,6 +1502,7 @@ Para consolidar las directrices de privacidad y control de acceso en el módulo 
 # ADR-41: Diseño de Contrato Anticipado para la Integración Desacoplada de Calificaciones Académicas
 
 ## Estatus
+
 Aceptado
 
 ## Contexto
@@ -1524,6 +1532,7 @@ No obstante, debido a que el módulo de inserción de calificaciones por parte d
 # ADR-42: Persistencia Relacional e Hidratación de Calificaciones con Aislamiento Deserializador READ_ONLY
 
 ## Estatus
+
 Aceptado
 
 ## Contexto
@@ -1553,6 +1562,7 @@ Específicamente, se debían mitigar dos vectores de riesgo críticos:
 # ADR-43: Arquitectura de Agregación Analítica Inmutable y Casteo Dinámico para Métricas de Catálogo
 
 ## Estatus
+
 Pospuesto
 
 ## Contexto
@@ -2345,3 +2355,49 @@ Mitigación aplicada:
 * Suites backend para emisión, rotación, expiración y revocación.
 * Suites frontend para 401 -> refresh -> retry, anti-bucle y concurrencia.
 * Validación estricta del `tokenType` en la cadena de seguridad.
+
+---
+
+# ADR-061: Estrategia Null-Safety en Streams Java para Compatibilidad con Análisis Estático
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Agosto 2026
+
+## Contexto
+
+Durante la evolución del servicio de catálogo administrativo de cursos, el analizador estático de Java en VS Code reportó advertencias de seguridad de nulos al usar referencias de método sobre colecciones potencialmente heterogéneas (`List<Courses>`). Aunque la compilación y los tests eran correctos, el diagnóstico persistente degradaba la señal de calidad en el panel de problemas y dificultaba distinguir advertencias reales de falsos positivos.
+
+El caso concreto apareció al proyectar IDs desde stream en `AdminCourseCatalogService.resolveUsedCourseIds(...)`.
+
+## Decisión
+
+Adoptar una política de mapeo null-safe explícito en streams cuando exista posibilidad de elementos nulos y el analizador no infiera correctamente los filtros previos.
+
+Regla aplicada:
+
+1. Preferir lambda defensiva en el `map` (`course != null ? course.getCourse_id() : null`).
+2. Filtrar nulos inmediatamente después con `Objects::nonNull`.
+3. Aplicar filtros de dominio posteriores (por ejemplo `id > 0`).
+
+Se evita depender exclusivamente de referencias de método (`Courses::getCourse_id`) cuando la inferencia de nullabilidad no es estable entre compilador y lenguaje servidor.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* Reducción de ruido en diagnósticos de null-safety del IDE.
+* Mayor legibilidad de la intención defensiva ante datos legacy o listas no normalizadas.
+* Criterio reutilizable para otros servicios con streams similares.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Verbosidad adicional en lambdas:** el código resulta menos conciso que una referencia de método.
+* *Mitigación:* aplicar la regla solo en rutas con advertencias persistentes de nullabilidad o entradas externas no confiables.
+
+* **Posible sobreuso de patrones defensivos:** puede ocultar problemas de origen si se usa indiscriminadamente.
+* *Mitigación:* mantener validaciones de entrada y tests unitarios del servicio para diferenciar datos inválidos de advertencias del analizador.

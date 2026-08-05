@@ -64,6 +64,7 @@ public class UserService {
     private final UserSystemNotificationRepository userSystemNotificationRepository;
     private final com.cursosonline.backend.repository.AcademicEvaluationRepository academicEvaluationRepository;
     private final com.cursosonline.backend.repository.UserProfileRepository userProfileRepository;
+    private final AdminCourseCatalogService adminCourseCatalogService;
     private final JdbcTemplate jdbcTemplate;
     private Clock clock = Clock.systemUTC();
 
@@ -563,7 +564,9 @@ public class UserService {
         enrollment.setCourse(course);
 
         // 5. Volcar de forma transaccional directa a PostgreSQL
-        return enrollmentRepository.saveAndFlush(enrollment);
+        Enrollment savedEnrollment = enrollmentRepository.saveAndFlush(enrollment);
+        adminCourseCatalogService.markCourseAsEverUsed(course.getCourse_id());
+        return savedEnrollment;
     }
 
     /**
@@ -988,7 +991,9 @@ public class UserService {
         }
 
         // 6. Volcar los cambios de forma transaccional directa a PostgreSQL
-        return coursesRepository.saveAndFlush(course);
+        Courses savedCourse = coursesRepository.saveAndFlush(course);
+        adminCourseCatalogService.markCourseAsEverUsed(savedCourse.getCourse_id());
+        return savedCourse;
     }
 
 }
