@@ -39,8 +39,8 @@ services/          → Lógica de negocio (FileStorageService, RecommendationSer
     - `/api/auth/login`, `/api/auth/register`, `GET /actuator/health`, `GET /uploads/**`, `GET /api/courses/search` → públicos.
     - `/api/auth/me`, `/api/auth/notifications`, `/api/v1/profile/**` → autenticado.
     - `/api/auth/users/**`, `/api/admin/**`, `/api/users/**` → `ADMIN`.
-    - `/api/professor/**` → `PROFESSOR` o `ADMIN`.
-    - `/api/student/**` → `STUDENT` o `ADMIN`.
+    - `/api/v1/teacher/**` → `PROFESSOR` o `ADMIN`.
+    - No existe un `requestMatcher` estructural específico para rutas de estudiante; cuando aplica, la restricción fina debe verificarse en el propio endpoint o mediante seguridad a nivel de método.
     - Resto → autenticado por defecto.
   - `@EnableMethodSecurity` habilitado (permite `@PreAuthorize` puntual además de la config a nivel de filtro).
   - Roles: `ADMIN`, `PROFESSOR`, `STUDENT` (enum `Role`).
@@ -96,7 +96,7 @@ services/              → apiClient (Axios + interceptores), documentService, e
 
 ## 4. Decisiones de arquitectura relevantes (ADR) a tener en cuenta
 
-El proyecto documenta **61 ADRs** en `adr.md`. Los más relevantes para generar código nuevo consistente:
+El proyecto documenta **59 ADRs** en `adr.md`, con numeración que llega hasta `ADR-061` y huecos en la secuencia. Los más relevantes para generar código nuevo consistente:
 
 | ADR | Tema |
 | --- | --- |

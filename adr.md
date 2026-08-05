@@ -72,7 +72,7 @@ Alojar ambas aplicaciones de forma centralizada en directorios diferenciados y e
 
 ### Impacto Positivo
 
-* **Despliegue y CI/CD Simplificado:** Permite configurar un único pipeline de integración continua (como GitHub Actions) que pueda disparar tareas de pruebas automatizadas y compilación para ambas capas de manera coordinada.
+* **Despliegue y CI/CD Simplificado:** Permite configurar un único workflow de integración continua (como GitHub Actions) con jobs independientes por capa, disparando pruebas automatizadas y compilación solo en las áreas afectadas cuando corresponde.
 * **Visión de Conjunto:** Centraliza el archivo de lectura principal (`README.md`), los diarios de bitácora y este registro de decisiones arquitectónicas (ADR) en la raíz del proyecto para una auditoría rápida.
 
 ### Impacto Negativo / Riesgos Mitigados

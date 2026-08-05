@@ -102,8 +102,8 @@ Migrar de autenticación por sesión a JWT sin romper el frontend actual, con de
 - [ ] Incluir `role` en claims del access token.
 - [ ] Validar que reglas por rol siguen operativas:
   - [ ] `/api/admin/**` -> ADMIN
-  - [ ] `/api/profesor/**` -> PROFESSOR
-  - [ ] `/api/estudiante/**` -> STUDENT
+  - [ ] `/api/v1/teacher/**` -> PROFESSOR o ADMIN
+  - [ ] Documentar explícitamente qué endpoints de estudiante dependen de autenticación genérica y cuáles añaden restricción fina a nivel de método.
 - [ ] Asegurar 401 (no autenticado) vs 403 (sin permisos) de forma consistente.
 
 ### Criterios de aceptación
