@@ -9,12 +9,13 @@ import { AdminDocumentInbox } from './components/AdminDocumentInbox';
 import { GlobalStatisticsPanel } from './components/GlobalStatisticsPanel';
 import { AdminCourseProfessorReassignmentPanel } from './components/AdminCourseProfessorReassignmentPanel';
 import { AdminCourseCatalogPanel } from './components/AdminCourseCatalogPanel';
+import { useLocation } from 'react-router-dom';
 
 const AdminDashboard = () => {
     const { user } = useAuth();
+    const location = useLocation();
     const documentsPanelRef = useRef<HTMLDivElement | null>(null);
-    const focusSearch = typeof window !== 'undefined' ? window.location.search : '';
-    const shouldFocusDocuments = new URLSearchParams(focusSearch).get('focus') === 'documents';
+    const shouldFocusDocuments = new URLSearchParams(location.search).get('focus') === 'documents';
     const [hasDeferredReveal, setHasDeferredReveal] = useState<boolean>(false);
     const deferHeavySections = shouldFocusDocuments && !hasDeferredReveal;
 
@@ -23,7 +24,7 @@ const AdminDashboard = () => {
             return;
         }
 
-        documentsPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        documentsPanelRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' });
 
         const timerId = window.setTimeout(() => {
             setHasDeferredReveal(true);

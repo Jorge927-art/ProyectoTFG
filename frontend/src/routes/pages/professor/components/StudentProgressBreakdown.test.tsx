@@ -62,6 +62,7 @@ describe('StudentProgressBreakdown', () => {
 
         expect(screen.getByText('alumno1')).toBeInTheDocument();
         expect(screen.getByText('Arquitectura')).toBeInTheDocument();
+        expect(screen.getByText('Progreso del curso')).toBeInTheDocument();
         expect(screen.getByText('90%')).toBeInTheDocument();
     });
 

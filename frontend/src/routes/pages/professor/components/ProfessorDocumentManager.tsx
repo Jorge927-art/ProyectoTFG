@@ -25,12 +25,14 @@ interface ProfessorDocumentManagerProps {
     availableCourses: TaughtCourse[];
     autoFocusDocuments?: boolean;
     focusDocumentId?: number | null;
+    className?: string;
 }
 
 export const ProfessorDocumentManager = ({
     availableCourses,
     autoFocusDocuments = false,
     focusDocumentId = null,
+    className = '',
 }: ProfessorDocumentManagerProps) => {
     const [activeTab, setActiveTab] = useState<'RECEIVED' | 'SENT'>('RECEIVED');
     const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
@@ -278,7 +280,7 @@ export const ProfessorDocumentManager = ({
     };
 
     return (
-        <GenericCard className="flex flex-col h-118">
+        <GenericCard className={`flex flex-col h-118 ${className}`.trim()}>
             <div className="flex items-center justify-between mb-3 shrink-0">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                     <FileUp size={18} className="text-blue-600" />

@@ -31,7 +31,7 @@ export const TaughtCoursesGrid = ({
         >
             <div className="grid grid-cols-1 gap-4">
                 {courses.map((course) => (
-                    <GenericCard key={course.id}>
+                    <GenericCard key={course.id} className="border border-slate-200 bg-white shadow-sm hover:shadow-md">
                         {/* Cabecera y Datos Reales de Matriculación */}
                         <div className="mb-4 flex-1">
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-green-50 text-green-700 inline-block">

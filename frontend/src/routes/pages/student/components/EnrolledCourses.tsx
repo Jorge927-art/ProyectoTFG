@@ -9,6 +9,7 @@ interface EnrolledCoursesProps {
     enrolledList: EnrollmentInfo[];
     loadingEnrollments: boolean;
     onRefresh: () => void;
+    className?: string;
 }
 
 const formatCourseDuration = (durationHours?: number): string => {
@@ -35,7 +36,7 @@ const clampProgress = (value: number | null | undefined): number => {
     return Math.max(0, Math.min(100, Math.round(value)));
 };
 
-export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh }: EnrolledCoursesProps) => {
+export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh, className = '' }: EnrolledCoursesProps) => {
     const [mutatingEnrollmentId, setMutatingEnrollmentId] = useState<number | null>(null);
 
     const handleStartCourse = async (enrollmentId: number) => {
@@ -55,7 +56,7 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh }:
     };
 
     return (
-        <GenericCard className="bg-emerald-100/40 mt-6 mb-8 h-109 flex flex-col p-5">
+        <GenericCard className={`bg-emerald-100/40 flex flex-col p-5 ${className}`.trim()}>
             <div className="flex items-center gap-2 mb-4 shrink-0">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                     <BookOpen size={18} className="text-emerald-700" />

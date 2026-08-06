@@ -15,6 +15,7 @@ import {
     uploadStudentDocument,
 } from '../../../../services/documentService';
 import { emitNotificationsRefresh } from '../../../../components/ui/globalNotificationBell/useNotifications';
+import { ACADEMIC_DOCUMENT_ACCEPT } from '../../../../services/academicDocumentUploadConfig';
 
 interface AdminDocumentInboxProps {
     autoFocusUnread?: boolean;
@@ -259,7 +260,7 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                         ref={recipientFileInputRef}
                         aria-label="Archivo para envío individual"
                         type="file"
-                        accept=".pdf,.doc,.docx,.txt"
+                        accept={ACADEMIC_DOCUMENT_ACCEPT}
                         disabled={sendingTarget !== null}
                         onChange={(e) => setSelectedRecipientFile(e.target.files?.[0] ?? null)}
                         className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-100 file:px-3 file:py-2 file:text-xs file:font-bold file:text-blue-700 hover:file:bg-blue-200"
@@ -309,7 +310,7 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                         ref={courseFileInputRef}
                         aria-label="Archivo para envío colectivo"
                         type="file"
-                        accept=".pdf,.doc,.docx,.txt"
+                        accept={ACADEMIC_DOCUMENT_ACCEPT}
                         disabled={sendingTarget !== null}
                         onChange={(e) => setSelectedCourseFile(e.target.files?.[0] ?? null)}
                         className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-100 file:px-3 file:py-2 file:text-xs file:font-bold file:text-indigo-700 hover:file:bg-indigo-200"

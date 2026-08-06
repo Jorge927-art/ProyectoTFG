@@ -23,18 +23,19 @@ import { EvaluationPanel } from './components/EvaluationPanel';
 import { StudentStatsPanel } from './components/StudentStatsPanel';
 import { useActiveEvaluations } from './components/useActiveEvaluations';
 import { CourseAssignmentPanel } from './components/CourseAssignmentPanel';
+import { useLocation } from 'react-router-dom';
 
 const ENROLLMENTS_AUTO_REFRESH_MS = 45000;
 
 
 const StudentDashboard = () => {
+    const location = useLocation();
     // --- ESTADOS DE UI Y FEEDBACK ---
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
     const [successMessage, setSuccessMessage] = useState<string>('');
     const documentsPanelRef = useRef<HTMLDivElement | null>(null);
-    const focusSearch = typeof window !== 'undefined' ? window.location.search : '';
-    const focusParams = new URLSearchParams(focusSearch);
+    const focusParams = new URLSearchParams(location.search);
     const shouldFocusDocuments = focusParams.get('focus') === 'documents';
     const focusDocumentIdParam = Number(focusParams.get('documentId'));
     const focusDocumentId = Number.isFinite(focusDocumentIdParam) && focusDocumentIdParam > 0
@@ -90,7 +91,7 @@ const StudentDashboard = () => {
             return;
         }
 
-        documentsPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        documentsPanelRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' });
     }, [shouldFocusDocuments]);
 
     /** 
@@ -132,7 +133,7 @@ const StudentDashboard = () => {
 
     return (
         <DashboardLayout>
-            <div className="p-6 max-w-7xl mx-auto space-y-6">
+            <div className="mx-auto max-w-420 px-4 py-6 md:px-6 xl:px-8 2xl:px-10 space-y-6 xl:space-y-8">
 
                 {/* CABECERA PRINCIPAL UNIFICADA REAL DE PRODUCCIÓN [ADR-13] */}
                 <GenericHeader
@@ -181,7 +182,7 @@ const StudentDashboard = () => {
                     1. COMPONENTE SUPERIOR PANORÁMICO: 
                     "Recomendaciones para ti" ocupa todo el ancho por encima de los demás.
                 */}
-                <div className="bg-linear-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-6 shadow-sm w-full">
+                <div className="bg-linear-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-5 xl:p-6 2xl:p-7 shadow-sm w-full">
                     <div className="flex items-center gap-2 mb-4">
                         <Sparkles className="h-5 w-5 text-blue-600" />
                         <h2 className="text-lg font-semibold text-gray-900">Recomendaciones para ti</h2>
@@ -196,16 +197,14 @@ const StudentDashboard = () => {
                 </div>
 
                 {/* 
-                    2. FILA CENTRAL DE ACTIVIDAD:
-                    Un Grid Layout de 3 columnas que sitúa "Tus asignaturas" (1 col) a la izquierda 
-                    y el "Catálogo" de referencia (2 cols) a la derecha.
+                    2. SECCIÓN UNIFICADA: "Tus asignaturas" + "Catálogo de Cursos Disponibles"
+                    Mantiene el reparto horizontal 1/3 + 2/3 y unifica altura/tipografía.
                 */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-
-                    {/* A la izquierda: "Tus asignaturas" (Toma 1 columna) */}
-                    <div className="lg:col-span-1">
-                        <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
+                <section className="bg-white border border-slate-100 rounded-2xl p-4 xl:p-5 2xl:p-6 shadow-sm">
+                    <div className="grid grid-cols-1 xl:grid-cols-[minmax(340px,0.95fr)_minmax(0,1.9fr)] gap-4 xl:gap-5 2xl:gap-6 items-stretch">
+                        <div className="xl:min-w-85 h-109 xl:h-112 2xl:h-120">
                             <EnrolledCourses
+                                className="h-full"
                                 enrolledList={enrolledList}
                                 loadingEnrollments={loadingEnrollments}
                                 onRefresh={() => {
@@ -215,12 +214,9 @@ const StudentDashboard = () => {
                                 }}
                             />
                         </div>
-                    </div>
 
-                    {/* A la derecha: "Catálogo de Cursos Disponibles" (Toma 2 columnas - COMPONENTE DE REFERENCIA INTACTO) */}
-                    <div className="lg:col-span-2">
-                        <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
-                            <h2 className="text-xl font-bold text-gray-900 mb-4">Catálogo de Cursos Disponibles</h2>
+                        <div className="h-109 xl:h-112 2xl:h-120 bg-slate-50/40 border border-slate-100 rounded-xl xl:rounded-2xl p-5 xl:p-6 overflow-y-auto">
+                            <h2 className="text-base font-bold text-slate-800 mb-4">Catálogo de Cursos Disponibles</h2>
                             <StudentCoursePicker
                                 enrolledList={enrolledList}
                                 onEnrollSuccess={handleEnrollSuccess}
@@ -229,50 +225,49 @@ const StudentDashboard = () => {
                             />
                         </div>
                     </div>
-                </div>
+                </section>
 
                 {/* 
-                    3. REAJUSTE DE LA FILA INFERIOR DE GESTIÓN (GRID DE 3 COLUMNAS - PROPORCIÓN PERFECTA):
-                    Copiamos la misma estructura de arriba para que los anchos queden alineados milimétricamente.
+                    3. SECCIÓN UNIFICADA: "Gestión de Documentos Académicos" + "ASIGNATURAS"
+                    Mantiene el reparto horizontal 1/3 + 2/3 y una lectura visual única.
                 */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start pt-2">
+                <section className="bg-white border border-slate-100 rounded-2xl p-4 xl:p-5 2xl:p-6 shadow-sm">
+                    <div className="grid grid-cols-1 xl:grid-cols-[minmax(340px,0.95fr)_minmax(0,1.9fr)] gap-4 xl:gap-5 2xl:gap-6 items-stretch">
+                        <div
+                            ref={documentsPanelRef}
+                            id="documents-panel"
+                            className="xl:min-w-85 h-109 xl:h-112 2xl:h-120"
+                        >
+                            <DocumentManager
+                                autoFocusDocuments={shouldFocusDocuments}
+                                focusDocumentId={focusDocumentId}
+                            />
+                        </div>
 
-                    {/* REAJUSTE: "Gestión de Documentos Académicos" recupera el ancho estrecho de arriba (1 columna) */}
-                    <div
-                        ref={documentsPanelRef}
-                        id="documents-panel"
-                        className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm h-108 overflow-y-auto scrollbar-thin lg:col-span-1"
-                    >
-                        <DocumentManager
-                            autoFocusDocuments={shouldFocusDocuments}
-                            focusDocumentId={focusDocumentId}
-                        />
+                        <div className="h-109 xl:h-112 2xl:h-120">
+                            <CourseAssignmentPanel
+                                activeCourseId={activeCourseId}
+                                enrolledList={enrolledList}
+                            />
+                        </div>
                     </div>
-
-                    {/* REAJUSTE: "ASIGNATURAS" gana el espacio panorámico de la derecha (2 columnas) */}
-                    <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm h-108 overflow-y-auto scrollbar-thin lg:col-span-2">
-                        <CourseAssignmentPanel
-                            activeCourseId={activeCourseId}
-                            enrolledList={enrolledList}
-                        />
-                    </div>
-                </div>
+                </section>
 
                 {/* 
-                    4. FILA DE BALANCE FINAL:
-                    Mantenemos la simetría final en la base de la pantalla.
+                    4. SECCIÓN UNIFICADA: "Rendimiento y Métricas del Curso" + "Evaluación académica"
+                    Mantiene ambos paneles en un único bloque visual para cerrar el dashboard con simetría.
                 */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                    {/* Abajo a la izquierda: El componente analítico de la copa (StudentStatsPanel) */}
-                    <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm w-full">
-                        <StudentStatsPanel activeCourseId={activeCourseId} enrolledList={enrolledList} />
-                    </div>
+                <section className="bg-white border border-slate-100 rounded-2xl p-4 xl:p-5 2xl:p-6 shadow-sm">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 xl:gap-5 2xl:gap-6 items-stretch">
+                        <div className="w-full h-109 xl:h-112 2xl:h-120">
+                            <StudentStatsPanel activeCourseId={activeCourseId} enrolledList={enrolledList} />
+                        </div>
 
-                    {/* Abajo a la derecha: "Evaluación académica" (EvaluationPanel) */}
-                    <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm w-full">
-                        <EvaluationPanel />
+                        <div className="w-full h-109 xl:h-112 2xl:h-120">
+                            <EvaluationPanel />
+                        </div>
                     </div>
-                </div>
+                </section>
 
                 {/* Modal de Configuración de Intereses */}
                 <InterestsModal

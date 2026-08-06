@@ -6,6 +6,10 @@ import { useActiveEvaluations } from './components/useActiveEvaluations';
 import { useSmartRecommendations } from './components/useSmartRecommendations';
 import type { EnrollmentInfo, DBModelCourse } from '../../../services/courseTypes';
 
+vi.mock('react-router-dom', () => ({
+    useLocation: () => ({ search: window.location.search })
+}));
+
 // =========================================================================
 // 1. MOCKS DE HOOKS DE LÓGICA DISTRIBUIDA (DOMINIO DE DATOS)
 // =========================================================================

@@ -66,7 +66,7 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
     const shouldShowScrollHint = workGrades.length > 3;
 
     return (
-        <GenericCard className="flex flex-col flex-1 min-h-0">
+        <GenericCard className="h-full flex flex-col flex-1 min-h-0 overflow-hidden">
             {/* CABECERA PRINCIPAL UNIFICADA (REESTRUCTURADA EN DOS FILAS) */}
             <div className="flex flex-col gap-3 mb-5 shrink-0 w-full">
                 {/* Fila 1: Título e Icono */}

@@ -23,6 +23,10 @@ export const StudentProgressBreakdown = ({
                 <Users size={16} className="text-blue-600" />
                 Alumnos matriculados
             </h3>
+            <div className="flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                <span>{showCourseColumn ? 'Alumno / Asignatura' : 'Alumno'}</span>
+                <span className="text-blue-600">Progreso del curso</span>
+            </div>
             <div
                 data-testid="student-progress-list"
                 className="max-h-56 overflow-y-scroll pr-1 space-y-1.5 custom-scrollbar"

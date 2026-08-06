@@ -3,6 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ProfessorDashboard from './ProfessorDashboard';
 
+vi.mock('react-router-dom', () => ({
+    useLocation: () => ({ search: window.location.search })
+}));
+
 const { mockedAuthUser } = vi.hoisted(() => ({
     mockedAuthUser: {
         username: 'Laura',

@@ -451,8 +451,8 @@ public class DocumentController {
                         .body(Map.of("error", "El archivo transmitido está vacío o es inválido."));
             }
 
-            validateFileSize(file, STANDARD_DOCUMENT_MAX_BYTES,
-                    "El archivo excede el límite de 5MB configurado para envíos administrativos.");
+            validateFileSize(file, ACADEMIC_MEDIA_DOCUMENT_MAX_BYTES,
+                    "El archivo excede el límite de 100MB configurado para envíos administrativos.");
 
             Users currentUser = resolveAuthenticatedUser(authentication.getName(),
                     "Usuario administrador emisor no encontrado.");
@@ -469,7 +469,7 @@ public class DocumentController {
 
             String relativePath = fileStorageService.storeDocumentFile(
                     file,
-                    FileStorageService.DocumentValidationProfile.BASIC_DOCUMENTS);
+                    FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS);
             String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
 
             for (Enrollment enrollment : classEnrollments) {

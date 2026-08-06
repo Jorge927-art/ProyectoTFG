@@ -552,7 +552,7 @@ public class DocumentControllerTest {
                 Mockito.when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(501L))
                                 .thenReturn(List.of(enrollmentA, enrollmentB));
                 Mockito.when(fileStorageService.storeDocumentFile(any(),
-                                eq(FileStorageService.DocumentValidationProfile.BASIC_DOCUMENTS)))
+                                eq(FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS)))
                                 .thenReturn("documents/uuid_circular.pdf");
 
                 ResponseEntity<?> response = documentController.uploadDocumentToCourseByAdmin(authentication, validFile,
