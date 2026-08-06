@@ -2401,3 +2401,56 @@ Se evita depender exclusivamente de referencias de método (`Courses::getCourse_
 
 * **Posible sobreuso de patrones defensivos:** puede ocultar problemas de origen si se usa indiscriminadamente.
 * *Mitigación:* mantener validaciones de entrada y tests unitarios del servicio para diferenciar datos inválidos de advertencias del analizador.
+
+---
+
+# ADR-062: Hardening de Autenticación JWT y Mitigación Base de XSS en Cliente
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Agosto 2026
+
+## Contexto
+
+La plataforma ya operaba con autenticación JWT stateless, rotación de refresh token y reintento controlado en cliente [ADR-060]. Sin embargo, se detectaron dos riesgos residuales relevantes:
+
+1. Riesgo de despliegue inseguro en producción por uso accidental del secreto JWT de fallback.
+2. Exposición del token en almacenamiento local ante escenarios de XSS en cliente.
+
+Aunque el flujo funcional era correcto, faltaba consolidar medidas de endurecimiento explícitas para reducir el riesgo operativo en producción y la superficie de ataque en frontend.
+
+## Decisión
+
+Aplicar una capa de hardening incremental, compatible con el comportamiento actual:
+
+* **Backend (Spring Boot):**
+  * Añadir validación en arranque para perfiles `prod` y `production` en `JwtProperties`.
+  * Rechazar arranque si `app.jwt.secret` está vacío, usa el valor por defecto local o tiene menos de 32 caracteres.
+  * Mantener flexibilidad en entornos no productivos (`dev`, `test-ci`) para no bloquear desarrollo ni CI.
+* **Frontend (Vite/React):**
+  * Incorporar una política CSP base en `index.html` para restringir orígenes de script, conexión e incrustación.
+  * Mantener conectividad local con backend (`localhost:8080`) y canal HMR de Vite (`localhost:5173` + WebSocket).
+
+## Consecuencias
+
+### Impacto Positivo
+
+* Prevención proactiva de despliegues con secreto JWT débil o no rotado en producción.
+* Reducción de la superficie de ataque XSS mediante restricciones de contenido en cliente.
+* Endurecimiento sin ruptura de contrato de autenticación ni cambios en endpoints.
+* Conservación de estabilidad en pipelines de pruebas gracias a la excepción controlada para perfiles no productivos.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Mayor rigidez en despliegue productivo:** el backend falla al iniciar si no existe un secreto robusto.
+* *Mitigación:* documentar y automatizar `APP_JWT_SECRET` en entornos de despliegue.
+
+* **CSP inicial conservadora:** algunos recursos externos futuros podrían requerir ajuste explícito de la política.
+* *Mitigación:* ampliar directivas CSP bajo control de cambios, manteniendo principio de mínimo privilegio.
+
+* **Persistencia de tokens en localStorage sigue siendo una deuda de seguridad parcial.**
+* *Mitigación:* mantener token de acceso de vida corta, rotación de refresh y planificar migración progresiva de refresh token a cookie HttpOnly + Secure + SameSite en una decisión posterior.

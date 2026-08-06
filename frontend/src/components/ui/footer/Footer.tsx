@@ -1,7 +1,17 @@
 import { BookOpen, Mail, Github, Linkedin } from "lucide-react";
+import type { MouseEvent } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 const Footer = () => {
     const year = new Date().getFullYear();
+    const location = useLocation();
+
+    const handleHomeClick = (event: MouseEvent<HTMLAnchorElement>) => {
+        if (location.pathname === "/") {
+            event.preventDefault();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+    };
 
     return (
         <footer className="bg-slate-900 text-slate-300">
@@ -63,9 +73,9 @@ const Footer = () => {
                             </a>
                         </li>
                         <li>
-                            <a href="/" className="hover:text-white transition-colors">
+                            <Link to="/" onClick={handleHomeClick} className="hover:text-white transition-colors">
                                 Inicio
-                            </a>
+                            </Link>
                         </li>
                     </ul>
                 </div>
@@ -76,19 +86,19 @@ const Footer = () => {
                     </h3>
                     <ul className="space-y-2.5 text-sm">
                         <li>
-                            <a href="/privacidad" className="hover:text-white transition-colors">
+                            <Link to="/privacidad" className="hover:text-white transition-colors">
                                 Política de privacidad
-                            </a>
+                            </Link>
                         </li>
                         <li>
-                            <a href="/terminos" className="hover:text-white transition-colors">
+                            <Link to="/terminos" className="hover:text-white transition-colors">
                                 Términos de uso
-                            </a>
+                            </Link>
                         </li>
                         <li>
-                            <a href="/cookies" className="hover:text-white transition-colors">
+                            <Link to="/cookies" className="hover:text-white transition-colors">
                                 Cookies
-                            </a>
+                            </Link>
                         </li>
                     </ul>
                 </div>

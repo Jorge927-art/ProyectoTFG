@@ -2,6 +2,9 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "./guards/ProtectedRoute";
 import LandingPage from "./pages/public/LandingPage";
 import AccessDenied from "./pages/public/AccessDenied";
+import PrivacyPolicyPage from "./pages/public/legal/PrivacyPolicyPage";
+import TermsOfUsePage from "./pages/public/legal/TermsOfUsePage";
+import CookiesPage from "./pages/public/legal/CookiesPage";
 import StudentDashboard from "./pages/student/StudentDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ProfessorDashboard from "./pages/professor/ProfessorDashboard";
@@ -34,6 +37,9 @@ const AppRoutes = () => {
                 }
             />
             <Route path="/acceso-denegado" element={<AccessDenied />} />
+            <Route path="/privacidad" element={<PrivacyPolicyPage />} />
+            <Route path="/terminos" element={<TermsOfUsePage />} />
+            <Route path="/cookies" element={<CookiesPage />} />
 
             {/* 2. PROTECCIÓN ALUMNO */}
             <Route element={<ProtectedRoute allowedRoles={['STUDENT']} />}>

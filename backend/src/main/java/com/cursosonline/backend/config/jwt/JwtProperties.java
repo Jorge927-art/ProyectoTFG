@@ -1,9 +1,12 @@
 package com.cursosonline.backend.config.jwt;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 
@@ -18,9 +21,15 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "app.jwt")
 public class JwtProperties {
 
+    private static final String INSECURE_LOCAL_DEFAULT_SECRET = "change-me-in-local-and-tests-please";
+    private static final int MIN_SECRET_LENGTH = 32;
+
     /** Clave secreta usada para firmar y verificar tokens HS256. */
     @NotBlank
     private String secret;
+
+    @Autowired(required = false)
+    private Environment environment;
 
     /** Emisor lógico del token. */
     @NotBlank
@@ -130,5 +139,49 @@ public class JwtProperties {
      */
     public void setClockSkewSeconds(long clockSkewSeconds) {
         this.clockSkewSeconds = clockSkewSeconds;
+    }
+
+    @PostConstruct
+    void validateOnStartup() {
+        String[] activeProfiles = environment != null ? environment.getActiveProfiles() : new String[0];
+        validateSecretForProfiles(activeProfiles);
+    }
+
+    void validateSecretForProfiles(String[] activeProfiles) {
+        if (!isProductionProfile(activeProfiles)) {
+            return;
+        }
+
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException("app.jwt.secret es obligatorio en producción.");
+        }
+
+        String trimmedSecret = secret.trim();
+        if (INSECURE_LOCAL_DEFAULT_SECRET.equals(trimmedSecret)) {
+            throw new IllegalStateException(
+                    "app.jwt.secret no puede usar el valor por defecto en producción. Configure APP_JWT_SECRET.");
+        }
+
+        if (trimmedSecret.length() < MIN_SECRET_LENGTH) {
+            throw new IllegalStateException("app.jwt.secret debe tener al menos 32 caracteres en producción.");
+        }
+    }
+
+    boolean isProductionProfile(String[] activeProfiles) {
+        if (activeProfiles == null || activeProfiles.length == 0) {
+            return false;
+        }
+
+        for (String profile : activeProfiles) {
+            if (profile == null) {
+                continue;
+            }
+
+            String normalized = profile.trim().toLowerCase();
+            if ("prod".equals(normalized) || "production".equals(normalized)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

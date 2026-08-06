@@ -21,6 +21,18 @@ vi.mock('./pages/public/AccessDenied', () => ({
     default: () => <div>Mock Access Denied</div>,
 }));
 
+vi.mock('./pages/public/legal/PrivacyPolicyPage', () => ({
+    default: () => <div>Mock Privacy Policy</div>,
+}));
+
+vi.mock('./pages/public/legal/TermsOfUsePage', () => ({
+    default: () => <div>Mock Terms Of Use</div>,
+}));
+
+vi.mock('./pages/public/legal/CookiesPage', () => ({
+    default: () => <div>Mock Cookies Policy</div>,
+}));
+
 vi.mock('./pages/student/StudentDashboard', () => ({
     default: () => <div>Mock Student Dashboard</div>,
 }));
@@ -145,5 +157,26 @@ describe('AppRoutes - autorizacion por rol', () => {
         renderWithRoute('/ruta-inexistente');
 
         expect(screen.getByText('Mock Landing')).toBeInTheDocument();
+    });
+
+    it('renderiza la ruta pública /privacidad sin redirigir al inicio', () => {
+        renderWithRoute('/privacidad');
+
+        expect(screen.getByText('Mock Privacy Policy')).toBeInTheDocument();
+        expect(screen.queryByText('Mock Landing')).not.toBeInTheDocument();
+    });
+
+    it('renderiza la ruta pública /terminos sin redirigir al inicio', () => {
+        renderWithRoute('/terminos');
+
+        expect(screen.getByText('Mock Terms Of Use')).toBeInTheDocument();
+        expect(screen.queryByText('Mock Landing')).not.toBeInTheDocument();
+    });
+
+    it('renderiza la ruta pública /cookies sin redirigir al inicio', () => {
+        renderWithRoute('/cookies');
+
+        expect(screen.getByText('Mock Cookies Policy')).toBeInTheDocument();
+        expect(screen.queryByText('Mock Landing')).not.toBeInTheDocument();
     });
 });

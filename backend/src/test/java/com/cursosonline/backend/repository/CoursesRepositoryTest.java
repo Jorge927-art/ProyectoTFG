@@ -1,95 +1,113 @@
 package com.cursosonline.backend.repository;
 
 import com.cursosonline.backend.entities.Courses;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@DisplayName("Suite de Pruebas Unitarias para CoursesRepository")
+@SpringBootTest
+@ActiveProfiles("test-ci")
+@Transactional
+@DisplayName("Suite de Persistencia para búsqueda predictiva de cursos")
 class CoursesRepositoryTest {
 
+    @Autowired
     private CoursesRepository coursesRepository;
-    private Courses sampleCourse;
-    private final Pageable pageable = PageRequest.of(0, 10);
 
-    @BeforeEach
-    void setUp() {
-        // Creamos el simulador (mock) del repositorio central de asignaturas
-        coursesRepository = Mockito.mock(CoursesRepository.class);
-
-        // Instanciamos un curso base para simular los retornos del catálogo
-        sampleCourse = new Courses();
-        sampleCourse.setCourse_id(101L);
-        sampleCourse.setTitle("Data Analysis Using Python");
-        try {
-            java.lang.reflect.Method setCategoryMethod = Courses.class.getMethod("setCategory", String.class);
-            setCategoryMethod.invoke(sampleCourse, "Data Science");
-        } catch (Exception ignored) {
-        }
+    private void saveCourse(String title, String category) {
+        Courses course = new Courses();
+        course.setTitle(title);
+        course.setCategory(category);
+        course.setSite("COLE");
+        course.setEverUsed(false);
+        coursesRepository.save(course);
     }
 
-    /*
-     * =========================================================================
-     * 1. VERIFICACIÓN: searchCoursesPredictive (BÚSQUEDA PERSONALIZADA PAGINADA)
-     * =========================================================================
-     */
+    private List<String> extractTitles(List<Courses> courses) {
+        return courses.stream().map(course -> Objects.requireNonNull(course.getTitle())).toList();
+    }
+
     @Test
-    @DisplayName("Debe validar la estructura de la respuesta paginada predictiva según las palabras clave")
-    void searchCoursesPredictive_ShouldReturnPageOfCourses() {
+    @DisplayName("searchCoursesPredictive debe ordenar por relevancia y después por título")
+    void searchCoursesPredictive_ShouldOrderByRelevanceThenTitle() {
+        saveCourse("Data Engineering Fundamentals", "Ingenieria");
+        saveCourse("Database Modeling Basics", "Ingenieria");
+        saveCourse("Big Data Foundations", "Ingenieria");
+        saveCourse("Calculo Avanzado", "Data Science");
+        saveCourse("Quimica General", "Ciencias");
+
         String formattedKeyword = "%data%";
         String startKeyword = "data%";
-        Page<Courses> mockPage = new PageImpl<>(List.of(sampleCourse), pageable, 1);
 
-        // Simulamos el comportamiento del motor predictivo
-        when(coursesRepository.searchCoursesPredictive(formattedKeyword, startKeyword, pageable))
-                .thenReturn(mockPage);
+        Page<Courses> resultPage = coursesRepository.searchCoursesPredictive(
+                formattedKeyword,
+                startKeyword,
+                PageRequest.of(0, 10));
 
-        Page<Courses> resultPage = coursesRepository.searchCoursesPredictive(formattedKeyword, startKeyword, pageable);
-
-        assertNotNull(resultPage, "La página de resultados no debe ser nula");
-        assertEquals(1, resultPage.getTotalElements(), "Debe contener exactamente un elemento en la simulación");
-        assertEquals("Data Analysis Using Python", resultPage.getContent().get(0).getTitle());
+        assertEquals(4, resultPage.getTotalElements());
+        assertEquals(
+                List.of(
+                        "Data Engineering Fundamentals",
+                        "Database Modeling Basics",
+                        "Big Data Foundations",
+                        "Calculo Avanzado"),
+                extractTitles(resultPage.getContent()));
     }
 
-    /*
-     * =========================================================================
-     * 2. VERIFICACIÓN: getCourseAnalyticalStatsNative (MAPA ANALÍTICO NATIVO)
-     * =========================================================================
-     */
     @Test
-    @DisplayName("Debe certificar la estructura del mapa analítico nativo cruzado con PostgreSQL")
-    void getCourseAnalyticalStatsNative_ShouldReturnValidMetricsMap() {
-        // Reconstruimos de forma simulada la estructura exacta que vuelca el mapeo
-        // nativo de PostgreSQL
-        Map<String, Object> mockStatsMap = new HashMap<>();
-        mockStatsMap.put("courseId", 101L);
-        mockStatsMap.put("averageGrade", 8.4);
-        mockStatsMap.put("localEnrollments", 15L);
-        mockStatsMap.put("communityRating", 4.7);
-        mockStatsMap.put("instructorRating", 4.9);
-        mockStatsMap.put("platform", "Coursera");
-        mockStatsMap.put("category", "Data Science");
+    @DisplayName("searchCoursesPredictive debe respetar la paginación sin romper el orden de relevancia")
+    void searchCoursesPredictive_ShouldRespectPagination() {
+        saveCourse("Data Engineering Fundamentals", "Ingenieria");
+        saveCourse("Database Modeling Basics", "Ingenieria");
+        saveCourse("Big Data Foundations", "Ingenieria");
+        saveCourse("Calculo Avanzado", "Data Science");
 
-        when(coursesRepository.getCourseAnalyticalStatsNative(101L)).thenReturn(mockStatsMap);
+        String formattedKeyword = "%data%";
+        String startKeyword = "data%";
 
-        Map<String, Object> resultStats = coursesRepository.getCourseAnalyticalStatsNative(101L);
+        Page<Courses> firstPage = coursesRepository.searchCoursesPredictive(
+                formattedKeyword,
+                startKeyword,
+                PageRequest.of(0, 2));
 
-        assertNotNull(resultStats, "El mapa analítico nativo no debe ser nulo");
-        assertEquals(101L, resultStats.get("courseId"), "El ID de la asignatura debe coincidir");
-        assertEquals(8.4, resultStats.get("averageGrade"), "La nota media calculada debe ser consistente");
-        assertEquals(15L, resultStats.get("localEnrollments"), "El contador de alumnos inscritos debe ser exacto");
-        assertEquals("Coursera", resultStats.get("platform"), "El origen de la plataforma debe coincidir");
+        Page<Courses> secondPage = coursesRepository.searchCoursesPredictive(
+                formattedKeyword,
+                startKeyword,
+                PageRequest.of(1, 2));
+
+        assertEquals(List.of("Data Engineering Fundamentals", "Database Modeling Basics"),
+                extractTitles(firstPage.getContent()));
+        assertEquals(List.of("Big Data Foundations", "Calculo Avanzado"),
+                extractTitles(secondPage.getContent()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "data", "DATA", "DaTa" })
+    @DisplayName("searchCoursesPredictive debe comportarse igual sin importar el casing del término")
+    void searchCoursesPredictive_ShouldBeCaseInsensitive(String keyword) {
+        saveCourse("Data Engineering Fundamentals", "Ingenieria");
+        saveCourse("Calculo Avanzado", "Data Science");
+
+        String formattedKeyword = "%" + keyword + "%";
+        String startKeyword = keyword + "%";
+
+        Page<Courses> resultPage = coursesRepository.searchCoursesPredictive(
+                formattedKeyword,
+                startKeyword,
+                PageRequest.of(0, 10));
+
+        assertEquals(2, resultPage.getTotalElements());
     }
 }

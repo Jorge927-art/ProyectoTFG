@@ -1,17 +1,26 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import Footer from './Footer';
+
+const renderFooter = () => {
+    return render(
+        <MemoryRouter>
+            <Footer />
+        </MemoryRouter>
+    );
+};
 
 describe('Footer - Suite de Pruebas Unitarias', () => {
     it('renderiza la marca y la descripción institucional', () => {
-        render(<Footer />);
+        renderFooter();
 
         expect(screen.getByText('GESTIÓN DE CURSOS ONLINE')).toBeInTheDocument();
         expect(screen.getByText(/Plataforma de formación online/i)).toBeInTheDocument();
     });
 
     it('renderiza el elemento semántico <footer> con fondo oscuro', () => {
-        render(<Footer />);
+        renderFooter();
 
         const footerElement = screen.getByRole('contentinfo');
         expect(footerElement).toBeInTheDocument();
@@ -19,7 +28,7 @@ describe('Footer - Suite de Pruebas Unitarias', () => {
     });
 
     it('renderiza los enlaces de navegación ancla a las secciones de la landing', () => {
-        render(<Footer />);
+        renderFooter();
 
         expect(screen.getByRole('link', { name: 'Características' })).toHaveAttribute('href', '#features');
         expect(screen.getByRole('link', { name: 'Testimonios' })).toHaveAttribute('href', '#testimonials');
@@ -27,7 +36,7 @@ describe('Footer - Suite de Pruebas Unitarias', () => {
     });
 
     it('renderiza los enlaces legales', () => {
-        render(<Footer />);
+        renderFooter();
 
         expect(screen.getByRole('link', { name: 'Política de privacidad' })).toHaveAttribute('href', '/privacidad');
         expect(screen.getByRole('link', { name: 'Términos de uso' })).toHaveAttribute('href', '/terminos');
@@ -35,7 +44,7 @@ describe('Footer - Suite de Pruebas Unitarias', () => {
     });
 
     it('renderiza los enlaces sociales con atributos de accesibilidad y seguridad correctos', () => {
-        render(<Footer />);
+        renderFooter();
 
         const emailLink = screen.getByRole('link', { name: 'Enviar correo' });
         expect(emailLink).toHaveAttribute('href', 'mailto:contacto@cursosonline.com');
@@ -50,14 +59,14 @@ describe('Footer - Suite de Pruebas Unitarias', () => {
     });
 
     it('renderiza el copyright con el año actual calculado dinámicamente', () => {
-        render(<Footer />);
+        renderFooter();
 
         const currentYear = new Date().getFullYear();
         expect(screen.getByText(new RegExp(`© ${currentYear} Gestión de Cursos Online`))).toBeInTheDocument();
     });
 
     it('renderiza la línea de stack tecnológico', () => {
-        render(<Footer />);
+        renderFooter();
 
         expect(screen.getByText('Hecho con React, Spring Boot y PostgreSQL.')).toBeInTheDocument();
     });
