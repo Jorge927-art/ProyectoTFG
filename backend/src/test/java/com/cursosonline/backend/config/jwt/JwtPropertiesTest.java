@@ -14,7 +14,7 @@ class JwtPropertiesTest {
     @BeforeEach
     void setUp() {
         // Instanciamos el componente de propiedades de forma limpia y directa
-        jwtProperties = new JwtProperties();
+        jwtProperties = new JwtProperties(null);
     }
 
     /*

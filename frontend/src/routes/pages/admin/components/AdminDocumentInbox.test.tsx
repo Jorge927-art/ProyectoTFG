@@ -205,6 +205,7 @@ describe('AdminDocumentInbox', () => {
 
         await waitFor(() => {
             expect(screen.getByLabelText('Seleccionar usuario destinatario')).toBeInTheDocument();
+            expect(screen.getByRole('option', { name: 'laura (STUDENT)' })).toBeInTheDocument();
         });
 
         fireEvent.change(screen.getByLabelText('Seleccionar usuario destinatario'), {
@@ -238,6 +239,7 @@ describe('AdminDocumentInbox', () => {
 
         await waitFor(() => {
             expect(screen.getByLabelText('Seleccionar curso destinatario')).toBeInTheDocument();
+            expect(screen.getByRole('option', { name: 'Álgebra (Matemáticas)' })).toBeInTheDocument();
         });
 
         fireEvent.change(screen.getByLabelText('Seleccionar curso destinatario'), {

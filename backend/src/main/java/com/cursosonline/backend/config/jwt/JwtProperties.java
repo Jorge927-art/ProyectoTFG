@@ -4,7 +4,6 @@ import jakarta.annotation.PostConstruct;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
@@ -28,8 +27,11 @@ public class JwtProperties {
     @NotBlank
     private String secret;
 
-    @Autowired(required = false)
-    private Environment environment;
+    private final Environment environment;
+
+    public JwtProperties(Environment environment) {
+        this.environment = environment;
+    }
 
     /** Emisor lógico del token. */
     @NotBlank
