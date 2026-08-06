@@ -8,7 +8,7 @@
 - **Backend**: Java 21, Spring Boot **4.0.6**, Spring Security, Spring Data JPA, Bean Validation, PostgreSQL, Lombok, Maven.
 - **Frontend**: React 19 + TypeScript, Vite 7, React Router 7, Axios, Tailwind CSS 4 (`@tailwindcss/vite`), lucide-react (iconos), Vitest + Testing Library para tests.
 - **CI**: GitHub Actions (`.github/workflows/ci.yml`) — pipeline único para ambas capas.
-- **Documentación de arquitectura**: `adr.md` (61 ADRs numerados) y `tfg-documentacion-tecnica.md` (memoria técnica narrativa, algo desactualizada respecto al código: describe auth por sesión, pero el sistema ya usa JWT en producción).
+- **Documentación de arquitectura**: `adr.md` (63 ADRs numerados) y `tfg-documentacion-tecnica.md` (memoria técnica narrativa, algo desactualizada respecto al código: describe auth por sesión, pero el sistema ya usa JWT en producción).
 
 ## 2. Backend — arquitectura en capas
 
@@ -96,7 +96,7 @@ services/              → apiClient (Axios + interceptores), documentService, e
 
 ## 4. Decisiones de arquitectura relevantes (ADR) a tener en cuenta
 
-El proyecto documenta **59 ADRs** en `adr.md`, con numeración que llega hasta `ADR-061` y huecos en la secuencia. Los más relevantes para generar código nuevo consistente:
+El proyecto documenta **63 ADRs** en `adr.md`, con numeración que llega hasta `ADR-063` y huecos en la secuencia. Los más relevantes para generar código nuevo consistente:
 
 | ADR | Tema |
 | --- | --- |
@@ -116,6 +116,7 @@ El proyecto documenta **59 ADRs** en `adr.md`, con numeración que llega hasta `
 | ADR-32/34 | Motor de recomendaciones por filtrado de contenido |
 | ADR-056 | Componentización del motor de búsqueda de cursos |
 | ADR-061 | Estrategia null-safety en streams Java para compatibilidad con análisis estático |
+| ADR-063 | Paridad funcional de campana para documentos académicos MP4 (alumno/profesor) |
 
 > Cuando pidas una funcionalidad nueva relacionada con alguno de estos temas, dime el número de ADR o el nombre y puedo releerlo entero para no contradecir una decisión ya tomada.
 

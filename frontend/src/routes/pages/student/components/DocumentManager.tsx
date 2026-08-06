@@ -5,6 +5,12 @@ import GenericButton from '../../../../components/ui/genericButton/GenericButton
 import { useDocuments } from './useDocuments';
 import { emitNotificationsRefresh } from '../../../../components/ui/globalNotificationBell/useNotifications';
 import { markDocumentAsRead } from '../../../../services/documentService'; // <-- RECOMENDACIÓN NOTEBOOKLM: Importación del Servicio
+import {
+    ACADEMIC_DOCUMENT_ACCEPT,
+    ACADEMIC_DOCUMENT_ALLOWED_LABEL,
+    ACADEMIC_DOCUMENT_MAX_SIZE_BYTES,
+    buildAcademicDocumentSizeErrorMessage,
+} from '../../../../services/academicDocumentUploadConfig';
 
 /**
  * Componente para gestionar la subida, descarga y visualización de documentos académicos.
@@ -96,9 +102,9 @@ export const DocumentManager = ({
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
 
-            // Validación previa en el cliente para ahorrar ancho de banda (Máx 5MB)
-            if (file.size > 5 * 1024 * 1024) {
-                setDocumentError("El archivo excede el límite de 5MB configurado por el sistema.");
+            // Validación previa en el cliente para ahorrar ancho de banda.
+            if (file.size > ACADEMIC_DOCUMENT_MAX_SIZE_BYTES) {
+                setDocumentError(buildAcademicDocumentSizeErrorMessage());
                 return;
             }
 
@@ -262,7 +268,7 @@ export const DocumentManager = ({
                                 ref={fileInputRef}
                                 hidden
                                 onChange={onFileChange}
-                                accept=".pdf,.docx,.txt"
+                                accept={ACADEMIC_DOCUMENT_ACCEPT}
                                 disabled={isUploading || !selectedReceiverId}
                             />
                             <label
@@ -290,7 +296,7 @@ export const DocumentManager = ({
                                             ? "Elige un destinatario arriba para desbloquear"
                                             : selectedFile
                                                 ? `Archivo listo: ${selectedFile.name}`
-                                                : "Seleccionar archivo (.pdf, .docx, .txt)"
+                                                : `Seleccionar archivo (${ACADEMIC_DOCUMENT_ALLOWED_LABEL})`
                                     }
                                 </span>
                             </label>

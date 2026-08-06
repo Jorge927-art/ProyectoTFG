@@ -161,7 +161,8 @@ public class DocumentControllerTest {
 
                 Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
                 Mockito.when(userRepository.findById(2L)).thenReturn(Optional.of(mockReceiver));
-                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
+                Mockito.when(fileStorageService.storeDocumentFile(any(),
+                                eq(FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS)))
                                 .thenReturn("documents/uuid_mock.pdf");
 
                 ResponseEntity<?> response = documentController.uploadDocument(authentication, validFile, 2L);
@@ -189,16 +190,17 @@ public class DocumentControllerTest {
                 Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
                 Mockito.when(userRepository.findById(2L)).thenReturn(Optional.of(mockReceiver));
 
-                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
+                Mockito.when(fileStorageService.storeDocumentFile(any(),
+                                eq(FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS)))
                                 .thenThrow(new IllegalArgumentException(
-                                                "Extensión de documento no permitida (.exe). Solo se admite PDF, DOCX o TXT."));
+                                                "Extensión de documento no permitida (exe). Solo se admite PDF, DOCX, TXT o MP4."));
 
                 ResponseEntity<?> response = documentController.uploadDocument(authentication, invalidFile, 2L);
 
                 assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
                 Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
                 assertNotNull(bodyMap);
-                assertEquals("Extensión de documento no permitida (.exe). Solo se admite PDF, DOCX o TXT.",
+                assertEquals("Extensión de documento no permitida (exe). Solo se admite PDF, DOCX, TXT o MP4.",
                                 bodyMap.get("error"));
 
                 Mockito.verify(documentMetadataRepository, Mockito.never()).save(any(DocumentMetadata.class));
@@ -255,7 +257,8 @@ public class DocumentControllerTest {
                 Mockito.when(enrollmentRepository.findAllByUserIdWithCourses(1L))
                                 .thenReturn(List.of(enrollment));
 
-                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
+                Mockito.when(fileStorageService.storeDocumentFile(any(),
+                                eq(FileStorageService.DocumentValidationProfile.BASIC_DOCUMENTS)))
                                 .thenReturn("documents/uuid_assignment.pdf");
 
                 ResponseEntity<?> response = documentController.uploadAssignmentDocument(
@@ -386,7 +389,8 @@ public class DocumentControllerTest {
                 enrollmentB.setCourse(course);
 
                 Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
-                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
+                Mockito.when(fileStorageService.storeDocumentFile(any(),
+                                eq(FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS)))
                                 .thenReturn("documents/uuid_bulk.pdf");
                 Mockito.when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(2958L))
                                 .thenReturn(List.of(enrollmentA, enrollmentB));
@@ -454,6 +458,57 @@ public class DocumentControllerTest {
         }
 
         @Test
+        @DisplayName("Debe devolver destinatarios académicos del profesor por curso incluyendo alumnos, profesorado y admins")
+        void debeDevolverDestinatariosAcademicosDelProfesorPorCurso() {
+                Users professor = new Users();
+                professor.setUser_id(10L);
+                professor.setUsername("profesor_juan");
+                professor.setEmail("juan@tfg.com");
+                professor.setRole(Role.PROFESSOR);
+                professor.setEnabled(true);
+
+                Users student = new Users();
+                student.setUser_id(20L);
+                student.setUsername("laura_student");
+                student.setEmail("laura@tfg.com");
+                student.setRole(Role.STUDENT);
+                student.setEnabled(true);
+
+                Users admin = new Users();
+                admin.setUser_id(30L);
+                admin.setUsername("root_admin");
+                admin.setEmail("admin@tfg.com");
+                admin.setRole(Role.ADMIN);
+                admin.setEnabled(true);
+
+                Courses course = new Courses();
+                course.setCourse_id(501L);
+                course.setTitle("Programación I");
+                course.setInstructors("profesor_juan");
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(7001L);
+                enrollment.setUser(student);
+                enrollment.setCourse(course);
+
+                Mockito.when(authentication.getName()).thenReturn("profesor_juan");
+                Mockito.when(userRepository.findByUsername("profesor_juan")).thenReturn(Optional.of(professor));
+                Mockito.when(coursesRepository.findById(501L)).thenReturn(Optional.of(course));
+                Mockito.when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(501L))
+                                .thenReturn(List.of(enrollment));
+                Mockito.when(userRepository.findByRole(Role.PROFESSOR)).thenReturn(List.of(professor));
+                Mockito.when(userRepository.findByRole(Role.ADMIN)).thenReturn(List.of(admin));
+
+                ResponseEntity<?> response = documentController.getProfessorRecipientsByCourse(authentication, 501L);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertTrue(response.getBody() instanceof List);
+
+                List<?> payload = (List<?>) response.getBody();
+                assertEquals(2, payload.size());
+        }
+
+        @Test
         @DisplayName("Debe permitir al admin enviar un documento colectivo a todos los alumnos activos de un curso")
         void debePermitirEnvioColectivoAdminPorCurso() {
                 MockMultipartFile validFile = new MockMultipartFile(
@@ -496,7 +551,8 @@ public class DocumentControllerTest {
                 Mockito.when(coursesRepository.findById(501L)).thenReturn(Optional.of(course));
                 Mockito.when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(501L))
                                 .thenReturn(List.of(enrollmentA, enrollmentB));
-                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
+                Mockito.when(fileStorageService.storeDocumentFile(any(),
+                                eq(FileStorageService.DocumentValidationProfile.BASIC_DOCUMENTS)))
                                 .thenReturn("documents/uuid_circular.pdf");
 
                 ResponseEntity<?> response = documentController.uploadDocumentToCourseByAdmin(authentication, validFile,
@@ -543,7 +599,8 @@ public class DocumentControllerTest {
                 enrollment.setUser(studentA);
                 enrollment.setCourse(course);
 
-                Mockito.when(fileStorageService.storeFile(any(), eq("documents")))
+                Mockito.when(fileStorageService.storeDocumentFile(any(),
+                                eq(FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS)))
                                 .thenReturn("documents/uuid_case.pdf");
                 Mockito.when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(2958L))
                                 .thenReturn(List.of(enrollment));

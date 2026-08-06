@@ -115,7 +115,10 @@ class NotificationDocumentFlowIntegrationTest {
         when(userRepository.findByUsername("alumno_tfg")).thenReturn(Optional.of(studentUser));
         when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(List.of(enrollment));
         when(userRepository.findByUsername("profesor_tfg")).thenReturn(Optional.of(teacherUser));
-        when(fileStorageService.storeFile(any(), eq("documents"))).thenReturn("uploads/documents/proyecto_final.pdf");
+        when(fileStorageService.storeDocumentFile(
+                any(),
+                eq(FileStorageService.DocumentValidationProfile.BASIC_DOCUMENTS)))
+                .thenReturn("uploads/documents/proyecto_final.pdf");
 
         mockMvc.perform(multipart("/api/v1/documents/upload/assignment")
                 .file(assignmentFile)

@@ -43,6 +43,10 @@ vi.mock('../../layouts/DashboardLayout', () => ({
     default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
 }));
 
+vi.mock('./components/ProfessorDocumentManager', () => ({
+    ProfessorDocumentManager: () => <section>Mock Professor Document Manager</section>
+}));
+
 vi.mock('../../../services/evaluationService', () => ({
     getActiveStudentsByCourse: mockedGetActiveStudentsByCourse,
     getProfessorAssignedCourses: mockedGetProfessorAssignedCourses,

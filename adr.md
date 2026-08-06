@@ -2454,3 +2454,47 @@ Aplicar una capa de hardening incremental, compatible con el comportamiento actu
 
 * **Persistencia de tokens en localStorage sigue siendo una deuda de seguridad parcial.**
 * *Mitigación:* mantener token de acceso de vida corta, rotación de refresh y planificar migración progresiva de refresh token a cookie HttpOnly + Secure + SameSite en una decisión posterior.
+
+---
+
+# ADR-063: Paridad Funcional de la Campana para Documentos Académicos MP4
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Agosto 2026
+
+## Contexto
+
+Tras habilitar la subida de archivos MP4 (hasta 100MB) en los flujos académicos de alumno y profesor, se requería confirmar que el sistema de alarmas de la barra de navegación (campana) mantuviera exactamente el mismo comportamiento observado con PDF/DOCX/TXT.
+
+El riesgo principal era introducir una diferencia de comportamiento por tipo de archivo (extensión/MIME), provocando inconsistencias de UX: campana sin activación en archivos de vídeo, o limpieza incompleta al marcar como leído.
+
+## Decisión
+
+Conservar el modelo de notificaciones basado en metadatos de recepción y estado de lectura (`DocumentMetadata`, `folder_type=RECEIVED`, `read=false`) sin condicionar por extensión o MIME, y reforzar la trazabilidad con cobertura explícita para MP4 en frontend.
+
+Reglas consolidadas:
+
+1. La campana se activa por documentos recibidos no leídos, independientemente del tipo de archivo.
+2. La descarga de un recibido no leído ejecuta `markDocumentAsRead(...)` y emite refresh global (`emitNotificationsRefresh()`) en alumno y profesor.
+3. El hook global de notificaciones mantiene redirección contextual de `DOCUMENT_INBOX` por rol, incluyendo `documentId` y `senderId` cuando aplica a profesor.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* Paridad funcional completa entre MP4 y documentos tradicionales en el canal de alarmas.
+* Comportamiento consistente de campana (activación y limpieza) para alumno y profesor.
+* Cobertura automatizada específica para vídeo, reduciendo riesgo de regresión en futuras refactorizaciones.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Mayor superficie de casos de prueba en frontend:** se incrementa el mantenimiento de suites por rol y tipo de flujo.
+* *Mitigación:* centralizar lógica de campana en `useNotifications` y mantener tests focalizados por comportamiento, no por implementación interna.
+
+* **Dependencia del evento global de refresco:** una omisión del broadcast puede degradar la sincronización visual de la campana.
+* *Mitigación:* conservar patrón único `emitNotificationsRefresh()` tras marcado de lectura y validar con pruebas de integración de flujo.

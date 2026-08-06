@@ -116,8 +116,19 @@ export const useDocuments = (successTrigger?: string) => {
             return true;
         } catch (err: unknown) {
             console.error("Error al procesar la subida del documento:", err);
-            const errorConResponse = err as { response?: { data?: { error?: string } } };
-            const backendError = errorConResponse.response?.data?.error || "Error crítico al subir el archivo.";
+            const errorConResponse = err as {
+                response?: {
+                    data?: {
+                        error?: string;
+                        message?: string;
+                        detalles?: string;
+                    };
+                };
+            };
+            const backendError = errorConResponse.response?.data?.error
+                || errorConResponse.response?.data?.message
+                || errorConResponse.response?.data?.detalles
+                || "Error crítico al subir el archivo.";
             setDocumentError(backendError);
             return false;
         } finally {

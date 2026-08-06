@@ -226,4 +226,56 @@ describe('useNotifications', () => {
         expect(hook.result.current.alerts[0].redirectUrl).toContain('/admin?focus=documents');
         expect(hook.result.current.alerts[0].redirectUrl).toContain('documentId=1');
     });
+
+    it('activa DOCUMENT_INBOX con MP4 no leído en alumno igual que con PDF', async () => {
+        currentAlerts = [];
+        currentDocuments = [
+            {
+                ...buildDoc(false),
+                documentid: 88,
+                filename: 'video-feedback.mp4',
+                originalname: 'video-feedback.mp4',
+            },
+        ];
+
+        const hook = renderHook(() => useNotifications(), { wrapper: AuthWrapper });
+
+        await waitFor(() => {
+            expect(hook.result.current.loading).toBe(false);
+        });
+
+        expect(hook.result.current.hasUnread).toBe(true);
+        expect(hook.result.current.alerts[0].type).toBe('DOCUMENT_INBOX');
+        expect(hook.result.current.alerts[0].message).toContain('1 documento(s)');
+        expect(hook.result.current.alerts[0].redirectUrl).toContain('/student?focus=documents');
+        expect(hook.result.current.alerts[0].redirectUrl).toContain('documentId=88');
+    });
+
+    it('activa DOCUMENT_INBOX con MP4 no leído en profesor e incluye senderId', async () => {
+        currentAlerts = [];
+        currentDocuments = [
+            {
+                documentid: 99,
+                filename: 'entrega-video.mp4',
+                originalname: 'entrega-video.mp4',
+                upload_date: '2026-07-15T00:00:00.000Z',
+                sender: { userId: 42, username: 'alumno_video', email: 'alumno_video@tfg.com', role: 'STUDENT' },
+                receiver: { userId: 7, username: 'profesor', email: 'profesor@tfg.com', role: 'PROFESSOR' },
+                folder_type: 'RECEIVED',
+                isRead: false,
+            },
+        ];
+
+        const hook = renderHook(() => useNotifications(), { wrapper: ProfessorAuthWrapper });
+
+        await waitFor(() => {
+            expect(hook.result.current.loading).toBe(false);
+        });
+
+        expect(hook.result.current.hasUnread).toBe(true);
+        expect(hook.result.current.alerts[0].type).toBe('DOCUMENT_INBOX');
+        expect(hook.result.current.alerts[0].redirectUrl).toContain('/professor?focus=documents');
+        expect(hook.result.current.alerts[0].redirectUrl).toContain('documentId=99');
+        expect(hook.result.current.alerts[0].redirectUrl).toContain('senderId=42');
+    });
 });

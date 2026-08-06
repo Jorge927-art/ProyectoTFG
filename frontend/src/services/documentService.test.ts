@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { 
     getAdminDocumentCourses,
     getAdminDocumentRecipients,
+    getProfessorRecipientsByCourse,
     getUserDocuments, 
     getSentDocuments, 
     uploadStudentDocument, 
@@ -133,6 +134,20 @@ describe('documentService - Suite de Pruebas Unitarias de Alta Fidelidad', () =>
         expect(courses).toEqual([{ courseId: 77, title: 'Álgebra', category: 'Matemáticas' }]);
         expect(mockedApi.get).toHaveBeenNthCalledWith(1, '/api/v1/documents/admin/users');
         expect(mockedApi.get).toHaveBeenNthCalledWith(2, '/api/v1/documents/admin/courses');
+    });
+
+    it('debe consultar el directorio de destinatarios académicos del profesor por curso', async () => {
+        mockedApi.get.mockResolvedValueOnce({
+            data: [
+                { userId: 41, username: 'marta_student', email: 'marta@tfg.com', role: 'STUDENT' },
+                { userId: 2, username: 'root_admin', email: 'admin@tfg.com', role: 'ADMIN' }
+            ]
+        });
+
+        const result = await getProfessorRecipientsByCourse(101);
+
+        expect(result).toHaveLength(2);
+        expect(mockedApi.get).toHaveBeenCalledWith('/api/v1/documents/professor/courses/101/recipients');
     });
 
     // --- BLOQUE 3: VALIDACIÓN DE SUBIDA MULTIPART/FORM-DATA (UPLOADS) ---

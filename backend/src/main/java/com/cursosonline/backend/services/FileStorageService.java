@@ -18,6 +18,11 @@ import java.util.UUID;
 @Service
 public class FileStorageService {
 
+    public enum DocumentValidationProfile {
+        BASIC_DOCUMENTS,
+        ACADEMIC_MEDIA_DOCUMENTS
+    }
+
     private final Path rootLocation;
 
     // Extensiones permitidas por categorías
@@ -26,6 +31,7 @@ public class FileStorageService {
     // [ADR-23 REFACTORIZADO]: Ampliación de lista blanca para incluir formatos de
     // texto y procesamiento de palabras
     private final List<String> ALLOWED_DOC_EXTENSIONS = Arrays.asList("pdf", "docx", "txt");
+    private final List<String> ALLOWED_ACADEMIC_MEDIA_EXTENSIONS = Arrays.asList("pdf", "docx", "txt", "mp4");
 
     // Lista blanca estricta de tipos MIME válidos para mitigar ataques de ejecución
     // remota (RCE) y MIME-sniffing
@@ -33,6 +39,11 @@ public class FileStorageService {
             "application/pdf",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "text/plain");
+    private final List<String> ALLOWED_ACADEMIC_MEDIA_MIME_TYPES = Arrays.asList(
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain",
+            "video/mp4");
 
     public FileStorageService(@Value("${spring.servlet.multipart.location}") String uploadDir) {
         this.rootLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
@@ -50,6 +61,14 @@ public class FileStorageService {
     }
 
     public String storeFile(MultipartFile file, String subFolder) {
+        return storeFile(file, subFolder, DocumentValidationProfile.BASIC_DOCUMENTS);
+    }
+
+    public String storeDocumentFile(MultipartFile file, DocumentValidationProfile validationProfile) {
+        return storeFile(file, "documents", validationProfile);
+    }
+
+    private String storeFile(MultipartFile file, String subFolder, DocumentValidationProfile validationProfile) {
         String originalFileName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
         try {
             if (file.isEmpty()) {
@@ -61,7 +80,7 @@ public class FileStorageService {
 
             // AUDITORÍA NOTEBOOKLM: Validación estricta de extensiones y tipos de archivo
             // por carpeta
-            validateFileType(file, originalFileName, subFolder);
+            validateFileType(file, originalFileName, subFolder, validationProfile);
 
             String uniqueFileName = UUID.randomUUID().toString() + "_" + originalFileName;
             Path targetLocation = this.rootLocation.resolve(subFolder).resolve(uniqueFileName);
@@ -77,9 +96,11 @@ public class FileStorageService {
      * Valida de manera estricta que el archivo corresponda al formato permitido
      * para su carpeta.
      */
-    private void validateFileType(MultipartFile file, String filename, String subFolder) {
+    private void validateFileType(MultipartFile file, String filename, String subFolder,
+            DocumentValidationProfile validationProfile) {
         String extension = getFileExtension(filename).toLowerCase();
         String contentType = file.getContentType();
+        String normalizedContentType = contentType != null ? contentType.toLowerCase() : null;
 
         if ("avatars".equalsIgnoreCase(subFolder)) {
             // Validar extensión de imagen
@@ -92,15 +113,32 @@ public class FileStorageService {
                 throw new IllegalArgumentException("El tipo de contenido no corresponde a una imagen válida.");
             }
         } else if ("documents".equalsIgnoreCase(subFolder)) {
+            List<String> allowedExtensions = validationProfile == DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS
+                    ? ALLOWED_ACADEMIC_MEDIA_EXTENSIONS
+                    : ALLOWED_DOC_EXTENSIONS;
+            List<String> allowedMimeTypes = validationProfile == DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS
+                    ? ALLOWED_ACADEMIC_MEDIA_MIME_TYPES
+                    : ALLOWED_DOC_MIME_TYPES;
+
             // [VALIDACIÓN PERIMETRAL DUAL]: Comprobar de forma síncrona que la extensión
             // esté en la lista blanca
-            if (!ALLOWED_DOC_EXTENSIONS.contains(extension)) {
+            if (!allowedExtensions.contains(extension)) {
+                String allowedLabel = validationProfile == DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS
+                        ? "PDF, DOCX, TXT o MP4"
+                        : "PDF, DOCX o TXT";
                 throw new IllegalArgumentException(
-                        "Extensión de documento no permitida (" + extension + "). Solo se admite PDF, DOCX o TXT.");
+                        "Extensión de documento no permitida (" + extension + "). Solo se admite " + allowedLabel
+                                + ".");
             }
             // [VALIDACIÓN PERIMETRAL DUAL]: Comprobar que el tipo MIME coincida
             // estrictamente con el payload transmitido
-            if (contentType == null || !ALLOWED_DOC_MIME_TYPES.contains(contentType.toLowerCase())) {
+            boolean isStandardAllowedMime = normalizedContentType != null
+                    && allowedMimeTypes.contains(normalizedContentType);
+            boolean isMp4FallbackMime = validationProfile == DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS
+                    && "mp4".equals(extension)
+                    && "application/octet-stream".equals(normalizedContentType);
+
+            if (!isStandardAllowedMime && !isMp4FallbackMime) {
                 throw new IllegalArgumentException("El tipo de contenido del documento no es válido o está corrupto.");
             }
         } else {

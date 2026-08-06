@@ -147,6 +147,11 @@ export const getAdminDocumentCourses = async (): Promise<AdminDocumentCourseOpti
     const response = await apiClient.get<AdminDocumentCourseOption[]>('/api/v1/documents/admin/courses');
     return Array.isArray(response.data) ? response.data : [];
 };
+
+export const getProfessorRecipientsByCourse = async (courseId: number): Promise<UserDirectoryDTO[]> => {
+    const response = await apiClient.get<UserDirectoryDTO[]>(`/api/v1/documents/professor/courses/${courseId}/recipients`);
+    return Array.isArray(response.data) ? response.data : [];
+};
 /**
  * [SERVICIO DE CARGA DIRIGIDO]: Envía el archivo físico y asocia el ID del destinatario
  * seleccionado de forma obligatoria para persistir el contrato emisor-receptor.

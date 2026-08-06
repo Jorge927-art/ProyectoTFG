@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { BookOpen, GraduationCap } from 'lucide-react';
 import { useAuth } from '../../../auth/useAuth';
 import ProfessorLayout from '../../layouts/DashboardLayout';
@@ -13,6 +13,7 @@ import { ProfessorCoursePicker } from './components/ProfessorCoursePicker';
 // Centro de Calificación: recepción de trabajos/exámenes y envío de notas
 import { GradingCenter } from './components/GradingCenter';
 import { TeachingMetricsPanel } from './components/TeachingMetricsPanel';
+import { ProfessorDocumentManager } from './components/ProfessorDocumentManager';
 
 // IMPORTACIÓN CENTRALIZADA DE DOMINIOS [DRY]
 import type { TaughtCourse } from '../../../services/userDomains';
@@ -57,7 +58,6 @@ const ProfessorDashboard = () => {
     const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
     // 1. ESTADO DE ASIGNATURAS IMPARTIDAS POR EL PROFESOR
     const [myCourses, setMyCourses] = useState<TaughtCourse[]>([]);
-    const [metricsColumnMinHeight, setMetricsColumnMinHeight] = useState<number>(0);
     const focusSearch = typeof window !== 'undefined' ? window.location.search : '';
     const focusParams = new URLSearchParams(focusSearch);
     const shouldFocusDocuments = focusParams.get('focus') === 'documents';
@@ -72,8 +72,7 @@ const ProfessorDashboard = () => {
     const effectiveSelectedCourseId = selectedCourseId
         ?? (shouldFocusDocuments && myCourses.length > 0 ? myCourses[0].id : null);
 
-    const leftColumnRef = useRef<HTMLDivElement | null>(null);
-    const gradingCenterRef = useRef<HTMLElement | null>(null);
+    const professorDocumentsRef = useRef<HTMLElement | null>(null);
     const senderCourseResolutionDoneRef = useRef(false);
     const studentsByCourseCacheRef = useRef<Map<number, StudentPerformanceDTO[]>>(new Map());
     const studentsByCoursePendingRef = useRef<Map<number, Promise<StudentPerformanceDTO[]>>>(new Map());
@@ -155,36 +154,12 @@ const ProfessorDashboard = () => {
         };
     }, [getStudentsForCourse]);
 
-    useLayoutEffect(() => {
-        const node = leftColumnRef.current;
-        if (!node) return;
-
-        const syncHeight = () => {
-            const shouldSync = window.innerWidth >= 1024;
-            setMetricsColumnMinHeight(shouldSync ? Math.ceil(node.getBoundingClientRect().height) : 0);
-        };
-
-        syncHeight();
-
-        const resizeObserver = new ResizeObserver(() => {
-            syncHeight();
-        });
-        resizeObserver.observe(node);
-
-        window.addEventListener('resize', syncHeight);
-
-        return () => {
-            resizeObserver.disconnect();
-            window.removeEventListener('resize', syncHeight);
-        };
-    }, [myCourses, selectedCourseId]);
-
     useEffect(() => {
         if (!shouldFocusDocuments) {
             return;
         }
 
-        gradingCenterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        professorDocumentsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, [shouldFocusDocuments]);
 
     useEffect(() => {
@@ -320,7 +295,7 @@ const ProfessorDashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
 
                 {/* COLUMNA IZQUIERDA: ASIGNATURAS + CENTRO DE CALIFICACIÓN APILADOS */}
-                <div ref={leftColumnRef} className="lg:col-span-2 space-y-12">
+                <div className="lg:col-span-2 space-y-12">
                     <section>
                         <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                             <BookOpen size={20} className="text-blue-600" />
@@ -336,7 +311,7 @@ const ProfessorDashboard = () => {
                         />
                     </section>
 
-                    <section ref={gradingCenterRef} id="grading-center">
+                    <section id="grading-center">
                         <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                             <GraduationCap size={20} className="text-blue-600" />
                             <span>Centro de Calificación</span>
@@ -353,11 +328,16 @@ const ProfessorDashboard = () => {
                     </section>
                 </div>
 
-                {/* COLUMNA DERECHA: RESUMEN DE MÉTRICAS */}
-                <div
-                    className="lg:col-span-1 lg:sticky lg:top-20 lg:self-stretch lg:flex h-full"
-                    style={metricsColumnMinHeight > 0 ? { minHeight: `${metricsColumnMinHeight}px` } : undefined}
-                >
+                {/* COLUMNA DERECHA: DOCUMENTOS ACADÉMICOS + MÉTRICAS */}
+                <div className="lg:col-span-1 space-y-6">
+                    <section ref={professorDocumentsRef} id="professor-documents-panel">
+                        <ProfessorDocumentManager
+                            availableCourses={myCourses}
+                            autoFocusDocuments={shouldFocusDocuments}
+                            focusDocumentId={focusDocumentId}
+                        />
+                    </section>
+
                     <TeachingMetricsPanel
                         selectedCourseId={effectiveSelectedCourseId}
                         onCourseChange={setSelectedCourseId}

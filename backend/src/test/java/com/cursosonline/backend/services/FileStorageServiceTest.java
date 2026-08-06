@@ -84,6 +84,48 @@ class FileStorageServiceTest {
     }
 
     @Test
+    @DisplayName("Debería almacenar un vídeo MP4 válido en documents cuando el perfil permite medios académicos")
+    void storeAcademicMediaDocumentSuccess() throws IOException {
+        String originalName = "explicacion.mp4";
+        byte[] content = "contenido-falso-mp4".getBytes();
+
+        when(multipartFile.getOriginalFilename()).thenReturn(originalName);
+        when(multipartFile.isEmpty()).thenReturn(false);
+        when(multipartFile.getContentType()).thenReturn("video/mp4");
+        when(multipartFile.getInputStream()).thenAnswer(invocation -> new ByteArrayInputStream(content));
+
+        String resultPath = fileStorageService.storeDocumentFile(
+                multipartFile,
+                FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS);
+
+        assertNotNull(resultPath);
+        assertTrue(resultPath.startsWith("documents/"));
+        assertTrue(resultPath.contains(originalName));
+        assertTrue(Files.exists(sharedTempDir.resolve(resultPath)));
+    }
+
+    @Test
+    @DisplayName("Debería aceptar MP4 con content-type application/octet-stream en perfil académico")
+    void storeAcademicMediaDocumentWithOctetStreamSuccess() throws IOException {
+        String originalName = "clase-grabada.mp4";
+        byte[] content = "contenido-falso-mp4-octet".getBytes();
+
+        when(multipartFile.getOriginalFilename()).thenReturn(originalName);
+        when(multipartFile.isEmpty()).thenReturn(false);
+        when(multipartFile.getContentType()).thenReturn("application/octet-stream");
+        when(multipartFile.getInputStream()).thenAnswer(invocation -> new ByteArrayInputStream(content));
+
+        String resultPath = fileStorageService.storeDocumentFile(
+                multipartFile,
+                FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS);
+
+        assertNotNull(resultPath);
+        assertTrue(resultPath.startsWith("documents/"));
+        assertTrue(resultPath.contains(originalName));
+        assertTrue(Files.exists(sharedTempDir.resolve(resultPath)));
+    }
+
+    @Test
     @DisplayName("Debería lanzar IllegalArgumentException si el archivo está vacío")
     void storeFileEmptyException() {
         when(multipartFile.getOriginalFilename()).thenReturn("vacio.txt");

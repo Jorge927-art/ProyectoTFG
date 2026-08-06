@@ -21,7 +21,7 @@ interface TaughtCoursesGridProps {
 export const TaughtCoursesGrid = ({
     courses
 }: TaughtCoursesGridProps) => {
-    const shouldEnableScroll = courses.length > 4;
+    const shouldEnableScroll = courses.length >= 3;
 
     return (
         <div
@@ -29,7 +29,7 @@ export const TaughtCoursesGrid = ({
             className={`pr-2 custom-scrollbar balance-scroll ${shouldEnableScroll ? 'max-h-136 overflow-y-auto' : 'overflow-y-visible'
                 }`}
         >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
                 {courses.map((course) => (
                     <GenericCard key={course.id}>
                         {/* Cabecera y Datos Reales de Matriculación */}

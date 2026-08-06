@@ -19,6 +19,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
@@ -34,6 +35,9 @@ import java.util.Optional;
 @RequestMapping("/api/v1/documents")
 @Transactional
 public class DocumentController {
+
+    private static final long STANDARD_DOCUMENT_MAX_BYTES = 5L * 1024L * 1024L;
+    private static final long ACADEMIC_MEDIA_DOCUMENT_MAX_BYTES = 100L * 1024L * 1024L;
 
     private final FileStorageService fileStorageService;
     private final DocumentMetadataRepository documentMetadataRepository;
@@ -111,6 +115,98 @@ public class DocumentController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                     "error", "Error al recuperar el directorio administrativo de cursos",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
+    /**
+     * Endpoint para que el profesor recupere destinatarios válidos de una
+     * asignatura: alumnado activo del curso, profesorado asociado al curso y
+     * administradores globales.
+     */
+    @GetMapping("/professor/courses/{courseId}/recipients")
+    @PreAuthorize("hasAnyAuthority('PROFESSOR','ADMIN')")
+    public ResponseEntity<?> getProfessorRecipientsByCourse(
+            Authentication authentication,
+            @PathVariable("courseId") Long courseId) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            Users currentUser = resolveAuthenticatedUser(authentication.getName(),
+                    "Usuario autenticado no encontrado.");
+
+            Courses selectedCourse = coursesRepository.findById(courseId)
+                    .orElseThrow(() -> new RuntimeException("La asignatura seleccionada no existe."));
+
+            Map<Long, UserDirectoryDTO> recipientsById = new LinkedHashMap<>();
+
+            List<Enrollment> activeEnrollments = enrollmentRepository
+                    .findActiveStudentEnrollmentsByCourseId(courseId);
+            for (Enrollment enrollment : activeEnrollments) {
+                Users student = enrollment.getUser();
+                if (student == null || !Boolean.TRUE.equals(student.getEnabled()) || student.getUser_id() == null) {
+                    continue;
+                }
+
+                recipientsById.put(student.getUser_id(),
+                        new UserDirectoryDTO(
+                                student.getUser_id(),
+                                student.getUsername(),
+                                student.getEmail(),
+                                student.getRole() != null ? student.getRole().name() : "UNKNOWN"));
+            }
+
+            String instructors = selectedCourse.getInstructors() != null ? selectedCourse.getInstructors() : "";
+            List<Users> professors = userRepository.findByRole(Role.PROFESSOR);
+            for (Users professor : professors) {
+                if (professor.getUser_id() == null || !Boolean.TRUE.equals(professor.getEnabled())) {
+                    continue;
+                }
+
+                boolean assignedProfessor = selectedCourse.getAssignedUser() != null
+                        && Objects.equals(selectedCourse.getAssignedUser().getUser_id(), professor.getUser_id());
+                boolean listedInCourse = !instructors.isBlank()
+                        && professor.getUsername() != null
+                        && instructors.contains(professor.getUsername());
+
+                if (assignedProfessor || listedInCourse) {
+                    recipientsById.put(professor.getUser_id(),
+                            new UserDirectoryDTO(
+                                    professor.getUser_id(),
+                                    professor.getUsername(),
+                                    professor.getEmail(),
+                                    professor.getRole() != null ? professor.getRole().name() : "UNKNOWN"));
+                }
+            }
+
+            List<Users> admins = userRepository.findByRole(Role.ADMIN);
+            for (Users admin : admins) {
+                if (admin.getUser_id() == null || !Boolean.TRUE.equals(admin.getEnabled())) {
+                    continue;
+                }
+
+                recipientsById.put(admin.getUser_id(),
+                        new UserDirectoryDTO(
+                                admin.getUser_id(),
+                                admin.getUsername(),
+                                admin.getEmail(),
+                                admin.getRole() != null ? admin.getRole().name() : "UNKNOWN"));
+            }
+
+            recipientsById.remove(currentUser.getUser_id());
+
+            List<UserDirectoryDTO> recipients = recipientsById.values().stream()
+                    .sorted(Comparator
+                            .comparing(dto -> dto.getUsername() != null ? dto.getUsername().toLowerCase() : ""))
+                    .toList();
+
+            return ResponseEntity.ok(recipients);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error al recuperar destinatarios académicos del profesor",
                     "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
         }
     }
@@ -303,6 +399,9 @@ public class DocumentController {
                         .body(Map.of("error", "El archivo transmitido está vacío o es inválido."));
             }
 
+            validateFileSize(file, ACADEMIC_MEDIA_DOCUMENT_MAX_BYTES,
+                    "El archivo excede el límite de 100MB configurado para documentos académicos.");
+
             Users currentUser = resolveAuthenticatedUser(authentication.getName(), "Usuario emisor no encontrado.");
 
             if (currentUser.getUser_id().equals(receiverId)) {
@@ -313,7 +412,9 @@ public class DocumentController {
             Users receiverUser = userRepository.findById(receiverId)
                     .orElseThrow(() -> new RuntimeException("El usuario destinatario no existe."));
 
-            String relativePath = fileStorageService.storeFile(file, "documents");
+            String relativePath = fileStorageService.storeDocumentFile(
+                    file,
+                    FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS);
             String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
 
             persistDirectedDocumentPair(relativePath, cleanOriginalName, currentUser, receiverUser, null);
@@ -350,6 +451,9 @@ public class DocumentController {
                         .body(Map.of("error", "El archivo transmitido está vacío o es inválido."));
             }
 
+            validateFileSize(file, STANDARD_DOCUMENT_MAX_BYTES,
+                    "El archivo excede el límite de 5MB configurado para envíos administrativos.");
+
             Users currentUser = resolveAuthenticatedUser(authentication.getName(),
                     "Usuario administrador emisor no encontrado.");
 
@@ -363,7 +467,9 @@ public class DocumentController {
                                 "No se puede realizar el envío colectivo porque no hay alumnos activos matriculados en la asignatura."));
             }
 
-            String relativePath = fileStorageService.storeFile(file, "documents");
+            String relativePath = fileStorageService.storeDocumentFile(
+                    file,
+                    FileStorageService.DocumentValidationProfile.BASIC_DOCUMENTS);
             String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
 
             for (Enrollment enrollment : classEnrollments) {
@@ -419,6 +525,9 @@ public class DocumentController {
                         .body(Map.of("error", "El archivo transmitido está vacío o es inválido."));
             }
 
+            validateFileSize(file, STANDARD_DOCUMENT_MAX_BYTES,
+                    "El archivo excede el límite de 5MB configurado para entregas académicas.");
+
             Users currentUser = resolveAuthenticatedUser(authentication.getName(), "Usuario emisor no encontrado.");
 
             // Selección determinista y acotada al alumno autenticado para evitar
@@ -462,7 +571,9 @@ public class DocumentController {
                                 "El profesor '" + targetInstructor + "' no está registrado como usuario activo."));
             }
 
-            String relativePath = fileStorageService.storeFile(file, "documents");
+            String relativePath = fileStorageService.storeDocumentFile(
+                    file,
+                    FileStorageService.DocumentValidationProfile.BASIC_DOCUMENTS);
             String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
 
             DocumentMetadata sentMetadata = new DocumentMetadata();
@@ -791,11 +902,18 @@ public class DocumentController {
                         .body(Map.of("error", "El archivo transmitido está vacío o es inválido."));
             }
 
+            validateFileSize(file, ACADEMIC_MEDIA_DOCUMENT_MAX_BYTES,
+                    "El archivo excede el límite de 100MB configurado para documentos académicos.");
+
             Users currentUser = resolveAuthenticatedUser(authentication.getName(),
                     "Usuario profesor emisor no encontrado.");
 
+            Courses selectedCourse = coursesRepository.findById(courseId).orElse(null);
+
             // Almacenamos el archivo una sola vez físicamente en el disco
-            String relativePath = fileStorageService.storeFile(file, "documents");
+            String relativePath = fileStorageService.storeDocumentFile(
+                    file,
+                    FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS);
             String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
 
             // CASO A: ENVÍO MASIVO A TODA LA CLASE (receiverId == 0)
@@ -820,6 +938,7 @@ public class DocumentController {
                         bulkSentPerStudent.setOriginalname(cleanOriginalName);
                         bulkSentPerStudent.setSender(currentUser);
                         bulkSentPerStudent.setReceiver(classStudent);
+                        bulkSentPerStudent.setCourse(selectedCourse);
                         bulkSentPerStudent.setFolder_type(FolderType.SENT);
                         documentMetadataRepository.save(bulkSentPerStudent);
 
@@ -829,6 +948,7 @@ public class DocumentController {
                         bulkReceived.setOriginalname(cleanOriginalName);
                         bulkReceived.setSender(currentUser);
                         bulkReceived.setReceiver(classStudent);
+                        bulkReceived.setCourse(selectedCourse);
                         bulkReceived.setFolder_type(FolderType.RECEIVED);
                         bulkReceived.setRead(false);
                         documentMetadataRepository.save(bulkReceived);
@@ -849,6 +969,7 @@ public class DocumentController {
             singleSent.setOriginalname(cleanOriginalName);
             singleSent.setSender(currentUser);
             singleSent.setReceiver(receiverUser);
+            singleSent.setCourse(selectedCourse);
             singleSent.setFolder_type(FolderType.SENT);
             documentMetadataRepository.save(singleSent);
 
@@ -857,6 +978,7 @@ public class DocumentController {
             singleReceived.setOriginalname(cleanOriginalName);
             singleReceived.setSender(currentUser);
             singleReceived.setReceiver(receiverUser);
+            singleReceived.setCourse(selectedCourse);
             singleReceived.setFolder_type(FolderType.RECEIVED);
             singleReceived.setRead(false);
             documentMetadataRepository.save(singleReceived);
@@ -891,6 +1013,12 @@ public class DocumentController {
 
         return userRepository.findByEmailIgnoreCase(principalName)
                 .orElseThrow(() -> new RuntimeException(notFoundMessage));
+    }
+
+    private void validateFileSize(MultipartFile file, long maxBytes, String errorMessage) {
+        if (file.getSize() > maxBytes) {
+            throw new IllegalArgumentException(errorMessage);
+        }
     }
 
     private void persistDirectedDocumentPair(String relativePath, String cleanOriginalName, Users sender,

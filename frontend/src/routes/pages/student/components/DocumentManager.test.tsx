@@ -250,13 +250,14 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
         render(<DocumentManager />);
 
         const fileInput = document.getElementById('doc-upload-input') as HTMLInputElement;
-        const largeFile = new File(['a'.repeat(6 * 1024 * 1024)], 'Ensayo_Largo.pdf', { type: 'application/pdf' });
+        const largeFile = new File(['x'], 'Ensayo_Largo.mp4', { type: 'video/mp4' });
+        Object.defineProperty(largeFile, 'size', { value: 101 * 1024 * 1024 });
 
         fireEvent.change(fileInput, { target: { files: [largeFile] } });
 
         await waitFor(() => {
             expect(mockSetDocumentError).toHaveBeenCalledWith(
-                "El archivo excede el límite de 5MB configurado por el sistema."
+                "El archivo excede el límite de 100MB configurado por el sistema."
             );
             expect(mockHandleUpload).not.toHaveBeenCalled();
         });
@@ -332,7 +333,7 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
         render(<DocumentManager />);
 
         const fileInput = document.getElementById('doc-upload-input') as HTMLInputElement;
-        const validFile = new File(['contenido'], 'Entrega.txt', { type: 'text/plain' });
+        const validFile = new File(['contenido-video'], 'Entrega.mp4', { type: 'video/mp4' });
 
         fireEvent.change(fileInput, { target: { files: [validFile] } });
         fireEvent.click(screen.getByRole('button', { name: /Enviar documento/i }));
@@ -420,6 +421,54 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
 
         expect(mockMarkDocumentAsRead).not.toHaveBeenCalled();
         expect(mockEmitNotificationsRefresh).not.toHaveBeenCalled();
+    });
+
+    it('debe activar campana al descargar un MP4 recibido no leído (mismo flujo que documentos)', async () => {
+        mockHandleSecureDownload.mockResolvedValueOnce(undefined);
+        mockMarkDocumentAsRead.mockResolvedValueOnce({
+            message: 'Documento marcado como leído correctamente.',
+            documentId: 31,
+            isRead: true,
+        });
+
+        const mockDocuments = [
+            {
+                documentid: 31,
+                filename: 'video-31.mp4',
+                originalname: 'Correccion_Algebra.mp4',
+                upload_date: '2026-07-06T10:00:00.000Z',
+                sender: { userId: 2, username: 'profesor_juan', email: 'juan@tfg.com', role: 'PROFESSOR' },
+                receiver: { userId: 1, username: 'luis_student', email: 'luis@tfg.com', role: 'STUDENT' },
+                folder_type: 'RECEIVED' as const,
+                isRead: false
+            }
+        ];
+
+        useDocumentsSpy.mockReturnValue({
+            documentList: mockDocuments,
+            activeTab: 'RECEIVED',
+            setActiveTab: mockSetActiveTab,
+            loadingDocuments: false,
+            isUploading: false,
+            documentError: '',
+            setDocumentError: mockSetDocumentError,
+            directory: [],
+            loadingDirectory: false,
+            selectedReceiverId: '',
+            setSelectedReceiverId: mockSetSelectedReceiverId,
+            handleUpload: mockHandleUpload,
+            handleSecureDownload: mockHandleSecureDownload
+        });
+
+        render(<DocumentManager />);
+
+        fireEvent.click(screen.getByRole('button', { name: /Descargar documento 31/i }));
+
+        await waitFor(() => {
+            expect(mockHandleSecureDownload).toHaveBeenCalledWith(31, 'Correccion_Algebra.mp4');
+            expect(mockMarkDocumentAsRead).toHaveBeenCalledWith(31);
+            expect(mockEmitNotificationsRefresh).toHaveBeenCalledTimes(1);
+        });
     });
 });
 

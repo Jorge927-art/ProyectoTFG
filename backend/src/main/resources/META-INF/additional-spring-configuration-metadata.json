@@ -6,6 +6,36 @@
       "description": "Lista de orígenes permitidos para CORS separados por coma."
     },
     {
+      "name": "app.jwt.secret",
+      "type": "java.lang.String",
+      "description": "Clave secreta usada para firmar y verificar tokens JWT.",
+      "defaultValue": "change-me-in-local-and-tests-please"
+    },
+    {
+      "name": "app.jwt.issuer",
+      "type": "java.lang.String",
+      "description": "Emisor lógico de los tokens JWT.",
+      "defaultValue": "cursosonline-backend"
+    },
+    {
+      "name": "app.jwt.access-token-expiration-minutes",
+      "type": "java.lang.Long",
+      "description": "Tiempo de vida del access token en minutos.",
+      "defaultValue": 15
+    },
+    {
+      "name": "app.jwt.refresh-token-expiration-days",
+      "type": "java.lang.Long",
+      "description": "Tiempo de vida del refresh token en días.",
+      "defaultValue": 7
+    },
+    {
+      "name": "app.jwt.clock-skew-seconds",
+      "type": "java.lang.Long",
+      "description": "Margen de tolerancia para diferencias de reloj al validar JWT.",
+      "defaultValue": 60
+    },
+    {
       "name": "app.security.protected-username",
       "type": "java.lang.String",
       "description": "Nombre de usuario protegido contra eliminación permanente."

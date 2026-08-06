@@ -84,16 +84,14 @@ describe('TaughtCoursesGrid - Suite de Pruebas Unitarias de la Cuadrícula del P
         expect(screen.queryByRole('button', { name: 'Gestionar Curso' })).not.toBeInTheDocument();
     });
 
-    it('Debe mantener la cuadrícula sin scroll cuando hay un máximo de 4 asignaturas', () => {
-        const fourCourses: readonly Course[] = [
+    it('Debe mantener la lista sin scroll cuando hay hasta 2 asignaturas', () => {
+        const twoCourses: readonly Course[] = [
             ...sampleCoursesList,
-            { id: 103, category: 'CLOUD', title: 'Fundamentos de Kubernetes', studentsCount: 22 },
-            { id: 104, category: 'DEVOPS', title: 'Pipelines CI/CD con GitHub Actions', studentsCount: 19 }
         ];
 
         render(
             <TaughtCoursesGrid
-                courses={fourCourses}
+                courses={twoCourses}
             />
         );
 
@@ -102,17 +100,15 @@ describe('TaughtCoursesGrid - Suite de Pruebas Unitarias de la Cuadrícula del P
         expect(scrollContainer.className).not.toContain('overflow-y-auto');
     });
 
-    it('Debe activar el scroll vertical cuando se superan 4 asignaturas', () => {
-        const fiveCourses: readonly Course[] = [
+    it('Debe activar el scroll vertical con 3 o más asignaturas', () => {
+        const threeCourses: readonly Course[] = [
             ...sampleCoursesList,
             { id: 103, category: 'CLOUD', title: 'Fundamentos de Kubernetes', studentsCount: 22 },
-            { id: 104, category: 'DEVOPS', title: 'Pipelines CI/CD con GitHub Actions', studentsCount: 19 },
-            { id: 105, category: 'ARQUITECTURA', title: 'Patrones de Microservicios', studentsCount: 31 }
         ];
 
         render(
             <TaughtCoursesGrid
-                courses={fiveCourses}
+                courses={threeCourses}
             />
         );
 
