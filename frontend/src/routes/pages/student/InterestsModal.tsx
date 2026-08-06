@@ -38,6 +38,7 @@ export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps)
     // Estado de carga para feedback visual y evitar doble post
     const [loading, setLoading] = useState(false);
 
+
     // 3. HIDRATACIÓN SÍNCRONA DESDE EL CONTRATO INICIAL DE SESIÓN (ADR-28)
     useEffect(() => {
         if (isOpen) {
