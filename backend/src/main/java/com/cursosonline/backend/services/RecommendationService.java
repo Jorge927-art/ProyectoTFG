@@ -154,7 +154,7 @@ public class RecommendationService {
             }
 
             if (maxProgressInTemplate >= 100)
-                historyScore = 25;
+                historyScore = 20;
             else if (maxProgressInTemplate >= 75)
                 historyScore = 15;
             else if (maxProgressInTemplate >= 50)

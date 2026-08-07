@@ -192,4 +192,33 @@ class RecommendationServiceTest {
 
         verify(coursesRepository, times(1)).findAll();
     }
+
+    @Test
+    @DisplayName("PESOS [Ajuste]: historial académico al 100% debe aportar 20 puntos máximos")
+    void getRecommendations_HistoryScoreCap20_WhenProgressIsAtLeast100() {
+        // Arrange: curso plantilla ya cursado en la misma categoría para activar el
+        // bonus histórico
+        Courses completedTemplateCourse = new Courses();
+        completedTemplateCourse.setCourse_id(900L);
+        completedTemplateCourse.setTitle("Plantilla Completada");
+        completedTemplateCourse.setCategory("Ciencia de Datos");
+
+        Enrollment completedEnrollment = new Enrollment();
+        completedEnrollment.setCourse(completedTemplateCourse);
+        completedEnrollment.setProgress_percentage(100);
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(Arrays.asList(completedEnrollment));
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1, course2));
+
+        // Act
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        // Assert: curso1 recibe categoría (30) + historial completo (20) = 50
+        RecommendationDTO topRecommendation = results.get(0);
+        assertEquals(101L, topRecommendation.id());
+        assertEquals(50, topRecommendation.score(),
+                "El peso total esperado debe ser 50 (30 por categoría + 20 por historial >= 100). ");
+    }
 }
