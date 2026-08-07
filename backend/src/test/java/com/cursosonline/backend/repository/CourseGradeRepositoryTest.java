@@ -102,7 +102,7 @@ class CourseGradeRepositoryTest {
         grade.setEnrollment(enrollment);
         grade.setTitle(title);
         grade.setScore(new BigDecimal(score));
-        grade.setFeedback("feedback");
+        grade.setComments("feedback");
         return courseGradeRepository.saveAndFlush(grade);
     }
 

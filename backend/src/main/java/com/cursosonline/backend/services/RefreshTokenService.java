@@ -17,6 +17,12 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.HexFormat;
 
+/**
+ * Servicio responsable de la gestión de tokens de actualización (refresh
+ * tokens) en el sistema.
+ * Proporciona funcionalidades para emitir, rotar y revocar refresh tokens,
+ * asegurando la seguridad y validez de las sesiones de usuario.
+ */
 @Service
 @RequiredArgsConstructor
 public class RefreshTokenService {
@@ -26,6 +32,13 @@ public class RefreshTokenService {
     private final JwtService jwtService;
     private final AuthRefreshTokenRepository authRefreshTokenRepository;
 
+    /**
+     * Emite un nuevo refresh token para un usuario dado y lo persiste en la base de
+     * datos.
+     * 
+     * @param user El usuario para el cual se emitirá el refresh token.
+     * @return El refresh token emitido como una cadena.
+     */
     @Transactional
     public String issueRefreshToken(Users user) {
         if (user == null || user.getUser_id() == null) {
@@ -37,6 +50,14 @@ public class RefreshTokenService {
         return refreshToken;
     }
 
+    /**
+     * Rota un refresh token existente, revocando el token actual y emitiendo uno
+     * nuevo.
+     * 
+     * @param rawRefreshToken El refresh token actual que se desea rotar.
+     * @return Un objeto RefreshTokenResponse que contiene el nuevo access token y
+     *         refresh token.
+     */
     @Transactional
     public RefreshTokenResponse rotate(String rawRefreshToken) {
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
@@ -99,6 +120,13 @@ public class RefreshTokenService {
         return new RefreshTokenResponse(newAccessToken, newRefreshToken, "Bearer", expiresInSeconds);
     }
 
+    /**
+     * Revoca un refresh token si está presente en la base de datos, marcándolo como
+     * revocado y registrando la fecha y hora de revocación.
+     * 
+     * @param rawRefreshToken El refresh token que se desea revocar, si está
+     *                        presente en la base de datos.
+     */
     @Transactional
     public void revokeIfPresent(String rawRefreshToken) {
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
@@ -117,6 +145,12 @@ public class RefreshTokenService {
         });
     }
 
+    /**
+     * Valida la estructura y el tipo de un refresh token dado, asegurando que sea
+     * válido y de tipo "refresh".
+     * 
+     * @param rawRefreshToken El refresh token que se desea validar.
+     */
     private void validateRefreshTokenStructure(String rawRefreshToken) {
         try {
             if (!jwtService.isTokenValid(rawRefreshToken)) {
@@ -134,6 +168,14 @@ public class RefreshTokenService {
         }
     }
 
+    /**
+     * Persiste un refresh token en la base de datos, asociándolo a un usuario y
+     * almacenando su hash, JTI y fecha de expiración.
+     * 
+     * @param user            El usuario al que se asociará el refresh token.
+     * @param rawRefreshToken El refresh token que se desea persistir.
+     * @return El objeto AuthRefreshToken persistido en la base de datos.
+     */
     private AuthRefreshToken persistToken(Users user, String rawRefreshToken) {
         String jti = jwtService.extractJti(rawRefreshToken);
         Instant expiresAt = jwtService.extractExpiration(rawRefreshToken);
@@ -152,6 +194,13 @@ public class RefreshTokenService {
         return authRefreshTokenRepository.save(token);
     }
 
+    /**
+     * Calcula el hash SHA-256 de un refresh token dado, utilizado para almacenar y
+     * buscar tokens de manera segura en la base de datos.
+     * 
+     * @param rawRefreshToken El refresh token del cual se desea calcular el hash.
+     * @return El hash SHA-256 del refresh token.
+     */
     private String hashToken(String rawRefreshToken) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

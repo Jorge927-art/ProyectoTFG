@@ -16,6 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Servicio de Recomendaciones de Cursos Personalizadas
+ * Basado en los intereses del usuario, historial de matrículas y afinidad de
+ * cursos.
+ */
 @Service
 @RequiredArgsConstructor
 public class RecommendationService {
@@ -25,6 +30,16 @@ public class RecommendationService {
     private final EnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
 
+    /**
+     * Obtiene una lista de recomendaciones de cursos para un usuario dado.
+     * La recomendación se basa en los intereses del usuario, su historial de
+     * matrículas y la afinidad de los cursos disponibles.
+     * 
+     * @param username El nombre de usuario del cual se obtendrán las
+     *                 recomendaciones.
+     * @return Una lista de objetos RecommendationDTO que representan los cursos
+     *         recomendados.
+     */
     @Transactional(readOnly = true)
     public List<RecommendationDTO> getRecommendations(String username) {
         if (username == null || username.trim().isEmpty()) {
@@ -43,6 +58,17 @@ public class RecommendationService {
         return buildRecommendations(interests, myEnrollments, allCourses);
     }
 
+    /**
+     * Obtiene una lista de recomendaciones de cursos para un usuario dado por su
+     * ID.
+     * La recomendación se basa en los intereses del usuario, su historial de
+     * matrículas y la afinidad de los cursos disponibles.
+     * 
+     * @param userId El ID del usuario para el cual se obtendrán las
+     *               recomendaciones.
+     * @return Una lista de objetos RecommendationDTO que representan los cursos
+     *         recomendados.
+     */
     @Transactional(readOnly = true)
     public List<RecommendationDTO> getRecommendationsForUser(Long userId) {
         if (userId == null) {
@@ -56,6 +82,16 @@ public class RecommendationService {
         return buildRecommendations(interests, myEnrollments, allCourses);
     }
 
+    /**
+     * Construye una lista de recomendaciones de cursos basada en los intereses del
+     * usuario, su historial de matrículas y la afinidad de los cursos disponibles.
+     * 
+     * @param interests     Los intereses del usuario.
+     * @param myEnrollments El historial de matrículas del usuario.
+     * @param allCourses    Todos los cursos disponibles.
+     * @return Una lista de objetos RecommendationDTO que representan los cursos
+     *         recomendados.
+     */
     private List<RecommendationDTO> buildRecommendations(
             Interest interests,
             List<Enrollment> myEnrollments,
@@ -69,8 +105,6 @@ public class RecommendationService {
                 .map(e -> e.getCourse().getCourse_id())
                 .collect(Collectors.toSet());
 
-        // FASE DE TRADUCCIÓN: Extracción previa y unificación a Tokens nativos
-        // independientes
         Set<String> userCategoryTokens = interests != null ? normalizeCollection(interests.getCategory())
                 : Collections.emptySet();
         Set<String> userLevelTokens = interests != null ? normalizeCollection(interests.getCourse_type())
@@ -92,6 +126,20 @@ public class RecommendationService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Calcula la afinidad de un curso con los intereses del usuario y su historial
+     * de matrículas.
+     * 
+     * @param course             El curso para el cual se calcula la afinidad.
+     * @param userCategoryTokens Los tokens de categoría del usuario.
+     * @param userLevelTokens    Los tokens de nivel del usuario.
+     * @param userLanguageTokens Los tokens de idioma del usuario.
+     * @param userSubtitleTokens Los tokens de subtítulos del usuario.
+     * @param rawDurations       Las duraciones de interés del usuario.
+     * @param myEnrollments      El historial de matrículas del usuario.
+     * @return Un objeto RecommendationDTO que representa la afinidad del curso con
+     *         el usuario.
+     */
     private RecommendationDTO calculateAffinityWithTokens(
             Courses course,
             Set<String> userCategoryTokens,
@@ -104,7 +152,7 @@ public class RecommendationService {
         double score = 0;
         StringBuilder reason = new StringBuilder();
 
-        // 1. Evaluación de Precondiciones emparejando a nivel de Token Semántico local
+        // Evaluación de Precondiciones emparejando a nivel de Token Semántico local
         String courseCategoryToken = normalizeSingle(course.getCategory());
         boolean isCategoryMatch = userCategoryTokens.contains(courseCategoryToken);
 
@@ -136,7 +184,7 @@ public class RecommendationService {
         }
         boolean isDurationMatch = checkDurationMatch(course.getDuration(), rawDurations);
 
-        // 2. MODELO POR ESCALONES CRECIENTES DEL HISTORIAL ACADÉMICO
+        // MODELO POR ESCALONES CRECIENTES DEL HISTORIAL ACADÉMICO
         int historyScore = 0;
         int maxProgressInTemplate = 0;
 
@@ -161,7 +209,7 @@ public class RecommendationService {
                 historyScore = 8;
         }
 
-        // 3. Acumulación Estricta de la Matriz de Pesos (Total 100 pts)
+        // Acumulación Estricta de la Matriz de Pesos (Total 100 pts)
         if (isCategoryMatch)
             score += 30;
         score += historyScore;
@@ -174,7 +222,7 @@ public class RecommendationService {
         if (isDurationMatch)
             score += 5;
 
-        // 4. GENERACIÓN DE EXPLICABILIDAD DINÁMICA
+        // GENERACIÓN DE EXPLICABILIDAD DINÁMICA
         if (isCategoryMatch) {
             reason.append("Coincide con tus categorías preferidas (").append(course.getCategory()).append("). ");
         }
@@ -209,6 +257,14 @@ public class RecommendationService {
         return new RecommendationDTO(course, (int) score, finalReason);
     }
 
+    /**
+     * Verifica si la duración del curso coincide con las preferencias del usuario.
+     * 
+     * @param courseHours        La duración del curso en horas.
+     * @param preferredDurations Las duraciones preferidas por el usuario.
+     * @return true si la duración del curso coincide con las preferencias del
+     *         usuario, false en caso contrario.
+     */
     private static boolean checkDurationMatch(Number courseHours, List<String> preferredDurations) {
         if (courseHours == null || preferredDurations == null || preferredDurations.isEmpty())
             return false;
@@ -225,8 +281,15 @@ public class RecommendationService {
     }
 
     /**
-     * ABSORCIÓN NATIVA DE SEMANTIC NORMALIZER:
-     * Convierte una cadena de texto libre en un token unificado e invariable.
+     * Normaliza una cadena de entrada a un token semántico único.
+     * La normalización incluye:
+     * - Conversión a minúsculas.
+     * - Eliminación de acentos.
+     * - Reemplazo de espacios por guiones bajos.
+     * - Eliminación de caracteres no alfanuméricos.
+     * 
+     * @param input La cadena de entrada a normalizar.
+     * @return El token semántico normalizado.
      */
     private static String normalizeSingle(String input) {
         if (input == null) {
@@ -244,10 +307,16 @@ public class RecommendationService {
     }
 
     /**
-     * ABSORCIÓN NATIVA DE SEMANTIC NORMALIZER:
-     * Transforma colecciones o estructuras delimitadas por comas en colecciones de
-     * tokens semánticos únicos.
-     * Blindado con supresión de alertas de casteo y validación anticipada de nulos.
+     * Normaliza una colección de entradas a un conjunto de tokens semánticos
+     * únicos.
+     * La normalización incluye:
+     * - Conversión a minúsculas.
+     * - Eliminación de acentos.
+     * - Reemplazo de espacios por guiones bajos.
+     * - Eliminación de caracteres no alfanuméricos.
+     * 
+     * @param input La colección de entradas a normalizar.
+     * @return El conjunto de tokens semánticos normalizados.
      */
     @SuppressWarnings("unchecked")
     private static Set<String> normalizeCollection(Object input) {

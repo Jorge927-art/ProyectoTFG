@@ -100,6 +100,12 @@ public class UserController {
                         avatarPath, interests));
     }
 
+    /**
+     * Endpoint para refrescar el token JWT utilizando un refresh token válido.
+     * 
+     * @param request La solicitud que contiene el refresh token.
+     * @return Una respuesta con el nuevo token JWT y el refresh token actualizado.
+     */
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@RequestBody RefreshTokenRequest request) {
         try {
@@ -111,6 +117,12 @@ public class UserController {
         }
     }
 
+    /**
+     * Endpoint para cerrar la sesión del usuario y revocar el refresh token.
+     * 
+     * @param request La solicitud que contiene el refresh token.
+     * @return Una respuesta indicando el éxito de la operación.
+     */
     @PostMapping("/logout")
     public ResponseEntity<?> logout(@RequestBody(required = false) RefreshTokenRequest request) {
         String refreshToken = request != null ? request.refreshToken() : null;

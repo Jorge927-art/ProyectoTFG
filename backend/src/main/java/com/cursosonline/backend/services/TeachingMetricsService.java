@@ -30,10 +30,14 @@ public class TeachingMetricsService {
     private final UserService userService;
 
     /**
-     * Resuelve el ámbito de asignaturas para el profesor autenticado:
-     * - courseId == null => TODOS: todas las asignaturas que imparte.
-     * - courseId != null => valida que el profesor realmente la imparte antes
-     * de devolver un ámbito de una sola asignatura.
+     * Resuelve la lista de IDs de asignaturas que el profesor autenticado puede
+     * consultar.
+     * Si se pasa un courseId concreto, se valida que el profesor lo imparta.
+     * 
+     * @param courseId          El ID de la asignatura que se desea consultar, o
+     *                          null para todas las asignaturas del profesor.
+     * @param professorUsername El nombre de usuario del profesor autenticado.
+     * @return Una lista de IDs de asignaturas que el profesor puede consultar.
      */
     private List<Long> resolveCourseIds(Long courseId, String professorUsername) {
         List<Courses> assigned = coursesRepository.findAllAssignedToProfessor(professorUsername);
@@ -56,9 +60,14 @@ public class TeachingMetricsService {
     }
 
     /**
-     * Calcula el resumen agregado (progreso colectivo, tasa de finalización,
-     * nota media) para el ámbito
-     * resuelto.
+     * Calcula el resumen de métricas de docencia para un profesor y una asignatura
+     * concreta o todas sus asignaturas.
+     * 
+     * @param courseId          El ID de la asignatura que se desea consultar, o
+     *                          null para todas las asignaturas del profesor.
+     * @param professorUsername El nombre de usuario del profesor autenticado.
+     * @return Un objeto TeachingMetricsSummaryDTO que contiene las métricas
+     *         agregadas.
      */
     public TeachingMetricsSummaryDTO getSummary(Long courseId, String professorUsername) {
         List<Long> courseIds = resolveCourseIds(courseId, professorUsername);
@@ -101,6 +110,12 @@ public class TeachingMetricsService {
     /**
      * Calcula el desglose individual por alumno (progreso y nota media) para
      * el ámbito resuelto, usado por "Progreso Alumno" y "Nota Alumno".
+     * 
+     * @param courseId          El ID de la asignatura que se desea consultar, o
+     *                          null para todas las asignaturas del profesor.
+     * @param professorUsername El nombre de usuario del profesor autenticado.
+     * @return Una lista de objetos StudentMetricBreakdownDTO que contienen las
+     *         métricas individuales por alumno.
      */
     public List<StudentMetricBreakdownDTO> getStudentBreakdown(Long courseId, String professorUsername) {
         List<Long> courseIds = resolveCourseIds(courseId, professorUsername);

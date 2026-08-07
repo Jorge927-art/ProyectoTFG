@@ -57,7 +57,7 @@ public class TeacherEvaluationController {
 
         String teacherUsername = principal.getName();
 
-        // 1. BLINDAJE DE SEGURIDAD EXCLUSIVO: ¿Es este profesor el instructor real del
+        // BLINDAJE DE SEGURIDAD EXCLUSIVO: ¿Es este profesor el instructor real del
         // curso?
         boolean isAuthorized = enrollmentRepository.isInstructorAuthorizedForEnrollment(
                 request.enrollmentId(),
@@ -69,7 +69,7 @@ public class TeacherEvaluationController {
                     "Acceso denegado: No eres el instructor asignado a esta asignatura o la matrícula no existe."));
         }
 
-        // 2. RECUPERACIÓN Y PERSISTENCIA DE LA CALIFICACIÓN EN POSTGRESQL
+        // RECUPERACIÓN Y PERSISTENCIA DE LA CALIFICACIÓN EN POSTGRESQL
         Enrollment enrollment = enrollmentRepository.findById(request.enrollmentId())
                 .orElseThrow(() -> new IllegalArgumentException("Matrícula no encontrada"));
 
@@ -95,7 +95,7 @@ public class TeacherEvaluationController {
             CourseGrade finalCourseGrade = new CourseGrade();
             finalCourseGrade.setTitle(requestedTitle);
             finalCourseGrade.setScore(request.score());
-            finalCourseGrade.setFeedback(request.feedback());
+            finalCourseGrade.setComments(request.feedback());
             finalCourseGrade.setEnrollment(enrollment);
             courseGradeRepository.save(finalCourseGrade);
 
@@ -115,7 +115,7 @@ public class TeacherEvaluationController {
             if (existingExam != null) {
                 existingExam.setTitle(requestedTitle);
                 existingExam.setScore(request.score());
-                existingExam.setFeedback(request.feedback());
+                existingExam.setComments(request.feedback());
                 courseGradeRepository.save(existingExam);
 
                 return ResponseEntity.ok(Map.of(
@@ -136,18 +136,24 @@ public class TeacherEvaluationController {
         CourseGrade newGrade = new CourseGrade();
         newGrade.setTitle(resolvedTitle);
         newGrade.setScore(request.score());
-        newGrade.setFeedback(request.feedback());
+        newGrade.setComments(request.feedback());
         newGrade.setEnrollment(enrollment);
 
-        // enrollment.addGrade(newGrade);
         courseGradeRepository.save(newGrade);
-        // enrollmentRepository.save(enrollment);
 
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Calificación registrada con éxito por el docente autorizado."));
     }
 
+    /**
+     * Endpoint GET para que un profesor obtenga las calificaciones de un estudiante
+     * en una matrícula específica.
+     * 
+     * @param enrollmentId
+     * @param principal
+     * @return
+     */
     @GetMapping("/enrollments/{enrollmentId}/grades")
     public ResponseEntity<?> getEnrollmentGrades(@PathVariable Long enrollmentId, Principal principal) {
         if (principal == null) {
@@ -174,6 +180,13 @@ public class TeacherEvaluationController {
         return ResponseEntity.ok(grades);
     }
 
+    /**
+     * Determina si un título de calificación corresponde a un examen o evaluación
+     * final.
+     * 
+     * @param title
+     * @return
+     */
     private boolean isExamGradeTitle(String title) {
         String normalized = title.toLowerCase(Locale.ROOT);
 
@@ -191,6 +204,13 @@ public class TeacherEvaluationController {
                 || normalized.equals("final");
     }
 
+    /**
+     * Determina si un título de calificación corresponde a la Nota Final de la
+     * Asignatura.
+     * 
+     * @param title
+     * @return
+     */
     private boolean isFinalCourseGradeTitle(String title) {
         return title.trim().equalsIgnoreCase("Nota Final Asignatura");
     }

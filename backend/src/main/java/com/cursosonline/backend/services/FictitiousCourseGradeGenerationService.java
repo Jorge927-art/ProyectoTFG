@@ -206,7 +206,7 @@ public class FictitiousCourseGradeGenerationService {
         grade.setEnrollment(enrollment);
         grade.setTitle(title);
         grade.setScore(score);
-        grade.setFeedback(null);
+        grade.setComments(null);
         courseGradeRepository.save(grade);
     }
 

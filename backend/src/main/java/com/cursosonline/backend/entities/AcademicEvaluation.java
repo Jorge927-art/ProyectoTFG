@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "academic_evaluations", uniqueConstraints = {
-        // [BLINDAJE DE IDENTIDAD TFG]: Impide estrictamente que un alumno
+        // Impide estrictamente que un alumno
         // duplique evaluaciones para la misma asignatura matriculada.
         @UniqueConstraint(columnNames = { "user_id", "course_id" })
 })
@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class AcademicEvaluation {
 
+    // Identificador único de la evaluación académica
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long evaluationid;
@@ -33,6 +34,7 @@ public class AcademicEvaluation {
     @Column(nullable = false)
     private Integer course_score; // Puntuación numérica local (1-5 estrellas)
 
+    // Retroalimentación textual opcional sobre el curso
     @Column(name = "course_comment", columnDefinition = "TEXT")
     private String courseComment; // Retroalimentación textual opcional sobre el curso
 
@@ -40,6 +42,7 @@ public class AcademicEvaluation {
     @Column(nullable = false)
     private Integer instructor_score; // Puntuación numérica local (1-5 estrellas)
 
+    // Retroalimentación textual opcional sobre el instructor
     @Column(name = "instructor_comment", columnDefinition = "TEXT")
     private String instructorComment; // Retroalimentación textual opcional sobre el profesor
 
@@ -47,11 +50,13 @@ public class AcademicEvaluation {
     @Column(nullable = false)
     private LocalDateTime evaluation_date = LocalDateTime.now();
 
+    // Relaciones con otras entidades
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = true) // nullable: permite anonimizar tras baja permanente
     private Users user; // El estudiante autenticado que emite el voto(puede ser null si la cuenta fue
                         // eliminada)
 
+    // Relación con la entidad Courses para obtener información del curso evaluado
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id", nullable = false)
     private Courses course; // El curso asociado (sirve como ancla y contiene el String de instructores)

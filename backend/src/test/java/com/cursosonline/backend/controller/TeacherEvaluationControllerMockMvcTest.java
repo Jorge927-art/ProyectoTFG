@@ -101,7 +101,7 @@ class TeacherEvaluationControllerMockMvcTest {
                 CourseGrade persisted = captor.getValue();
                 assertEquals("Examen Final Modulo 1", persisted.getTitle());
                 assertEquals(new BigDecimal("9.50"), persisted.getScore());
-                assertEquals(feedback, persisted.getFeedback());
+                assertEquals(feedback, persisted.getComments());
                 assertEquals(enrollmentId, persisted.getEnrollment().getEnrollmentid());
 
                 verify(enrollmentRepository, times(1)).isInstructorAuthorizedForEnrollment(eq(enrollmentId),

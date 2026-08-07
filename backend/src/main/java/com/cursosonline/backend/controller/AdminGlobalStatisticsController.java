@@ -23,11 +23,21 @@ public class AdminGlobalStatisticsController {
 
     private final AdminGlobalStatisticsService adminGlobalStatisticsService;
 
+    /**
+     * Obtiene las estadísticas globales de la plataforma.
+     * 
+     * @return
+     */
     @GetMapping("/global")
     public ResponseEntity<AdminGlobalStatisticsDTO> getGlobalStatistics() {
         return ResponseEntity.ok(adminGlobalStatisticsService.getGlobalStatistics());
     }
 
+    /**
+     * Finaliza el histórico anual de estadísticas y genera un snapshot consolidado.
+     * 
+     * @return
+     */
     @PostMapping("/global/finalize-previous-year")
     public ResponseEntity<Map<String, Object>> finalizePreviousYearSnapshot() {
         int finalizedYear = adminGlobalStatisticsService.finalizePreviousYearSnapshotNow();

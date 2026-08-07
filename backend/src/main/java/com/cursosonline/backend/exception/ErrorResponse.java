@@ -5,7 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.util.Map;
 
-@Data // Genera getters, setters, toString, etc. automáticamente
+@Data
 @AllArgsConstructor
 @NoArgsConstructor
 

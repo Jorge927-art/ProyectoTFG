@@ -39,6 +39,14 @@ public class AdminGlobalStatisticsService {
 
     private Clock clock = Clock.systemDefaultZone();
 
+    /**
+     * Obtiene las estadísticas globales actuales y de años anteriores.
+     * Si no existen datos históricos para años anteriores, se generan de manera
+     * ficticia a partir de los datos actuales.
+     * 
+     * @return AdminGlobalStatisticsDTO que contiene las estadísticas globales
+     *         actuales y de años anteriores.
+     */
     @Transactional
     public AdminGlobalStatisticsDTO getGlobalStatistics() {
         int currentYear = Year.now(clock).getValue();
@@ -75,7 +83,9 @@ public class AdminGlobalStatisticsService {
     }
 
     /**
-     * Consolida el año cerrado y sustituye cualquier dato ficticio por dato real.
+     * Finaliza el snapshot del año anterior y lo guarda en la base de datos.
+     * Este método se ejecuta automáticamente mediante un cron job al inicio del
+     * año.
      */
     @Scheduled(cron = "${app.admin.global-stats.finalize-cron:0 10 0 1 1 *}", zone = "${app.admin.global-stats.time-zone:Europe/Madrid}")
     @Transactional
@@ -83,11 +93,23 @@ public class AdminGlobalStatisticsService {
         finalizePreviousYearSnapshotInternal();
     }
 
+    /**
+     * Finaliza el snapshot del año anterior y lo guarda en la base de datos.
+     * Este método se puede invocar manualmente para forzar la finalización del
+     * snapshot.
+     * 
+     * @return El año del snapshot finalizado.
+     */
     @Transactional
     public int finalizePreviousYearSnapshotNow() {
         return finalizePreviousYearSnapshotInternal();
     }
 
+    /**
+     * Finaliza el snapshot del año anterior y lo guarda en la base de datos.
+     * 
+     * @return El año del snapshot finalizado.
+     */
     private int finalizePreviousYearSnapshotInternal() {
         int currentYear = Year.now(clock).getValue();
         int previousYear = currentYear - 1;
@@ -109,6 +131,17 @@ public class AdminGlobalStatisticsService {
         return previousYear;
     }
 
+    /**
+     * Si no existe un registro histórico para el año objetivo, genera un registro
+     * ficticio basado en los datos actuales y un factor de escala.
+     * Esto asegura que siempre haya datos disponibles para años anteriores, incluso
+     * si no se han recopilado datos reales.
+     * 
+     * @param targetYear El año objetivo para el cual se debe garantizar un registro
+     *                   histórico.
+     * @param current    El snapshot actual de las estadísticas globales.
+     * @param factor     El factor de escala para generar datos ficticios.
+     */
     private void ensureFictitiousHistoryIfMissing(int targetYear, CurrentGlobalSnapshot current, double factor) {
         if (historyRepository.findBySnapshotYear(targetYear).isPresent()) {
             return;
@@ -138,6 +171,12 @@ public class AdminGlobalStatisticsService {
         historyRepository.save(row);
     }
 
+    /**
+     * Calcula el snapshot actual de las estadísticas globales, incluyendo el total
+     * de estudiantes, profesores y la lista de cursos principales.
+     * 
+     * @return El snapshot actual de las estadísticas globales.
+     */
     private CurrentGlobalSnapshot calculateCurrentSnapshot() {
         int totalStudents = safeLongToInt(userRepository.countByRoleAndEnabledTrue(Role.STUDENT));
         int totalProfessors = safeLongToInt(userRepository.countByRoleAndEnabledTrue(Role.PROFESSOR));
@@ -158,6 +197,17 @@ public class AdminGlobalStatisticsService {
         return new CurrentGlobalSnapshot(totalStudents, totalProfessors, topCourseEnrollment, topCourses);
     }
 
+    /**
+     * Convierte un registro histórico de estadísticas globales en un DTO de
+     * comparación de años.
+     * Si el registro histórico es nulo, se devuelve un DTO con valores
+     * predeterminados.
+     * 
+     * @param history El registro histórico de estadísticas globales.
+     * @param year    El año para el cual se realiza la comparación.
+     * @return Un DTO de comparación de años que representa los datos históricos o
+     *         valores predeterminados si el historial es nulo.
+     */
     private AdminGlobalYearComparisonDTO toComparison(AdminGlobalStatsHistory history, int year) {
         if (history == null) {
             return new AdminGlobalYearComparisonDTO(year, 0, 0, 0, false);
@@ -171,6 +221,13 @@ public class AdminGlobalStatisticsService {
                 history.isRealData());
     }
 
+    /**
+     * Convierte una lista de DTOs de cursos principales en una lista de entidades
+     * históricas de cursos principales.
+     * 
+     * @param topCourses La lista de DTOs de cursos principales.
+     * @return Una lista de entidades históricas de cursos principales.
+     */
     private List<AdminGlobalTopCourseHistory> toHistoryItems(List<AdminGlobalTopCourseDTO> topCourses) {
         List<AdminGlobalTopCourseHistory> items = new ArrayList<>();
         int rank = 1;
@@ -187,6 +244,15 @@ public class AdminGlobalStatisticsService {
         return items;
     }
 
+    /**
+     * Convierte un valor long a int de manera segura, asegurando que no se exceda
+     * el rango de int.
+     * Si el valor es mayor que Integer.MAX_VALUE, se devuelve Integer.MAX_VALUE.
+     * 
+     * @param value El valor long que se desea convertir a int.
+     * @return El valor convertido a int, asegurando que no se exceda el rango de
+     *         int.
+     */
     private int safeLongToInt(long value) {
         if (value > Integer.MAX_VALUE) {
             return Integer.MAX_VALUE;
@@ -197,6 +263,14 @@ public class AdminGlobalStatisticsService {
         return (int) value;
     }
 
+    /**
+     * Resuelve el número máximo de estudiantes matriculados en una lista de cursos
+     * principales.
+     * 
+     * @param courses La lista de cursos principales.
+     * @return El número máximo de estudiantes matriculados en los cursos
+     *         principales.
+     */
     private int resolveMaxEnrolledStudents(List<AdminGlobalTopCourseDTO> courses) {
         if (courses == null || courses.isEmpty()) {
             return 0;
@@ -217,6 +291,19 @@ public class AdminGlobalStatisticsService {
         return max;
     }
 
+    /**
+     * Registro interno que representa un snapshot actual de las estadísticas
+     * globales.
+     * Contiene el total de estudiantes, total de profesores, la cantidad de
+     * estudiantes matriculados en el curso principal y la lista de cursos
+     * principales.
+     * 
+     * @param totalStudents       El total de estudiantes.
+     * @param totalProfessors     El total de profesores.
+     * @param topCourseEnrollment La cantidad de estudiantes matriculados en el
+     *                            curso principal.
+     * @param topCourses          La lista de cursos principales.
+     */
     private record CurrentGlobalSnapshot(
             int totalStudents,
             int totalProfessors,

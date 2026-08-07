@@ -211,11 +211,11 @@ public class UserService {
         Long userId = user.getUser_id();
 
         try {
-            // 1. Documentos enviados o recibidos por el usuario
+            // Documentos enviados o recibidos por el usuario
             documentMetadataRepository.deleteAllBySenderOrReceiver(userId);
             userSystemNotificationRepository.deleteAllByReceiverUserId(userId);
 
-            // 2. Si es PROFESSOR: desasignar (no borrar) sus cursos
+            // Si es PROFESSOR: desasignar (no borrar) sus cursos
             if (user.getRole() == Role.PROFESSOR) {
                 List<Courses> assigned = getAssignedCoursesForProfessor(username);
                 for (Courses course : assigned) {
@@ -224,7 +224,7 @@ public class UserService {
                 }
             }
 
-            // 3. Si es STUDENT: anonimizar valoraciones (NO borrarlas) y borrar
+            // Si es STUDENT: anonimizar valoraciones (NO borrarlas) y borrar
             // matrículas propias
             if (user.getRole() == Role.STUDENT) {
                 List<AcademicEvaluation> evaluations = academicEvaluationRepository.findByUserId(userId);
@@ -237,12 +237,12 @@ public class UserService {
                 enrollmentRepository.deleteAll(enrollments); // cascada -> CourseGrade
             }
 
-            // 4. Perfil e intereses personales (clave primaria compartida, no cascadean
+            // Perfil e intereses personales (clave primaria compartida, no cascadean
             // solos)
             userProfileRepository.findById(userId).ifPresent(userProfileRepository::delete);
             interestRepository.findById(userId).ifPresent(interestRepository::delete);
 
-            // 5. Finalmente, el propio usuario
+            // Finalmente, el propio usuario
             userRepository.delete(user);
             userRepository.flush();
         } catch (DataIntegrityViolationException ex) {
@@ -309,11 +309,11 @@ public class UserService {
      */
     @Transactional
     public void saveUserInterests(String username, InterestDTO dto) {
-        // 1. Validar la existencia del usuario en el sistema con excepción semántica
+        // Validar la existencia del usuario en el sistema con excepción semántica
         Users user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
 
-        // 2. Buscar si ya tiene un registro de intereses previo. Si no existe, creamos
+        // Buscar si ya tiene un registro de intereses previo. Si no existe, creamos
         // uno nuevo con ID síncrono.
         Interest interest = interestRepository.findById(user.getUser_id())
                 .orElseGet(() -> {
@@ -323,7 +323,7 @@ public class UserService {
                     return interestRepository.save(newInterest);
                 });
 
-        // 3. Mapear y actualizar el contenido de los listados preservando las
+        // Mapear y actualizar el contenido de los listados preservando las
         // referencias de Hibernate [ADR-18]
         updateCollection(interest.getCategory(), dto.categories());
         updateCollection(interest.getCourse_type(), dto.levels());
@@ -331,7 +331,7 @@ public class UserService {
         updateCollection(interest.getLanguage(), dto.languages());
         updateCollection(interest.getSubtitle_languages(), dto.subtitles());
 
-        // 4. Persistir los cambios forzando el volcado directo a PostgreSQL y sus 5
+        // Persistir los cambios forzando el volcado directo a PostgreSQL y sus 5
         // tablas satélite
         interestRepository.saveAndFlush(interest);
     }
@@ -362,22 +362,14 @@ public class UserService {
      */
     @Transactional(readOnly = true)
     public List<Courses> searchCourses(String keyword) {
-        // Configuramos el límite exacto a 12 elementos solicitados para la UI (Página
-        // 0, Tamaño 12)
         Pageable pageSize = PageRequest.of(0, 12);
-
-        // Si el buscador está vacío, devolvemos los 12 primeros de forma segura
         if (keyword == null || keyword.trim().isEmpty()) {
             return coursesRepository.findAll(pageSize).getContent();
         }
-
         String cleanKeyword = keyword.trim();
         // Creamos los dos patrones de coincidencia de forma nativa en Java
         String formattedKeyword = "%" + cleanKeyword + "%"; // Para buscar en cualquier parte
         String startKeyword = cleanKeyword + "%"; // Para priorizar si empieza por la palabra
-
-        // [CORREGIDO] Invocamos al repositorio paginado y desenvolvemos la lista con
-        // .getContent()
         return coursesRepository.searchCoursesPredictive(formattedKeyword, startKeyword, pageSize).getContent();
     }
 
@@ -658,7 +650,7 @@ public class UserService {
      */
     @Transactional(readOnly = true)
     public List<Enrollment> getStudentActiveCoursesWithCalculatedProgress(Long userId) {
-        // 1. Recuperamos la lista directa desde la relación JOIN FETCH del repositorio
+        // Recuperamos la lista directa desde la relación JOIN FETCH del repositorio
         List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(userId);
 
         List<Long> enrollmentIds = enrollments.stream()
@@ -682,7 +674,7 @@ public class UserService {
             }
         }
 
-        // 2. Recorremos cada matrícula para inyectar proactivamente el progreso
+        // Recorremos cada matrícula para inyectar proactivamente el progreso
         // dinámico transcurrido e hidratar las notas correspondientes
         for (Enrollment enrollment : enrollments) {
             int currentProgress = calculateCurrentProgress(enrollment);
@@ -694,7 +686,7 @@ public class UserService {
             enrollment.setGrades(enrollmentGrades);
         }
 
-        // 3. Devolvemos la lista perfectamente calculada y sincronizada
+        // Devolvemos la lista perfectamente calculada y sincronizada
         return enrollments;
     }
 
@@ -738,7 +730,7 @@ public class UserService {
             return alerts;
         }
 
-        // 1. Documentos/trabajos/exámenes recibidos y NO leídos — aplica a los 3 roles
+        // Documentos/trabajos/exámenes recibidos y NO leídos — aplica a los 3 roles
         List<com.cursosonline.backend.entities.DocumentMetadata> unreadDocs = documentMetadataRepository
                 .findUnreadReceivedDocumentsByUsername(username);
         if (unreadDocs != null && !unreadDocs.isEmpty()) {
@@ -834,7 +826,7 @@ public class UserService {
     private void appendProgressNotificationsSafely(Users user, String username,
             List<com.cursosonline.backend.dto.NotificationDTO> alerts) {
         try {
-            // 2. Estudiante: su propia asignatura al 95% de tiempo consumido
+            // Estudiante: su propia asignatura al 95% de tiempo consumido
             if (user.getRole() == Role.STUDENT) {
                 List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(user.getUser_id());
                 if (enrollments != null) {
@@ -852,7 +844,7 @@ public class UserService {
                 }
             }
 
-            // 3. Profesor: alumno propio al 90% de tiempo consumido de su asignatura
+            // Profesor: alumno propio al 90% de tiempo consumido de su asignatura
             if (user.getRole() == Role.PROFESSOR) {
                 List<Long> courseIds = getAssignedCoursesForProfessor(username).stream()
                         .map(course -> course != null ? course.getCourse_id() : null)
@@ -959,7 +951,7 @@ public class UserService {
      */
     @Transactional
     public Courses assignUserToCourse(String username, Long courseId) {
-        // 1. Validar la existencia del usuario en el sistema
+        // Validar la existencia del usuario en el sistema
         Users user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con el username: " + username));
 
@@ -968,29 +960,29 @@ public class UserService {
                     "Acción inválida: solo las cuentas PROFESSOR pueden autoasignarse asignaturas.");
         }
 
-        // 2. Validar la existencia del curso en el catálogo de PostgreSQL
+        // Validar la existencia del curso en el catálogo de PostgreSQL
         Courses course = coursesRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Curso no encontrado en el catálogo con el ID: " + courseId));
 
-        // 3. Control de Ocupación Preventivo: Validar si el curso ya está asignado a
+        // Control de Ocupación Preventivo: Validar si el curso ya está asignado a
         // otro usuario
         if (course.getAssignedUser() != null) {
             throw new ServicesException(
                     "Este curso está gestionado por Administración. La asignación solo puede modificarse por un administrador.");
         }
 
-        // 4. Establecer la vinculación relacional fuerte (JPA mapeará la clave
+        // Establecer la vinculación relacional fuerte (JPA mapeará la clave
         // assigned_user_id)
         course.setAssignedUser(user);
 
-        // 5. Mantener sincronía de texto con las búsquedas predictivas existentes si es
+        // Mantener sincronía de texto con las búsquedas predictivas existentes si es
         // un profesor
         if (user.getRole() == Role.PROFESSOR || user.getRole() == Role.PROFESSOR) {
             course.setInstructors(user.getUsername());
         }
 
-        // 6. Volcar los cambios de forma transaccional directa a PostgreSQL
+        // Volcar los cambios de forma transaccional directa a PostgreSQL
         Courses savedCourse = coursesRepository.saveAndFlush(course);
         adminCourseCatalogService.markCourseAsEverUsed(savedCourse.getCourse_id());
         return savedCourse;

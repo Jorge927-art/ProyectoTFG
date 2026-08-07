@@ -167,6 +167,69 @@ class RefreshTokenServiceTest {
     }
 
     @Test
+    @DisplayName("rotate debe revocar y rechazar si el jti no coincide (detección de reuso/robo)")
+    void rotate_WithJtiMismatch_ShouldRevokeAndThrow() {
+        Users user = enabledUser();
+        String refreshToken = "refresh-jti-mismatch";
+
+        AuthRefreshToken persisted = new AuthRefreshToken();
+        persisted.setTokenId(501L);
+        persisted.setUser(user);
+        persisted.setRevoked(false);
+        persisted.setJti("jti-persistido");
+        persisted.setExpiresAt(LocalDateTime.now().plusHours(2));
+
+        when(jwtService.isTokenValid(refreshToken)).thenReturn(true);
+        when(jwtService.extractTokenTypeOrNull(refreshToken)).thenReturn("refresh");
+        when(authRefreshTokenRepository.findByTokenHash(eq(sha256(refreshToken)))).thenReturn(Optional.of(persisted));
+        when(jwtService.extractJti(refreshToken)).thenReturn("jti-robado");
+        when(authRefreshTokenRepository.save(any(AuthRefreshToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ServicesException ex = assertThrows(ServicesException.class, () -> refreshTokenService.rotate(refreshToken));
+
+        assertEquals("Refresh token inválido o revocado.", ex.getMessage());
+        assertTrue(persisted.isRevoked());
+        assertNotNull(persisted.getRevokedAt());
+        assertNotNull(persisted.getLastUsedAt());
+        verify(authRefreshTokenRepository).save(persisted);
+        verify(jwtService, never()).generateAccessToken(any(), any(), any());
+        verify(jwtService, never()).generateRefreshToken(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("rotate debe revocar y rechazar cuando el usuario está deshabilitado")
+    void rotate_WithDisabledUser_ShouldRevokeAndThrow() {
+        Users disabledUser = enabledUser();
+        disabledUser.setEnabled(false);
+        String refreshToken = "refresh-disabled-user";
+
+        AuthRefreshToken persisted = new AuthRefreshToken();
+        persisted.setTokenId(777L);
+        persisted.setUser(disabledUser);
+        persisted.setRevoked(false);
+        persisted.setJti("jti-disabled");
+        persisted.setExpiresAt(LocalDateTime.now().plusHours(2));
+
+        when(jwtService.isTokenValid(refreshToken)).thenReturn(true);
+        when(jwtService.extractTokenTypeOrNull(refreshToken)).thenReturn("refresh");
+        when(authRefreshTokenRepository.findByTokenHash(eq(sha256(refreshToken)))).thenReturn(Optional.of(persisted));
+        when(jwtService.extractJti(refreshToken)).thenReturn("jti-disabled");
+        when(authRefreshTokenRepository.save(any(AuthRefreshToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ServicesException ex = assertThrows(ServicesException.class, () -> refreshTokenService.rotate(refreshToken));
+
+        assertEquals("No se puede renovar la sesión de este usuario.", ex.getMessage());
+        assertTrue(persisted.isRevoked());
+        assertNotNull(persisted.getRevokedAt());
+        assertNotNull(persisted.getLastUsedAt());
+        verify(authRefreshTokenRepository).save(persisted);
+        verify(jwtService, never()).generateAccessToken(any(), any(), any());
+        verify(jwtService, never()).generateRefreshToken(any(), any(), any());
+    }
+
+    @Test
     @DisplayName("revokeIfPresent debe marcar como revocado cuando existe token")
     void revokeIfPresent_ShouldRevokeStoredToken() {
         String activeRefresh = "refresh-active";

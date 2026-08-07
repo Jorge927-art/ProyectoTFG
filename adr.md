@@ -1291,7 +1291,7 @@ Se requería un motor de sugerencias personalizado dentro del panel del estudian
 
 ## Decisión
 
-Diseñar y desarrollar un servicio especializado (`RecommendationService.java`) que implementa un algoritmo de Filtrado Basado en Contenido (*Content-Based Filtering*). El motor opera de forma determinista bajo una matriz de pesos en memoria (30% Categoría, 25% Historial, 20% Nivel, 15% Idioma, 10% Duración). El enrutamiento se expone en `/api/courses/recommendations` resolviendo la identidad mediante el *Claim* del token JWT [ADR-29], y el cliente en React se conecta de forma reactiva a través del gancho personalizado `useSmartRecommendations.ts`.
+Diseñar y desarrollar un servicio especializado (`RecommendationService.java`) que implementa un algoritmo de Filtrado Basado en Contenido (*Content-Based Filtering*). El motor opera de forma determinista bajo una matriz de pesos en memoria (30% Categoría, 20% Historial, 20% Nivel, 15% Idioma, 10%  Subtitulos, 5% Duración). El enrutamiento se expone en `/api/courses/recommendations` resolviendo la identidad mediante el *Claim* del token JWT [ADR-29], y el cliente en React se conecta de forma reactiva a través del gancho personalizado `useSmartRecommendations.ts`.
 
 ## Justificación para el TFG
 

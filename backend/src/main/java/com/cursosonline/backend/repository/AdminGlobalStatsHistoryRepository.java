@@ -8,6 +8,12 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Repositorio para la entidad AdminGlobalStatsHistory, proporcionando métodos
+ * de
+ * CRUD y consultas personalizadas relacionadas con el historial de estadísticas
+ * de AdminGlobalStatsHistory.
+ */
 public interface AdminGlobalStatsHistoryRepository extends JpaRepository<AdminGlobalStatsHistory, Long> {
 
     Optional<AdminGlobalStatsHistory> findBySnapshotYear(Integer snapshotYear);

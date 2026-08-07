@@ -22,6 +22,12 @@ public class CourseStatsController {
 
     private final UserService userService;
 
+    /**
+     * Constructor de la clase CourseStatsController.
+     * 
+     * @param userService Servicio utilizado para obtener las estadísticas del
+     *                    curso.
+     */
     public CourseStatsController(UserService userService) {
         this.userService = userService;
     }

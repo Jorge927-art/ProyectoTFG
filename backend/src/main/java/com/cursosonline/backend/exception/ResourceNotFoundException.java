@@ -10,13 +10,23 @@ package com.cursosonline.backend.exception;
  */
 public class ResourceNotFoundException extends ServicesException {
 
-    // Constructor original: Se mantiene para búsquedas por ID numérico
+    /**
+     * Constructor que crea una nueva instancia de ResourceNotFoundException con un
+     * mensaje específico.
+     * 
+     * @param resource El nombre del recurso que no fue encontrado.
+     * @param id       El identificador del recurso que no fue encontrado.
+     */
     public ResourceNotFoundException(String resource, Long id) {
         super(resource + " con ID " + id + " no encontrado.");
     }
 
-    // Auditoría NotebookLM: Nuevo constructor sobrecargado para permitir
-    // mensajes directos basados en texto (ej. búsquedas por username).
+    /**
+     * Constructor que crea una nueva instancia de ResourceNotFoundException con un
+     * mensaje específico.
+     * 
+     * @param message El mensaje de error que describe la excepción.
+     */
     public ResourceNotFoundException(String message) {
         super(message);
     }

@@ -18,6 +18,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+/**
+ * Servicio de administración del catálogo de cursos.
+ * Proporciona funcionalidades para crear, actualizar, eliminar y listar cursos
+ * AdminCourseCatalogService
+ */
 @Service
 @RequiredArgsConstructor
 public class AdminCourseCatalogService {
@@ -44,6 +49,14 @@ public class AdminCourseCatalogService {
     private final CoursesRepository coursesRepository;
     private final EnrollmentRepository enrollmentRepository;
 
+    /**
+     * Obtiene el catálogo completo de cursos para administración.
+     * Cada curso se representa como un objeto AdminCourseCatalogItemDTO, que
+     * contiene la información relevante para la administración.
+     * 
+     * @return Una lista de objetos AdminCourseCatalogItemDTO que representan el
+     *         catálogo de cursos.
+     */
     @Transactional(readOnly = true)
     public List<AdminCourseCatalogItemDTO> getAdminCourseCatalog() {
         List<Courses> courses = coursesRepository.findAllByOrderByTitleAsc();
@@ -59,6 +72,13 @@ public class AdminCourseCatalogService {
                 .toList();
     }
 
+    /**
+     * Crea un nuevo curso en el catálogo de administración.
+     * 
+     * @param request El objeto AdminCourseCreateRequestDTO que contiene la
+     *                información del nuevo curso.
+     * @return Un objeto AdminCourseCatalogItemDTO que representa el curso creado.
+     */
     @Transactional
     public AdminCourseCatalogItemDTO createCourse(AdminCourseCreateRequestDTO request) {
         if (request == null) {
@@ -94,6 +114,17 @@ public class AdminCourseCatalogService {
         return toCatalogItem(saved, false);
     }
 
+    /**
+     * Realiza una actualización parcial de un curso existente en el catálogo de
+     * administración.
+     * Se pueden modificar campos específicos del curso, pero algunos campos están
+     * restringidos si el curso ya ha sido utilizado.
+     * 
+     * @param courseId El ID del curso a actualizar.
+     * @param changes  Un mapa que contiene los cambios a aplicar al curso.
+     * @return Un objeto AdminCourseCatalogItemDTO que representa el curso
+     *         actualizado.
+     */
     @Transactional
     public AdminCourseCatalogItemDTO patchCourse(Long courseId, Map<String, Object> changes) {
         Courses course = coursesRepository.findById(courseId)
@@ -121,6 +152,12 @@ public class AdminCourseCatalogService {
         return toCatalogItem(saved, used);
     }
 
+    /**
+     * Elimina un curso del catálogo de administración.
+     * Solo se permite eliminar cursos que no estén en uso.
+     * 
+     * @param courseId El ID del curso a eliminar.
+     */
     @Transactional
     public void deleteCourse(Long courseId) {
         Courses course = coursesRepository.findById(courseId)
@@ -134,6 +171,14 @@ public class AdminCourseCatalogService {
         coursesRepository.flush();
     }
 
+    /**
+     * Marca un curso como "ever used" (usado alguna vez) en el catálogo de
+     * administración.
+     * Esto indica que el curso ha sido utilizado en algún momento, aunque
+     * actualmente no tenga matrículas activas.
+     * 
+     * @param courseId El ID del curso a marcar como "ever used".
+     */
     @Transactional
     public void markCourseAsEverUsed(Long courseId) {
         if (courseId == null) {
@@ -149,6 +194,12 @@ public class AdminCourseCatalogService {
         });
     }
 
+    /**
+     * Valida que las claves proporcionadas para la actualización parcial sean
+     * permitidas.
+     * 
+     * @param keys Las claves a validar.
+     */
     private void validatePatchKeys(Set<String> keys) {
         for (String key : keys) {
             if (!PATCHABLE_FIELDS.contains(key)) {
@@ -157,6 +208,12 @@ public class AdminCourseCatalogService {
         }
     }
 
+    /**
+     * Aplica los cambios proporcionados a un curso existente.
+     * 
+     * @param course  El curso al que se le aplicarán los cambios.
+     * @param changes Un mapa que contiene los cambios a aplicar al curso.
+     */
     private void applyPatch(Courses course, Map<String, Object> changes) {
         for (Map.Entry<String, Object> entry : changes.entrySet()) {
             String key = entry.getKey();
@@ -183,6 +240,12 @@ public class AdminCourseCatalogService {
         }
     }
 
+    /**
+     * Obtiene los IDs de los cursos que están en uso.
+     * 
+     * @param courses La lista de cursos a verificar.
+     * @return Un conjunto de IDs de cursos que están en uso.
+     */
     private Set<Long> resolveUsedCourseIds(List<Courses> courses) {
         List<Long> courseIds = courses.stream()
                 .map(course -> course != null ? course.getCourse_id() : null)
@@ -197,6 +260,13 @@ public class AdminCourseCatalogService {
         return new HashSet<>(enrollmentRepository.findUsedCourseIds(courseIds));
     }
 
+    /**
+     * Verifica si un curso está siendo utilizado por alguna matrícula.
+     * 
+     * @param courseId El ID del curso a verificar.
+     * @return true si el curso está siendo utilizado por alguna matrícula, false en
+     *         caso contrario.
+     */
     private boolean isCourseUsedByEnrollment(Long courseId) {
         if (courseId == null) {
             return false;
@@ -204,10 +274,26 @@ public class AdminCourseCatalogService {
         return enrollmentRepository.existsEnrollmentByCourseId(courseId);
     }
 
+    /**
+     * Determina si un curso está en uso, ya sea porque ha sido utilizado alguna
+     * vez, tiene matrículas activas o tiene un profesor asignado.
+     * 
+     * @param course           El curso a verificar.
+     * @param usedByEnrollment Indica si el curso está siendo utilizado por alguna
+     *                         matrícula.
+     * @return true si el curso está en uso, false en caso contrario.
+     */
     private boolean isCourseUsed(Courses course, boolean usedByEnrollment) {
         return course.isEverUsed() || usedByEnrollment || course.getAssignedUser() != null;
     }
 
+    /**
+     * Convierte un objeto Courses en un objeto AdminCourseCatalogItemDTO.
+     * 
+     * @param course El curso a convertir.
+     * @param used   Indica si el curso está en uso.
+     * @return Un objeto AdminCourseCatalogItemDTO que representa el curso.
+     */
     private AdminCourseCatalogItemDTO toCatalogItem(Courses course, boolean used) {
         return new AdminCourseCatalogItemDTO(
                 course.getCourse_id(),
@@ -228,6 +314,12 @@ public class AdminCourseCatalogService {
                 used);
     }
 
+    /**
+     * Sanitiza y valida el título de un curso requerido.
+     * 
+     * @param title El título del curso a sanitizar y validar.
+     * @return El título sanitizado.
+     */
     private String sanitizeRequiredTitle(String title) {
         String safeTitle = title == null ? "" : title.trim();
         if (safeTitle.isEmpty()) {
@@ -242,6 +334,14 @@ public class AdminCourseCatalogService {
         return safeTitle;
     }
 
+    /**
+     * Normaliza un título de curso para generar una clave única.
+     * La normalización consiste en convertir el título a minúsculas, eliminar
+     * espacios y caracteres especiales, y recortar espacios al inicio y al final.
+     * 
+     * @param title El título del curso a normalizar.
+     * @return La clave única generada a partir del título.
+     */
     private String normalizeTitleKey(String title) {
         if (title == null) {
             return "";
@@ -252,6 +352,15 @@ public class AdminCourseCatalogService {
                 .trim();
     }
 
+    /**
+     * Normaliza un valor de cadena opcional, eliminando espacios al inicio y al
+     * final.
+     * Si el valor es nulo o una cadena vacía después de la normalización, se
+     * devuelve null.
+     * 
+     * @param value El valor de cadena opcional a normalizar.
+     * @return El valor normalizado o null si es nulo o vacío.
+     */
     private String normalizeOptionalString(Object value) {
         if (value == null) {
             return null;
@@ -264,6 +373,14 @@ public class AdminCourseCatalogService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
+    /**
+     * Parsea un valor a Float, manejando diferentes tipos de entrada y validando el
+     * formato.
+     * 
+     * @param value     El valor a parsear.
+     * @param fieldName El nombre del campo para mensajes de error.
+     * @return El valor parseado como Float, o null si el valor es nulo o vacío.
+     */
     private Float parseFloatValue(Object value, String fieldName) {
         if (value == null) {
             return null;
@@ -289,6 +406,14 @@ public class AdminCourseCatalogService {
         throw new ServicesException("Tipo de dato inválido para " + fieldName + ".");
     }
 
+    /**
+     * Parsea un valor a Integer, manejando diferentes tipos de entrada y validando
+     * el formato.
+     * 
+     * @param value     El valor a parsear.
+     * @param fieldName El nombre del campo para mensajes de error.
+     * @return El valor parseado como Integer, o null si el valor es nulo o vacío.
+     */
     private Integer parseIntegerValue(Object value, String fieldName) {
         if (value == null) {
             return null;

@@ -37,8 +37,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Filtra las solicitudes HTTP entrantes para autenticar usuarios mediante
-     * tokens JWT.
+     * (non-Javadoc)
+     * 
+     * @see org.springframework.web.filter.OncePerRequestFilter#doFilterInternal(jakarta.servlet.http.HttpServletRequest,
+     *      jakarta.servlet.http.HttpServletResponse, jakarta.servlet.FilterChain)
      */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -112,7 +114,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Solo si el token es 100% válido permitimos continuar hacia los controladores
         filterChain.doFilter(request, response);
     }
 }

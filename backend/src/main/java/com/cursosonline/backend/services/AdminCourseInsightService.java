@@ -155,6 +155,17 @@ public class AdminCourseInsightService {
                 collectiveMetrics.averageInstructorRating());
     }
 
+    /**
+     * Calcula y devuelve las métricas colectivas de un curso específico, incluyendo
+     * el número de alumnos activos, el progreso promedio del curso, la tasa de
+     * finalización,
+     * la calificación promedio del curso y la calificación promedio del instructor.
+     * 
+     * @param courseId El ID del curso para el cual se desean obtener las métricas
+     *                 colectivas.
+     * @return AdminCourseCollectiveStatsDTO que contiene las métricas colectivas
+     *         del curso.
+     */
     @Transactional(readOnly = true)
     public AdminCourseCollectiveStatsDTO getCourseCollectiveStats(Long courseId) {
         if (!coursesRepository.existsById(courseId)) {
@@ -173,6 +184,17 @@ public class AdminCourseInsightService {
                 metrics.averageFinalExamGrade());
     }
 
+    /**
+     * Resuelve las métricas colectivas de un curso específico, incluyendo el número
+     * de alumnos activos,
+     * el progreso promedio del curso, la tasa de finalización, la calificación
+     * promedio del curso y la calificación promedio del instructor.
+     * 
+     * @param courseId El ID del curso para el cual se desean resolver las métricas
+     *                 colectivas.
+     * @return CourseCollectiveMetrics que contiene las métricas colectivas del
+     *         curso.
+     */
     private CourseCollectiveMetrics resolveCourseCollectiveMetrics(Long courseId) {
         List<Enrollment> activeEnrollments = enrollmentRepository.findActiveStudentEnrollmentsByCourseId(courseId);
         int activeStudents = activeEnrollments.size();
@@ -196,6 +218,13 @@ public class AdminCourseInsightService {
                 averageScoreByKeywords(courseGrades, FINAL_EXAM_KEYWORDS));
     }
 
+    /**
+     * Calcula la media de las calificaciones de un conjunto de CourseGrade.
+     * 
+     * @param grades La lista de calificaciones del curso.
+     * @return La media de las calificaciones, o null si no hay calificaciones
+     *         válidas.
+     */
     private Double averageScore(List<CourseGrade> grades) {
         if (grades == null || grades.isEmpty()) {
             return null;
@@ -210,6 +239,15 @@ public class AdminCourseInsightService {
         return Double.isNaN(average) ? null : average;
     }
 
+    /**
+     * Calcula la media de las calificaciones de un conjunto de CourseGrade que
+     * coinciden con palabras clave específicas.
+     * 
+     * @param grades   La lista de calificaciones del curso.
+     * @param keywords Las palabras clave para filtrar las calificaciones.
+     * @return La media de las calificaciones que coinciden con las palabras clave,
+     *         o null si no hay calificaciones válidas.
+     */
     private Double averageScoreByKeywords(List<CourseGrade> grades, String... keywords) {
         if (grades == null || grades.isEmpty()) {
             return null;
@@ -225,6 +263,15 @@ public class AdminCourseInsightService {
         return Double.isNaN(average) ? null : average;
     }
 
+    /**
+     * Verifica si el título de un CourseGrade contiene alguna de las palabras clave
+     * proporcionadas.
+     * 
+     * @param title    El título del CourseGrade.
+     * @param keywords Las palabras clave a verificar en el título.
+     * @return true si el título contiene alguna de las palabras clave, false en
+     *         caso contrario.
+     */
     private boolean matchesAnyKeyword(String title, String... keywords) {
         if (title == null || keywords == null || keywords.length == 0) {
             return false;
@@ -239,6 +286,24 @@ public class AdminCourseInsightService {
         return false;
     }
 
+    /**
+     * Clase interna para encapsular las métricas colectivas de un curso, incluyendo
+     * el número de alumnos activos, el progreso promedio del curso, la tasa de
+     * finalización, la calificación promedio del curso y la calificación promedio
+     * del instructor.
+     * Esta clase se utiliza internamente para calcular y devolver las métricas
+     * colectivas de un curso específico.
+     * CourseCollectiveMetrics
+     * 
+     * @param activeStudentsInCourse
+     * @param courseAverageProgressPercentage
+     * @param completionRatePercentage
+     * @param averageCourseRating
+     * @param averageInstructorRating
+     * @param averageGrade
+     * @param averageWorkGrade
+     * @param averageFinalExamGrade
+     */
     private record CourseCollectiveMetrics(
             int activeStudentsInCourse,
             int courseAverageProgressPercentage,
@@ -250,6 +315,15 @@ public class AdminCourseInsightService {
             Double averageFinalExamGrade) {
     }
 
+    /**
+     * Resuelve la calificación de un usuario en un curso específico buscando
+     * coincidencias con palabras clave en los títulos de las calificaciones.
+     * 
+     * @param grades   La lista de calificaciones del curso.
+     * @param keywords Las palabras clave para filtrar las calificaciones.
+     * @return La calificación que coincide con las palabras clave, o null si no se
+     *         encuentra ninguna.
+     */
     private Double resolveGradeByKeywords(List<CourseGrade> grades, String... keywords) {
         for (CourseGrade grade : grades) {
             if (grade == null || grade.getTitle() == null || grade.getScore() == null) {

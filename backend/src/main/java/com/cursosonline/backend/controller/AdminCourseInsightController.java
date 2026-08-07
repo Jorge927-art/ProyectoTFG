@@ -30,22 +30,52 @@ public class AdminCourseInsightController {
     private final AdminCourseInsightService adminCourseInsightService;
     private final AdminCourseCatalogService adminCourseCatalogService;
 
+    /**
+     * Endpoint para obtener el catálogo de cursos en el panel de administración.
+     * Devuelve una lista de cursos con información básica.
+     * 
+     * @return
+     */
     @GetMapping("/catalog")
     public ResponseEntity<List<AdminCourseCatalogItemDTO>> getCourseCatalog() {
         return ResponseEntity.ok(adminCourseCatalogService.getAdminCourseCatalog());
     }
 
+    /**
+     * Endpoint para crear un nuevo curso en el panel de administración. Recibe los
+     * detalles del curso en el cuerpo de la solicitud y devuelve la información del
+     * curso creado.
+     * 
+     * @param request
+     * @return
+     */
     @PostMapping
     public ResponseEntity<AdminCourseCatalogItemDTO> createCourse(@RequestBody AdminCourseCreateRequestDTO request) {
         return ResponseEntity.ok(adminCourseCatalogService.createCourse(request));
     }
 
+    /**
+     * Endpoint para actualizar parcialmente los detalles de un curso en el panel de
+     * administración. Recibe un mapa de cambios en el cuerpo de la solicitud y
+     * devuelve la información actualizada del curso.
+     * 
+     * @param courseId
+     * @param changes
+     * @return
+     */
     @PatchMapping("/{courseId}")
     public ResponseEntity<AdminCourseCatalogItemDTO> patchCourse(@PathVariable Long courseId,
             @RequestBody Map<String, Object> changes) {
         return ResponseEntity.ok(adminCourseCatalogService.patchCourse(courseId, changes));
     }
 
+    /**
+     * Endpoint para eliminar un curso del panel de administración. Recibe el ID del
+     * curso como parámetro de ruta y devuelve un mensaje de confirmación.
+     * 
+     * @param courseId
+     * @return
+     */
     @DeleteMapping("/{courseId}")
     public ResponseEntity<Map<String, String>> deleteCourse(@PathVariable Long courseId) {
         adminCourseCatalogService.deleteCourse(courseId);

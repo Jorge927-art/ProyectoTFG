@@ -20,6 +20,13 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * Servicio que gestiona la reasignación de cursos entre profesores por parte
+ * del
+ * administrador del sistema. Permite obtener la lista de profesores
+ * habilitados,
+ * AdminCourseAssignmentService
+ */
 @Service
 @RequiredArgsConstructor
 public class AdminCourseAssignmentService {
@@ -32,6 +39,14 @@ public class AdminCourseAssignmentService {
     private final UserSystemNotificationRepository userSystemNotificationRepository;
     private final AdminCourseCatalogService adminCourseCatalogService;
 
+    /**
+     * Obtiene una lista de profesores habilitados en el sistema, ordenados
+     * alfabéticamente por su nombre de usuario. Esta lista se utiliza para
+     * mostrar opciones de reasignación de cursos en la interfaz de administración.
+     * 
+     * @return Una lista de objetos AdminProfessorOptionDTO que representan a los
+     *         profesores habilitados.
+     */
     @Transactional(readOnly = true)
     public List<AdminProfessorOptionDTO> getEnabledProfessorsAlphabetical() {
         return userRepository.findByRole(Role.PROFESSOR)
@@ -44,6 +59,15 @@ public class AdminCourseAssignmentService {
                 .toList();
     }
 
+    /**
+     * Obtiene una lista de cursos asignados a un profesor específico, identificados
+     * por su ID. Esta lista se utiliza para mostrar los cursos que un profesor
+     * tiene actualmente bajo su responsabilidad.
+     * 
+     * @param professorId El ID del profesor.
+     * @return Una lista de objetos AdminProfessorCourseDTO que representan los
+     *         cursos asignados al profesor.
+     */
     @Transactional(readOnly = true)
     public List<AdminProfessorCourseDTO> getCoursesAssignedToProfessor(Long professorId) {
         Users professor = userRepository.findById(professorId)
@@ -63,6 +87,17 @@ public class AdminCourseAssignmentService {
                 .toList();
     }
 
+    /**
+     * Reasigna un curso a un nuevo profesor, notificando a ambos profesores sobre
+     * el cambio. Este método realiza la reasignación de manera transaccional,
+     * asegurando que los cambios se guarden correctamente en la base de datos y que
+     * las notificaciones se envíen a los profesores involucrados.
+     * 
+     * @param courseId       El ID del curso a reasignar.
+     * @param newProfessorId El ID del nuevo profesor al que se asignará el curso.
+     * @return Un objeto AdminCourseProfessorReassignmentResultDTO que contiene los
+     *         detalles de la reasignación.
+     */
     @Transactional
     public AdminCourseProfessorReassignmentResultDTO reassignCourseProfessor(Long courseId, Long newProfessorId) {
         if (newProfessorId == null) {
@@ -115,6 +150,18 @@ public class AdminCourseAssignmentService {
                 nextUsername);
     }
 
+    /**
+     * Construye una notificación para el profesor anterior indicando que ha sido
+     * desvinculado del curso debido a una reasignación administrativa. La
+     * notificación incluye detalles sobre el curso y proporciona un enlace de
+     * redirección a la interfaz del profesor.
+     * 
+     * @param previousProfessor El profesor anterior que ha sido desvinculado del
+     *                          curso.
+     * @param course            El curso del cual el profesor ha sido desvinculado.
+     * @return Un objeto UserSystemNotification que representa la notificación para
+     *         el profesor anterior.
+     */
     private UserSystemNotification buildOutNotification(Users previousProfessor, Courses course) {
         String courseTitle = safeCourseTitle(course.getTitle());
         UserSystemNotification notification = new UserSystemNotification();
@@ -129,6 +176,17 @@ public class AdminCourseAssignmentService {
         return notification;
     }
 
+    /**
+     * Construye una notificación para el nuevo profesor indicando que ha sido
+     * asignado al curso debido a una reasignación administrativa. La notificación
+     * incluye detalles sobre el curso y proporciona un enlace de redirección a la
+     * interfaz del profesor.
+     * 
+     * @param newProfessor El nuevo profesor que ha sido asignado al curso.
+     * @param course       El curso al cual el nuevo profesor ha sido asignado.
+     * @return Un objeto UserSystemNotification que representa la notificación para
+     *         el nuevo profesor.
+     */
     private UserSystemNotification buildInNotification(Users newProfessor, Courses course) {
         String courseTitle = safeCourseTitle(course.getTitle());
         UserSystemNotification notification = new UserSystemNotification();
@@ -143,6 +201,15 @@ public class AdminCourseAssignmentService {
         return notification;
     }
 
+    /**
+     * Devuelve un título de curso seguro para su uso en notificaciones y mensajes.
+     * Si el título es nulo, vacío o igual a "null" (ignorando mayúsculas), se
+     * devuelve un valor predeterminado "Curso sin título". De lo contrario, se
+     * devuelve el título original recortado.
+     * 
+     * @param title El título del curso.
+     * @return Un título de curso seguro para su uso en notificaciones y mensajes.
+     */
     private String safeCourseTitle(String title) {
         if (title == null || title.trim().isEmpty()) {
             return "Curso sin título";

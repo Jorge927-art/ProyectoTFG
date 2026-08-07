@@ -10,7 +10,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.List;
 
@@ -128,5 +130,49 @@ class JwtServiceTest {
         assertThrows(RuntimeException.class, () -> {
             jwtService.extractUsername("jwt.malformado.invalido");
         }, "La extracción de claims en tokens corruptos debe propagar un fallo de ejecución controlado");
+    }
+
+    @Test
+    @DisplayName("Debe respetar el clock skew configurado antes de considerar expirado un token")
+    void isTokenValid_ShouldRespectClockSkewWindow() {
+        Instant issuedAt = Instant.parse("2026-08-07T12:00:00Z");
+        JwtService issuerService = new JwtService(jwtProperties, Clock.fixed(issuedAt, ZoneOffset.UTC));
+        String token = issuerService.generateAccessToken(sampleUserDetails, 45L, "alumno.cripto@tfg.com");
+
+        // Access TTL 15 min -> exp 12:15:00Z. Con skew 60s aún debe aceptar hasta
+        // 12:15:59Z.
+        JwtService withinSkewService = new JwtService(
+                jwtProperties,
+                Clock.fixed(Instant.parse("2026-08-07T12:15:30Z"), ZoneOffset.UTC));
+        JwtService beyondSkewService = new JwtService(
+                jwtProperties,
+                Clock.fixed(Instant.parse("2026-08-07T12:16:01Z"), ZoneOffset.UTC));
+
+        assertTrue(withinSkewService.isTokenValid(token),
+                "El token debe seguir siendo válido dentro de la ventana de tolerancia del clock skew.");
+        assertFalse(beyondSkewService.isTokenValid(token),
+                "El token debe invalidarse al superar exp + clockSkew.");
+    }
+
+    @Test
+    @DisplayName("Debe invalidar token justo después de expirar cuando clockSkew es 0")
+    void isTokenValid_ShouldExpireImmediatelyWhenClockSkewIsZero() {
+        when(jwtProperties.getClockSkewSeconds()).thenReturn(0L);
+
+        Instant issuedAt = Instant.parse("2026-08-07T14:00:00Z");
+        JwtService issuerService = new JwtService(jwtProperties, Clock.fixed(issuedAt, ZoneOffset.UTC));
+        String token = issuerService.generateAccessToken(sampleUserDetails, 45L, "alumno.cripto@tfg.com");
+
+        JwtService atExpiryService = new JwtService(
+                jwtProperties,
+                Clock.fixed(Instant.parse("2026-08-07T14:15:00Z"), ZoneOffset.UTC));
+        JwtService afterExpiryService = new JwtService(
+                jwtProperties,
+                Clock.fixed(Instant.parse("2026-08-07T14:15:01Z"), ZoneOffset.UTC));
+
+        assertTrue(atExpiryService.isTokenValid(token),
+                "En el segundo exacto de expiración no debe considerarse vencido por comparación estricta isBefore.");
+        assertFalse(afterExpiryService.isTokenValid(token),
+                "Un segundo después de exp debe quedar inválido con skew=0.");
     }
 }

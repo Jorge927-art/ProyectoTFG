@@ -189,9 +189,29 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
                         "ORDER BY e.user.username ASC")
         List<Enrollment> findAllByCourseId(@Param("courseId") Long courseId);
 
+        /**
+         * [PANEL DOCENTE - LISTADO ALUMNOS]: Comprueba si existen matrículas activas de
+         * alumnos para un curso concreto, incluyendo la referencia al usuario para
+         * construir DTOs docentes.
+         * 
+         * @param courseId El ID del curso para el cual se desea verificar la existencia
+         *                 de matrículas activas de alumnos.
+         * @return true si existen matrículas activas de alumnos para el curso
+         *         especificado, false en caso contrario.
+         */
         @Query("SELECT COUNT(e) > 0 FROM Enrollment e WHERE e.course.course_id = :courseId")
         boolean existsEnrollmentByCourseId(@Param("courseId") Long courseId);
 
+        /**
+         * [PANEL DOCENTE - LISTADO CURSOS DEL ALUMNO]: Recupera los IDs de los cursos
+         * que están siendo utilizados por matrículas activas.
+         * Esto es útil para filtrar cursos que tienen al menos un alumno matriculado.
+         * 
+         * @param courseIds El conjunto de IDs de cursos para los cuales se desea
+         *                  verificar la existencia de matrículas activas de alumnos.
+         * @return Lista de IDs de cursos que están siendo utilizados por matrículas
+         *         activas.
+         */
         @Query("SELECT DISTINCT e.course.course_id FROM Enrollment e WHERE e.course.course_id IN :courseIds")
         List<Long> findUsedCourseIds(@Param("courseIds") List<Long> courseIds);
 

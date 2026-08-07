@@ -33,6 +33,18 @@ public class AcademicEvaluationController {
         private final UserRepository userRepository;
         private final CoursesRepository coursesRepository;
 
+        /**
+         * Constructor de la clase AcademicEvaluationController.
+         * 
+         * @param enrollmentRepository         Repositorio utilizado para acceder a las
+         *                                     matrículas de los alumnos.
+         * @param academicEvaluationRepository Repositorio utilizado para acceder a las
+         *                                     evaluaciones académicas.
+         * @param userRepository               Repositorio utilizado para acceder a la
+         *                                     información de los usuarios.
+         * @param coursesRepository            Repositorio utilizado para acceder a la
+         *                                     información de los cursos.
+         */
         public AcademicEvaluationController(EnrollmentRepository enrollmentRepository,
                         AcademicEvaluationRepository academicEvaluationRepository,
                         UserRepository userRepository,
@@ -105,7 +117,7 @@ public class AcademicEvaluationController {
                                                 .body(Map.of("error", "No autenticado o sesión inválida."));
                         }
 
-                        // 1. Extracción y parseo seguro del payload entrante
+                        // Extracción y parseo seguro del payload entrante
                         Long courseId = Long.valueOf(payload.get("course_id").toString());
                         Integer courseScore = Integer.valueOf(payload.get("course_score").toString());
                         Integer instructorScore = Integer.valueOf(payload.get("instructor_score").toString());
@@ -125,7 +137,7 @@ public class AcademicEvaluationController {
 
                         String username = authentication.getName();
 
-                        // 2. [BLINDAJE PERIMETRAL JWT]: Validar que el alumno esté legítimamente
+                        // [BLINDAJE PERIMETRAL JWT]: Validar que el alumno esté legítimamente
                         // matriculado
                         boolean isEnrolled = enrollmentRepository.existsByUsernameAndCourseId(username, courseId);
                         if (!isEnrolled) {
@@ -134,7 +146,7 @@ public class AcademicEvaluationController {
                                                                 "Acceso denegado: No puedes evaluar una asignatura en la que no estás matriculado."));
                         }
 
-                        // 3. [CONTROL ANTE DUPLICADOS]: Validar que no exista un voto previo
+                        // [CONTROL ANTE DUPLICADOS]: Validar que no exista un voto previo
                         boolean alreadyEvaluated = academicEvaluationRepository.existsByUserUsernameAndCourseCourseId(
                                         username,
                                         courseId);
@@ -144,7 +156,8 @@ public class AcademicEvaluationController {
                                                                 "Ya has emitido una calificación para esta asignatura."));
                         }
 
-                        // 4. Recuperación de entidades y persistencia
+                        // [RECUPERACIÓN DE ENTIDADES Y PERSISTENCIA]: Obtener entidades y guardar
+                        // evaluación
                         Users currentUser = userRepository.findByUsername(username)
                                         .orElseThrow(() -> new RuntimeException(
                                                         "Usuario no encontrado en el sistema."));

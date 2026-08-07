@@ -1,7 +1,7 @@
 package com.cursosonline.backend.security.jwt;
 
 import com.cursosonline.backend.config.jwt.JwtProperties;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -27,7 +27,6 @@ import java.util.regex.Pattern;
  * aislada.
  */
 @Service
-@RequiredArgsConstructor
 public class JwtService {
 
     private static final String HMAC_ALGORITHM = "HmacSHA256";
@@ -41,41 +40,124 @@ public class JwtService {
     private static final Base64.Decoder BASE64_URL_DECODER = Base64.getUrlDecoder();
 
     private final JwtProperties jwtProperties;
-    private final Clock clock = Clock.systemUTC();
+    private final Clock clock;
 
+    /**
+     * Constructor de la clase JwtService.
+     * 
+     * @param jwtProperties Las propiedades de configuración de JWT.
+     */
+    @Autowired
+    public JwtService(JwtProperties jwtProperties) {
+        this(jwtProperties, Clock.systemUTC());
+    }
+
+    /**
+     * Constructor de la clase JwtService con inyección de reloj para pruebas.
+     * 
+     * @param jwtProperties Las propiedades de configuración de JWT.
+     * @param clock         El reloj a utilizar para la generación y validación de
+     *                      tokens.
+     */
+    public JwtService(JwtProperties jwtProperties, Clock clock) {
+        this.jwtProperties = jwtProperties;
+        this.clock = clock != null ? clock : Clock.systemUTC();
+    }
+
+    /**
+     * Genera un Access Token JWT firmado con HS256.
+     * 
+     * @param userDetails Los detalles del usuario para el cual se genera el token.
+     * @param userId      El ID del usuario.
+     * @param email       El correo electrónico del usuario.
+     * @return El Access Token JWT generado.
+     */
     public String generateAccessToken(UserDetails userDetails, Long userId, String email) {
         return generateToken(userDetails, ACCESS_TOKEN_TYPE, accessTokenTtl(), userId, email);
     }
 
+    /**
+     * Genera un Refresh Token JWT firmado con HS256.
+     * 
+     * @param userDetails Los detalles del usuario para el cual se genera el token.
+     * @param userId      El ID del usuario.
+     * @param email       El correo electrónico del usuario.
+     * @return El Refresh Token JWT generado.
+     */
     public String generateRefreshToken(UserDetails userDetails, Long userId, String email) {
         return generateToken(userDetails, REFRESH_TOKEN_TYPE, refreshTokenTtl(), userId, email);
     }
 
+    /**
+     * Extrae el nombre de usuario (claim "sub") de un token JWT.
+     * 
+     * @param token El token JWT del cual se extrae el nombre de usuario.
+     * @return El nombre de usuario contenido en el claim "sub" del token.
+     */
     public String extractUsername(String token) {
         return getClaim(token, "sub", String.class);
     }
 
+    /**
+     * Extrae el tipo de token (claim "tokenType") de un token JWT.
+     * 
+     * @param token El token JWT del cual se extrae el tipo.
+     * @return El tipo de token contenido en el claim "tokenType" del token.
+     */
     public String extractTokenType(String token) {
         return getClaim(token, "tokenType", String.class);
     }
 
+    /**
+     * Extrae el rol del usuario (claim "role") de un token JWT.
+     * 
+     * @param token El token JWT del cual se extrae el rol.
+     * @return El rol del usuario contenido en el claim "role" del token.
+     */
     public String extractRole(String token) {
         return getClaim(token, "role", String.class);
     }
 
+    /**
+     * Extrae la fecha de expiración (claim "exp") de un token JWT como un objeto
+     * Instant.
+     * 
+     * @param token El token JWT del cual se extrae la fecha de expiración.
+     * @return La fecha de expiración contenida en el claim "exp" del token como un
+     *         objeto Instant.
+     */
     public Instant extractExpiration(String token) {
         Long exp = getClaim(token, "exp", Long.class);
         return exp == null ? null : Instant.ofEpochSecond(exp);
     }
 
+    /**
+     * Extrae el ID de usuario (claim "userId") de un token JWT.
+     * 
+     * @param token El token JWT del cual se extrae el ID de usuario.
+     * @return El ID de usuario contenido en el claim "userId" del token.
+     */
     public Long extractUserId(String token) {
         return getClaim(token, "userId", Long.class);
     }
 
+    /**
+     * Extrae el ID único del token (claim "jti") de un token JWT.
+     * 
+     * @param token El token JWT del cual se extrae el ID único.
+     * @return El ID único contenido en el claim "jti" del token.
+     */
     public String extractJti(String token) {
         return getClaim(token, "jti", String.class);
     }
 
+    /**
+     * Valida un token JWT verificando su firma y asegurándose de que no esté
+     * expirado.
+     * 
+     * @param token El token JWT a validar.
+     * @return true si el token es válido, false en caso contrario.
+     */
     public boolean isTokenValid(String token) {
         try {
             Map<String, Object> claims = parseAndVerify(token);
@@ -86,6 +168,17 @@ public class JwtService {
         }
     }
 
+    /**
+     * Valida un token JWT verificando su firma, asegurándose de que no esté
+     * expirado y comparando el nombre de usuario con los detalles del usuario
+     * proporcionados.
+     * 
+     * @param token       El token JWT a validar.
+     * @param userDetails Los detalles del usuario con los cuales se compara el
+     *                    nombre de usuario del token.
+     * @return true si el token es válido y coincide con los detalles del usuario,
+     *         false en caso contrario.
+     */
     public boolean isTokenValid(String token, UserDetails userDetails) {
         try {
             Map<String, Object> claims = parseAndVerify(token);
@@ -99,6 +192,14 @@ public class JwtService {
         }
     }
 
+    /**
+     * Extrae el tipo de token (claim "tokenType") de un token JWT, devolviendo null
+     * si ocurre algún error durante la extracción.
+     * 
+     * @param token El token JWT del cual se intenta extraer el tipo.
+     * @return El tipo de token contenido en el claim "tokenType" del token, o null
+     *         si ocurre algún error durante la extracción.
+     */
     public String extractTokenTypeOrNull(String token) {
         try {
             return extractTokenType(token);
@@ -107,6 +208,16 @@ public class JwtService {
         }
     }
 
+    /**
+     * Genera un token JWT firmado con HS256, incluyendo los claims necesarios.
+     * 
+     * @param userDetails Los detalles del usuario para el cual se genera el token.
+     * @param tokenType   El tipo de token (por ejemplo, "access" o "refresh").
+     * @param ttl         El tiempo de vida del token.
+     * @param userId      El ID del usuario.
+     * @param email       El correo electrónico del usuario.
+     * @return El token JWT generado como una cadena.
+     */
     private String generateToken(UserDetails userDetails, String tokenType, Duration ttl, Long userId, String email) {
         Instant issuedAt = Instant.now(clock);
         Instant expiresAt = issuedAt.plus(ttl);
@@ -137,14 +248,33 @@ public class JwtService {
         return signingInput + "." + base64Url(sign(signingInput));
     }
 
+    /**
+     * Calcula la duración del tiempo de vida del access token en base a la
+     * configuración.
+     * 
+     * @return La duración del tiempo de vida del access token.
+     */
     private Duration accessTokenTtl() {
         return Duration.ofMinutes(jwtProperties.getAccessTokenExpirationMinutes());
     }
 
+    /**
+     * Calcula la duración del tiempo de vida del refresh token en base a la
+     * configuración.
+     * 
+     * @return La duración del tiempo de vida del refresh token.
+     */
     private Duration refreshTokenTtl() {
         return Duration.ofDays(jwtProperties.getRefreshTokenExpirationDays());
     }
 
+    /**
+     * Firma el contenido del token utilizando HMAC-SHA256 con la clave secreta
+     * configurada.
+     * 
+     * @param signingInput El contenido del token que se va a firmar.
+     * @return La firma HMAC-SHA256 del contenido del token.
+     */
     private byte[] sign(String signingInput) {
         try {
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);
@@ -155,6 +285,13 @@ public class JwtService {
         }
     }
 
+    /**
+     * Parsea y verifica un token JWT, asegurándose de que tenga un formato válido y
+     * que la firma sea correcta.
+     * 
+     * @param token El token JWT que se va a parsear y verificar.
+     * @return Un mapa con los claims contenidos en el token.
+     */
     private Map<String, Object> parseAndVerify(String token) {
         String[] parts = token.split("\\.");
         if (parts.length != 3) {
@@ -173,6 +310,17 @@ public class JwtService {
         return parseJson(payloadJson);
     }
 
+    /**
+     * Extrae un claim específico de un token JWT y lo convierte al tipo deseado.
+     * Si el claim no existe o no se puede convertir, devuelve null.
+     * 
+     * @param <T>      El tipo al cual se desea convertir el claim.
+     * @param token    El token JWT del cual se extraerá el claim.
+     * @param claimKey La clave del claim a extraer.
+     * @param type     La clase del tipo al cual se desea convertir el claim.
+     * @return El valor del claim convertido al tipo especificado, o null si no
+     *         existe o no se puede convertir.
+     */
     private <T> T getClaim(String token, String claimKey, Class<T> type) {
         try {
             Map<String, Object> claims = parseAndVerify(token);
@@ -188,13 +336,17 @@ public class JwtService {
         }
     }
 
-    // --- ENFOQUE CORREGIDO: VALIDACIÓN MATEMÁTICA INMUTABLE DEL VENCIMIENTO CON
-    // CLOCK SKEW EN REVERSA ---
+    /**
+     * Verifica si un token JWT ha expirado basándose en el claim "exp" y el clock
+     * skew configurado.
+     * 
+     * @param claims El mapa de claims del token JWT.
+     * @return true si el token ha expirado, false en caso contrario.
+     */
     private boolean isExpired(Map<String, Object> claims) {
         Object expObj = claims.get("exp");
         if (expObj instanceof Number) {
-            // Convertimos de forma segura ignorando si el parser JSON manual metió un Long
-            // o un Double
+
             long expSeconds = ((Number) expObj).longValue();
             long skew = jwtProperties.getClockSkewSeconds();
 
@@ -210,20 +362,47 @@ public class JwtService {
         return true; // Si no hay propiedad de expiración, se rechaza por seguridad
     }
 
+    /**
+     * Resuelve la autoridad principal de un conjunto de GrantedAuthority.
+     * Si no hay autoridades, devuelve null.
+     * 
+     * @param authorities La colección de GrantedAuthority.
+     * @return La autoridad principal como String, o null si no hay autoridades.
+     */
     private String resolvePrimaryAuthority(Collection<? extends GrantedAuthority> authorities) {
         if (authorities == null || authorities.isEmpty())
             return null;
         return authorities.iterator().next().getAuthority();
     }
 
+    /**
+     * Codifica un arreglo de bytes en una cadena Base64 URL-safe sin padding.
+     * 
+     * @param bytes El arreglo de bytes a codificar.
+     * @return La cadena codificada en Base64 URL-safe sin padding.
+     */
     private String base64Url(byte[] bytes) {
         return BASE64_URL_ENCODER.encodeToString(bytes);
     }
 
+    /**
+     * Convierte un objeto a String si es una instancia de String, de lo contrario
+     * devuelve null.
+     * 
+     * @param obj El objeto a convertir.
+     * @return La cadena resultante si el objeto es una instancia de String, o null
+     *         en caso contrario.
+     */
     private String asString(Object obj) {
         return obj instanceof String ? (String) obj : null;
     }
 
+    /**
+     * Serializa un mapa de claims a una cadena JSON y luego a un arreglo de bytes.
+     * 
+     * @param claims El mapa de claims a serializar.
+     * @return El arreglo de bytes resultante de la serialización JSON.
+     */
     private byte[] serializeClaims(Map<String, Object> claims) {
         StringBuilder sb = new StringBuilder("{");
         boolean first = true;
@@ -243,6 +422,13 @@ public class JwtService {
         return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
+    /**
+     * Parsea una cadena JSON simple a un mapa de claims.
+     * Este método es un parser muy básico y no soporta estructuras complejas.
+     * 
+     * @param json La cadena JSON a parsear.
+     * @return Un mapa de claims extraído de la cadena JSON.
+     */
     private Map<String, Object> parseJson(String json) {
         Map<String, Object> map = new LinkedHashMap<>();
         Matcher matcher = JSON_FIELD_PATTERN.matcher(json);

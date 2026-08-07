@@ -15,9 +15,20 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Servicio de almacenamiento de archivos que gestiona la carga y validación de
+ * documentos e imágenes.
+ * FileStorageService
+ */
 @Service
 public class FileStorageService {
 
+    /**
+     * Perfiles de validación de documentos para diferentes tipos de contenido.
+     * Se utiliza para aplicar reglas de validación específicas según el tipo de
+     * documento.
+     * DocumentValidationProfile
+     */
     public enum DocumentValidationProfile {
         BASIC_DOCUMENTS,
         ACADEMIC_MEDIA_DOCUMENTS
@@ -45,10 +56,22 @@ public class FileStorageService {
             "text/plain",
             "video/mp4");
 
+    /**
+     * Constructor que inicializa el servicio de almacenamiento de archivos con la
+     * ubicación raíz especificada.
+     *
+     * @param uploadDir La ruta del directorio raíz donde se almacenarán los
+     *                  archivos.
+     */
     public FileStorageService(@Value("${spring.servlet.multipart.location}") String uploadDir) {
         this.rootLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
     }
 
+    /**
+     * Inicializa las carpetas de almacenamiento necesarias al arrancar la
+     * aplicación.
+     * Crea las carpetas "avatars" y "documents" dentro del directorio raíz
+     */
     @PostConstruct
     public void init() {
         try {
@@ -60,14 +83,43 @@ public class FileStorageService {
         }
     }
 
+    /**
+     * Almacena un archivo en la carpeta especificada y devuelve la ruta relativa
+     * del archivo almacenado.
+     * 
+     * @param file      El archivo a almacenar.
+     * @param subFolder La subcarpeta dentro del directorio raíz donde se almacenará
+     *                  el archivo.
+     * @return La ruta relativa del archivo almacenado.
+     */
     public String storeFile(MultipartFile file, String subFolder) {
         return storeFile(file, subFolder, DocumentValidationProfile.BASIC_DOCUMENTS);
     }
 
+    /**
+     * Almacena un documento en la carpeta "documents" y aplica validación según el
+     * perfil especificado.
+     * 
+     * @param file              El archivo a almacenar.
+     * @param validationProfile El perfil de validación a aplicar.
+     * @return La ruta relativa del archivo almacenado.
+     */
     public String storeDocumentFile(MultipartFile file, DocumentValidationProfile validationProfile) {
         return storeFile(file, "documents", validationProfile);
     }
 
+    /**
+     * Almacena un archivo en la carpeta especificada y aplica validación según el
+     * perfil proporcionado.
+     * Este método es privado y se utiliza internamente para centralizar la lógica
+     * de almacenamiento y validación.
+     * 
+     * @param file              El archivo a almacenar.
+     * @param subFolder         La subcarpeta dentro del directorio raíz donde se
+     *                          almacenará el archivo.
+     * @param validationProfile El perfil de validación a aplicar.
+     * @return La ruta relativa del archivo almacenado.
+     */
     private String storeFile(MultipartFile file, String subFolder, DocumentValidationProfile validationProfile) {
         String originalFileName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
         try {
@@ -93,8 +145,16 @@ public class FileStorageService {
     }
 
     /**
-     * Valida de manera estricta que el archivo corresponda al formato permitido
-     * para su carpeta.
+     * Valida el tipo de archivo según la extensión y el tipo MIME, dependiendo de
+     * la carpeta de destino y el perfil de validación.
+     * Esta validación es crucial para prevenir ataques de seguridad como Path
+     * Traversal y ejecución remota de código (RCE).
+     * 
+     * @param file              El archivo a validar.
+     * @param filename          El nombre original del archivo.
+     * @param subFolder         La subcarpeta dentro del directorio raíz donde se
+     *                          almacenará el archivo.
+     * @param validationProfile El perfil de validación a aplicar.
      */
     private void validateFileType(MultipartFile file, String filename, String subFolder,
             DocumentValidationProfile validationProfile) {
@@ -149,8 +209,8 @@ public class FileStorageService {
     /**
      * Obtiene la extensión del archivo a partir de su nombre.
      * 
-     * @param filename
-     * @return
+     * @param filename El nombre del archivo.
+     * @return La extensión del archivo.
      */
     private String getFileExtension(String filename) {
         int lastIndexOf = filename.lastIndexOf(".");
@@ -161,10 +221,13 @@ public class FileStorageService {
     }
 
     /**
-     * [NUEVO MÉTODO DE LECTURA SEGURO]: Carga un archivo desde el disco como un
-     * recurso
-     * para que pueda ser transmitido de forma autenticada por flujo de datos
-     * (Stream).
+     * Carga un archivo como recurso desde la ruta relativa especificada.
+     * Este método resuelve la ruta relativa contra el directorio raíz inmutable y
+     * devuelve un recurso que puede ser utilizado para la transmisión de archivos.
+     * 
+     * @param relativePath La ruta relativa del archivo dentro del directorio raíz.
+     * @return El recurso correspondiente al archivo, o null si no existe o no es
+     *         legible.
      */
     public Resource loadFileAsResource(String relativePath) {
         try {

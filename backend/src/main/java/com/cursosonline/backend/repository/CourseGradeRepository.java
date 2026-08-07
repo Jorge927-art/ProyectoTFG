@@ -6,6 +6,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
 
+/**
+ * Repositorio para la entidad CourseGrade, proporcionando métodos de
+ * CRUD y consultas personalizadas relacionadas con las calificaciones de los
+ * cursos.
+ */
 public interface CourseGradeRepository extends JpaRepository<CourseGrade, Long> {
         // Hereda automáticamente todos los métodos de guardado (save, etc.) de JPA
 

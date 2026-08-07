@@ -7,6 +7,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
+/**
+ * Entidad que representa los metadatos de un documento subido al sistema.
+ * Contiene información sobre el nombre del archivo, nombre original, fecha de
+ * DocumentMetadata
+ */
 @Entity
 @Table(name = "document_metadata")
 @Data
@@ -14,47 +19,54 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class DocumentMetadata {
 
+    // Identificador único del documento
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long documentid;
 
+    // Nombre físico único generado con UUID en disco
     @Column(nullable = false)
-    private String filename; // Nombre físico único generado con UUID en disco
+    private String filename;
 
+    // Nombre original del archivo subido por el usuario
     @Column(nullable = false)
-    private String originalname; // Nombre original subido por el usuario
+    private String originalname;
 
+    // Fecha y hora de subida del documento al sistema
     @Column(nullable = false)
     private LocalDateTime upload_date = LocalDateTime.now();
 
+    // Tipo de evaluación asociada al documento, si aplica
     @Column(name = "evaluation_type")
-    private String evaluation_type; // Guardará valores literales: "TRABAJO", "EXAMEN" o null para documentos
-                                    // generales
+    private String evaluation_type;
 
-    /**
-     * Estado de lectura del documento
-     */
+    // Indica si el documento ha sido leído o procesado
     @Column(name = "is_read", nullable = false)
     private boolean read = false;
 
-    // --- NUEVOS CAMPOS PARA INTERCAMBIO BIDIRECCIONAL ---
-
+    // Relación con la entidad Users para asociar el documento con un usuario
+    // específico
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "sender_id", nullable = false) // Quién envía el archivo
+    @JoinColumn(name = "sender_id", nullable = false)
     private Users sender;
 
+    // Relación con la entidad Users para asociar el documento con un usuario
+    // específico
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "receiver_id", nullable = false) // Quién recibe el archivo
+    @JoinColumn(name = "receiver_id", nullable = false)
     private Users receiver;
 
+    // Relación con la entidad Courses para asociar el documento con un curso
+    // específico, si aplica
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "course_id") // Contexto opcional de la asignatura
+    @JoinColumn(name = "course_id")
     private Courses course;
 
+    // Tipo de carpeta donde se encuentra el documento (SENT o RECEIVED)
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private FolderType folder_type; // SENT o RECEIVED para mapear las pestañas frontend
+    private FolderType folder_type;
 }

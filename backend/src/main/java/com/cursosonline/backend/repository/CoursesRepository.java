@@ -10,10 +10,34 @@ import java.util.List;
 
 public interface CoursesRepository extends JpaRepository<Courses, Long> {
 
+        /**
+         * Recupera un curso por su clave de título única, utilizada para la
+         * identificación y acceso a cursos específicos.
+         * 
+         * @param titleKey La clave de título única del curso.
+         * @return Un Optional que contiene el curso si se encuentra, o vacío si no.
+         */
         java.util.Optional<Courses> findByTitleKey(String titleKey);
 
+        /**
+         * Verifica si existe un curso con la clave de título única especificada.
+         * Esto es útil para validar la unicidad de los cursos antes de su creación o
+         * actualización.
+         * 
+         * @param titleKey La clave de título única del curso.
+         * @return true si existe un curso con la clave de título especificada, false en
+         *         caso contrario.
+         */
         boolean existsByTitleKey(String titleKey);
 
+        /**
+         * Recupera todos los cursos ordenados alfabéticamente por su título.
+         * Esto es útil para mostrar un listado completo de cursos en la interfaz de
+         * usuario.
+         * 
+         * @return Una lista de todos los cursos ordenados alfabéticamente por su
+         *         título.
+         */
         List<Courses> findAllByOrderByTitleAsc();
 
         /**

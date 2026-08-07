@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * Controlador REST para gestionar las operaciones relacionadas con la
@@ -67,6 +66,13 @@ public class DocumentController {
         this.enrollmentRepository = enrollmentRepository;
     }
 
+    /**
+     * Endpoint para que el administrador recupere un directorio de usuarios y sus
+     * roles.
+     * 
+     * @param authentication
+     * @return
+     */
     @GetMapping("/admin/users")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<?> getAdminUsersDirectory(Authentication authentication) {
@@ -92,6 +98,13 @@ public class DocumentController {
         }
     }
 
+    /**
+     * Endpoint para que el administrador recupere un directorio de cursos y sus
+     * categorías.
+     * 
+     * @param authentication
+     * @return
+     */
     @GetMapping("/admin/courses")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<?> getAdminCoursesDirectory(Authentication authentication) {
@@ -433,6 +446,15 @@ public class DocumentController {
         }
     }
 
+    /**
+     * Endpoint para que el administrador suba un documento y lo envíe a todos los
+     * alumnos activos de una asignatura.
+     * 
+     * @param authentication
+     * @param file
+     * @param courseId
+     * @return
+     */
     @PostMapping("/admin/upload/course")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<?> uploadDocumentToCourseByAdmin(
@@ -860,6 +882,12 @@ public class DocumentController {
                 "role", user.getRole() != null ? user.getRole().name() : "UNKNOWN");
     }
 
+    /**
+     * Convierte un objeto Courses en un mapa de resumen para la API.
+     * 
+     * @param course El objeto Courses que se desea convertir.
+     * @return Mapa de resumen que representa al curso para la API.
+     */
     private Map<String, Object> toCourseSummary(Courses course) {
         if (course == null) {
             return null;
@@ -999,28 +1027,48 @@ public class DocumentController {
     /**
      * Resuelve el usuario autenticado tolerando variaciones de identidad del
      * principal (username exacto, username case-insensitive o email).
+     * 
+     * @param principalName   El nombre del principal (username o email) del usuario
+     *                        autenticado.
+     * @param notFoundMessage Mensaje de error a lanzar si el usuario no se
+     *                        encuentra.
+     * @return El objeto Users correspondiente al usuario autenticado.
      */
     private Users resolveAuthenticatedUser(String principalName, String notFoundMessage) {
-        Optional<Users> byUsername = userRepository.findByUsername(principalName);
-        if (byUsername.isPresent()) {
-            return byUsername.get();
+        if (principalName == null || principalName.isBlank()) {
+            throw new RuntimeException(notFoundMessage);
         }
 
-        Optional<Users> byUsernameIgnoreCase = userRepository.findByUsernameIgnoreCase(principalName);
-        if (byUsernameIgnoreCase.isPresent()) {
-            return byUsernameIgnoreCase.get();
-        }
-
-        return userRepository.findByEmailIgnoreCase(principalName)
+        return userRepository.findByUsername(principalName)
+                .or(() -> userRepository.findByUsernameIgnoreCase(principalName))
+                .or(() -> userRepository.findByEmailIgnoreCase(principalName))
                 .orElseThrow(() -> new RuntimeException(notFoundMessage));
     }
 
+    /**
+     * Valida el tamaño del archivo subido y lanza una excepción si excede el límite
+     * permitido.
+     * 
+     * @param file
+     * @param maxBytes
+     * @param errorMessage
+     */
     private void validateFileSize(MultipartFile file, long maxBytes, String errorMessage) {
         if (file.getSize() > maxBytes) {
             throw new IllegalArgumentException(errorMessage);
         }
     }
 
+    /**
+     * Persiste un par de metadatos de documento dirigido (emisor y receptor) en la
+     * base de datos.
+     * 
+     * @param relativePath
+     * @param cleanOriginalName
+     * @param sender
+     * @param receiver
+     * @param course
+     */
     private void persistDirectedDocumentPair(String relativePath, String cleanOriginalName, Users sender,
             Users receiver,
             Courses course) {

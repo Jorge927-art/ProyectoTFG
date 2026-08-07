@@ -9,8 +9,16 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.List; // Soporte para colecciones relacionales
+import java.util.List;
 
+/**
+ * Entidad que representa la matrícula de un estudiante en un curso.
+ * Contiene información sobre el progreso del estudiante, el estado de la
+ * matrícula y las calificaciones asociadas.
+ * Se vincula mediante relaciones de muchos a uno con las entidades Users y
+ * Courses.
+ * Enrollment
+ */
 @Entity
 @Table(name = "enrollment")
 @Getter
@@ -19,43 +27,50 @@ import java.util.List; // Soporte para colecciones relacionales
 @AllArgsConstructor
 public class Enrollment {
 
+    // Identificador único de la matrícula
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long enrollmentid;
 
+    // Relación de muchos a uno con la entidad Users, que representa al estudiante
+    // matriculado en el curso
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private Users user;
 
-    /**
-     * Relación con el curso.
-     * Se fuerza mediante @JsonProperty que la propiedad JSON sea "course" (en
-     * singular)
-     * para asegurar compatibilidad absoluta con la interfaz de TypeScript del
-     * Frontend,
-     * independientemente del tipo de clase 'Courses' en plural del compilador.
-     */
+    // Relación de muchos a uno con la entidad Courses, que representa el curso en
+    // el que el estudiante está matriculado
     @JsonProperty("course")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id")
     private Courses course;
 
-    @Column(nullable = false)
+    // Fecha y hora en que se realizó la matrícula, utilizada para auditoría y
+    // seguimiento
+    @Column(name = "enrolled_at", nullable = false)
     private LocalDateTime enrolled_at = LocalDateTime.now();
 
+    // Estado de la matrícula, que puede ser "EN_PROGRESO", "COMPLETADO" o
+    // "CANCELADO"
     @Column(nullable = false)
     private String status = "EN_PROGRESO";
 
+    // Porcentaje de progreso del estudiante en el curso, representado como un
+    // entero entre 0 y 100
     @Column(name = "progress", nullable = false)
     private int progress_percentage = 0;
 
+    // Fecha y hora en que el estudiante comenzó el curso, utilizada para
+    // seguimiento del progreso
     @Column(name = "started_at")
     private LocalDateTime started_at;
 
+    // Indica si el estudiante ha reconocido la alerta de progreso del curso
     @Column(name = "progress_alert_student_ack", nullable = false)
     private boolean progressAlertStudentAck = false;
 
+    // Indica si el profesor ha reconocido la alerta de progreso del curso
     @Column(name = "progress_alert_professor_ack", nullable = false)
     private boolean progressAlertProfessorAck = false;
 
@@ -82,6 +97,14 @@ public class Enrollment {
         grade.setEnrollment(this);
     }
 
+    /**
+     * Elimina una calificación del curso de la lista de calificaciones asociadas a
+     * esta matrícula.
+     * También establece la referencia de la calificación a null para mantener la
+     * integridad de la relación bidireccional.
+     * 
+     * @param grade La calificación del curso que se desea eliminar de la matrícula.
+     */
     public void removeGrade(CourseGrade grade) {
         if (grade == null || this.grades == null) {
             return;
@@ -94,7 +117,6 @@ public class Enrollment {
 
     /**
      * Getter explícito para la salida JSON del frontend de asignaturas en curso
-     * [ADR-39].
      * Al llamarse diferente, Jackson lo serializa como "grades" en la API de cursos
      * activos,
      * pero no interfiere de ninguna manera en las subconsultas del repositorio de
