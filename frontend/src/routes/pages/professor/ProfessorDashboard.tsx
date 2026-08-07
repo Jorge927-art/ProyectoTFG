@@ -73,7 +73,7 @@ const ProfessorDashboard = () => {
     const effectiveSelectedCourseId = selectedCourseId
         ?? (shouldFocusDocuments && myCourses.length > 0 ? myCourses[0].id : null);
 
-    const professorDocumentsRef = useRef<HTMLElement | null>(null);
+    const professorDocumentsRef = useRef<HTMLDivElement | null>(null);
     const senderCourseResolutionDoneRef = useRef(false);
     const studentsByCourseCacheRef = useRef<Map<number, StudentPerformanceDTO[]>>(new Map());
     const studentsByCoursePendingRef = useRef<Map<number, Promise<StudentPerformanceDTO[]>>>(new Map());
