@@ -70,9 +70,11 @@ const NoAuthWrapper = ({ children }: { children: React.ReactNode }) => {
 describe('useNotifications', () => {
     let currentAlerts: NotificationDTO[];
     let currentDocuments: DocumentMetadata[];
+    let currentRecommendations: Array<{ id: number; title: string; instructor: string; category: string; rating: number; reason: string }>;
 
     beforeEach(() => {
         vi.clearAllMocks();
+        window.localStorage.clear();
 
         currentAlerts = [
             {
@@ -83,8 +85,15 @@ describe('useNotifications', () => {
             },
         ];
         currentDocuments = [buildDoc(false)];
+        currentRecommendations = [];
 
-        vi.spyOn(apiClient, 'get').mockImplementation(async () => ({ data: currentAlerts }) as never);
+        vi.spyOn(apiClient, 'get').mockImplementation(async (url: string) => {
+            if (url === '/api/courses/recommendations') {
+                return { data: currentRecommendations } as never;
+            }
+
+            return { data: currentAlerts } as never;
+        });
         vi.spyOn(documentService, 'getUserDocuments').mockImplementation(async () => currentDocuments);
     });
 
@@ -277,5 +286,67 @@ describe('useNotifications', () => {
         expect(hook.result.current.alerts[0].redirectUrl).toContain('/professor?focus=documents');
         expect(hook.result.current.alerts[0].redirectUrl).toContain('documentId=99');
         expect(hook.result.current.alerts[0].redirectUrl).toContain('senderId=42');
+    });
+
+    it('activa aviso de campana cuando aparece un nuevo curso recomendado para el estudiante', async () => {
+        currentAlerts = [];
+        currentDocuments = [buildDoc(true)];
+        currentRecommendations = [
+            {
+                id: 101,
+                title: 'Curso base recomendado',
+                instructor: 'Profesor A',
+                category: 'Datos',
+                rating: 4.8,
+                reason: 'Coincide con tus intereses',
+            },
+        ];
+
+        const patchSpy = vi.spyOn(apiClient, 'patch').mockResolvedValue({} as never);
+        const hook = renderHook(() => useNotifications(), { wrapper: AuthWrapper });
+
+        await waitFor(() => {
+            expect(hook.result.current.loading).toBe(false);
+        });
+
+        // Primera carga: se crea baseline y no debe aparecer aviso por histórico.
+        expect(hook.result.current.alerts.some((alert) => alert.type === 'COURSE_RECOMMENDATION')).toBe(false);
+
+        currentRecommendations = [
+            ...currentRecommendations,
+            {
+                id: 202,
+                title: 'Nuevo curso recomendado',
+                instructor: 'Profesora B',
+                category: 'IA',
+                rating: 4.9,
+                reason: 'Nuevo match por tus preferencias',
+            },
+        ];
+
+        await act(async () => {
+            await hook.result.current.refreshNotifications();
+        });
+
+        await waitFor(() => {
+            const recommendationAlert = hook.result.current.alerts.find((alert) => alert.type === 'COURSE_RECOMMENDATION');
+            expect(recommendationAlert).toBeDefined();
+            expect(recommendationAlert?.title).toContain('recomendación');
+            expect(recommendationAlert?.redirectUrl).toBe('/student');
+        });
+
+        await act(async () => {
+            await hook.result.current.dismissNotifications();
+        });
+
+        expect(patchSpy).toHaveBeenCalledWith('/api/auth/notifications/dismiss');
+
+        await act(async () => {
+            await hook.result.current.refreshNotifications();
+        });
+
+        await waitFor(() => {
+            expect(hook.result.current.alerts.some((alert) => alert.type === 'COURSE_RECOMMENDATION')).toBe(false);
+        });
     });
 });
