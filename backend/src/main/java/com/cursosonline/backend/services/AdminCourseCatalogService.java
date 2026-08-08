@@ -67,8 +67,11 @@ public class AdminCourseCatalogService {
         Set<Long> usedCourseIds = resolveUsedCourseIds(courses);
 
         return courses.stream()
-                .map(course -> toCatalogItem(course,
-                        isCourseUsed(course, usedCourseIds.contains(course.getCourse_id()))))
+                .map(course -> {
+                    Long courseId = course.getCourse_id();
+                    boolean usedByEnrollment = courseId != null && usedCourseIds.contains(courseId);
+                    return toCatalogItem(course, isCourseUsed(course, usedByEnrollment));
+                })
                 .toList();
     }
 

@@ -364,6 +364,25 @@ public class UserServiceTest {
         }
 
         @Test
+        void startCourseSecure_DebeGuardarInicioYEstadoCuandoLaMatriculaNoHabiaSidoIniciada() {
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(78L);
+                enrollment.setStarted_at(null);
+                enrollment.setStatus("PENDIENTE");
+
+                when(enrollmentRepository.findByEnrollmentidAndUserUsername(78L, "Luis"))
+                                .thenReturn(Optional.of(enrollment));
+                when(enrollmentRepository.save(any(Enrollment.class)))
+                                .thenAnswer(invocation -> invocation.getArgument(0));
+
+                userService.startCourseSecure(78L, "Luis");
+
+                assertNotNull(enrollment.getStarted_at());
+                assertEquals("EN_CURSO", enrollment.getStatus());
+                verify(enrollmentRepository).save(enrollment);
+        }
+
+        @Test
         void enrollStudentInCourse_DebeRechazarMatriculaDuplicadaSinPersistir() {
                 Users student = new Users(11L, "student_dup", "enc", Role.STUDENT, "dup@example.com", true,
                                 new java.util.ArrayList<>());
@@ -570,6 +589,37 @@ public class UserServiceTest {
         }
 
         @Test
+        void getUserNotifications_DebeSeguirConLasAlertasDeDocumentoYSistemaCuandoLasAlertasDeProgresoFallan() {
+                Users student = new Users(44L, "student_progress_failure", "pwd", Role.STUDENT,
+                                "student_progress_failure@example.com", true, new java.util.ArrayList<>());
+
+                com.cursosonline.backend.entities.DocumentMetadata unreadDoc = new com.cursosonline.backend.entities.DocumentMetadata();
+                unreadDoc.setRead(false);
+
+                com.cursosonline.backend.entities.UserSystemNotification systemNotification = new com.cursosonline.backend.entities.UserSystemNotification();
+                systemNotification.setType("SYSTEM_ALERT");
+                systemNotification.setTitle("Aviso del sistema");
+                systemNotification.setMessage("Hay una incidencia");
+                systemNotification.setRedirectUrl("/student");
+
+                when(userRepository.findByUsername("student_progress_failure")).thenReturn(Optional.of(student));
+                when(documentMetadataRepository.findUnreadReceivedDocumentsByUsername("student_progress_failure"))
+                                .thenReturn(List.of(unreadDoc));
+                when(userSystemNotificationRepository.findUnreadByUsername("student_progress_failure"))
+                                .thenReturn(List.of(systemNotification));
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(2);
+                when(enrollmentRepository.findAllByUserIdWithCourses(44L))
+                                .thenThrow(new RuntimeException("boom-progress"));
+
+                List<com.cursosonline.backend.dto.NotificationDTO> alerts = userService
+                                .getUserNotifications("student_progress_failure");
+
+                assertEquals(2, alerts.size());
+                assertTrue(alerts.stream().anyMatch(alert -> "DOCUMENT_INBOX".equals(alert.type())));
+                assertTrue(alerts.stream().anyMatch(alert -> "SYSTEM_ALERT".equals(alert.type())));
+        }
+
+        @Test
         void dismissUserNotifications_DebeHacerFallbackPorEntidadSiElBulkUpdateFalla() {
                 Users user = new Users(11L, "alumno", "pwd", Role.STUDENT, "alumno@example.com", true,
                                 new java.util.ArrayList<>());
@@ -589,6 +639,24 @@ public class UserServiceTest {
 
                 assertTrue(unreadDoc.isRead());
                 verify(documentMetadataRepository).saveAll(List.of(unreadDoc));
+        }
+
+        @Test
+        void dismissUserNotifications_DebeIgnorarErroDeAckDeProgresoYSeguirMarcandoNotificaciones() {
+                Users student = new Users(45L, "student_ack_failure", "pwd", Role.STUDENT,
+                                "student_ack_failure@example.com", true, new java.util.ArrayList<>());
+
+                when(userRepository.findByUsername("student_ack_failure")).thenReturn(Optional.of(student));
+                doThrow(new RuntimeException("ack-progress-fail"))
+                                .when(documentMetadataRepository)
+                                .markAllReceivedAsRead("student_ack_failure");
+                when(documentMetadataRepository.findUnreadReceivedDocumentsByUsername("student_ack_failure"))
+                                .thenReturn(List.of());
+                when(userSystemNotificationRepository.markAllAsReadByUsername("student_ack_failure")).thenReturn(1);
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(2);
+
+                assertDoesNotThrow(() -> userService.dismissUserNotifications("student_ack_failure"));
+                verify(userSystemNotificationRepository).markAllAsReadByUsername("student_ack_failure");
         }
 
         @Test
@@ -1162,6 +1230,80 @@ public class UserServiceTest {
                 assertEquals(
                                 "No se pudo eliminar permanentemente al usuario por dependencias activas en la base de datos.",
                                 exception.getMessage());
+        }
+
+        @Test
+        void searchCourses_DebeUsarFindAllCuandoKeywordEsNuloOVacio() {
+                Courses c1 = new Courses();
+                c1.setCourse_id(1L);
+                c1.setTitle("Curso A");
+
+                when(coursesRepository.findAll(any(org.springframework.data.domain.Pageable.class)))
+                                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(c1)));
+
+                List<Courses> resultNull = userService.searchCourses(null);
+                List<Courses> resultBlank = userService.searchCourses("   ");
+
+                assertEquals(1, resultNull.size());
+                assertEquals(1, resultBlank.size());
+                verify(coursesRepository, times(2)).findAll(any(org.springframework.data.domain.Pageable.class));
+                verify(coursesRepository, never()).searchCoursesPredictive(
+                                anyString(),
+                                anyString(),
+                                any(org.springframework.data.domain.Pageable.class));
+        }
+
+        @Test
+        void searchCourses_DebeUsarBusquedaPredictivaCuandoKeywordTieneContenido() {
+                Courses c1 = new Courses();
+                c1.setCourse_id(2L);
+                c1.setTitle("Data Science");
+
+                when(coursesRepository.searchCoursesPredictive(
+                                eq("%data%"),
+                                eq("data%"),
+                                any(org.springframework.data.domain.Pageable.class)))
+                                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(c1)));
+
+                List<Courses> result = userService.searchCourses("  data  ");
+
+                assertEquals(1, result.size());
+                assertEquals("Data Science", result.get(0).getTitle());
+                verify(coursesRepository, never()).findAll(any(org.springframework.data.domain.Pageable.class));
+        }
+
+        @Test
+        void getCourseStats_DebeRetornarNullCuandoNoHayFila() {
+                when(coursesRepository.getCourseAnalyticalStatsNative(99L)).thenReturn(null);
+
+                com.cursosonline.backend.dto.CourseStatsDTO result = userService.getCourseStats(99L);
+
+                assertNull(result);
+        }
+
+        @Test
+        void getCourseStats_DebeMapearValoresConNulosParciales() {
+                java.util.Map<String, Object> row = new java.util.HashMap<>();
+                row.put("courseId", 12L);
+                row.put("averageGrade", 8.25d);
+                row.put("localEnrollments", 15L);
+                row.put("communityRating", null);
+                row.put("instructorRating", 4.5d);
+                row.put("platform", "COLE");
+                row.put("category", "Ingeniería");
+
+                when(coursesRepository.getCourseAnalyticalStatsNative(12L)).thenReturn(row);
+
+                com.cursosonline.backend.dto.CourseStatsDTO result = userService.getCourseStats(12L);
+
+                assertNotNull(result);
+                assertEquals(12L, result.courseId());
+                assertEquals(8.25d, result.averageGrade());
+                assertEquals(15L, result.localEnrollments());
+                assertNull(result.communityRating());
+                assertEquals(4.5d, result.instructorRating());
+                assertEquals("COLE", result.platform());
+                assertEquals("Ingeniería", result.category());
         }
 
         private com.cursosonline.backend.entities.UserSystemNotification buildSystemNotification(

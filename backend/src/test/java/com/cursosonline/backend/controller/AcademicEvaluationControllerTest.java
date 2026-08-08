@@ -21,6 +21,7 @@ import org.springframework.security.core.Authentication;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -189,5 +190,108 @@ public class AcademicEvaluationControllerTest {
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
         assertEquals("Estructura de datos de evaluación corrupta o incompleta.", bodyMap.get("error"));
+    }
+
+    @Test
+    @DisplayName("Debe devolver 401 cuando se intenta enviar una evaluación sin autenticación válida")
+    void debeRechazarSubmitSinAutenticacionValida() {
+        Mockito.when(authentication.isAuthenticated()).thenReturn(false);
+
+        ResponseEntity<?> response = academicEvaluationController.submitEvaluation(authentication, Map.of());
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+        assertEquals("No autenticado o sesión inválida.", bodyMap.get("error"));
+    }
+
+    @Test
+    @DisplayName("Debe devolver 400 cuando las puntuaciones están fuera del rango 1..5")
+    void debeRechazarSubmitConPuntuacionesFueraDeRango() {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("course_id", 101L);
+        payload.put("course_score", 0);
+        payload.put("instructor_score", 6);
+
+        ResponseEntity<?> response = academicEvaluationController.submitEvaluation(authentication, payload);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+        assertEquals("Las puntuaciones deben estar confinadas entre 1 y 5 estrellas.", bodyMap.get("error"));
+        Mockito.verify(academicEvaluationRepository, Mockito.never()).save(any(AcademicEvaluation.class));
+    }
+
+    @Test
+    @DisplayName("Debe devolver 500 cuando falla la consulta de evaluaciones pendientes")
+    void debeDevolverErrorControladoEnPendingCuandoFallaRepositorio() {
+        Mockito.when(enrollmentRepository.findPendingEvaluationsByUsername("luis_student"))
+                .thenThrow(new RuntimeException("db-down"));
+
+        ResponseEntity<?> response = academicEvaluationController.getPendingEvaluations(authentication);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+        assertEquals("Error interno al recuperar asignaturas pendientes de evaluación", bodyMap.get("error"));
+    }
+
+    @Test
+    @DisplayName("Debe hidratar correctamente cuando grades no es nulo en evaluaciones pendientes")
+    void debeHidratarGradesEnPendingCuandoNoEsNulo() {
+        Enrollment enrollment = new Enrollment();
+        enrollment.setEnrollmentid(88L);
+        enrollment.setCourse(mockCourse);
+        enrollment.setUser(mockUser);
+        enrollment.setGrades(new ArrayList<>());
+
+        Mockito.when(enrollmentRepository.findPendingEvaluationsByUsername("luis_student"))
+                .thenReturn(List.of(enrollment));
+
+        ResponseEntity<?> response = academicEvaluationController.getPendingEvaluations(authentication);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertTrue(response.getBody() instanceof List);
+        assertEquals(1, ((List<?>) response.getBody()).size());
+    }
+
+    @Test
+    @DisplayName("Debe devolver 500 si el usuario autenticado no existe al enviar evaluación")
+    void debeDevolver500SiUsuarioNoExisteEnSubmitEvaluation() {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("course_id", 101L);
+        payload.put("course_score", 4);
+        payload.put("instructor_score", 4);
+
+        Mockito.when(enrollmentRepository.existsByUsernameAndCourseId("luis_student", 101L)).thenReturn(true);
+        Mockito.when(academicEvaluationRepository.existsByUserUsernameAndCourseCourseId("luis_student", 101L))
+                .thenReturn(false);
+        Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.empty());
+
+        ResponseEntity<?> response = academicEvaluationController.submitEvaluation(authentication, payload);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+        assertEquals("Error crítico al guardar la evaluación en el servidor", bodyMap.get("error"));
+        Mockito.verify(academicEvaluationRepository, Mockito.never()).save(any(AcademicEvaluation.class));
+    }
+
+    @Test
+    @DisplayName("Debe devolver 500 si el curso no existe en catálogo al enviar evaluación")
+    void debeDevolver500SiCursoNoExisteEnSubmitEvaluation() {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("course_id", 101L);
+        payload.put("course_score", 4);
+        payload.put("instructor_score", 4);
+
+        Mockito.when(enrollmentRepository.existsByUsernameAndCourseId("luis_student", 101L)).thenReturn(true);
+        Mockito.when(academicEvaluationRepository.existsByUserUsernameAndCourseCourseId("luis_student", 101L))
+                .thenReturn(false);
+        Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockUser));
+        Mockito.when(coursesRepository.findById(101L)).thenReturn(Optional.empty());
+
+        ResponseEntity<?> response = academicEvaluationController.submitEvaluation(authentication, payload);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+        assertEquals("Error crítico al guardar la evaluación en el servidor", bodyMap.get("error"));
+        Mockito.verify(academicEvaluationRepository, Mockito.never()).save(any(AcademicEvaluation.class));
     }
 }

@@ -84,6 +84,25 @@ class AdminCourseCatalogServiceTest {
     }
 
     @Test
+    @DisplayName("getAdminCourseCatalog ignora IDs nulos o inválidos al resolver usados")
+    void getAdminCourseCatalog_ShouldSkipInvalidIdsInUsedResolution() {
+        Courses withoutId = new Courses();
+        withoutId.setCourse_id(null);
+        withoutId.setTitle("Sin ID");
+
+        Courses withInvalidId = new Courses();
+        withInvalidId.setCourse_id(0L);
+        withInvalidId.setTitle("ID inválido");
+
+        when(coursesRepository.findAllByOrderByTitleAsc()).thenReturn(List.of(withoutId, withInvalidId));
+
+        List<AdminCourseCatalogItemDTO> result = adminCourseCatalogService.getAdminCourseCatalog();
+
+        assertEquals(2, result.size());
+        verify(enrollmentRepository, never()).findUsedCourseIds(anyList());
+    }
+
+    @Test
     @DisplayName("createCourse persiste title normalizado, fuerza site COLE y retorna DTO")
     void createCourse_ShouldPersistNormalizedTitleAndSiteCole() {
         AdminCourseCreateRequestDTO request = new AdminCourseCreateRequestDTO(
@@ -275,6 +294,49 @@ class AdminCourseCatalogServiceTest {
                 () -> adminCourseCatalogService.patchCourse(13L, Map.of("numOfViewers", "abc")));
 
         assertEquals("Valor numérico inválido para numOfViewers.", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("patchCourse rechaza tipo inválido para campo textual")
+    void patchCourse_WhenTextFieldReceivesInvalidType_ShouldThrow() {
+        Courses course = new Courses();
+        course.setCourse_id(130L);
+        when(coursesRepository.findById(130L)).thenReturn(Optional.of(course));
+        when(enrollmentRepository.existsEnrollmentByCourseId(130L)).thenReturn(false);
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.patchCourse(130L, Map.of("category", 123)));
+
+        assertEquals("Tipo de dato inválido para un campo textual.", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("patchCourse rechaza tipo inválido para campo numérico")
+    void patchCourse_WhenNumericFieldReceivesInvalidType_ShouldThrow() {
+        Courses course = new Courses();
+        course.setCourse_id(131L);
+        when(coursesRepository.findById(131L)).thenReturn(Optional.of(course));
+        when(enrollmentRepository.existsEnrollmentByCourseId(131L)).thenReturn(false);
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.patchCourse(131L, Map.of("duration", true)));
+
+        assertEquals("Tipo de dato inválido para duration.", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("patchCourse con cambios vacíos devuelve DTO sin persistir")
+    void patchCourse_WhenChangesAreEmpty_ShouldReturnCurrentWithoutSave() {
+        Courses course = new Courses();
+        course.setCourse_id(132L);
+        course.setTitle("Curso estable");
+        when(coursesRepository.findById(132L)).thenReturn(Optional.of(course));
+        when(enrollmentRepository.existsEnrollmentByCourseId(132L)).thenReturn(false);
+
+        AdminCourseCatalogItemDTO dto = adminCourseCatalogService.patchCourse(132L, Map.of());
+
+        assertEquals(132L, dto.courseId());
+        verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
     }
 
     @Test

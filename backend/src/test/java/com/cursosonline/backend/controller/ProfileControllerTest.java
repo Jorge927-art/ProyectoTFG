@@ -101,6 +101,18 @@ class ProfileControllerTest {
                                 .andExpect(jsonPath("$.error").value("No autenticado"));
         }
 
+        @Test
+        @DisplayName("GET /api/v1/profile - Debe devolver 500 controlado si el usuario autenticado no existe")
+        void getProfile_UserNotFound_ShouldReturnInternalServerError() throws Exception {
+                when(authentication.isAuthenticated()).thenReturn(true);
+                when(authentication.getName()).thenReturn("fantasma");
+                when(userRepository.findByUsername("fantasma")).thenReturn(Optional.empty());
+
+                mockMvc.perform(get("/api/v1/profile").principal(authentication))
+                                .andExpect(status().isInternalServerError())
+                                .andExpect(jsonPath("$.error").value("Internal Server Error en Java"));
+        }
+
         // ==========================================
         // 2. PRUEBAS DEL ENDPOINT POST (SUBIR AVATAR)
         // ==========================================
@@ -140,6 +152,39 @@ class ProfileControllerTest {
                                 .principal(authentication))
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.error").value("El archivo no puede estar vacío"));
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/profile/avatar - Debe retornar 401 si el usuario no está autenticado")
+        void uploadAvatar_Unauthorized() throws Exception {
+                MockMultipartFile file = new MockMultipartFile(
+                                "file", "avatar.jpg", MediaType.IMAGE_JPEG_VALUE, "imagenes_bytes".getBytes());
+
+                mockMvc.perform(multipart("/api/v1/profile/avatar")
+                                .file(file))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.error").value("No autenticado"));
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/profile/avatar - Debe crear perfil nuevo cuando no existe")
+        void uploadAvatar_CreatesProfileWhenMissing() throws Exception {
+                MockMultipartFile file = new MockMultipartFile(
+                                "file", "avatar.jpg", MediaType.IMAGE_JPEG_VALUE, "imagenes_bytes".getBytes());
+
+                when(authentication.isAuthenticated()).thenReturn(true);
+                when(authentication.getName()).thenReturn("luis");
+                when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+                when(fileStorageService.storeFile(any(), eq("avatars"))).thenReturn("uploads/avatars/new_avatar.jpg");
+                when(profileRepository.findById(1L)).thenReturn(Optional.empty());
+
+                mockMvc.perform(multipart("/api/v1/profile/avatar")
+                                .file(file)
+                                .principal(authentication))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.message").value("Foto de perfil actualizada con éxito"));
+
+                verify(profileRepository).save(any(UserProfile.class));
         }
 
         // ==========================================
@@ -216,5 +261,21 @@ class ProfileControllerTest {
                                                 .value("Datos de perfil extendido guardados correctamente"));
 
                 verify(profileRepository, times(1)).save(any(UserProfile.class));
+        }
+
+        @Test
+        @DisplayName("PUT /api/v1/profile/update - Debe retornar 401 si no existe autenticación")
+        void updateProfileData_Unauthorized() throws Exception {
+                String dtoJson = "{" +
+                                "\"email\":\"nuevo_email@test.com\"," +
+                                "\"phoneNumber\":\"699999999\"," +
+                                "\"homeAddress\":\"Nueva Avenida 456\"" +
+                                "}";
+
+                mockMvc.perform(put("/api/v1/profile/update")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(dtoJson))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.error").value("No autenticado"));
         }
 }

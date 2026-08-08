@@ -526,4 +526,151 @@ class UserControllerTest {
                 mockMvc.perform(get("/api/auth/my-active-courses"))
                                 .andExpect(status().isBadRequest());
         }
+
+        @Test
+        void getMyActiveCoursesDebeUsarElPrincipalComoFallbackCuandoNoHayOtrosIdentificadores() throws Exception {
+                Users user = new Users(66L, "principal_user", "encoded", Role.STUDENT, "principal@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses course = new Courses();
+                course.setCourse_id(999L);
+                course.setTitle("Curso por principal");
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(5555L);
+                enrollment.setUser(user);
+                enrollment.setCourse(course);
+                enrollment.setStatus("EN_PROGRESO");
+                enrollment.setProgress_percentage(12);
+
+                java.security.Principal principal = () -> "principal_user";
+
+                when(userService.findByUsername("principal_user")).thenReturn(Optional.of(user));
+                when(userService.getStudentActiveCoursesWithCalculatedProgress(66L)).thenReturn(List.of(enrollment));
+
+                mockMvc.perform(get("/api/auth/my-active-courses")
+                                .principal(principal))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].enrollmentid").value(5555))
+                                .andExpect(jsonPath("$[0].course.course_id").value(999));
+        }
+
+        @Test
+        void registerDebeCrearAlumnoYResponderPayloadMinimo() throws Exception {
+                Users saved = new Users(501L, "nuevo_alumno", "encoded", Role.STUDENT, "nuevo@demo.com", true,
+                                new java.util.ArrayList<>());
+                when(userService.registerUser(org.mockito.ArgumentMatchers.any(Users.class))).thenReturn(saved);
+
+                mockMvc.perform(post("/api/auth/register")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{" +
+                                                "\"username\":\"nuevo_alumno\"," +
+                                                "\"password\":\"secret123\"," +
+                                                "\"email\":\"nuevo@demo.com\"" +
+                                                "}"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.userId").value(501))
+                                .andExpect(jsonPath("$.username").value("nuevo_alumno"))
+                                .andExpect(jsonPath("$.role").value("STUDENT"));
+        }
+
+        @Test
+        void meDebeDevolverPerfilCuandoHayPrincipalValido() throws Exception {
+                Users user = new Users(601L, "perfil_user", "enc", Role.STUDENT, "perfil@demo.com", true,
+                                new java.util.ArrayList<>());
+                java.security.Principal principal = () -> "perfil_user";
+
+                when(userService.findByUsername("perfil_user")).thenReturn(Optional.of(user));
+
+                mockMvc.perform(get("/api/auth/me").principal(principal))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.userId").value(601))
+                                .andExpect(jsonPath("$.username").value("perfil_user"))
+                                .andExpect(jsonPath("$.email").value("perfil@demo.com"))
+                                .andExpect(jsonPath("$.enabled").value(true));
+        }
+
+        @Test
+        void getStudentInterestsDebeRetornarInteresesCuandoHayPrincipal() throws Exception {
+                java.security.Principal principal = () -> "Luis";
+                com.cursosonline.backend.dto.InterestDTO dto = new com.cursosonline.backend.dto.InterestDTO(
+                                List.of("Data"),
+                                List.of("Básico"),
+                                List.of("Corto"),
+                                List.of("Español"),
+                                List.of("ES"));
+
+                when(userService.getUserInterests("Luis")).thenReturn(dto);
+
+                mockMvc.perform(get("/api/auth/my-interests").principal(principal))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.categories[0]").value("Data"));
+        }
+
+        @Test
+        void saveStudentInterestsDebePersistirCuandoHayPrincipal() throws Exception {
+                java.security.Principal principal = () -> "Luis";
+
+                mockMvc.perform(post("/api/auth/my-interests")
+                                .principal(principal)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{" +
+                                                "\"categories\":[\"Data\"]," +
+                                                "\"levels\":[\"Básico\"]," +
+                                                "\"durations\":[\"Corto\"]," +
+                                                "\"languages\":[\"Español\"]," +
+                                                "\"subtitles\":[\"ES\"]" +
+                                                "}"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true));
+
+                verify(userService).saveUserInterests(org.mockito.ArgumentMatchers.eq("Luis"),
+                                org.mockito.ArgumentMatchers.any(com.cursosonline.backend.dto.InterestDTO.class));
+        }
+
+        @Test
+        void logoutDebeAceptarBodyNuloYRevocarSinToken() throws Exception {
+                mockMvc.perform(post("/api/auth/logout"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true));
+
+                verify(refreshTokenService).revokeIfPresent(null);
+        }
+
+        @Test
+        void listAllUsersDebeMapearRespuestaAdministrativa() throws Exception {
+                Users u1 = new Users(701L, "u1", "enc", Role.STUDENT, "u1@demo.com", true,
+                                new java.util.ArrayList<>());
+                Users u2 = new Users(702L, "u2", "enc", null, "u2@demo.com", false,
+                                new java.util.ArrayList<>());
+
+                when(userService.getAllUsers()).thenReturn(List.of(u1, u2));
+
+                mockMvc.perform(get("/api/auth"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].userId").value(701))
+                                .andExpect(jsonPath("$[0].role").value("STUDENT"))
+                                .andExpect(jsonPath("$[1].userId").value(702))
+                                .andExpect(jsonPath("$[1].enabled").value(false));
+        }
+
+        @Test
+        void deleteUserByAdminDebeRetornar401SiNoHayPrincipalValido() throws Exception {
+                mockMvc.perform(delete("/api/auth/users/alumno_x"))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.error").value("Sesión inválida o expirada."));
+
+                verify(userService, never()).deleteByUsername(anyString());
+        }
+
+        @Test
+        void deleteUserByAdminDebeRetornarOkCuandoAplicaBajaLogica() throws Exception {
+                Users disabledUser = new Users(801L, "alumno_x", "enc", Role.STUDENT, "ax@demo.com", false,
+                                new java.util.ArrayList<>());
+                when(userService.deleteByUsername("alumno_x")).thenReturn(disabledUser);
+
+                java.security.Principal principal = () -> "root_admin";
+                mockMvc.perform(delete("/api/auth/users/alumno_x").principal(principal))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.enabled").value(false));
+        }
 }

@@ -1,5 +1,6 @@
 package com.cursosonline.backend.controller;
 
+import com.cursosonline.backend.dto.UserDirectoryDTO;
 import com.cursosonline.backend.entities.DocumentMetadata;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.FolderType;
@@ -445,6 +446,79 @@ public class DocumentControllerTest {
         }
 
         @Test
+        @DisplayName("Debe ignorar matrículas sin curso o sin instructores sin romper la respuesta")
+        void debeIgnorarMatriculasSinCursoOSinInstructoresEnDirectorioProfesores() {
+                Enrollment enrollmentWithoutCourse = new Enrollment();
+                enrollmentWithoutCourse.setEnrollmentid(9001L);
+                enrollmentWithoutCourse.setUser(mockSender);
+                enrollmentWithoutCourse.setCourse(null);
+
+                Enrollment enrollmentWithoutInstructors = new Enrollment();
+                enrollmentWithoutInstructors.setEnrollmentid(9002L);
+                enrollmentWithoutInstructors.setUser(mockSender);
+                Courses courseWithoutInstructors = new Courses();
+                courseWithoutInstructors.setCourse_id(777L);
+                courseWithoutInstructors.setInstructors(null);
+                enrollmentWithoutInstructors.setCourse(courseWithoutInstructors);
+
+                Users professor = new Users();
+                professor.setUser_id(10L);
+                professor.setUsername("profesor_juan");
+                professor.setEmail("juan@tfg.com");
+                professor.setRole(Role.PROFESSOR);
+                professor.setEnabled(true);
+
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("luis_student");
+                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
+                Mockito.when(enrollmentRepository.findAllByUserIdWithCourses(mockSender.getUser_id()))
+                                .thenReturn(List.of(enrollmentWithoutCourse, enrollmentWithoutInstructors));
+                Mockito.when(userRepository.findByRole(Role.PROFESSOR)).thenReturn(List.of(professor));
+
+                ResponseEntity<?> response = documentController.getMyTeachers(authentication);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertTrue(response.getBody() instanceof List);
+                List<?> payload = (List<?>) response.getBody();
+                assertTrue(payload.isEmpty());
+        }
+
+        @Test
+        @DisplayName("Debe tolerar profesores sin rol definido en el directorio de profesores")
+        void debeTolerarProfesoresSinRolDefinidoEnDirectorioProfesores() {
+                Users professorWithoutRole = new Users();
+                professorWithoutRole.setUser_id(10L);
+                professorWithoutRole.setUsername("profesor_sin_rol");
+                professorWithoutRole.setEmail("sinrol@tfg.com");
+                professorWithoutRole.setRole(null);
+                professorWithoutRole.setEnabled(true);
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(9003L);
+                enrollment.setUser(mockSender);
+                Courses course = new Courses();
+                course.setCourse_id(888L);
+                course.setInstructors("profesor_sin_rol");
+                enrollment.setCourse(course);
+
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("luis_student");
+                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
+                Mockito.when(enrollmentRepository.findAllByUserIdWithCourses(mockSender.getUser_id()))
+                                .thenReturn(List.of(enrollment));
+                Mockito.when(userRepository.findByRole(Role.PROFESSOR)).thenReturn(List.of(professorWithoutRole));
+
+                ResponseEntity<?> response = documentController.getMyTeachers(authentication);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertTrue(response.getBody() instanceof List);
+                List<?> payload = (List<?>) response.getBody();
+                assertEquals(1, payload.size());
+                UserDirectoryDTO teacher = (UserDirectoryDTO) payload.get(0);
+                assertEquals("UNKNOWN", teacher.getRole());
+        }
+
+        @Test
         @DisplayName("Debe devolver 500 controlado si el repositorio falla al recuperar el directorio administrativo")
         void debeDevolverErrorControladoSiElRepositorioFalla() {
                 Mockito.when(authentication.isAuthenticated()).thenReturn(true);
@@ -560,6 +634,31 @@ public class DocumentControllerTest {
         }
 
         @Test
+        @DisplayName("Debe devolver 401 cuando el directorio administrativo de cursos se consulta sin autenticación")
+        void debeRechazarDirectorioAdminCursosSinAutenticacion() {
+                ResponseEntity<?> response = documentController.getAdminCoursesDirectory(null);
+
+                assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("No autenticado o token JWT inválido.", bodyMap.get("error"));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 500 controlado si falla la consulta del directorio administrativo de cursos")
+        void debeDevolverErrorControladoSiFallaDirectorioAdminCursos() {
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(coursesRepository.findAll(any(org.springframework.data.domain.Sort.class)))
+                                .thenThrow(new RuntimeException("boom-courses"));
+
+                ResponseEntity<?> response = documentController.getAdminCoursesDirectory(authentication);
+
+                assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertTrue(bodyMap.get("error").toString()
+                                .contains("Error al recuperar el directorio administrativo de cursos"));
+        }
+
+        @Test
         @DisplayName("Debe devolver destinatarios académicos del profesor por curso incluyendo alumnos, profesorado y admins")
         void debeDevolverDestinatariosAcademicosDelProfesorPorCurso() {
                 Users professor = new Users();
@@ -608,6 +707,53 @@ public class DocumentControllerTest {
 
                 List<?> payload = (List<?>) response.getBody();
                 assertEquals(2, payload.size());
+        }
+
+        @Test
+        @DisplayName("Debe devolver 401 cuando el profesor consulta destinatarios sin autenticación")
+        void debeRechazarDestinatariosProfesorSinAutenticacion() {
+                ResponseEntity<?> response = documentController.getProfessorRecipientsByCourse(null, 501L);
+
+                assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("No autenticado o token JWT inválido.", bodyMap.get("error"));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 500 controlado cuando el principal autenticado llega en blanco")
+        void debeDevolverErrorControladoEnDestinatariosSiPrincipalEnBlanco() {
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("   ");
+
+                ResponseEntity<?> response = documentController.getProfessorRecipientsByCourse(authentication, 501L);
+
+                assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertTrue(bodyMap.get("error").toString()
+                                .contains("Error al recuperar destinatarios académicos del profesor"));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 500 controlado cuando el curso solicitado por destinatarios no existe")
+        void debeDevolverErrorControladoEnDestinatariosSiCursoNoExiste() {
+                Users professor = new Users();
+                professor.setUser_id(10L);
+                professor.setUsername("profesor_juan");
+                professor.setEmail("juan@tfg.com");
+                professor.setRole(Role.PROFESSOR);
+                professor.setEnabled(true);
+
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("profesor_juan");
+                Mockito.when(userRepository.findByUsername("profesor_juan")).thenReturn(Optional.of(professor));
+                Mockito.when(coursesRepository.findById(9999L)).thenReturn(Optional.empty());
+
+                ResponseEntity<?> response = documentController.getProfessorRecipientsByCourse(authentication, 9999L);
+
+                assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertTrue(bodyMap.get("error").toString()
+                                .contains("Error al recuperar destinatarios académicos del profesor"));
         }
 
         @Test
@@ -774,6 +920,80 @@ public class DocumentControllerTest {
                 verify(fileStorageService, never()).loadFileAsResource(anyString());
         }
 
+        @Test
+        @DisplayName("Debe devolver 401 cuando se consulta el directorio de compañeros sin autenticación")
+        void debeRechazarDirectorioClassmatesSinAutenticacion() {
+                ResponseEntity<?> response = documentController.getMyClassmates(null);
+
+                assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("No autenticado.", bodyMap.get("error"));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 500 cuando falla la carga de compañeros")
+        void debeDevolverErrorControladoSiFallaClassmates() {
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("luis_student");
+                Mockito.when(userRepository.findClassmatesByUsername("luis_student"))
+                                .thenThrow(new RuntimeException("db-classmates-down"));
+
+                ResponseEntity<?> response = documentController.getMyClassmates(authentication);
+
+                assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("db-classmates-down", bodyMap.get("error"));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 500 si un administrador no tiene rol definido en el directorio de admins")
+        void debeDevolverErrorControladoSiAdminNoTieneRol() {
+                Users adminSinRol = new Users();
+                adminSinRol.setUser_id(501L);
+                adminSinRol.setUsername("admin_sin_rol");
+                adminSinRol.setEmail("admin@demo.com");
+                adminSinRol.setRole(null);
+
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(userRepository.findByRole(Role.ADMIN)).thenReturn(List.of(adminSinRol));
+
+                ResponseEntity<?> response = documentController.getPlatformAdmins(authentication);
+
+                assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertNotNull(bodyMap.get("error"));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 401 cuando se consulta el directorio de admins sin autenticación")
+        void debeRechazarDirectorioAdminsSinAutenticacion() {
+                ResponseEntity<?> response = documentController.getPlatformAdmins(null);
+
+                assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("No autenticado.", bodyMap.get("error"));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 200 con administradores cuando todos tienen rol válido")
+        void debeDevolverDirectorioAdminsConRolValido() {
+                Users admin = new Users();
+                admin.setUser_id(77L);
+                admin.setUsername("root_admin");
+                admin.setEmail("root@demo.com");
+                admin.setRole(Role.ADMIN);
+
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(userRepository.findByRole(Role.ADMIN)).thenReturn(List.of(admin));
+
+                ResponseEntity<?> response = documentController.getPlatformAdmins(authentication);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertTrue(response.getBody() instanceof List);
+                List<?> payload = (List<?>) response.getBody();
+                assertEquals(1, payload.size());
+        }
+
         // =========================================================================
         // NUEVOS TESTS DE AUDITORÍA: CONTROL DE LECTURA DE LA CAMPANA (CON MÉTODO REAL
         // 'READ')
@@ -827,5 +1047,318 @@ public class DocumentControllerTest {
                 assertEquals("Acceso denegado: No puedes modificar el estado de este documento.", bodyMap.get("error"));
 
                 Mockito.verify(documentMetadataRepository, Mockito.never()).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("CAMPANA - Debe devolver 401 cuando se intenta marcar como leído sin autenticación")
+        void debeRechazarMarkAsReadSinAutenticacion() {
+                ResponseEntity<?> response = documentController.markAsRead(null, 50L);
+
+                assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("No autenticado o token JWT inválido.", bodyMap.get("error"));
+        }
+
+        @Test
+        @DisplayName("CAMPANA - Debe devolver 403 cuando el documento no pertenece a RECEIVED")
+        void debeDenegarMarkAsReadSiNoEsCarpetaReceived() {
+                Long documentId = 51L;
+                DocumentMetadata mockDoc = new DocumentMetadata();
+                mockDoc.setDocumentid(documentId);
+                mockDoc.setReceiver(mockReceiver);
+                mockDoc.setFolder_type(FolderType.SENT);
+                mockDoc.setRead(false);
+
+                Mockito.when(authentication.getName()).thenReturn("profesor_juan");
+                Mockito.when(documentMetadataRepository.findById(documentId)).thenReturn(Optional.of(mockDoc));
+
+                ResponseEntity<?> response = documentController.markAsRead(authentication, documentId);
+
+                assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("Acceso denegado: No puedes modificar el estado de este documento.", bodyMap.get("error"));
+                Mockito.verify(documentMetadataRepository, never()).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("CAMPANA - Debe devolver 500 controlado cuando el documento no existe")
+        void debeDevolverErrorControladoEnMarkAsReadCuandoNoExisteDocumento() {
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("profesor_juan");
+                Mockito.when(documentMetadataRepository.findById(999L)).thenReturn(Optional.empty());
+
+                ResponseEntity<?> response = documentController.markAsRead(authentication, 999L);
+
+                assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertTrue(bodyMap.get("error").toString()
+                                .contains("Error al actualizar el estado de lectura del documento"));
+        }
+
+        @Test
+        @DisplayName("CAMPANA - No debe persistir cambios cuando el documento ya estaba marcado como leído")
+        void noDebePersistirMarkAsReadCuandoYaEstaLeido() {
+                Long documentId = 52L;
+                DocumentMetadata mockDoc = new DocumentMetadata();
+                mockDoc.setDocumentid(documentId);
+                mockDoc.setReceiver(mockReceiver);
+                mockDoc.setFolder_type(FolderType.RECEIVED);
+                mockDoc.setRead(true);
+
+                Mockito.when(authentication.getName()).thenReturn("profesor_juan");
+                Mockito.when(documentMetadataRepository.findById(documentId)).thenReturn(Optional.of(mockDoc));
+
+                ResponseEntity<?> response = documentController.markAsRead(authentication, documentId);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                Mockito.verify(documentMetadataRepository, never()).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 401 cuando se consultan enviados sin autenticación")
+        void debeRechazarSentDocumentsSinAutenticacion() {
+                ResponseEntity<?> response = documentController.getSentDocuments(null);
+
+                assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("No autenticado o token JWT inválido.", bodyMap.get("error"));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 500 controlado si falla la consulta de enviados")
+        void debeDevolverErrorControladoEnSentDocumentsSiFallaRepositorio() {
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("luis_student");
+                Mockito.when(documentMetadataRepository.findSentDocumentsByUsername("luis_student"))
+                                .thenThrow(new RuntimeException("boom-sent"));
+
+                ResponseEntity<?> response = documentController.getSentDocuments(authentication);
+
+                assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("Error al recuperar los documentos enviados", bodyMap.get("error"));
+        }
+
+        @Test
+        @DisplayName("Debe devolver recibidos por asignatura para usuario autenticado")
+        void debeDevolverReceivedByCourseConSesionValida() {
+                Courses course = new Courses();
+                course.setCourse_id(501L);
+
+                DocumentMetadata doc = new DocumentMetadata();
+                doc.setDocumentid(901L);
+                doc.setFilename("documents/uuid-course.pdf");
+                doc.setOriginalname("Actividad_1.pdf");
+                doc.setCourse(course);
+                doc.setSender(mockSender);
+                doc.setReceiver(mockReceiver);
+                doc.setFolder_type(FolderType.RECEIVED);
+
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("luis_student");
+                Mockito.when(documentMetadataRepository.findReceivedDocumentsByUsernameAndCourse("luis_student", 501L))
+                                .thenReturn(List.of(doc));
+
+                ResponseEntity<?> response = documentController.getReceivedDocumentsByCourse(authentication, 501L);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertTrue(response.getBody() instanceof List);
+                List<?> payload = (List<?>) response.getBody();
+                assertEquals(1, payload.size());
+                Map<?, ?> first = (Map<?, ?>) payload.get(0);
+                assertEquals("Actividad_1.pdf", first.get("originalname"));
+        }
+
+        @Test
+        @DisplayName("Debe devolver enviados por asignatura para usuario autenticado")
+        void debeDevolverSentByCourseConSesionValida() {
+                Courses course = new Courses();
+                course.setCourse_id(702L);
+
+                DocumentMetadata doc = new DocumentMetadata();
+                doc.setDocumentid(902L);
+                doc.setFilename("documents/uuid-sent-course.pdf");
+                doc.setOriginalname("Entrega_Final.pdf");
+                doc.setCourse(course);
+                doc.setSender(mockSender);
+                doc.setReceiver(mockReceiver);
+                doc.setFolder_type(FolderType.SENT);
+
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("luis_student");
+                Mockito.when(documentMetadataRepository.findSentDocumentsByUsernameAndCourse("luis_student", 702L))
+                                .thenReturn(List.of(doc));
+
+                ResponseEntity<?> response = documentController.getSentDocumentsByCourse(authentication, 702L);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertTrue(response.getBody() instanceof List);
+                List<?> payload = (List<?>) response.getBody();
+                assertEquals(1, payload.size());
+                Map<?, ?> first = (Map<?, ?>) payload.get(0);
+                assertEquals("Entrega_Final.pdf", first.get("originalname"));
+        }
+
+        @Test
+        @DisplayName("Debe bloquear envío colectivo admin cuando no hay alumnos activos")
+        void debeBloquearEnvioColectivoAdminSinAlumnos() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "circular.pdf",
+                                "application/pdf",
+                                "Circular vacia".getBytes());
+
+                Users admin = new Users();
+                admin.setUser_id(90L);
+                admin.setUsername("root_admin");
+                admin.setRole(Role.ADMIN);
+
+                Courses course = new Courses();
+                course.setCourse_id(900L);
+
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("root_admin");
+                Mockito.when(userRepository.findByUsername("root_admin")).thenReturn(Optional.of(admin));
+                Mockito.when(coursesRepository.findById(900L)).thenReturn(Optional.of(course));
+                Mockito.when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(900L)).thenReturn(List.of());
+
+                ResponseEntity<?> response = documentController.uploadDocumentToCourseByAdmin(authentication, validFile,
+                                900L);
+
+                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertTrue(bodyMap.get("error").toString().contains("no hay alumnos activos matriculados"));
+                Mockito.verify(documentMetadataRepository, never()).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("Debe bloquear envío masivo del profesor cuando no hay alumnos matriculados")
+        void debeBloquearEnvioMasivoProfesorSinAlumnos() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "guia.pdf",
+                                "application/pdf",
+                                "Guia".getBytes());
+
+                Users professor = new Users();
+                professor.setUser_id(10L);
+                professor.setUsername("profesor_juan");
+                professor.setRole(Role.PROFESSOR);
+
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("profesor_juan");
+                Mockito.when(userRepository.findByUsername("profesor_juan")).thenReturn(Optional.of(professor));
+                Mockito.when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(77L)).thenReturn(List.of());
+                Mockito.when(fileStorageService.storeDocumentFile(any(),
+                                eq(FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS)))
+                                .thenReturn("documents/uuid_guide.pdf");
+
+                ResponseEntity<?> response = documentController.professorUploadDocument(authentication, validFile, 77L,
+                                0L);
+
+                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertTrue(bodyMap.get("error").toString().contains("no hay alumnos matriculados"));
+                Mockito.verify(documentMetadataRepository, never()).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 500 controlado en envío individual del profesor si el receptor no existe")
+        void debeDevolverErrorControladoEnEnvioIndividualProfesorSiReceptorNoExiste() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "nota.pdf",
+                                "application/pdf",
+                                "Nota".getBytes());
+
+                Users professor = new Users();
+                professor.setUser_id(10L);
+                professor.setUsername("profesor_juan");
+                professor.setRole(Role.PROFESSOR);
+
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("profesor_juan");
+                Mockito.when(userRepository.findByUsername("profesor_juan")).thenReturn(Optional.of(professor));
+                Mockito.when(coursesRepository.findById(200L)).thenReturn(Optional.of(new Courses()));
+                Mockito.when(fileStorageService.storeDocumentFile(any(),
+                                eq(FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS)))
+                                .thenReturn("documents/uuid_note.pdf");
+                Mockito.when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+                ResponseEntity<?> response = documentController.professorUploadDocument(authentication, validFile, 200L,
+                                999L);
+
+                assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("Error crítico al procesar la transmisión académica del profesor", bodyMap.get("error"));
+                Mockito.verify(documentMetadataRepository, never()).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 400 cuando el alumno no tiene matrícula activa para la asignatura")
+        void debeBloquearAssignmentSiNoHayMatriculaActivaParaAsignatura() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "entrega.pdf",
+                                "application/pdf",
+                                "Entrega".getBytes());
+
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("luis_student");
+                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
+
+                Courses otherCourse = new Courses();
+                otherCourse.setCourse_id(1234L);
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(9991L);
+                enrollment.setUser(mockSender);
+                enrollment.setCourse(otherCourse);
+
+                Mockito.when(enrollmentRepository.findAllByUserIdWithCourses(mockSender.getUser_id()))
+                                .thenReturn(List.of(enrollment));
+
+                ResponseEntity<?> response = documentController.uploadAssignmentDocument(authentication, validFile,
+                                5000L,
+                                "TRABAJO");
+
+                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("No se encontró una matrícula activa para esta asignatura.", bodyMap.get("error"));
+                Mockito.verify(documentMetadataRepository, never()).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 400 cuando la asignatura no tiene profesor asignado para entregas")
+        void debeBloquearAssignmentSiNoHayProfesorAsignado() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "entrega.pdf",
+                                "application/pdf",
+                                "Entrega".getBytes());
+
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("luis_student");
+                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
+
+                Courses course = new Courses();
+                course.setCourse_id(101L);
+                course.setInstructors("Sin asignar");
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(1212L);
+                enrollment.setUser(mockSender);
+                enrollment.setCourse(course);
+
+                Mockito.when(enrollmentRepository.findAllByUserIdWithCourses(mockSender.getUser_id()))
+                                .thenReturn(List.of(enrollment));
+
+                ResponseEntity<?> response = documentController.uploadAssignmentDocument(authentication, validFile,
+                                101L,
+                                "TRABAJO");
+
+                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertTrue(bodyMap.get("error").toString().contains("Profesor no asignado"));
+                Mockito.verify(documentMetadataRepository, never()).save(any(DocumentMetadata.class));
         }
 }

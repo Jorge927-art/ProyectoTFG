@@ -660,17 +660,27 @@ public class DocumentController {
             List<Users> allProfessors = userRepository.findByRole(Role.PROFESSOR);
 
             // 3. Filtrar los profesores cuyos nombres aparezcan en la cadena "instructors"
-            // de los cursos matriculados
+            // de los cursos matriculados, tolerando matriculas sin curso o sin instructores
             List<UserDirectoryDTO> myTeachers = allProfessors.stream()
-                    .filter(prof -> enrollments.stream().anyMatch(e -> e.getCourse().getInstructors() != null &&
-                            e.getCourse().getInstructors().contains(prof.getUsername())))
-                    .map(p -> new UserDirectoryDTO(p.getUser_id(), p.getUsername(), p.getEmail(), p.getRole().name()))
+                    .filter(prof -> enrollments.stream()
+                            .anyMatch(e -> matchesInstructorInCourse(e, prof.getUsername())))
+                    .map(p -> new UserDirectoryDTO(p.getUser_id(), p.getUsername(), p.getEmail(),
+                            p.getRole() != null ? p.getRole().name() : "UNKNOWN"))
                     .toList();
 
             return ResponseEntity.ok(myTeachers);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
+    }
+
+    private boolean matchesInstructorInCourse(Enrollment enrollment, String username) {
+        if (enrollment == null || enrollment.getCourse() == null || username == null || username.isBlank()) {
+            return false;
+        }
+
+        String instructors = enrollment.getCourse().getInstructors();
+        return instructors != null && instructors.contains(username);
     }
 
     /**
