@@ -1596,7 +1596,7 @@ Se determina **posponer e inactivar temporalmente la integración del componente
 
 # ADR-44: Tipado Defensivo y Gestión de Precisión en el Progreso Académico
 
-### Estado
+## Status
 
 Aceptado
 
@@ -1620,7 +1620,7 @@ Se decide mantener el uso del tipo `Long` para almacenar y procesar el total de 
 
 # ADR-45: Abstracción de Infraestructura y Purificación Semántica de la Interfaz (UX)
 
-### Estado
+## Status
 
 Aceptado
 
@@ -1646,7 +1646,7 @@ Se establece un principio estricto de **Purificación Semántica y Abstracción 
 **Fecha:** Julio 2026  
 **Estatus:** Aceptado  
 
-### Contexto
+## Status
 
 Se requiere proyectar métricas en tiempo real que combinen el catálogo base de cursos externos (origen, especialidad) con la analítica dinámica de los usuarios en la plataforma local (inscripciones, notas, valoraciones de docentes).
 
@@ -1674,7 +1674,7 @@ Los principales desafíos son:
 
 # ADR-47: Canal de Alarmas Académicas Dinámicas en Barra de Navegación
 
-### Estatus
+## Status
 
 Aceptado (Julio 2026)
 
@@ -1698,7 +1698,7 @@ El estudiante requería avisos visuales inmediatos sobre la llegada de nuevos do
 
 # ADR-48: Purificación del Sistema de Contingencia y Control de Permisos
 
-### Estatus
+## Status
 
 Aceptado (Julio 2026)
 
@@ -1721,7 +1721,7 @@ La vista de error por falta de privilegios (`AccessDenied.tsx`) utilizaba etique
 
 # ADR-49: Purificación Visual de Dashboards y Centralización de Componentes de Enrutamiento
 
-### Estado
+## Status
 
 Aceptado (Julio 2026)
 

@@ -63,6 +63,10 @@ jobs:
       - name: Build + Tests
         run: ./mvnw -B -ntp clean verify -Dspring.profiles.active=test-ci
 
+      - name: Enforce coverage ratchet
+        if: success()
+        run: python3 scripts/check_coverage_ratchet.py target/site/jacoco/jacoco.csv coverage-baseline.json
+
   frontend-typescript:
     name: Frontend - Node 20 / Vite
     runs-on: ubuntu-latest
