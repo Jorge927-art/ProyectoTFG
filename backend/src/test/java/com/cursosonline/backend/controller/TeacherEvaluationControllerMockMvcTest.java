@@ -225,14 +225,72 @@ class TeacherEvaluationControllerMockMvcTest {
         }
 
         @Test
-        @DisplayName("Debe registrar la Nota Final de Asignatura la primera vez que se envía")
-        void deberiaRegistrarNotaFinalAsignaturaPrimeraVez() {
+        @DisplayName("debe devolver 400 cuando el título de la calificación está vacío")
+        void gradeStudent_shouldReturnBadRequest_WhenTitleIsBlank() throws Exception {
+                Long enrollmentId = 777L;
+                String teacherUsername = "profesor_test";
 
+                when(principal.getName()).thenReturn(teacherUsername);
+                when(enrollmentRepository.isInstructorAuthorizedForEnrollment(enrollmentId, teacherUsername))
+                                .thenReturn(true);
+                when(enrollmentRepository.findById(enrollmentId)).thenReturn(Optional.of(new Enrollment()));
+                when(courseGradeRepository.findAllByEnrollmentIdOrderByGradeIdAsc(enrollmentId)).thenReturn(List.of());
+
+                String gradePayload = """
+                                {
+                                  "enrollmentId": 777,
+                                  "title": "   ",
+                                  "score": 8.50,
+                                  "feedback": "Falta el título"
+                                }
+                                """;
+
+                mockMvc.perform(post("/api/v1/teacher/evaluations/submit")
+                                .principal(principal)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(gradePayload))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.error").value("El título de la calificación es obligatorio."));
+
+                verify(courseGradeRepository, never()).save(org.mockito.ArgumentMatchers.any(CourseGrade.class));
         }
 
         @Test
-        @DisplayName("Debe rechazar con 409 el reenvío de la Nota Final de Asignatura ya existente")
-        void deberiaRechazarReenvioNotaFinalAsignatura() {
+        @DisplayName("debe devolver 409 cuando la Nota Final de Asignatura ya había sido enviada")
+        void gradeStudent_shouldReturnConflict_WhenFinalGradeAlreadySubmitted() throws Exception {
+                Long enrollmentId = 778L;
+                String teacherUsername = "profesor_test";
 
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(enrollmentId);
+
+                CourseGrade existingFinal = new CourseGrade();
+                existingFinal.setTitle("Nota Final Asignatura");
+
+                when(principal.getName()).thenReturn(teacherUsername);
+                when(enrollmentRepository.isInstructorAuthorizedForEnrollment(enrollmentId, teacherUsername))
+                                .thenReturn(true);
+                when(enrollmentRepository.findById(enrollmentId)).thenReturn(Optional.of(enrollment));
+                when(courseGradeRepository.findAllByEnrollmentIdOrderByGradeIdAsc(enrollmentId))
+                                .thenReturn(List.of(existingFinal));
+
+                String gradePayload = """
+                                {
+                                  "enrollmentId": 778,
+                                  "title": "Nota Final Asignatura",
+                                  "score": 9.00,
+                                  "feedback": "Cierre del curso"
+                                }
+                                """;
+
+                mockMvc.perform(post("/api/v1/teacher/evaluations/submit")
+                                .principal(principal)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(gradePayload))
+                                .andExpect(status().isConflict())
+                                .andExpect(jsonPath("$.error").value(
+                                                "La Nota Final de la Asignatura ya fue enviada. Es definitiva y no puede modificarse."));
+
+                verify(courseGradeRepository, never()).save(org.mockito.ArgumentMatchers.any(CourseGrade.class));
         }
 }

@@ -404,4 +404,40 @@ class UserControllerTest {
                                 .andExpect(jsonPath("$.message").value(
                                                 "Acción denegada: no puedes eliminarte permanentemente a ti mismo."));
         }
+
+        @Test
+        void getStudentInterestsDebeRetornar401CuandoNoHayPrincipal() throws Exception {
+                mockMvc.perform(get("/api/auth/my-interests"))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.error").value("Sesión inválida o expirada."));
+        }
+
+        @Test
+        void meDebeRetornar401CuandoNoHayPrincipal() throws Exception {
+                mockMvc.perform(get("/api/auth/me"))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.error").value("Sesión inválida o expirada."));
+        }
+
+        @Test
+        void saveStudentInterestsDebeRetornar401CuandoNoHayPrincipal() throws Exception {
+                mockMvc.perform(post("/api/auth/my-interests")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.error").value("Sesión inválida o expirada."));
+        }
+
+        @Test
+        void refreshDebeRetornar401CuandoElRefreshTokenEsNulo() throws Exception {
+                when(refreshTokenService.rotate(null))
+                                .thenThrow(new com.cursosonline.backend.exception.ServicesException(
+                                                "Refresh token inválido o expirado."));
+
+                mockMvc.perform(post("/api/auth/refresh")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.error").value("Refresh token inválido o expirado."));
+        }
 }

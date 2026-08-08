@@ -203,6 +203,79 @@ class RecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("Debe devolver lista vacía si el nombre de usuario es nulo o en blanco")
+    void getRecommendations_WithBlankUsername_ShouldReturnEmptyList() {
+        assertTrue(recommendationService.getRecommendations(null).isEmpty());
+        assertTrue(recommendationService.getRecommendations("   ").isEmpty());
+    }
+
+    @Test
+    @DisplayName("Debe devolver lista vacía cuando se pide por userId nulo")
+    void getRecommendationsForUser_WithNullUserId_ShouldReturnEmptyList() {
+        assertTrue(recommendationService.getRecommendationsForUser(null).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Debe tolerar intereses y colecciones nulas sin romper el algoritmo")
+    void getRecommendations_WithNullInterestsAndCollections_ShouldReturnCourses() {
+        userInterests.setCategory(null);
+        userInterests.setCourse_type(null);
+        userInterests.setLanguage(null);
+        userInterests.setSubtitle_languages(null);
+        userInterests.setDuration(null);
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1, course2));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertFalse(results.isEmpty());
+        assertEquals(101L, results.get(0).id());
+    }
+
+    @Test
+    @DisplayName("PESOS [Ajuste]: historial académico al 50% debe aportar 8 puntos")
+    void getRecommendations_HistoryScoreAt50_WhenProgressIsAtLeast50() {
+        Courses historyCourse = new Courses();
+        historyCourse.setCourse_id(999L);
+        historyCourse.setCategory("Ciencia de Datos");
+        Enrollment progress50 = new Enrollment();
+        progress50.setCourse(historyCourse);
+        progress50.setProgress_percentage(50);
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(Arrays.asList(progress50));
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertEquals(38, results.get(0).score());
+    }
+
+    @Test
+    @DisplayName("PESOS [Ajuste]: historial académico al 75% debe aportar 15 puntos")
+    void getRecommendations_HistoryScoreAt75_WhenProgressIsAtLeast75() {
+        Courses historyCourse = new Courses();
+        historyCourse.setCourse_id(998L);
+        historyCourse.setCategory("Ciencia de Datos");
+        Enrollment progress75 = new Enrollment();
+        progress75.setCourse(historyCourse);
+        progress75.setProgress_percentage(75);
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(Arrays.asList(progress75));
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertEquals(45, results.get(0).score());
+    }
+
+    @Test
     @DisplayName("PESOS [Ajuste]: historial académico al 100% debe aportar 20 puntos máximos")
     void getRecommendations_HistoryScoreCap20_WhenProgressIsAtLeast100() {
         // Arrange: curso plantilla ya cursado en la misma categoría para activar el

@@ -164,4 +164,30 @@ public class AcademicEvaluationControllerTest {
 
         Mockito.verify(academicEvaluationRepository, Mockito.never()).save(any(AcademicEvaluation.class));
     }
+
+    @Test
+    @DisplayName("Debe devolver 401 cuando la sesión es nula o inválida al recuperar pendientes")
+    void debeRetornarUnauthorizedSinAutenticacionValida() {
+        Mockito.when(authentication.isAuthenticated()).thenReturn(false);
+
+        ResponseEntity<?> response = academicEvaluationController.getPendingEvaluations(authentication);
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+        assertEquals("No autenticado o sesión inválida.", bodyMap.get("error"));
+    }
+
+    @Test
+    @DisplayName("Debe devolver 400 cuando el payload de evaluación está incompleto y produce un error de estructura")
+    void debeRechazarEvaluacionConPayloadIncompleto() {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("course_score", 5);
+        payload.put("instructor_score", 4);
+
+        ResponseEntity<?> response = academicEvaluationController.submitEvaluation(authentication, payload);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+        assertEquals("Estructura de datos de evaluación corrupta o incompleta.", bodyMap.get("error"));
+    }
 }

@@ -140,6 +140,23 @@ class JwtServiceTest {
     }
 
     @Test
+    @DisplayName("Debe rechazar un token válido cuando el usuario esperado no coincide")
+    void isTokenValid_WithDifferentUserDetails_ShouldReturnFalse() {
+        String token = jwtService.generateAccessToken(sampleUserDetails, 45L, "alumno.cripto@tfg.com");
+        UserDetails otherUser = new User("otro_usuario", "", List.of(new SimpleGrantedAuthority("ROLE_STUDENT")));
+
+        assertFalse(jwtService.isTokenValid(token, otherUser));
+    }
+
+    @Test
+    @DisplayName("Debe devolver null para userId cuando el token no incluye el claim")
+    void extractUserId_WithoutUserIdClaim_ShouldReturnNull() {
+        String token = jwtService.generateAccessToken(sampleUserDetails, null, null);
+
+        assertNull(jwtService.extractUserId(token));
+    }
+
+    @Test
     @DisplayName("Debe respetar el clock skew configurado antes de considerar expirado un token")
     void isTokenValid_ShouldRespectClockSkewWindow() {
         Instant issuedAt = Instant.parse("2026-08-07T12:00:00Z");

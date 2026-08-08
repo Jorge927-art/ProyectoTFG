@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import com.cursosonline.backend.dto.InterestDTO;
 import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Role;
@@ -151,6 +153,178 @@ public class UserServiceTest {
                 assertFalse(resultado.isPresent(), "El resultado debería ser un Optional vacío");
                 assertTrue(resultado.isEmpty());
                 verify(userRepository, times(1)).findByUsername(username_does_not_exist);
+        }
+
+        @Test
+        void findByUsername_DebeResolverCoincidenciaCaseInsensitiveYEmailFallback() {
+                Users caseUser = new Users(2L, "Luis", "enc", Role.STUDENT, "luis@demo.com", true,
+                                new java.util.ArrayList<>());
+                Users emailUser = new Users(3L, "correo", "enc", Role.STUDENT, "correo@demo.com", true,
+                                new java.util.ArrayList<>());
+
+                when(userRepository.findByUsername("Luis")).thenReturn(Optional.empty());
+                when(userRepository.findByUsernameIgnoreCase("Luis")).thenReturn(Optional.of(caseUser));
+
+                Optional<Users> caseResult = userService.findByUsername("Luis");
+                assertTrue(caseResult.isPresent());
+                assertEquals(2L, caseResult.get().getUser_id());
+
+                when(userRepository.findByUsername("correo@demo.com")).thenReturn(Optional.empty());
+                when(userRepository.findByUsernameIgnoreCase("correo@demo.com")).thenReturn(Optional.empty());
+                when(userRepository.findByEmailIgnoreCase("correo@demo.com")).thenReturn(Optional.of(emailUser));
+
+                Optional<Users> emailResult = userService.findByUsername("correo@demo.com");
+                assertTrue(emailResult.isPresent());
+                assertEquals(3L, emailResult.get().getUser_id());
+        }
+
+        @Test
+        void login_DebeRechazarUsuarioNoEncontrado() {
+                when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+
+                ServicesException ex = assertThrows(ServicesException.class, () -> userService.login("ghost", "pw"));
+
+                assertTrue(ex.getMessage().contains("Usuario no encontrado"));
+        }
+
+        @Test
+        void login_DebeRechazarCuentaDeshabilitada() {
+                Users disabledUser = new Users(4L, "disabled", "enc", Role.STUDENT, "d@demo.com", false,
+                                new java.util.ArrayList<>());
+                when(userRepository.findByUsername("disabled")).thenReturn(Optional.of(disabledUser));
+
+                ServicesException ex = assertThrows(ServicesException.class, () -> userService.login("disabled", "pw"));
+
+                assertTrue(ex.getMessage().contains("Acceso denegado"));
+        }
+
+        @Test
+        void login_DebeRechazarPasswordIncorrecta() {
+                Users user = new Users(5L, "luis", "encoded", Role.STUDENT, "luis@demo.com", true,
+                                new java.util.ArrayList<>());
+                when(userRepository.findByUsername("luis")).thenReturn(Optional.of(user));
+                when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
+
+                ServicesException ex = assertThrows(ServicesException.class, () -> userService.login("luis", "wrong"));
+
+                assertTrue(ex.getMessage().contains("Contraseña incorrecta"));
+        }
+
+        @Test
+        void updateUserRole_DebeActualizarElRolYPersistirCambio() {
+                Users user = new Users(6L, "teacher", "enc", Role.STUDENT, "teacher@demo.com", true,
+                                new java.util.ArrayList<>());
+                when(userRepository.findByUsername("teacher")).thenReturn(Optional.of(user));
+                when(userRepository.save(any(Users.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+                Users updated = userService.updateUserRole("teacher", Role.PROFESSOR);
+
+                assertEquals(Role.PROFESSOR, updated.getRole());
+                verify(userRepository).save(user);
+        }
+
+        @Test
+        void saveUserInterests_DebeCrearRegistroNuevoCuandoNoExiste() {
+                Users user = new Users(7L, "nuevo", "enc", Role.STUDENT, "nuevo@demo.com", true,
+                                new java.util.ArrayList<>());
+                InterestDTO dto = new InterestDTO(List.of("Datos"), List.of("Básico"), List.of("1 semana"),
+                                List.of("Español"), List.of("Subtítulos"));
+
+                when(userRepository.findByUsername("nuevo")).thenReturn(Optional.of(user));
+                when(interestRepository.findById(7L)).thenReturn(Optional.empty());
+                when(interestRepository.save(any(com.cursosonline.backend.entities.Interest.class)))
+                                .thenAnswer(invocation -> invocation.getArgument(0));
+                when(interestRepository.saveAndFlush(any(com.cursosonline.backend.entities.Interest.class)))
+                                .thenAnswer(invocation -> invocation.getArgument(0));
+
+                userService.saveUserInterests("nuevo", dto);
+
+                verify(interestRepository).save(any(com.cursosonline.backend.entities.Interest.class));
+                verify(interestRepository).saveAndFlush(any(com.cursosonline.backend.entities.Interest.class));
+        }
+
+        @Test
+        void startCourseSecure_DebeNoGuardarSiLaMatriculaYaHabiaSidoIniciada() {
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(77L);
+                enrollment.setStarted_at(LocalDateTime.now());
+
+                when(enrollmentRepository.findByEnrollmentidAndUserUsername(77L, "Luis"))
+                                .thenReturn(Optional.of(enrollment));
+
+                userService.startCourseSecure(77L, "Luis");
+
+                verify(enrollmentRepository, never()).save(any(Enrollment.class));
+        }
+
+        @Test
+        void calculateCurrentProgress_DebeAcotarElProgresoEntreCeroYCien() {
+                Clock fixedClockNow = Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneId.of("UTC"));
+                userService.setClock(fixedClockNow);
+
+                Users user = new Users(8L, "Luis", "pwd", Role.STUDENT, "luis@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses course = new Courses();
+                course.setCourse_id(88L);
+                course.setDuration(1.0f);
+
+                Clock fixedClockStart = Clock.fixed(Instant.parse("2026-01-01T10:00:00Z"), ZoneId.of("UTC"));
+                Enrollment enrollment = new Enrollment(1005L, user, course, null, "EN_CURSO", 0,
+                                java.time.LocalDateTime.now(fixedClockStart));
+
+                int progress = userService.calculateCurrentProgress(enrollment);
+
+                assertEquals(100, progress);
+        }
+
+        @Test
+        void getStudentActiveCoursesWithCalculatedProgress_DebeIgnorarMatriculasSinIdYDejarNotasVacias() {
+                Users user = new Users(9L, "student", "pwd", Role.STUDENT, "student@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses course = new Courses();
+                course.setCourse_id(90L);
+                course.setDuration(1.0f);
+
+                Enrollment validEnrollment = new Enrollment();
+                validEnrollment.setEnrollmentid(900L);
+                validEnrollment.setUser(user);
+                validEnrollment.setCourse(course);
+                validEnrollment.setStarted_at(LocalDateTime.of(2026, 1, 1, 11, 30));
+                userService.setClock(Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneId.of("UTC")));
+
+                Enrollment invalidEnrollment = new Enrollment();
+                invalidEnrollment.setEnrollmentid(null);
+                invalidEnrollment.setUser(user);
+                invalidEnrollment.setCourse(course);
+
+                when(enrollmentRepository.findAllByUserIdWithCourses(9L))
+                                .thenReturn(List.of(validEnrollment, invalidEnrollment));
+                when(courseGradeRepository.findAllByEnrollmentIdsOrderByGradeIdAsc(List.of(900L)))
+                                .thenReturn(List.of());
+
+                List<Enrollment> result = userService.getStudentActiveCoursesWithCalculatedProgress(9L);
+
+                assertEquals(2, result.size());
+                assertEquals(50, result.get(0).getProgress_percentage());
+                assertNotNull(result.get(0).getGrades());
+                assertTrue(result.get(0).getGrades().isEmpty());
+        }
+
+        @Test
+        void getUserNotifications_DebeIgnorarAlertasDeProgresoSiElProfesorNoTieneCursosAsignados() {
+                Users professor = new Users(10L, "profesor", "pwd", Role.PROFESSOR, "profe@example.com", true,
+                                new java.util.ArrayList<>());
+                when(userRepository.findByUsername("profesor")).thenReturn(Optional.of(professor));
+                when(documentMetadataRepository.findUnreadReceivedDocumentsByUsername("profesor"))
+                                .thenReturn(List.of());
+                when(userSystemNotificationRepository.findUnreadByUsername("profesor")).thenReturn(List.of());
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(2);
+                when(coursesRepository.findAllAssignedToProfessor("profesor")).thenReturn(List.of());
+
+                List<com.cursosonline.backend.dto.NotificationDTO> alerts = userService
+                                .getUserNotifications("profesor");
+
+                assertTrue(alerts.isEmpty());
         }
 
         /**

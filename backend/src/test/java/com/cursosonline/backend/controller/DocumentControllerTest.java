@@ -357,6 +357,77 @@ public class DocumentControllerTest {
         }
 
         @Test
+        @DisplayName("Debe devolver 401 cuando el directorio administrativo se consulta sin autenticación válida")
+        void debeRechazarDirectorioAdminSinAutenticacionValida() {
+                ResponseEntity<?> response = documentController.getAdminUsersDirectory(null);
+
+                assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("No autenticado o token JWT inválido.", bodyMap.get("error"));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 403 cuando un usuario no instructor intenta ver entregas por matrícula")
+        void debeRechazarEntregasPorMatriculaSiNoEsInstructorAutorizado() {
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("alumno_no_autorizado");
+                Mockito.when(enrollmentRepository.isInstructorAuthorizedForEnrollment(10L, "alumno_no_autorizado"))
+                                .thenReturn(false);
+
+                ResponseEntity<?> response = documentController.getDocumentsByEnrollmentId(authentication, 10L);
+
+                assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertTrue(bodyMap.get("error").toString().contains("Acceso denegado"));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 403 si un usuario no participante intenta descargar un documento privado")
+        void debeRechazarDescargaSiNoEsEmisorNiReceptor() {
+                Long documentId = 11L;
+                DocumentMetadata privateDoc = new DocumentMetadata();
+                privateDoc.setSender(mockSender);
+                privateDoc.setReceiver(mockReceiver);
+                privateDoc.setFilename("documents/secured.pdf");
+                privateDoc.setOriginalname("privado.pdf");
+
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("intruso");
+                Mockito.when(documentMetadataRepository.findById(documentId)).thenReturn(Optional.of(privateDoc));
+
+                ResponseEntity<?> response = documentController.downloadDocumentSecure(authentication, documentId);
+
+                assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertTrue(bodyMap.get("error").toString().contains("Acceso denegado"));
+                Mockito.verify(fileStorageService, Mockito.never()).loadFileAsResource(anyString());
+        }
+
+        @Test
+        @DisplayName("Debe devolver 401 al solicitar la agenda de profesores sin autenticación")
+        void debeRechazarDirectorioDeProfesoresSinAutenticacion() {
+                ResponseEntity<?> response = documentController.getMyTeachers(null);
+
+                assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("No autenticado.", bodyMap.get("error"));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 500 controlado si el repositorio falla al recuperar el directorio administrativo")
+        void debeDevolverErrorControladoSiElRepositorioFalla() {
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(userRepository.findAll()).thenThrow(new RuntimeException("boom"));
+
+                ResponseEntity<?> response = documentController.getAdminUsersDirectory(authentication);
+
+                assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertTrue(bodyMap.get("error").toString()
+                                .contains("Error al recuperar el directorio administrativo de usuarios"));
+        }
+
+        @Test
         @DisplayName("Debe procesar envío masivo del profesor sin violar receiver_id al enviar a toda la clase")
         void debeProcesarEnvioMasivoProfesorConReceiverIdCero() {
                 MockMultipartFile validFile = new MockMultipartFile(
