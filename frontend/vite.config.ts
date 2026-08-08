@@ -25,6 +25,24 @@ export default defineConfig({
     unstubEnvs: true,
     maxWorkers: 2,
     setupFiles: './src/setupTests.tsx',
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'json-summary'],
+      exclude: [
+        '**/*.d.ts',
+        '**/*.test.ts',
+        '**/*.test.tsx',
+        '**/*.config.{ts,js,mjs,cjs}',
+        '**/vite.config.ts',
+        '**/vitest.config.ts',
+        '**/eslint.config.js',
+        '**/src/main.tsx',
+        '**/src/setupTests.tsx',
+        '**/src/**/types.ts',
+        '**/src/**/types.tsx',
+        '**/src/**/types/**',
+      ],
+    },
   },
 })
 

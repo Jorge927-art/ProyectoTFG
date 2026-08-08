@@ -279,6 +279,118 @@ describe('apiClient - Suite de Pruebas Unitarias de Interceptores de Red', () =>
         await expect(responseInterceptor.rejected(retriedError)).rejects.toBe(retriedError);
         expect(axiosPostSpy).not.toHaveBeenCalled();
     });
+
+    it('Debe propagar directo errores no Axios o no 401 sin intentar refresh', async () => {
+        vi.spyOn(axios, 'isAxiosError').mockReturnValue(false);
+        const axiosPostSpy = vi.spyOn(axios, 'post');
+
+        const responseInterceptor = (apiClient.interceptors.response as unknown as {
+            handlers: Array<{ rejected: (error: unknown) => Promise<unknown> }>
+        }).handlers[0];
+
+        const genericError = new Error('network down');
+
+        await expect(responseInterceptor.rejected(genericError)).rejects.toBe(genericError);
+        expect(axiosPostSpy).not.toHaveBeenCalled();
+    });
+
+    it('Debe invalidar la sesión si refresh responde sin accessToken utilizable', async () => {
+        const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
+        vi.spyOn(axios, 'isAxiosError').mockReturnValue(true);
+        vi.spyOn(axios, 'post').mockResolvedValue({
+            data: {
+                accessToken: '   ',
+                refreshToken: 'refresh_nuevo_ignorado',
+                expiresIn: 900
+            }
+        } as AxiosResponse);
+
+        vi.mocked(authStorageModule.readStoredRefreshToken).mockReturnValue('refresh-original');
+
+        const responseInterceptor = (apiClient.interceptors.response as unknown as {
+            handlers: Array<{ rejected: (error: unknown) => Promise<unknown> }>
+        }).handlers[0];
+
+        const authError = {
+            isAxiosError: true,
+            config: { url: '/api/protected/no-token', headers: {} },
+            response: { status: 401 }
+        };
+
+        await expect(responseInterceptor.rejected(authError)).rejects.toBe(authError);
+
+        expect(authStorageModule.writeStoredToken).not.toHaveBeenCalled();
+        expect(authStorageModule.clearStoredAuth).toHaveBeenCalled();
+        expect(dispatchEventSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'auth-session-expired' }));
+    });
+
+    it('Debe reutilizar el refresh token existente del usuario si el backend no envía uno nuevo', async () => {
+        const requestSpy = vi.spyOn(apiClient, 'request').mockResolvedValue({ status: 200 } as AxiosResponse);
+        vi.spyOn(axios, 'isAxiosError').mockReturnValue(true);
+        vi.spyOn(axios, 'post').mockResolvedValue({
+            data: {
+                accessToken: 'nuevo_access_token',
+                expiresIn: 0
+            }
+        } as AxiosResponse);
+
+        vi.mocked(authStorageModule.readStoredRefreshToken).mockReturnValue('refresh_original');
+        vi.mocked(authStorageModule.readStoredAuthUser).mockReturnValue({
+            username: 'usuario_refresh',
+            token: 'viejo_access',
+            refreshToken: 'refresh_original'
+        });
+
+        const responseInterceptor = (apiClient.interceptors.response as unknown as {
+            handlers: Array<{ rejected: (error: unknown) => Promise<unknown> }>
+        }).handlers[0];
+
+        const authError = {
+            isAxiosError: true,
+            config: { url: '/api/protected/reuse-refresh', headers: {} },
+            response: { status: 401 }
+        };
+
+        await expect(responseInterceptor.rejected(authError)).resolves.toEqual({ status: 200 });
+
+        expect(authStorageModule.writeStoredRefreshToken).not.toHaveBeenCalled();
+        expect(authStorageModule.writeStoredAuthUser).toHaveBeenCalledWith(expect.objectContaining({
+            token: 'nuevo_access_token',
+            refreshToken: 'refresh_original'
+        }));
+        expect(requestSpy).toHaveBeenCalled();
+    });
+
+    it('Debe reintentar con nuevo token aunque no exista currentUser en storage', async () => {
+        const requestSpy = vi.spyOn(apiClient, 'request').mockResolvedValue({ status: 204 } as AxiosResponse);
+        vi.spyOn(axios, 'isAxiosError').mockReturnValue(true);
+        vi.spyOn(axios, 'post').mockResolvedValue({
+            data: {
+                accessToken: 'token_sin_usuario',
+                refreshToken: 'refresh_sin_usuario',
+                expiresIn: 900
+            }
+        } as AxiosResponse);
+
+        vi.mocked(authStorageModule.readStoredRefreshToken).mockReturnValue('refresh_base');
+        vi.mocked(authStorageModule.readStoredAuthUser).mockReturnValue(null);
+
+        const responseInterceptor = (apiClient.interceptors.response as unknown as {
+            handlers: Array<{ rejected: (error: unknown) => Promise<unknown> }>
+        }).handlers[0];
+
+        const authError = {
+            isAxiosError: true,
+            config: { url: '/api/protected/no-user', headers: {} },
+            response: { status: 401 }
+        };
+
+        await expect(responseInterceptor.rejected(authError)).resolves.toEqual({ status: 204 });
+
+        expect(authStorageModule.writeStoredToken).toHaveBeenCalledWith('token_sin_usuario');
+        expect(authStorageModule.writeStoredAuthUser).not.toHaveBeenCalled();
+        expect(requestSpy).toHaveBeenCalled();
+    });
 });
 
 

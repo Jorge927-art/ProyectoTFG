@@ -81,6 +81,14 @@ describe('AuthStorage - Suite de Pruebas Unitarias de Almacenamiento Local', () 
         expect(token).toBe('refresh-valido-secreto-123');
     });
 
+    it('Debería tolerar escritura de refresh token sin storage disponible sin provocar side effects', () => {
+        vi.stubGlobal('window', undefined);
+
+        writeStoredRefreshToken('refresh-inaccesible');
+
+        expect(localStorage.setItem).not.toHaveBeenCalled();
+    });
+
     it('Debería usar el token embebido en auth_user cuando accessToken no existe', () => {
         localStorageMockStore[USER_KEY] = JSON.stringify({
             ...sampleValidUser,
@@ -115,6 +123,18 @@ describe('AuthStorage - Suite de Pruebas Unitarias de Almacenamiento Local', () 
 
         expect(token).toBe('refresh-legacy-auth-user');
         expect(localStorage.setItem).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, 'refresh-legacy-auth-user');
+    });
+
+    it('Debería usar refresh_token legacy desde auth_user si no existe refreshToken dedicado', () => {
+        localStorageMockStore[USER_KEY] = JSON.stringify({
+            ...sampleValidUser,
+            refresh_token: ' refresh-legacy-snake '
+        });
+
+        const token = readStoredRefreshToken();
+
+        expect(token).toBe('refresh-legacy-snake');
+        expect(localStorage.setItem).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, 'refresh-legacy-snake');
     });
 
     it('Debería sincronizar accessToken si difiere del token embebido en auth_user', () => {
@@ -196,6 +216,25 @@ describe('AuthStorage - Suite de Pruebas Unitarias de Almacenamiento Local', () 
             expiresAt: Date.now() + 60000
         };
         localStorageMockStore[USER_KEY] = JSON.stringify(activeSession);
+
+        const retrievedUser = readStoredAuthUser();
+
+        expect(retrievedUser).not.toBeNull();
+        expect(retrievedUser!.username).toBe('juan_tfg');
+    });
+
+    it('Debería aceptar el usuario si el JWT no aporta userId, sub ni email comparables', () => {
+        const tokenPayload = btoa(JSON.stringify({ role: 'STUDENT' }))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+
+        localStorageMockStore[TOKEN_KEY] = `x.${tokenPayload}.y`;
+        localStorageMockStore[USER_KEY] = JSON.stringify({
+            ...sampleValidUser,
+            username: 'juan_tfg',
+            email: 'juan@tfg.com'
+        });
 
         const retrievedUser = readStoredAuthUser();
 
@@ -289,6 +328,18 @@ describe('AuthStorage - Suite de Pruebas Unitarias de Almacenamiento Local', () 
         expect(localStorageMockStore[TOKEN_KEY]).toBeUndefined();
         expect(localStorageMockStore[REFRESH_TOKEN_KEY]).toBeUndefined();
         expect(localStorageMockStore[LEGACY_KEY]).toBeUndefined();
+    });
+
+    it('Debería no sincronizar accessToken ni refreshToken si el usuario los trae vacíos o en blanco', () => {
+        writeStoredAuthUser({
+            ...sampleValidUser,
+            token: '   ',
+            refreshToken: ''
+        });
+
+        expect(localStorage.setItem).toHaveBeenCalledWith(USER_KEY, expect.any(String));
+        expect(localStorage.setItem).not.toHaveBeenCalledWith(TOKEN_KEY, expect.anything());
+        expect(localStorage.setItem).not.toHaveBeenCalledWith(REFRESH_TOKEN_KEY, expect.anything());
     });
 });
 
