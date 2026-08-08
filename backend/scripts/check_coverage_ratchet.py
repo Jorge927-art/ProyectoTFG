@@ -2,6 +2,7 @@
 import csv
 import json
 import sys
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Dict, Tuple
 
@@ -34,17 +35,25 @@ def compare_againsts_baseline(current: Dict[str, float], baseline: Dict[str, flo
     raise_for_improvement = 1.0
     epsilon = 1e-9
 
+    # CI y local pueden divergir en centésimas por entorno/JDK;
+    # se compara sobre 1 decimal con ROUND_HALF_UP para estabilidad.
+    def round_one(value: float) -> float:
+        return float(Decimal(str(value)).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
+
+    current_rounded = {metric: round_one(value) for metric, value in current.items()}
+    baseline_rounded = {metric: round_one(value) for metric, value in baseline.items()}
+
     for metric in ("line", "branch"):
-        delta = current[metric] - baseline[metric]
+        delta = current_rounded[metric] - baseline_rounded[metric]
         if delta < -(tolerance + epsilon):
             return {
                 "status": "fail",
-                "message": f"Coverage regression detected for {metric}: current {current[metric]:.1f}% is {baseline[metric] - current[metric]:.1f} percentage points below baseline {baseline[metric]:.1f}%.",
+                "message": f"Coverage regression detected for {metric}: current {current_rounded[metric]:.1f}% is {baseline_rounded[metric] - current_rounded[metric]:.1f} percentage points below baseline {baseline_rounded[metric]:.1f}%.",
             }
         if delta > raise_for_improvement + epsilon:
             return {
                 "status": "fail",
-                "message": f"Coverage improved for {metric}: current {current[metric]:.1f}% exceeds baseline {baseline[metric]:.1f}% by {delta:.1f} points. Please update backend/coverage-baseline.json in this PR.",
+                "message": f"Coverage improved for {metric}: current {current_rounded[metric]:.1f}% exceeds baseline {baseline_rounded[metric]:.1f}% by {delta:.1f} points. Please update backend/coverage-baseline.json in this PR.",
             }
 
     return {"status": "pass", "message": "Coverage is within the ratchet bounds."}
