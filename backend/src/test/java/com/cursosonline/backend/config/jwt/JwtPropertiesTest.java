@@ -3,8 +3,11 @@ package com.cursosonline.backend.config.jwt;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.core.env.Environment;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.when;
 
 @DisplayName("Suite de Pruebas Unitarias para JwtProperties")
 class JwtPropertiesTest {
@@ -95,5 +98,45 @@ class JwtPropertiesTest {
         jwtProperties.setSecret("prod-super-secret-at-least-32-characters-long");
 
         assertDoesNotThrow(() -> jwtProperties.validateSecretForProfiles(new String[] { "prod" }));
+    }
+
+    @Test
+    @DisplayName("Debe rechazar secreto nulo o en blanco cuando el perfil es productivo")
+    void validateSecretForProfiles_ShouldRejectBlankSecretInProduction() {
+        jwtProperties.setSecret("   ");
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                () -> jwtProperties.validateSecretForProfiles(new String[] { "production" }));
+
+        assertTrue(exception.getMessage().contains("obligatorio en producción"));
+    }
+
+    @Test
+    @DisplayName("Debe detectar perfiles productivos ignorando mayúsculas y espacios")
+    void isProductionProfile_ShouldMatchTrimmedCaseInsensitiveValues() {
+        assertTrue(jwtProperties.isProductionProfile(new String[] { "  PROD  " }));
+        assertTrue(jwtProperties.isProductionProfile(new String[] { "staging", " Production " }));
+    }
+
+    @Test
+    @DisplayName("No debe considerar productivos perfiles nulos, vacíos o irrelevantes")
+    void isProductionProfile_ShouldIgnoreNullBlankAndNonProdProfiles() {
+        assertFalse(jwtProperties.isProductionProfile(null));
+        assertFalse(jwtProperties.isProductionProfile(new String[0]));
+        assertFalse(jwtProperties.isProductionProfile(new String[] { null, "   ", "dev", "test-ci" }));
+    }
+
+    @Test
+    @DisplayName("validateOnStartup debe usar los perfiles activos del entorno")
+    void validateOnStartup_ShouldReadProfilesFromEnvironment() {
+        Environment environment = Mockito.mock(Environment.class);
+        when(environment.getActiveProfiles()).thenReturn(new String[] { "prod" });
+
+        JwtProperties prodProperties = new JwtProperties(environment);
+        prodProperties.setSecret("change-me-in-local-and-tests-please");
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, prodProperties::validateOnStartup);
+
+        assertTrue(exception.getMessage().contains("valor por defecto"));
     }
 }

@@ -10,11 +10,16 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
@@ -198,5 +203,132 @@ class JwtServiceTest {
                 "En el segundo exacto de expiración no debe considerarse vencido por comparación estricta isBefore.");
         assertFalse(afterExpiryService.isTokenValid(token),
                 "Un segundo después de exp debe quedar inválido con skew=0.");
+    }
+
+    @Test
+    @DisplayName("Debe generar token válido sin email ni rol cuando el usuario no aporta autoridades")
+    void generateAccessToken_WithoutAuthorities_ShouldRemainValidAndOmitRole() {
+        UserDetails userWithoutAuthorities = new User("usuario_sin_rol", "", List.of());
+
+        String token = jwtService.generateAccessToken(userWithoutAuthorities, 99L, null);
+
+        assertTrue(jwtService.isTokenValid(token));
+        assertEquals("usuario_sin_rol", jwtService.extractUsername(token));
+        assertEquals(99L, jwtService.extractUserId(token));
+        assertNull(jwtService.extractRole(token));
+    }
+
+    @Test
+    @DisplayName("Debe aceptar token válido cuando no se aporta UserDetails para comparar")
+    void isTokenValid_WithNullUserDetails_ShouldReturnTrue() {
+        String token = jwtService.generateAccessToken(sampleUserDetails, 45L, "alumno.cripto@tfg.com");
+
+        assertTrue(jwtService.isTokenValid(token, null));
+    }
+
+    @Test
+    @DisplayName("Debe invalidar token firmado si no contiene claim exp")
+    void isTokenValid_WithoutExpirationClaim_ShouldReturnFalse() {
+        String token = createSignedToken(Map.of(
+                "iss", "cursosonline-backend",
+                "sub", "alumno_criptografia",
+                "tokenType", "access",
+                "jti", "jwt-sin-exp"));
+
+        assertFalse(jwtService.isTokenValid(token));
+    }
+
+    @Test
+    @DisplayName("Debe invalidar token firmado si no contiene claim sub")
+    void isTokenValid_WithoutSubjectClaim_ShouldReturnFalse() {
+        String token = createSignedToken(Map.of(
+                "iss", "cursosonline-backend",
+                "exp", Instant.now().plusSeconds(300).getEpochSecond(),
+                "tokenType", "access",
+                "jti", "jwt-sin-sub"));
+
+        assertFalse(jwtService.isTokenValid(token));
+    }
+
+    @Test
+    @DisplayName("Debe devolver null para claims opcionales ausentes en un token firmado válido")
+    void extractOptionalClaims_WhenMissing_ShouldReturnNull() {
+        String token = createSignedToken(Map.of(
+                "iss", "cursosonline-backend",
+                "sub", "alumno_criptografia",
+                "exp", Instant.now().plusSeconds(300).getEpochSecond(),
+                "tokenType", "access",
+                "jti", "jwt-optional-null"));
+
+        assertNull(jwtService.extractRole(token));
+        assertNull(jwtService.extractUserId(token));
+    }
+
+    @Test
+    @DisplayName("Debe rechazar tokens con segmento de firma en Base64URL inválido")
+    void isTokenValid_WithMalformedSignatureEncoding_ShouldReturnFalse() {
+        String validToken = jwtService.generateAccessToken(sampleUserDetails, 45L, "alumno.cripto@tfg.com");
+        String[] parts = validToken.split("\\.");
+        String malformedSignatureToken = parts[0] + "." + parts[1] + ".***";
+
+        assertFalse(jwtService.isTokenValid(malformedSignatureToken));
+        assertNull(jwtService.extractTokenTypeOrNull(malformedSignatureToken));
+    }
+
+    @Test
+    @DisplayName("Debe propagar RuntimeException si userId no es numérico en el claim")
+    void extractUserId_WithStringClaim_ShouldThrowRuntimeException() {
+        String token = createSignedToken(Map.of(
+                "iss", "cursosonline-backend",
+                "sub", "alumno_criptografia",
+                "exp", Instant.now().plusSeconds(300).getEpochSecond(),
+                "tokenType", "access",
+                "jti", "jwt-userid-string",
+                "userId", "cuarenta-y-cinco"));
+
+        assertThrows(RuntimeException.class, () -> jwtService.extractUserId(token));
+    }
+
+    private String createSignedToken(Map<String, Object> claims) {
+        String headerJson = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
+        String payloadJson = serializeClaims(claims);
+        String header = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(headerJson.getBytes(StandardCharsets.UTF_8));
+        String payload = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(payloadJson.getBytes(StandardCharsets.UTF_8));
+        String signingInput = header + "." + payload;
+        return signingInput + "." + Base64.getUrlEncoder().withoutPadding().encodeToString(sign(signingInput));
+    }
+
+    private byte[] sign(String signingInput) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(testSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return mac.doFinal(signingInput.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    private String serializeClaims(Map<String, Object> claims) {
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (Map.Entry<String, Object> entry : new LinkedHashMap<>(claims).entrySet()) {
+            if (!first) {
+                sb.append(",");
+            }
+            first = false;
+            sb.append("\"").append(entry.getKey()).append("\":");
+            Object value = entry.getValue();
+            if (value == null) {
+                sb.append("null");
+            } else if (value instanceof String) {
+                sb.append("\"").append(value).append("\"");
+            } else {
+                sb.append(value);
+            }
+        }
+        sb.append("}");
+        return sb.toString();
     }
 }
