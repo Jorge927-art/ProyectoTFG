@@ -254,6 +254,40 @@ class RefreshTokenServiceTest {
     }
 
     @Test
+    @DisplayName("rotate debe rechazar refresh token en blanco antes de validar la estructura")
+    void rotate_WithBlankToken_ShouldThrowBeforeValidation() {
+        ServicesException ex = assertThrows(ServicesException.class, () -> refreshTokenService.rotate("   "));
+
+        assertEquals("Refresh token requerido.", ex.getMessage());
+        verify(authRefreshTokenRepository, never()).findByTokenHash(any());
+    }
+
+    @Test
+    @DisplayName("rotate debe rechazar un token inválido cuando la estructura falla")
+    void rotate_WithInvalidStructure_ShouldThrow() {
+        when(jwtService.isTokenValid("bad-token")).thenReturn(false);
+
+        ServicesException ex = assertThrows(ServicesException.class, () -> refreshTokenService.rotate("bad-token"));
+
+        assertEquals("Refresh token inválido o expirado.", ex.getMessage());
+        verify(authRefreshTokenRepository, never()).findByTokenHash(any());
+    }
+
+    @Test
+    @DisplayName("persistToken debe fallar de forma controlada si falta el JTI o la expiración")
+    void issueRefreshToken_WithMissingJtiOrExpiration_ShouldThrow() {
+        Users user = enabledUser();
+        when(jwtService.generateRefreshToken(user, 99L, "a@cursosonline.es")).thenReturn("refresh-no-jti");
+        when(jwtService.extractJti("refresh-no-jti")).thenReturn(null);
+        when(jwtService.extractExpiration("refresh-no-jti")).thenReturn(null);
+
+        ServicesException ex = assertThrows(ServicesException.class, () -> refreshTokenService.issueRefreshToken(user));
+
+        assertEquals("No se pudo persistir el refresh token emitido.", ex.getMessage());
+        verify(authRefreshTokenRepository, never()).save(any(AuthRefreshToken.class));
+    }
+
+    @Test
     @DisplayName("revokeIfPresent debe marcar como revocado cuando existe token")
     void revokeIfPresent_ShouldRevokeStoredToken() {
         String activeRefresh = "refresh-active";

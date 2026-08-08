@@ -189,4 +189,76 @@ class JwtAuthenticationFilterTest {
         verify(mockFilterChain, never()).doFilter(request, response);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
+
+    @Test
+    @DisplayName("Debe conservar el contexto existente cuando el token no se procesa por no tener cabecera Bearer")
+    void doFilterInternal_WithoutBearerPrefix_ShouldLeaveContextUntouched() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("existing", null));
+        request.addHeader("Authorization", "Basic abc123");
+
+        invokeFilter();
+
+        verify(mockFilterChain).doFilter(request, response);
+        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    @DisplayName("Debe conservar la autenticación existente si ya hay un principal en el contexto")
+    void doFilterInternal_WithExistingAuthentication_ShouldNotOverrideContext() throws Exception {
+        var existingAuth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                "existing-user", null);
+        SecurityContextHolder.getContext().setAuthentication(existingAuth);
+        request.addHeader("Authorization", "Bearer token-con-contexto");
+        when(jwtService.isTokenValid("token-con-contexto")).thenReturn(true);
+        when(jwtService.extractTokenTypeOrNull("token-con-contexto")).thenReturn("access");
+        when(jwtService.extractUsername("token-con-contexto")).thenReturn("nuevo-usuario");
+        when(jwtService.extractRole("token-con-contexto")).thenReturn("ROLE_STUDENT");
+
+        invokeFilter();
+
+        verify(mockFilterChain).doFilter(request, response);
+        assertSame(existingAuth, SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    @DisplayName("Debe autenticar incluso cuando el token no aporta rol y dejar autoridades vacías")
+    void doFilterInternal_ValidTokenWithoutRole_ShouldAuthenticateWithEmptyAuthorities() throws Exception {
+        request.addHeader("Authorization", "Bearer token-sin-rol");
+        when(jwtService.isTokenValid("token-sin-rol")).thenReturn(true);
+        when(jwtService.extractTokenTypeOrNull("token-sin-rol")).thenReturn("access");
+        when(jwtService.extractUsername("token-sin-rol")).thenReturn("alumno_sin_rol");
+        when(jwtService.extractRole("token-sin-rol")).thenReturn(null);
+
+        invokeFilter();
+
+        verify(mockFilterChain).doFilter(request, response);
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        assertNotNull(authentication);
+        assertTrue(authentication.getAuthorities().isEmpty());
+    }
+
+    @Test
+    @DisplayName("Debe rechazar un token válido sin nombre de usuario y no establecer autenticación")
+    void doFilterInternal_ValidTokenWithoutUsername_ShouldNotAuthenticate() throws Exception {
+        request.addHeader("Authorization", "Bearer token-sin-usuario");
+        when(jwtService.isTokenValid("token-sin-usuario")).thenReturn(true);
+        when(jwtService.extractTokenTypeOrNull("token-sin-usuario")).thenReturn("access");
+        when(jwtService.extractUsername("token-sin-usuario")).thenReturn(null);
+
+        invokeFilter();
+
+        verify(mockFilterChain).doFilter(request, response);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    private void invokeFilter() throws Exception {
+        java.lang.reflect.Method method = JwtAuthenticationFilter.class.getDeclaredMethod(
+                "doFilterInternal",
+                jakarta.servlet.http.HttpServletRequest.class,
+                jakarta.servlet.http.HttpServletResponse.class,
+                jakarta.servlet.FilterChain.class);
+        method.setAccessible(true);
+        method.invoke(jwtAuthenticationFilter, request, response, mockFilterChain);
+    }
 }

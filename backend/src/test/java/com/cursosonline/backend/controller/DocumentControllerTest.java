@@ -151,6 +151,37 @@ public class DocumentControllerTest {
         }
 
         @Test
+        @DisplayName("Debe devolver 400 cuando el archivo subido está vacío")
+        void debeRechazarSubidaConArchivoVacio() {
+                MockMultipartFile emptyFile = new MockMultipartFile("file", "vacío.pdf", "application/pdf",
+                                new byte[0]);
+
+                ResponseEntity<?> response = documentController.uploadDocument(authentication, emptyFile, 2L);
+
+                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("El archivo transmitido está vacío o es inválido.", bodyMap.get("error"));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 400 cuando el archivo supera el límite de tamaño")
+        void debeRechazarSubidaPorTamanoExcedido() {
+                byte[] payload = new byte[(int) (101L * 1024L * 1024L)];
+                MockMultipartFile oversizedFile = new MockMultipartFile(
+                                "file",
+                                "pesado.pdf",
+                                "application/pdf",
+                                payload);
+
+                ResponseEntity<?> response = documentController.uploadDocument(authentication, oversizedFile, 2L);
+
+                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("El archivo excede el límite de 100MB configurado para documentos académicos.",
+                                bodyMap.get("error"));
+        }
+
+        @Test
         @DisplayName("Debe procesar y persistir con éxito (HTTP 200) un archivo multipart válido duplicando para emisor (SENT) y receptor (RECEIVED)")
         void debeSubirDocumentoValidoConExito() {
                 MockMultipartFile validFile = new MockMultipartFile(

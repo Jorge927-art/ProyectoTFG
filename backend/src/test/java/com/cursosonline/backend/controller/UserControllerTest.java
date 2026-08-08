@@ -295,6 +295,32 @@ class UserControllerTest {
                                 .andExpect(jsonPath("$[0].course.title").value("Programación Funcional Aplicada"));
         }
 
+        @Test
+        void myActiveCoursesDebeResolverElUserIdDesdeElHeaderAuthorization() throws Exception {
+                Users user = new Users(88L, "header_user", "encoded", Role.STUDENT, "header@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses course = new Courses();
+                course.setCourse_id(777L);
+                course.setTitle("Curso desde header");
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(4444L);
+                enrollment.setUser(user);
+                enrollment.setCourse(course);
+                enrollment.setStatus("EN_PROGRESO");
+                enrollment.setProgress_percentage(33);
+
+                when(jwtService.extractUserId("token-header")).thenReturn(88L);
+                when(userService.getStudentActiveCoursesWithCalculatedProgress(88L)).thenReturn(List.of(enrollment));
+
+                mockMvc.perform(get("/api/auth/my-active-courses")
+                                .header("Authorization", "Bearer token-header"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].enrollmentid").value(4444))
+                                .andExpect(jsonPath("$[0].course.course_id").value(777))
+                                .andExpect(jsonPath("$[0].course.title").value("Curso desde header"));
+        }
+
         /**
          * Prueba de integración que valida la recuperación exitosa de alertas
          * académicas
@@ -429,6 +455,42 @@ class UserControllerTest {
         }
 
         @Test
+        void changeUserRoleByAdminDebeRechazarRoleVacio() throws Exception {
+                java.security.Principal mockPrincipal = () -> "root_admin";
+
+                mockMvc.perform(patch("/api/auth/users/luis/role")
+                                .principal(mockPrincipal)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"role\":\"   \"}"))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.message").value("El campo 'role' es requerido"));
+        }
+
+        @Test
+        void changeUserRoleByAdminDebeRechazarRolInvalido() throws Exception {
+                java.security.Principal mockPrincipal = () -> "root_admin";
+
+                mockMvc.perform(patch("/api/auth/users/luis/role")
+                                .principal(mockPrincipal)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"role\":\"MAESTRO\"}"))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.message").value(
+                                                "Rol inválido. Opciones válidas: STUDENT, PROFESSOR, ADMIN"));
+        }
+
+        @Test
+        void deleteUserByAdminDebeRechazarAutoEliminacionDelAdmin() throws Exception {
+                java.security.Principal mockPrincipal = () -> "root_admin";
+
+                mockMvc.perform(delete("/api/auth/users/root_admin")
+                                .principal(mockPrincipal))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.error").value(
+                                                "Acción denegada: No puedes modificar tu propia cuenta de administrador."));
+        }
+
+        @Test
         void refreshDebeRetornar401CuandoElRefreshTokenEsNulo() throws Exception {
                 when(refreshTokenService.rotate(null))
                                 .thenThrow(new com.cursosonline.backend.exception.ServicesException(
@@ -439,5 +501,29 @@ class UserControllerTest {
                                 .content("{}"))
                                 .andExpect(status().isUnauthorized())
                                 .andExpect(jsonPath("$.error").value("Refresh token inválido o expirado."));
+        }
+
+        @Test
+        void startCourseDebeRetornar401CuandoNoHayPrincipal() throws Exception {
+                mockMvc.perform(post("/api/auth/enrollment/77/start"))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.error").value("Sesión inválida o expirada."));
+        }
+
+        @Test
+        void startCourseDebeDelegarAlServicioCuandoHayPrincipalValido() throws Exception {
+                java.security.Principal mockPrincipal = () -> "Luis";
+
+                mockMvc.perform(post("/api/auth/enrollment/77/start")
+                                .principal(mockPrincipal))
+                                .andExpect(status().isOk());
+
+                verify(userService).startCourseSecure(77L, "Luis");
+        }
+
+        @Test
+        void getMyActiveCoursesDebeRetornar400CuandoNoHayIdentidad() throws Exception {
+                mockMvc.perform(get("/api/auth/my-active-courses"))
+                                .andExpect(status().isBadRequest());
         }
 }

@@ -276,6 +276,107 @@ class RecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("Debe reconocer coincidencia de subtítulos y duración cuando el usuario tiene esas preferencias")
+    void getRecommendations_ShouldApplySubtitleAndDurationBranches() {
+        userInterests.setSubtitle_languages(new ArrayList<>(Arrays.asList("English")));
+        userInterests.setDuration(new ArrayList<>(Arrays.asList("Corto", "Medio")));
+
+        Courses courseWithSubtitleAndDuration = new Courses();
+        courseWithSubtitleAndDuration.setCourse_id(104L);
+        courseWithSubtitleAndDuration.setTitle("Curso con subtítulos y duración media");
+        courseWithSubtitleAndDuration.setCategory("Negocios");
+        courseWithSubtitleAndDuration.setLanguage("Español");
+        courseWithSubtitleAndDuration.setCourseType("Principiante");
+        courseWithSubtitleAndDuration.setSubtitleLanguages("English, Spanish");
+        courseWithSubtitleAndDuration.setDuration(25.0f);
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(courseWithSubtitleAndDuration));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertFalse(results.isEmpty());
+        RecommendationDTO dto = results.get(0);
+        assertEquals(104L, dto.id());
+        assertTrue(dto.reason().contains("subtítulos") || dto.reason().contains("disponibilidad"));
+        assertEquals(15, dto.score());
+    }
+
+    @Test
+    @DisplayName("Debe ignorar coincidencias de duración cuando el curso no tiene duración")
+    void getRecommendations_ShouldSkipDurationMatchWhenCourseHoursAreMissing() {
+        userInterests.setDuration(new ArrayList<>(Arrays.asList("Corto")));
+        course1.setDuration(null);
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertFalse(results.isEmpty());
+        assertEquals(30, results.get(0).score());
+    }
+
+    @Test
+    @DisplayName("Debe normalizar intereses con entradas nulas, vacías y acentuadas")
+    void getRecommendations_ShouldNormalizeMessyInterestCollections() {
+        userInterests.setCategory(new ArrayList<>(Arrays.asList(" Ciencia de Datos", null, "  ", "Música y Arte")));
+        userInterests.setCourse_type(new ArrayList<>(Arrays.asList("Avanzado")));
+        userInterests.setLanguage(new ArrayList<>(Arrays.asList("Español")));
+        userInterests.setSubtitle_languages(new ArrayList<>(Arrays.asList("English")));
+        userInterests.setDuration(new ArrayList<>(Arrays.asList("Medio")));
+
+        course1.setCategory("Ciencia de Datos");
+        course1.setCourseType("Avanzado");
+        course1.setLanguage("Español");
+        course1.setSubtitleLanguages("English");
+        course1.setDuration(25.0f);
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertFalse(results.isEmpty());
+        assertTrue(results.get(0).score() >= 30 + 20 + 15 + 10 + 5);
+        assertTrue(
+                results.get(0).reason().contains("categorías") || results.get(0).reason().contains("disponibilidad"));
+    }
+
+    @Test
+    @DisplayName("Debe devolver puntuación mínima cuando no hay coincidencias semánticas relevantes")
+    void getRecommendations_ShouldReturnBaseScoreWhenNoPreferencesMatch() {
+        userInterests.setCategory(new ArrayList<>(Arrays.asList("Arte")));
+        userInterests.setCourse_type(new ArrayList<>(Arrays.asList("Avanzado")));
+        userInterests.setLanguage(new ArrayList<>(Arrays.asList("Frances")));
+        userInterests.setSubtitle_languages(new ArrayList<>(Arrays.asList("Japanese")));
+        userInterests.setDuration(new ArrayList<>(Arrays.asList("Largo")));
+
+        course1.setCategory("Tecnología");
+        course1.setCourseType("Principiante");
+        course1.setLanguage("Ingles");
+        course1.setSubtitleLanguages("German");
+        course1.setDuration(3.0f);
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertFalse(results.isEmpty());
+        assertEquals(0, results.get(0).score());
+        assertTrue(results.get(0).reason().contains("Sugerencia personalizada"));
+    }
+
+    @Test
     @DisplayName("PESOS [Ajuste]: historial académico al 100% debe aportar 20 puntos máximos")
     void getRecommendations_HistoryScoreCap20_WhenProgressIsAtLeast100() {
         // Arrange: curso plantilla ya cursado en la misma categoría para activar el

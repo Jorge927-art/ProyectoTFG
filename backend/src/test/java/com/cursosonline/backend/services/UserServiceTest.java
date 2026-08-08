@@ -21,11 +21,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.cursosonline.backend.dto.InterestDTO;
 import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.DocumentMetadata;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.entities.UserSystemNotification;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.exception.ResourceNotFoundException;
 import com.cursosonline.backend.exception.ServicesException;
@@ -64,6 +67,9 @@ public class UserServiceTest {
 
         @Mock
         private JdbcTemplate jdbcTemplate;
+
+        @Mock
+        private AdminCourseCatalogService adminCourseCatalogService;
 
         @Mock
         private com.cursosonline.backend.repository.AcademicEvaluationRepository academicEvaluationRepository;
@@ -129,6 +135,106 @@ public class UserServiceTest {
 
                 assertTrue(exception.getMessage().contains("Acción denegada"));
                 verify(userRepository, never()).delete(any(Users.class));
+        }
+
+        @Test
+        void deleteUserPermanently_DebeRechazarCuentaProtegida() {
+                ReflectionTestUtils.setField(userService, "protectedUsername", "admin_cole");
+
+                Users protectedUser = new Users(2L, "admin_cole", "enc", Role.ADMIN, "admin@example.com", true,
+                                new java.util.ArrayList<>());
+
+                when(userRepository.findByUsername("admin_cole")).thenReturn(Optional.of(protectedUser));
+
+                ServicesException exception = assertThrows(ServicesException.class,
+                                () -> userService.deleteUserPermanently("admin_cole", "otro_admin"));
+
+                assertTrue(exception.getMessage().contains("protegida"));
+                verify(userRepository, never()).delete(any(Users.class));
+        }
+
+        @Test
+        void getUserNotifications_DebeAgregarAlertasDeDocumentoSistemaYProgreso() {
+                Users student = new Users(20L, "student_alerts", "enc", Role.STUDENT, "student_alerts@example.com",
+                                true, new java.util.ArrayList<>());
+                student.setRole(Role.STUDENT);
+
+                DocumentMetadata unreadDoc = new DocumentMetadata();
+                unreadDoc.setRead(false);
+
+                UserSystemNotification systemNotification = new UserSystemNotification();
+                systemNotification.setType("SYSTEM_ALERT");
+                systemNotification.setTitle("Nueva función");
+                systemNotification.setMessage("Explora la nueva funcionalidad");
+                systemNotification.setRedirectUrl("/student");
+
+                Courses course = new Courses();
+                course.setCourse_id(200L);
+                course.setTitle("Curso de progreso");
+                course.setDuration(1.0f);
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setCourse(course);
+                enrollment.setStarted_at(
+                                LocalDateTime.ofInstant(Instant.parse("2024-01-01T00:00:00Z"), ZoneId.of("UTC")));
+                enrollment.setProgress_percentage(0);
+
+                when(userRepository.findByUsername("student_alerts")).thenReturn(Optional.of(student));
+                when(documentMetadataRepository.findUnreadReceivedDocumentsByUsername("student_alerts"))
+                                .thenReturn(List.of(unreadDoc));
+                when(userSystemNotificationRepository.findUnreadByUsername("student_alerts"))
+                                .thenReturn(List.of(systemNotification));
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(2);
+                when(enrollmentRepository.findAllByUserIdWithCourses(20L)).thenReturn(List.of(enrollment));
+
+                userService.setClock(Clock.fixed(Instant.parse("2024-01-01T00:57:00Z"), ZoneId.of("UTC")));
+
+                List<com.cursosonline.backend.dto.NotificationDTO> alerts = userService
+                                .getUserNotifications("student_alerts");
+
+                assertEquals(3, alerts.size());
+                assertTrue(alerts.stream().anyMatch(alert -> "DOCUMENT_INBOX".equals(alert.type())));
+                assertTrue(alerts.stream().anyMatch(alert -> "SYSTEM_ALERT".equals(alert.type())));
+                assertTrue(alerts.stream().anyMatch(alert -> "COURSE_PROGRESS".equals(alert.type())));
+        }
+
+        @Test
+        void dismissUserNotifications_DebeAplicarFallbackYMarcarAckCuandoLasAlertasLleganAlUmbral() {
+                Users student = new Users(21L, "student_ack", "enc", Role.STUDENT, "student_ack@example.com", true,
+                                new java.util.ArrayList<>());
+
+                DocumentMetadata unreadDoc = new DocumentMetadata();
+                unreadDoc.setRead(false);
+
+                Courses course = new Courses();
+                course.setCourse_id(201L);
+                course.setTitle("Curso de ack");
+                course.setDuration(1.0f);
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setCourse(course);
+                enrollment.setStarted_at(
+                                LocalDateTime.ofInstant(Instant.parse("2024-01-01T00:00:00Z"), ZoneId.of("UTC")));
+                enrollment.setProgress_percentage(0);
+
+                when(userRepository.findByUsername("student_ack")).thenReturn(Optional.of(student));
+                when(documentMetadataRepository.markAllReceivedAsRead("student_ack"))
+                                .thenThrow(new RuntimeException("bulk-failure"));
+                when(documentMetadataRepository.findUnreadReceivedDocumentsByUsername("student_ack"))
+                                .thenReturn(List.of(unreadDoc));
+                when(documentMetadataRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+                when(userSystemNotificationRepository.markAllAsReadByUsername("student_ack")).thenReturn(1);
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(2);
+                when(enrollmentRepository.findAllByUserIdWithCourses(21L)).thenReturn(List.of(enrollment));
+
+                userService.setClock(Clock.fixed(Instant.parse("2024-01-01T00:57:00Z"), ZoneId.of("UTC")));
+
+                userService.dismissUserNotifications("student_ack");
+
+                assertTrue(unreadDoc.isRead());
+                verify(documentMetadataRepository).saveAll(anyList());
+                verify(enrollmentRepository).save(enrollment);
+                verify(userSystemNotificationRepository).markAllAsReadByUsername("student_ack");
         }
 
         @Test
@@ -258,6 +364,81 @@ public class UserServiceTest {
         }
 
         @Test
+        void enrollStudentInCourse_DebeRechazarMatriculaDuplicadaSinPersistir() {
+                Users student = new Users(11L, "student_dup", "enc", Role.STUDENT, "dup@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses course = new Courses();
+                course.setCourse_id(55L);
+
+                when(userRepository.findByUsername("student_dup")).thenReturn(Optional.of(student));
+                when(coursesRepository.findById(55L)).thenReturn(Optional.of(course));
+                when(enrollmentRepository.findByUserIdAndCourseId(11L, 55L))
+                                .thenReturn(Optional.of(new Enrollment()));
+
+                ServicesException ex = assertThrows(ServicesException.class,
+                                () -> userService.enrollStudentInCourse("student_dup", 55L));
+
+                assertTrue(ex.getMessage().contains("Ya te encuentras matriculado"));
+                verify(enrollmentRepository, never()).saveAndFlush(any(Enrollment.class));
+                verify(adminCourseCatalogService, never()).markCourseAsEverUsed(anyLong());
+        }
+
+        @Test
+        void assignUserToCourse_DebeRechazarUsuariosNoProfesores() {
+                Users student = new Users(12L, "student_assign", "enc", Role.STUDENT, "assign@example.com", true,
+                                new java.util.ArrayList<>());
+
+                when(userRepository.findByUsername("student_assign")).thenReturn(Optional.of(student));
+
+                ServicesException ex = assertThrows(ServicesException.class,
+                                () -> userService.assignUserToCourse("student_assign", 77L));
+
+                assertTrue(ex.getMessage().contains("solo las cuentas PROFESSOR"));
+                verify(coursesRepository, never()).findById(anyLong());
+        }
+
+        @Test
+        void assignUserToCourse_DebeRechazarCursosYaAsignados() {
+                Users professor = new Users(13L, "prof_assign", "enc", Role.PROFESSOR, "prof@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses course = new Courses();
+                course.setCourse_id(78L);
+                course.setAssignedUser(new Users(99L, "other", "enc", Role.PROFESSOR, "other@example.com", true,
+                                new java.util.ArrayList<>()));
+
+                when(userRepository.findByUsername("prof_assign")).thenReturn(Optional.of(professor));
+                when(coursesRepository.findById(78L)).thenReturn(Optional.of(course));
+
+                ServicesException ex = assertThrows(ServicesException.class,
+                                () -> userService.assignUserToCourse("prof_assign", 78L));
+
+                assertTrue(ex.getMessage().contains("gestionado por Administración"));
+                verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
+        }
+
+        @Test
+        void assignUserToCourse_DebeAsignarCursoCorrectamente() {
+                Users professor = new Users(14L, "prof_ok", "enc", Role.PROFESSOR, "prof_ok@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses course = new Courses();
+                course.setCourse_id(79L);
+                course.setAssignedUser(null);
+
+                when(userRepository.findByUsername("prof_ok")).thenReturn(Optional.of(professor));
+                when(coursesRepository.findById(79L)).thenReturn(Optional.of(course));
+                when(coursesRepository.saveAndFlush(any(Courses.class)))
+                                .thenAnswer(invocation -> invocation.getArgument(0));
+
+                Courses savedCourse = userService.assignUserToCourse("prof_ok", 79L);
+
+                assertSame(course, savedCourse);
+                assertEquals(professor, course.getAssignedUser());
+                assertEquals("prof_ok", course.getInstructors());
+                verify(coursesRepository).saveAndFlush(course);
+                verify(adminCourseCatalogService).markCourseAsEverUsed(79L);
+        }
+
+        @Test
         void calculateCurrentProgress_DebeAcotarElProgresoEntreCeroYCien() {
                 Clock fixedClockNow = Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneId.of("UTC"));
                 userService.setClock(fixedClockNow);
@@ -311,6 +492,35 @@ public class UserServiceTest {
         }
 
         @Test
+        void getAssignedCoursesForProfessor_DebeResolverAliasLegacyYEvitarDuplicados() {
+                Users professor = new Users(30L, "Juan Pérez", "enc", Role.PROFESSOR, "juan.perez@academy.edu", true,
+                                new java.util.ArrayList<>());
+
+                when(userRepository.findByUsername("Juan Pérez")).thenReturn(Optional.of(professor));
+
+                Courses directCourse = new Courses();
+                directCourse.setCourse_id(400L);
+                directCourse.setTitle("Curso directo");
+                when(coursesRepository.findAllAssignedToProfessor("juan pérez")).thenReturn(List.of());
+                when(coursesRepository.findAllAssignedToProfessor("juan")).thenReturn(List.of(directCourse));
+                when(coursesRepository.findAllAssignedToProfessor("pérez")).thenReturn(List.of());
+
+                Courses legacyCourse = new Courses();
+                legacyCourse.setCourse_id(401L);
+                legacyCourse.setTitle("Curso legacy");
+                legacyCourse.setInstructors("Juan Pérez");
+                when(coursesRepository.findAllByInstructorsIsNotNullOrderByTitleAsc())
+                                .thenReturn(List.of(legacyCourse));
+
+                List<Courses> result = userService.getAssignedCoursesForProfessor("Juan Pérez");
+
+                assertEquals(2, result.size());
+                assertTrue(result.stream().anyMatch(course -> course.getCourse_id().equals(400L)));
+                assertTrue(result.stream().anyMatch(course -> course.getCourse_id().equals(401L)));
+                verify(coursesRepository).findAllAssignedToProfessor("juan");
+        }
+
+        @Test
         void getUserNotifications_DebeIgnorarAlertasDeProgresoSiElProfesorNoTieneCursosAsignados() {
                 Users professor = new Users(10L, "profesor", "pwd", Role.PROFESSOR, "profe@example.com", true,
                                 new java.util.ArrayList<>());
@@ -325,6 +535,130 @@ public class UserServiceTest {
                                 .getUserNotifications("profesor");
 
                 assertTrue(alerts.isEmpty());
+        }
+
+        @Test
+        void getUserNotifications_DebeAgregarAlertaDeProgresoParaEstudianteAl95Porciento() {
+                Clock fixedClockNow = Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneId.of("UTC"));
+                userService.setClock(fixedClockNow);
+
+                Users student = new Users(40L, "student_95", "pwd", Role.STUDENT, "student@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses course = new Courses();
+                course.setCourse_id(500L);
+                course.setTitle("Curso crítico");
+                course.setDuration(1.0f);
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setCourse(course);
+                enrollment.setProgressAlertStudentAck(false);
+                Clock fixedClockStart = Clock.fixed(Instant.parse("2026-01-01T11:03:00Z"), ZoneId.of("UTC"));
+                enrollment.setStarted_at(LocalDateTime.now(fixedClockStart));
+
+                when(userRepository.findByUsername("student_95")).thenReturn(Optional.of(student));
+                when(documentMetadataRepository.findUnreadReceivedDocumentsByUsername("student_95"))
+                                .thenReturn(List.of());
+                when(userSystemNotificationRepository.findUnreadByUsername("student_95")).thenReturn(List.of());
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(2);
+                when(enrollmentRepository.findAllByUserIdWithCourses(40L)).thenReturn(List.of(enrollment));
+
+                List<com.cursosonline.backend.dto.NotificationDTO> alerts = userService
+                                .getUserNotifications("student_95");
+
+                assertEquals(1, alerts.size());
+                assertEquals("COURSE_PROGRESS", alerts.get(0).type());
+        }
+
+        @Test
+        void dismissUserNotifications_DebeHacerFallbackPorEntidadSiElBulkUpdateFalla() {
+                Users user = new Users(11L, "alumno", "pwd", Role.STUDENT, "alumno@example.com", true,
+                                new java.util.ArrayList<>());
+                com.cursosonline.backend.entities.DocumentMetadata unreadDoc = new com.cursosonline.backend.entities.DocumentMetadata();
+                unreadDoc.setRead(false);
+
+                when(userRepository.findByUsername("alumno")).thenReturn(Optional.of(user));
+                doThrow(new RuntimeException("bulk-fail"))
+                                .when(documentMetadataRepository).markAllReceivedAsRead("alumno");
+                when(documentMetadataRepository.findUnreadReceivedDocumentsByUsername("alumno"))
+                                .thenReturn(List.of(unreadDoc));
+                when(documentMetadataRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+                when(userSystemNotificationRepository.markAllAsReadByUsername("alumno")).thenReturn(1);
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(0);
+
+                userService.dismissUserNotifications("alumno");
+
+                assertTrue(unreadDoc.isRead());
+                verify(documentMetadataRepository).saveAll(List.of(unreadDoc));
+        }
+
+        @Test
+        void getUserNotifications_DebeRetornarListaVaciaCuandoElUsuarioNoExiste() {
+                when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+
+                List<com.cursosonline.backend.dto.NotificationDTO> alerts = userService.getUserNotifications("ghost");
+
+                assertTrue(alerts.isEmpty());
+                verify(documentMetadataRepository, never()).findUnreadReceivedDocumentsByUsername(anyString());
+                verify(userSystemNotificationRepository, never()).findUnreadByUsername(anyString());
+        }
+
+        @Test
+        void dismissUserNotifications_DebeIgnorarUsuarioInexistenteSinLanzarExcepcion() {
+                when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+
+                assertDoesNotThrow(() -> userService.dismissUserNotifications("ghost"));
+                verify(documentMetadataRepository).markAllReceivedAsRead("ghost");
+                verify(userSystemNotificationRepository).markAllAsReadByUsername("ghost");
+        }
+
+        @Test
+        void getUserNotifications_DebeOmitirAlertasDeProgresoCuandoElEsquemaNoEstaDisponible() {
+                Users student = new Users(41L, "student_schema", "pwd", Role.STUDENT, "schema@example.com", true,
+                                new java.util.ArrayList<>());
+
+                when(userRepository.findByUsername("student_schema")).thenReturn(Optional.of(student));
+                when(documentMetadataRepository.findUnreadReceivedDocumentsByUsername("student_schema"))
+                                .thenReturn(List.of());
+                when(userSystemNotificationRepository.findUnreadByUsername("student_schema")).thenReturn(List.of());
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class)))
+                                .thenThrow(new RuntimeException("schema-down"));
+
+                List<com.cursosonline.backend.dto.NotificationDTO> alerts = userService
+                                .getUserNotifications("student_schema");
+
+                assertTrue(alerts.isEmpty());
+        }
+
+        @Test
+        void dismissUserNotifications_DebeMarcarAckDeProfesorCuandoLaAlertaEstaCercaDelUmbral() {
+                Users professor = new Users(42L, "prof_ack", "enc", Role.PROFESSOR, "prof_ack@example.com", true,
+                                new java.util.ArrayList<>());
+                Users student = new Users(43L, "student_prof", "enc", Role.STUDENT, "student_prof@example.com", true,
+                                new java.util.ArrayList<>());
+
+                Courses course = new Courses();
+                course.setCourse_id(601L);
+                course.setTitle("Curso de profesor");
+                course.setDuration(1.0f);
+
+                Enrollment enrollment = new Enrollment();
+                enrollment.setEnrollmentid(701L);
+                enrollment.setUser(student);
+                enrollment.setCourse(course);
+                enrollment.setProgressAlertProfessorAck(false);
+                enrollment.setStarted_at(LocalDateTime.of(2026, 1, 1, 11, 6));
+
+                when(userRepository.findByUsername("prof_ack")).thenReturn(Optional.of(professor));
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(2);
+                when(coursesRepository.findAllAssignedToProfessor("prof_ack")).thenReturn(List.of(course));
+                when(enrollmentRepository.findActiveStudentEnrollmentsByCourseIds(List.of(601L)))
+                                .thenReturn(List.of(enrollment));
+                userService.setClock(Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneId.of("UTC")));
+
+                userService.dismissUserNotifications("prof_ack");
+
+                assertTrue(enrollment.isProgressAlertProfessorAck());
+                verify(enrollmentRepository).save(enrollment);
         }
 
         /**
@@ -665,6 +999,41 @@ public class UserServiceTest {
                 verify(doc2).setRead(true);
                 verify(documentMetadataRepository).saveAll(anyList());
                 verify(userSystemNotificationRepository).markAllAsReadByUsername("Luis");
+        }
+
+        @Test
+        void dismissUserNotifications_DebeMarcarAckDeProgresoParaProfesorAl90Porciento() {
+                Clock fixedClockNow = Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneId.of("UTC"));
+                userService.setClock(fixedClockNow);
+
+                Users professor = new Users(41L, "prof_ack", "pwd", Role.PROFESSOR, "prof@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses assignedCourse = new Courses();
+                assignedCourse.setCourse_id(600L);
+                assignedCourse.setTitle("Curso asignado");
+                assignedCourse.setDuration(1.0f);
+
+                Users student = new Users(42L, "student_ack", "pwd", Role.STUDENT, "student@example.com", true,
+                                new java.util.ArrayList<>());
+                Enrollment enrollment = new Enrollment();
+                enrollment.setUser(student);
+                enrollment.setCourse(assignedCourse);
+                enrollment.setProgressAlertProfessorAck(false);
+                Clock fixedClockStart = Clock.fixed(Instant.parse("2026-01-01T11:06:00Z"), ZoneId.of("UTC"));
+                enrollment.setStarted_at(LocalDateTime.now(fixedClockStart));
+
+                when(userRepository.findByUsername("prof_ack")).thenReturn(Optional.of(professor));
+                when(coursesRepository.findAllAssignedToProfessor("prof_ack")).thenReturn(List.of(assignedCourse));
+                when(coursesRepository.findAllByInstructorsIsNotNullOrderByTitleAsc()).thenReturn(List.of());
+                when(enrollmentRepository.findActiveStudentEnrollmentsByCourseIds(List.of(600L)))
+                                .thenReturn(List.of(enrollment));
+                when(userSystemNotificationRepository.markAllAsReadByUsername("prof_ack")).thenReturn(1);
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(2);
+
+                userService.dismissUserNotifications("prof_ack");
+
+                assertTrue(enrollment.isProgressAlertProfessorAck());
+                verify(enrollmentRepository).save(enrollment);
         }
 
         /*
