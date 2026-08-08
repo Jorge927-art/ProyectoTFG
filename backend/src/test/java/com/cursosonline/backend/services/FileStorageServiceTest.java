@@ -154,6 +154,16 @@ class FileStorageServiceTest {
     }
 
     @Test
+    @DisplayName("Debería rechazar archivos sin extensión en la validación de documentos")
+    void storeFileWithoutExtensionException() {
+        when(multipartFile.getOriginalFilename()).thenReturn("sin_extension");
+        when(multipartFile.isEmpty()).thenReturn(false);
+        when(multipartFile.getContentType()).thenReturn("application/pdf");
+
+        assertThrows(IllegalArgumentException.class, () -> fileStorageService.storeFile(multipartFile, "documents"));
+    }
+
+    @Test
     @DisplayName("Debería lanzar IllegalArgumentException si el Content-Type no corresponde a una imagen")
     void storeFileInvalidImageContentTypeException() {
         when(multipartFile.getOriginalFilename()).thenReturn("foto.jpg");

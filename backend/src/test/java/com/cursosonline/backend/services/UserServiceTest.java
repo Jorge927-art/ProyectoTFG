@@ -115,6 +115,35 @@ public class UserServiceTest {
          * vacío cuando el usuario no existe.
          */
         @Test
+        void deleteUserPermanently_DebeRechazarAutoEliminacion() {
+                Users user = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true,
+                                new java.util.ArrayList<>());
+                user.setUsername("Luis");
+
+                when(userRepository.findByUsername("Luis")).thenReturn(Optional.of(user));
+
+                ServicesException exception = assertThrows(ServicesException.class,
+                                () -> userService.deleteUserPermanently("Luis", "Luis"));
+
+                assertTrue(exception.getMessage().contains("Acción denegada"));
+                verify(userRepository, never()).delete(any(Users.class));
+        }
+
+        @Test
+        void deleteByUsername_DebeAlternarEstadoEnabled() {
+                Users user = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true,
+                                new java.util.ArrayList<>());
+                when(userRepository.findByUsername("Luis")).thenReturn(Optional.of(user));
+                when(userRepository.saveAndFlush(any(Users.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+                Users firstResult = userService.deleteByUsername("Luis");
+                assertFalse(firstResult.isEnabled());
+
+                Users secondResult = userService.deleteByUsername("Luis");
+                assertTrue(secondResult.isEnabled());
+        }
+
+        @Test
         void findByUsername_ReturnEmpty() {
                 String username_does_not_exist = "usuario_no_existe";
                 when(userRepository.findByUsername(username_does_not_exist)).thenReturn(Optional.empty());

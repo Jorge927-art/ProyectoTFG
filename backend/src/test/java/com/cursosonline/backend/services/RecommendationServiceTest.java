@@ -126,6 +126,15 @@ class RecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("Debe manejar repositorios nulos de forma segura y devolver una lista vacía")
+    void getRecommendationsForUser_WithNullRepositoryData_ShouldReturnEmptyList() {
+        List<RecommendationDTO> results = recommendationService.getRecommendationsForUser(1L);
+
+        assertNotNull(results);
+        assertTrue(results.isEmpty());
+    }
+
+    @Test
     @DisplayName("Debe devolver lista vacía si el usuario no existe")
     void getRecommendations_UserNotFound() {
         // Arrange

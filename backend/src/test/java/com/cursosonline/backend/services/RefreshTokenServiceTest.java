@@ -75,6 +75,30 @@ class RefreshTokenServiceTest {
     }
 
     @Test
+    @DisplayName("issueRefreshToken debe rechazar un usuario sin identificador válido")
+    void issueRefreshToken_WithInvalidUser_ShouldThrow() {
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> refreshTokenService.issueRefreshToken(new Users()));
+
+        assertEquals("No se puede emitir refresh token sin usuario válido.", ex.getMessage());
+        verify(authRefreshTokenRepository, never()).save(any(AuthRefreshToken.class));
+    }
+
+    @Test
+    @DisplayName("rotate debe rechazar un token con tipo incorrecto antes de consultar la base")
+    void rotate_WithWrongTokenType_ShouldThrowBeforeLookup() {
+        String token = "refresh-wrong-type";
+
+        when(jwtService.isTokenValid(token)).thenReturn(true);
+        when(jwtService.extractTokenTypeOrNull(token)).thenReturn("access");
+
+        ServicesException ex = assertThrows(ServicesException.class, () -> refreshTokenService.rotate(token));
+
+        assertEquals("El token recibido no es de tipo refresh.", ex.getMessage());
+        verify(authRefreshTokenRepository, never()).findByTokenHash(any());
+    }
+
+    @Test
     @DisplayName("rotate debe revocar token antiguo y devolver nueva pareja access/refresh")
     void rotate_ShouldRevokeCurrentAndReturnNewTokens() {
         Users user = enabledUser();

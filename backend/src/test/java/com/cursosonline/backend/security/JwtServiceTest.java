@@ -133,6 +133,13 @@ class JwtServiceTest {
     }
 
     @Test
+    @DisplayName("Debe devolver null cuando no se puede extraer el tipo de token de una cadena inválida")
+    void extractTokenTypeOrNull_MalformedToken_ShouldReturnNull() {
+        assertNull(jwtService.extractTokenTypeOrNull("jwt.malformado.invalido"));
+        assertNull(jwtService.extractTokenTypeOrNull(null));
+    }
+
+    @Test
     @DisplayName("Debe respetar el clock skew configurado antes de considerar expirado un token")
     void isTokenValid_ShouldRespectClockSkewWindow() {
         Instant issuedAt = Instant.parse("2026-08-07T12:00:00Z");
