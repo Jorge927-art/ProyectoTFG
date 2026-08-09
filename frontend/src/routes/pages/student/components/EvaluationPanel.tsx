@@ -5,12 +5,16 @@ import GenericButton from '../../../../components/ui/genericButton/GenericButton
 import { useActiveEvaluations } from './useActiveEvaluations';
 import type { EvaluationInput } from '../../../../services/evaluationService';
 
+type EvaluationPanelProps = {
+    hasEnrolledCourses?: boolean;
+};
+
 /**
  * Componente de Evaluación Académica [ADR-37].
  * Permite calificar de forma asimétrica la asignatura y al profesorado.
  * Implementa un contenedor de scroll controlado para mantener la simetría visual [ADR-19].
  */
-export const EvaluationPanel = () => {
+export const EvaluationPanel = ({ hasEnrolledCourses = true }: EvaluationPanelProps) => {
     const {
         pendingList,
         loadingPending,
@@ -70,8 +74,19 @@ export const EvaluationPanel = () => {
                     </div>
                 ) : safePendingList.length === 0 && !evaluationError ? (
                     <div className="bg-slate-50 border-2 border-dashed border-slate-100 rounded-2xl p-8 text-center">
-                        <CheckCircle2 className="mx-auto text-emerald-400 mb-2" size={32} />
-                        <p className="text-slate-500 text-xs font-bold">¡Todo al día! No tienes evaluaciones pendientes.</p>
+                        {hasEnrolledCourses ? (
+                            <>
+                                <CheckCircle2 className="mx-auto text-emerald-400 mb-2" size={32} />
+                                <p className="text-slate-500 text-xs font-bold">¡Todo al día! No tienes evaluaciones pendientes.</p>
+                            </>
+                        ) : (
+                            <>
+                                <AlertCircle className="mx-auto text-amber-500 mb-2" size={32} />
+                                <p className="text-slate-500 text-xs font-bold">
+                                    Aún no puedes evaluar cursos ni profesorado: primero debes matricularte en una asignatura.
+                                </p>
+                            </>
+                        )}
                     </div>
                 ) : (
                     safePendingList.map((item) => {

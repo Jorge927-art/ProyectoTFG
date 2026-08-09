@@ -125,7 +125,7 @@ public class UserService {
      * @param rawPassword La contraseña en texto plano proporcionada por el usuario.
      * @return El usuario autenticado si las credenciales son correctas.
      */
-    @Transactional
+    @Transactional(noRollbackFor = ServicesException.class)
     public Users login(String username, String rawPassword) {
         Users user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ServicesException("Usuario no encontrado"));

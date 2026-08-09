@@ -264,7 +264,7 @@ const StudentDashboard = () => {
                         </div>
 
                         <div className="w-full h-109 xl:h-112 2xl:h-120">
-                            <EvaluationPanel />
+                            <EvaluationPanel hasEnrolledCourses={enrolledList.length > 0} />
                         </div>
                     </div>
                 </section>

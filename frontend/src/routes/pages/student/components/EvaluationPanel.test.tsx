@@ -47,6 +47,13 @@ describe('EvaluationPanel Component [TFG Test Suite]', () => {
         expect(screen.getByText('¡Todo al día! No tienes evaluaciones pendientes.')).toBeInTheDocument();
     });
 
+    it('debe mostrar un mensaje descriptivo cuando el alumno aún no tiene matrículas', () => {
+        render(<EvaluationPanel hasEnrolledCourses={false} />);
+
+        expect(screen.getByText('Evaluación académica')).toBeInTheDocument();
+        expect(screen.getByText('Aún no puedes evaluar cursos ni profesorado: primero debes matricularte en una asignatura.')).toBeInTheDocument();
+    });
+
     it('debe renderizar la lista de asignaturas y profesores activos pendientes de calificación', () => {
         vi.mocked(useActiveEvaluations).mockReturnValue({
             pendingList: mockPending,
