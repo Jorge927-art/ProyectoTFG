@@ -61,11 +61,28 @@ public class Users implements UserDetails {
     @Column(nullable = false)
     private Boolean enabled = true;
 
+    @Column(name = "failed_login_attempts", nullable = false)
+    private Integer failedLoginAttempts = 0;
+
     // Relación de uno a uno con la entidad UserProfile, que contiene información
     // adicional sobre el usuario, como su avatar, número de teléfono y dirección
     @JsonIgnore
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Enrollment> enrollments = new ArrayList<>();
+
+    // Mantiene compatibilidad con tests/llamadas existentes (firma histórica de 7
+    // args).
+    public Users(Long user_id, String username, String password, Role role, String email, Boolean enabled,
+            List<Enrollment> enrollments) {
+        this.user_id = user_id;
+        this.username = username;
+        this.password = password;
+        this.role = role;
+        this.email = email;
+        this.enabled = enabled;
+        this.enrollments = enrollments;
+        this.failedLoginAttempts = 0;
+    }
 
     /**
      * (non-Javadoc)

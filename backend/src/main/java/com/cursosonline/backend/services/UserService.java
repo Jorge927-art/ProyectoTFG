@@ -53,6 +53,7 @@ import org.slf4j.LoggerFactory;
 public class UserService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(UserService.class);
+    private static final int MAX_FAILED_LOGIN_ATTEMPTS = 3;
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -112,6 +113,7 @@ public class UserService {
         user.setPassword(encodedPassword);
         user.setRole(Role.STUDENT);
         user.setEnabled(true);
+        user.setFailedLoginAttempts(0);
         return userRepository.save(user);
     }
 
@@ -123,18 +125,43 @@ public class UserService {
      * @param rawPassword La contraseña en texto plano proporcionada por el usuario.
      * @return El usuario autenticado si las credenciales son correctas.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public Users login(String username, String rawPassword) {
         Users user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ServicesException("Usuario no encontrado"));
 
+        int currentFailedAttempts = user.getFailedLoginAttempts() != null ? user.getFailedLoginAttempts() : 0;
+
         if (!user.isEnabled()) {
+            if (currentFailedAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
+                throw new ServicesException("Usuario bloqueado. Póngase en contacto con el administrador");
+            }
             throw new ServicesException("Acceso denegado: La cuenta de este usuario ha sido dada de baja.");
         }
 
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
-            throw new ServicesException("Contraseña incorrecta");
+            int nextFailedAttempts = currentFailedAttempts + 1;
+            user.setFailedLoginAttempts(nextFailedAttempts);
+
+            if (nextFailedAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
+                user.setEnabled(false);
+                userRepository.saveAndFlush(user);
+                throw new ServicesException("Usuario bloqueado. Póngase en contacto con el administrador");
+            }
+
+            userRepository.saveAndFlush(user);
+            int remainingAttempts = MAX_FAILED_LOGIN_ATTEMPTS - nextFailedAttempts;
+            String attemptLabel = remainingAttempts == 1 ? "intento" : "intentos";
+            String remainingLabel = remainingAttempts == 1 ? "Queda" : "Quedan";
+            throw new ServicesException(
+                    "Contraseña incorrecta. " + remainingLabel + " " + remainingAttempts + " " + attemptLabel);
         }
+
+        if (currentFailedAttempts > 0) {
+            user.setFailedLoginAttempts(0);
+            userRepository.saveAndFlush(user);
+        }
+
         return user;
     }
 
@@ -182,6 +209,7 @@ public class UserService {
             user.setEnabled(false);
         } else {
             user.setEnabled(true);
+            user.setFailedLoginAttempts(0);
         }
 
         return userRepository.saveAndFlush(user);

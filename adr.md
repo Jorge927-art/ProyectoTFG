@@ -2156,6 +2156,56 @@ Implementación aplicada:
 
 ---
 
+# ADR-064: Bloqueo Automático de Cuenta por Intentos Fallidos de Login
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Agosto 2026
+
+## Contexto
+
+El sistema solo contaba con un mecanismo de baja lógica (`enabled = false`) activado manualmente por el administrador desde `/admin` [ADR-058]. No existía ninguna protección automática frente a ataques de fuerza bruta o adivinación de contraseña sobre `/api/auth/login`: un atacante podía intentar credenciales de forma indefinida sin restricción ni aviso progresivo al usuario legítimo.
+
+Se requería limitar a **3 intentos** de login por usuario, informando de los intentos restantes tras cada fallo, y bloqueando la cuenta automáticamente al tercer fallo consecutivo.
+
+## Decisión
+
+Reutilizar el mecanismo de baja lógica ya existente (`enabled = false`) como bloqueo automático, en lugar de introducir un mecanismo de bloqueo paralelo (p. ej. tabla de intentos, rate-limiting a nivel de infraestructura, o un campo `locked` independiente):
+
+1. **Contador de intentos:** se añade `failedLoginAttempts` (entero, default 0) a la entidad `Users`, incrementado en cada fallo de contraseña dentro de `UserService.login()` y reseteado a 0 tras un login correcto.
+2. **Mensajes progresivos:** 1er fallo → "Quedan 2 intentos"; 2º fallo → "Queda 1 intento"; 3er fallo → baja lógica automática (`enabled = false`) + "Usuario bloqueado. Póngase en contacto con el administrador".
+3. **Canal de error:** se mantiene `ServicesException` → HTTP 400 con mensaje libre, el mismo patrón ya usado por el resto de errores de login ("Usuario no encontrado", "Contraseña incorrecta"). Se descartan explícitamente 401/403/423 porque:
+   * `AuthModal.tsx` sobrescribe el `message` del backend con un texto fijo cuando el status es 401, ocultando los avisos progresivos.
+   * 403 colisiona semánticamente con el `@ExceptionHandler(AccessDeniedException.class)` ya registrado en `GlobalExceptionHandler`, que devuelve un mensaje fijo distinto.
+   * 423 no tiene handler registrado; caería en el `catch-all` genérico y devolvería un 500 engañoso.
+   Esta vía evita tocar el frontend y el manejador global de excepciones.
+4. **Integración con `/admin`:** al no crear un estado nuevo, la cuenta bloqueada aparece automáticamente como "Inactivo" en la Consola de Usuarios [ADR-058], reutilizando la reactivación ya existente. Se resetea `failedLoginAttempts = 0` en el mismo método de toggle (`deleteByUsername`) al reactivar, para evitar un rebloqueo inmediato tras el primer fallo posterior.
+5. **Compatibilidad de constructor:** se preserva manualmente el constructor de 7 argumentos de `Users` (sustituyendo el `@AllArgsConstructor` de Lombok) para no romper las ~143 instanciaciones existentes en el código y en la suite de tests; `failedLoginAttempts` nace a 0 por defecto sin necesidad de tocarlas.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* Protección básica contra fuerza bruta sin introducir infraestructura nueva (sin Redis, sin tabla de intentos separada, sin rate-limiter externo).
+* Cero cambios en frontend y en `GlobalExceptionHandler`: la funcionalidad se apoya íntegramente en un patrón ya consolidado (`ServicesException` + mensaje libre + baja lógica).
+* Visibilidad inmediata para el administrador: una cuenta bloqueada por intentos se ve exactamente igual que una baja manual en la Consola de Usuarios, sin lógica de UI adicional.
+* Cero impacto en los ~143 usos existentes de `new Users(...)` gracias al constructor de compatibilidad.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Ambigüedad de causa:** una cuenta con `enabled = false` no distingue si fue desactivada por el administrador o bloqueada automáticamente por intentos fallidos; ambos casos muestran el mismo estado "Inactivo".
+  * *Mitigación futura:* añadir un campo `lockReason` o `lockedAt` si se necesitara distinguir el origen del bloqueo en auditoría.
+* **Bloqueo por terceros (enumeration/DoS dirigido):** un atacante que conozca un `username` válido puede bloquear la cuenta de otra persona intencionadamente con 3 intentos fallidos.
+  * *Mitigación futura:* complementar con CAPTCHA o rate-limiting por IP en `/api/auth/login` si se detecta abuso en producción.
+* **Semántica HTTP no estricta:** usar 400 para "credenciales inválidas" y "cuenta bloqueada" se aparta de la convención REST más purista (401/403/423).
+  * *Mitigación:* decisión consciente y documentada aquí; el proyecto prioriza consistencia interna y menor superficie de cambio sobre semántica HTTP pura en este endpoint concreto.
+
+  ---
+  
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026

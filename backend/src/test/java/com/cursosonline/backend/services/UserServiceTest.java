@@ -241,6 +241,7 @@ public class UserServiceTest {
         void deleteByUsername_DebeAlternarEstadoEnabled() {
                 Users user = new Users(1L, "Luis", "jki", Role.STUDENT, "jose.gmail.com", true,
                                 new java.util.ArrayList<>());
+                user.setFailedLoginAttempts(2);
                 when(userRepository.findByUsername("Luis")).thenReturn(Optional.of(user));
                 when(userRepository.saveAndFlush(any(Users.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -249,6 +250,7 @@ public class UserServiceTest {
 
                 Users secondResult = userService.deleteByUsername("Luis");
                 assertTrue(secondResult.isEnabled());
+                assertEquals(0, secondResult.getFailedLoginAttempts());
         }
 
         @Test
@@ -308,12 +310,65 @@ public class UserServiceTest {
         void login_DebeRechazarPasswordIncorrecta() {
                 Users user = new Users(5L, "luis", "encoded", Role.STUDENT, "luis@demo.com", true,
                                 new java.util.ArrayList<>());
+                user.setFailedLoginAttempts(0);
                 when(userRepository.findByUsername("luis")).thenReturn(Optional.of(user));
                 when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
+                when(userRepository.saveAndFlush(any(Users.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
                 ServicesException ex = assertThrows(ServicesException.class, () -> userService.login("luis", "wrong"));
 
-                assertTrue(ex.getMessage().contains("Contraseña incorrecta"));
+                assertEquals("Contraseña incorrecta. Quedan 2 intentos", ex.getMessage());
+                assertEquals(1, user.getFailedLoginAttempts());
+                verify(userRepository).saveAndFlush(user);
+        }
+
+        @Test
+        void login_DebeAvisarUltimoIntentoEnSegundoFallo() {
+                Users user = new Users(51L, "luis2", "encoded", Role.STUDENT, "luis2@demo.com", true,
+                                new java.util.ArrayList<>());
+                user.setFailedLoginAttempts(1);
+                when(userRepository.findByUsername("luis2")).thenReturn(Optional.of(user));
+                when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
+                when(userRepository.saveAndFlush(any(Users.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+                ServicesException ex = assertThrows(ServicesException.class, () -> userService.login("luis2", "wrong"));
+
+                assertEquals("Contraseña incorrecta. Queda 1 intento", ex.getMessage());
+                assertEquals(2, user.getFailedLoginAttempts());
+                verify(userRepository).saveAndFlush(user);
+        }
+
+        @Test
+        void login_DebeBloquearUsuarioEnTercerFallo() {
+                Users user = new Users(52L, "luis3", "encoded", Role.STUDENT, "luis3@demo.com", true,
+                                new java.util.ArrayList<>());
+                user.setFailedLoginAttempts(2);
+                when(userRepository.findByUsername("luis3")).thenReturn(Optional.of(user));
+                when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
+                when(userRepository.saveAndFlush(any(Users.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+                ServicesException ex = assertThrows(ServicesException.class, () -> userService.login("luis3", "wrong"));
+
+                assertEquals("Usuario bloqueado. Póngase en contacto con el administrador", ex.getMessage());
+                assertFalse(user.isEnabled());
+                assertEquals(3, user.getFailedLoginAttempts());
+                verify(userRepository).saveAndFlush(user);
+        }
+
+        @Test
+        void login_DebeResetearIntentosTrasAutenticacionCorrecta() {
+                Users user = new Users(53L, "luis4", "encoded", Role.STUDENT, "luis4@demo.com", true,
+                                new java.util.ArrayList<>());
+                user.setFailedLoginAttempts(2);
+                when(userRepository.findByUsername("luis4")).thenReturn(Optional.of(user));
+                when(passwordEncoder.matches("correct", "encoded")).thenReturn(true);
+                when(userRepository.saveAndFlush(any(Users.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+                Users loggedUser = userService.login("luis4", "correct");
+
+                assertEquals("luis4", loggedUser.getUsername());
+                assertEquals(0, user.getFailedLoginAttempts());
+                verify(userRepository).saveAndFlush(user);
         }
 
         @Test

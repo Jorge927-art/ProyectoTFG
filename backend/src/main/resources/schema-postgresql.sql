@@ -35,6 +35,12 @@ ALTER TABLE IF EXISTS enrollment
     ALTER COLUMN progress_alert_professor_ack SET NOT NULL;
 
 -- -----------------------------------------------------------------------------
+-- Seguridad de autenticación: contador de intentos fallidos de login por usuario
+-- -----------------------------------------------------------------------------
+ALTER TABLE IF EXISTS users
+    ADD COLUMN IF NOT EXISTS failed_login_attempts integer NOT NULL DEFAULT 0;
+
+-- -----------------------------------------------------------------------------
 -- Histórico anual del panel estadístico global de administración
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS admin_global_stats_history (
