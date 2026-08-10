@@ -48,7 +48,7 @@ describe('AdminCourseProfessorReassignmentPanel', () => {
     it('carga profesores al montar y muestra cabecera del panel', async () => {
         render(<AdminCourseProfessorReassignmentPanel />);
 
-        expect(screen.getByText('Reasignación Administrativa de Profesor')).toBeInTheDocument();
+        expect(screen.getByText('Reasignación Administrativa de Profesores')).toBeInTheDocument();
 
         await waitFor(() => {
             expect(assignmentService.getAdminProfessorOptions).toHaveBeenCalledTimes(1);

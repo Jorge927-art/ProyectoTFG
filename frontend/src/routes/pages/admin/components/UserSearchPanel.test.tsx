@@ -66,6 +66,7 @@ describe('UserSearchPanel', () => {
         deleting: false,
         deletingPermanently: false,
         error: '',
+        successMessage: '',
         handleSearchUser: mockHandleSearchUser,
         handleRoleChange: mockHandleRoleChange,
         handleDeleteUser: mockHandleDeleteUser,
@@ -81,7 +82,7 @@ describe('UserSearchPanel', () => {
         render(<UserSearchPanel currentAdminUsername="root_admin" />);
 
         expect(screen.getByText('Buscador de Usuarios')).toBeInTheDocument();
-        expect(screen.getByText('Consulta directa a PostgreSQL')).toBeInTheDocument();
+        expect(screen.getByText('Consulta y gestión directa de usuarios en PostgreSQL')).toBeInTheDocument();
         expect(screen.getByTestId('mock-text-input')).toBeInTheDocument();
     });
 

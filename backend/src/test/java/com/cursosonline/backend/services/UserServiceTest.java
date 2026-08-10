@@ -497,6 +497,7 @@ public class UserServiceTest {
                 Courses course = new Courses();
                 course.setCourse_id(79L);
                 course.setAssignedUser(null);
+                course.setInstructors("Por asignar");
 
                 when(userRepository.findByUsername("prof_ok")).thenReturn(Optional.of(professor));
                 when(coursesRepository.findById(79L)).thenReturn(Optional.of(course));
@@ -510,6 +511,26 @@ public class UserServiceTest {
                 assertEquals("prof_ok", course.getInstructors());
                 verify(coursesRepository).saveAndFlush(course);
                 verify(adminCourseCatalogService).markCourseAsEverUsed(79L);
+        }
+
+        @Test
+        void assignUserToCourse_DebeRechazarCursosConInstructorHeredado() {
+                Users professor = new Users(15L, "prof_legacy", "enc", Role.PROFESSOR, "prof_legacy@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses course = new Courses();
+                course.setCourse_id(80L);
+                course.setAssignedUser(null);
+                course.setInstructors("Instructor legado");
+
+                when(userRepository.findByUsername("prof_legacy")).thenReturn(Optional.of(professor));
+                when(coursesRepository.findById(80L)).thenReturn(Optional.of(course));
+
+                ServicesException ex = assertThrows(ServicesException.class,
+                                () -> userService.assignUserToCourse("prof_legacy", 80L));
+
+                assertTrue(ex.getMessage().contains("instructor heredado"));
+                verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
+                verify(adminCourseCatalogService, never()).markCourseAsEverUsed(anyLong());
         }
 
         @Test
@@ -566,7 +587,7 @@ public class UserServiceTest {
         }
 
         @Test
-        void getAssignedCoursesForProfessor_DebeResolverAliasLegacyYEvitarDuplicados() {
+        void getAssignedCoursesForProfessor_DebeRetornarSoloAsignacionesRelacionales() {
                 Users professor = new Users(30L, "Juan Pérez", "enc", Role.PROFESSOR, "juan.perez@academy.edu", true,
                                 new java.util.ArrayList<>());
 
@@ -575,23 +596,14 @@ public class UserServiceTest {
                 Courses directCourse = new Courses();
                 directCourse.setCourse_id(400L);
                 directCourse.setTitle("Curso directo");
-                when(coursesRepository.findAllAssignedToProfessor("juan pérez")).thenReturn(List.of());
-                when(coursesRepository.findAllAssignedToProfessor("juan")).thenReturn(List.of(directCourse));
-                when(coursesRepository.findAllAssignedToProfessor("pérez")).thenReturn(List.of());
-
-                Courses legacyCourse = new Courses();
-                legacyCourse.setCourse_id(401L);
-                legacyCourse.setTitle("Curso legacy");
-                legacyCourse.setInstructors("Juan Pérez");
-                when(coursesRepository.findAllByInstructorsIsNotNullOrderByTitleAsc())
-                                .thenReturn(List.of(legacyCourse));
+                when(coursesRepository.findAllByAssignedUser_UserIdOrderByTitleAsc(30L))
+                                .thenReturn(List.of(directCourse));
 
                 List<Courses> result = userService.getAssignedCoursesForProfessor("Juan Pérez");
 
-                assertEquals(2, result.size());
-                assertTrue(result.stream().anyMatch(course -> course.getCourse_id().equals(400L)));
-                assertTrue(result.stream().anyMatch(course -> course.getCourse_id().equals(401L)));
-                verify(coursesRepository).findAllAssignedToProfessor("juan");
+                assertEquals(1, result.size());
+                assertEquals(400L, result.get(0).getCourse_id());
+                verify(coursesRepository).findAllByAssignedUser_UserIdOrderByTitleAsc(30L);
         }
 
         @Test
@@ -603,7 +615,7 @@ public class UserServiceTest {
                                 .thenReturn(List.of());
                 when(userSystemNotificationRepository.findUnreadByUsername("profesor")).thenReturn(List.of());
                 when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(2);
-                when(coursesRepository.findAllAssignedToProfessor("profesor")).thenReturn(List.of());
+                when(coursesRepository.findAllByAssignedUser_UserIdOrderByTitleAsc(10L)).thenReturn(List.of());
 
                 List<com.cursosonline.backend.dto.NotificationDTO> alerts = userService
                                 .getUserNotifications("profesor");
@@ -773,7 +785,7 @@ public class UserServiceTest {
 
                 when(userRepository.findByUsername("prof_ack")).thenReturn(Optional.of(professor));
                 when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(2);
-                when(coursesRepository.findAllAssignedToProfessor("prof_ack")).thenReturn(List.of(course));
+                when(coursesRepository.findAllByAssignedUser_UserIdOrderByTitleAsc(42L)).thenReturn(List.of(course));
                 when(enrollmentRepository.findActiveStudentEnrollmentsByCourseIds(List.of(601L)))
                                 .thenReturn(List.of(enrollment));
                 userService.setClock(Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneId.of("UTC")));
@@ -1146,8 +1158,8 @@ public class UserServiceTest {
                 enrollment.setStarted_at(LocalDateTime.now(fixedClockStart));
 
                 when(userRepository.findByUsername("prof_ack")).thenReturn(Optional.of(professor));
-                when(coursesRepository.findAllAssignedToProfessor("prof_ack")).thenReturn(List.of(assignedCourse));
-                when(coursesRepository.findAllByInstructorsIsNotNullOrderByTitleAsc()).thenReturn(List.of());
+                when(coursesRepository.findAllByAssignedUser_UserIdOrderByTitleAsc(41L))
+                                .thenReturn(List.of(assignedCourse));
                 when(enrollmentRepository.findActiveStudentEnrollmentsByCourseIds(List.of(600L)))
                                 .thenReturn(List.of(enrollment));
                 when(userSystemNotificationRepository.markAllAsReadByUsername("prof_ack")).thenReturn(1);
@@ -1237,8 +1249,7 @@ public class UserServiceTest {
                 course.setCourse_id(300L);
                 course.setAssignedUser(professor);
 
-                when(coursesRepository.findAllAssignedToProfessor(anyString())).thenReturn(List.of(course));
-                when(coursesRepository.findAllByInstructorsIsNotNullOrderByTitleAsc()).thenReturn(List.of());
+                when(coursesRepository.findAllByAssignedUser_UserIdOrderByTitleAsc(20L)).thenReturn(List.of(course));
 
                 userService.deleteUserPermanently("laura_teacher", "root_admin");
 

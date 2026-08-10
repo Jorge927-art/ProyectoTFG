@@ -10,6 +10,9 @@ import {
     type AdminCourseCatalogItem,
     type AdminCourseCreatePayload,
 } from '../../../../services/adminCourseCatalogService';
+import { COURSE_CATEGORIES } from '../../../../shared/courseCategories';
+import { COURSE_DIFFICULTY_LEVELS } from '../../../../shared/courseDifficultyLevels';
+import { getSubtitleLanguagesDisplay, NO_SUBTITLES_TEXT } from '../../../../shared/subtitleLanguages';
 
 type EditableCourseDraft = {
     url: string;
@@ -24,6 +27,16 @@ type EditableCourseDraft = {
     rating: string;
     numOfViewers: string;
     duration: string;
+};
+
+type CatalogSelectFieldProps = {
+    label: string;
+    value: string;
+    options: readonly string[];
+    placeholder: string;
+    onSelect: (value: string) => void;
+    disabled?: boolean;
+    onCommit?: (value: string) => void;
 };
 
 const EMPTY_DRAFT: EditableCourseDraft = {
@@ -41,9 +54,18 @@ const EMPTY_DRAFT: EditableCourseDraft = {
     duration: '',
 };
 
+const CATEGORY_PLACEHOLDER = 'Selecciona una categoría';
+const LEVEL_PLACEHOLDER = 'Selecciona un nivel';
+const DURATION_ERROR_MESSAGE = 'La duración es obligatoria y debe ser mayor que 0 horas.';
+const LANGUAGE_ERROR_MESSAGE = 'El idioma es obligatorio.';
 const toNullableString = (value: string): string | null => {
     const trimmed = value.trim();
     return trimmed.length === 0 ? null : trimmed;
+};
+
+const normalizeSubtitleLanguagesInput = (value: string): string => {
+    const trimmed = value.trim();
+    return trimmed.length === 0 ? NO_SUBTITLES_TEXT : trimmed;
 };
 
 const toNullableNumber = (value: string): number | null => {
@@ -53,6 +75,20 @@ const toNullableNumber = (value: string): number | null => {
     }
     const parsed = Number(trimmed);
     return Number.isFinite(parsed) ? parsed : null;
+};
+
+const getPositiveDurationError = (value: string): string => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return DURATION_ERROR_MESSAGE;
+    }
+
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        return DURATION_ERROR_MESSAGE;
+    }
+
+    return '';
 };
 
 const toDraft = (course: AdminCourseCatalogItem): EditableCourseDraft => ({
@@ -77,6 +113,42 @@ const getCourseDisplayName = (course: Pick<AdminCourseCatalogItem, 'courseId' | 
     }
     return `Curso sin título`;
 };
+
+const CatalogSelectField = ({
+    label,
+    value,
+    options,
+    placeholder,
+    onSelect,
+    disabled = false,
+    onCommit,
+}: CatalogSelectFieldProps) => (
+    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+        {label}
+        <select
+            className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:bg-slate-100 disabled:text-slate-500"
+            value={value}
+            onChange={(event) => {
+                const selectedValue = event.target.value;
+                onSelect(selectedValue);
+                if (onCommit) {
+                    onCommit(selectedValue);
+                }
+            }}
+            disabled={disabled}
+            required
+        >
+            <option value="" disabled>
+                {placeholder}
+            </option>
+            {options.map((option) => (
+                <option key={option} value={option}>
+                    {option}
+                </option>
+            ))}
+        </select>
+    </label>
+);
 
 export const AdminCourseCatalogPanel = () => {
     const [courses, setCourses] = useState<AdminCourseCatalogItem[]>([]);
@@ -165,7 +237,7 @@ export const AdminCourseCatalogPanel = () => {
         subCategory: toNullableString(createForm.subCategory),
         courseType: toNullableString(createForm.courseType),
         language: toNullableString(createForm.language),
-        subtitleLanguages: toNullableString(createForm.subtitleLanguages),
+        subtitleLanguages: normalizeSubtitleLanguagesInput(createForm.subtitleLanguages),
         skills: toNullableString(createForm.skills),
         instructors: toNullableString(createForm.instructors),
         rating: toNullableNumber(createForm.rating),
@@ -176,6 +248,31 @@ export const AdminCourseCatalogPanel = () => {
     const handleCreateCourse = async () => {
         if (!createForm.title.trim()) {
             setError('El título es obligatorio.');
+            setSuccessMessage('');
+            return;
+        }
+
+        if (!createForm.category.trim()) {
+            setError('La categoría es obligatoria.');
+            setSuccessMessage('');
+            return;
+        }
+
+        if (!createForm.courseType.trim()) {
+            setError('El nivel de dificultad es obligatorio.');
+            setSuccessMessage('');
+            return;
+        }
+
+        const durationError = getPositiveDurationError(createForm.duration);
+        if (durationError) {
+            setError(durationError);
+            setSuccessMessage('');
+            return;
+        }
+
+        if (!createForm.language.trim()) {
+            setError(LANGUAGE_ERROR_MESSAGE);
             setSuccessMessage('');
             return;
         }
@@ -226,12 +323,61 @@ export const AdminCourseCatalogPanel = () => {
         setDraft((prev) => ({ ...prev, [field]: value }));
     };
 
-    const commitField = async (field: keyof EditableCourseDraft) => {
+    const resolveMissingRequiredFieldError = (field: keyof EditableCourseDraft): string => {
+        const draftCategory = field === 'category' ? draft.category.trim() : draft.category.trim();
+        const draftCourseType = field === 'courseType' ? draft.courseType.trim() : draft.courseType.trim();
+        const draftLanguage = field === 'language' ? draft.language.trim() : draft.language.trim();
+
+        if (field !== 'category' && !selectedCourse?.category?.trim() && !draftCategory) {
+            return 'La categoría es obligatoria.';
+        }
+
+        if (field !== 'courseType' && !selectedCourse?.courseType?.trim() && !draftCourseType) {
+            return 'El nivel de dificultad es obligatorio.';
+        }
+
+        if (field !== 'language' && !selectedCourse?.language?.trim() && !draftLanguage) {
+            return LANGUAGE_ERROR_MESSAGE;
+        }
+
+        if (field === 'language' && !draftLanguage) {
+            return LANGUAGE_ERROR_MESSAGE;
+        }
+
+        if (field !== 'duration') {
+            const hasPersistedPositiveDuration = selectedCourse?.duration != null && selectedCourse.duration > 0;
+            if (!hasPersistedPositiveDuration) {
+                const durationError = getPositiveDurationError(draft.duration);
+                if (durationError) {
+                    return durationError;
+                }
+            }
+        }
+
+        return '';
+    };
+
+    const commitField = async (field: keyof EditableCourseDraft, explicitValue?: string) => {
         if (!selectedCourse) {
             return;
         }
 
-        const currentValue = draft[field];
+        const missingFieldError = resolveMissingRequiredFieldError(field);
+        if (missingFieldError) {
+            setError(missingFieldError);
+            return;
+        }
+
+        const currentValue = explicitValue ?? draft[field];
+
+        if (field === 'duration') {
+            const durationError = getPositiveDurationError(currentValue);
+            if (durationError) {
+                setError(durationError);
+                return;
+            }
+        }
+
         let hasChanged = false;
         let payloadValue: string | number | null = null;
 
@@ -246,7 +392,9 @@ export const AdminCourseCatalogPanel = () => {
             hasChanged = (parsed ?? null) !== (previousNumeric ?? null);
             payloadValue = parsed;
         } else {
-            const normalized = toNullableString(currentValue);
+            const normalized = field === 'subtitleLanguages'
+                ? normalizeSubtitleLanguagesInput(currentValue)
+                : toNullableString(currentValue);
             const previousValue = selectedCourse[field] as string | null;
             hasChanged = (normalized ?? null) !== (previousValue ?? null);
             payloadValue = normalized;
@@ -366,20 +514,34 @@ export const AdminCourseCatalogPanel = () => {
                     </label>
 
                     <CourseTextField label="URL" value={createForm.url} onChange={(value) => handleCreateInputChange('url', value)} />
-                    <CourseTextAreaField label="Short Intro" value={createForm.shortIntro} onChange={(value) => handleCreateInputChange('shortIntro', value)} rows={2} />
-                    <CourseTextField label="Category" value={createForm.category} onChange={(value) => handleCreateInputChange('category', value)} />
-                    <CourseTextField label="Sub Category" value={createForm.subCategory} onChange={(value) => handleCreateInputChange('subCategory', value)} />
-                    <CourseTextField label="Course Type" value={createForm.courseType} onChange={(value) => handleCreateInputChange('courseType', value)} />
-                    <CourseTextField label="Language" value={createForm.language} onChange={(value) => handleCreateInputChange('language', value)} />
-                    <CourseTextField label="Subtitle Languages" value={createForm.subtitleLanguages} onChange={(value) => handleCreateInputChange('subtitleLanguages', value)} />
-                    <CourseTextAreaField label="Skills" value={createForm.skills} onChange={(value) => handleCreateInputChange('skills', value)} rows={2} />
+                    <CourseTextAreaField label="Introducción breve" value={createForm.shortIntro} onChange={(value) => handleCreateInputChange('shortIntro', value)} rows={2} />
+                    <CatalogSelectField
+                        label="Categoría (obligatoria)"
+                        value={createForm.category}
+                        options={COURSE_CATEGORIES}
+                        placeholder={CATEGORY_PLACEHOLDER}
+                        onSelect={(value) => handleCreateInputChange('category', value)}
+                        disabled={loading || creating || deleting}
+                    />
+                    <CourseTextField label="Subcategoría" value={createForm.subCategory} onChange={(value) => handleCreateInputChange('subCategory', value)} />
+                    <CatalogSelectField
+                        label="Nivel de dificultad (obligatorio)"
+                        value={createForm.courseType}
+                        options={COURSE_DIFFICULTY_LEVELS}
+                        placeholder={LEVEL_PLACEHOLDER}
+                        onSelect={(value) => handleCreateInputChange('courseType', value)}
+                        disabled={loading || creating || deleting}
+                    />
+                    <CourseTextField label="Idioma (obligatorio)" value={createForm.language} onChange={(value) => handleCreateInputChange('language', value)} />
+                    <CourseTextField label="Idiomas de subtítulos (si no hay, se guarda 'Sin subtítulos')" value={createForm.subtitleLanguages} onChange={(value) => handleCreateInputChange('subtitleLanguages', value)} />
+                    <CourseTextAreaField label="Habilidades" value={createForm.skills} onChange={(value) => handleCreateInputChange('skills', value)} rows={2} />
                     <CourseTextField label="Instructor" value={createForm.instructors} onChange={(value) => handleCreateInputChange('instructors', value)} />
-                    <CourseTextField label="Rating" value={createForm.rating} onChange={(value) => handleCreateInputChange('rating', value)} inputMode="decimal" />
-                    <CourseTextField label="Number of viewers" value={createForm.numOfViewers} onChange={(value) => handleCreateInputChange('numOfViewers', value)} inputMode="numeric" />
-                    <CourseTextField label="Duration" value={createForm.duration} onChange={(value) => handleCreateInputChange('duration', value)} inputMode="decimal" />
+                    <CourseTextField label="Valoración" value={createForm.rating} onChange={(value) => handleCreateInputChange('rating', value)} inputMode="decimal" />
+                    <CourseTextField label="Número de visualizaciones" value={createForm.numOfViewers} onChange={(value) => handleCreateInputChange('numOfViewers', value)} inputMode="numeric" />
+                    <CourseTextField label="Duración (horas, > 0)" value={createForm.duration} onChange={(value) => handleCreateInputChange('duration', value)} inputMode="decimal" />
 
                     <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
-                        Site
+                        Sitio
                         <input
                             className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600"
                             value="COLE"
@@ -426,11 +588,44 @@ export const AdminCourseCatalogPanel = () => {
                                 <p>
                                     Curso seleccionado: <span className="font-semibold text-slate-800">{getCourseDisplayName(selectedCourse)}</span>
                                 </p>
+                                <p className="mt-1">
+                                    Subtítulos actuales: <span className="font-semibold text-slate-800">{getSubtitleLanguagesDisplay(selectedCourse.subtitleLanguages)}</span>
+                                </p>
                             </div>
+
+                            {!selectedCourse.category?.trim() && (
+                                <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2">
+                                    Este curso todavía no tiene categoría. Debes seleccionar una antes de guardar cambios.
+                                </div>
+                            )}
+
+                            {!selectedCourse.courseType?.trim() && (
+                                <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2">
+                                    Este curso todavía no tiene nivel de dificultad. Debes seleccionar uno antes de guardar cambios.
+                                </div>
+                            )}
+
+                            {(!selectedCourse.duration || selectedCourse.duration <= 0) && (
+                                <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2">
+                                    Este curso todavía no tiene una duración válida. Debes indicar horas mayores que 0 para habilitar estadísticas y avance.
+                                </div>
+                            )}
+
+                            {!selectedCourse.language?.trim() && (
+                                <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2">
+                                    Este curso todavía no tiene idioma. Debes indicar uno antes de guardar cambios.
+                                </div>
+                            )}
+
+                            {!selectedCourse.subtitleLanguages?.trim() && (
+                                <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2">
+                                    Este curso todavía no tiene subtítulos informados. Al guardar, se autocompletará con "Sin subtítulos".
+                                </div>
+                            )}
 
                             {isNumericBlocked && (
                                 <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2">
-                                    Este curso ya está en uso y no permite editar Rating, Number of viewers ni Duration.
+                                    Este curso ya está en uso y no permite editar Valoración ni Número de visualizaciones.
                                 </div>
                             )}
                         </>
@@ -444,50 +639,54 @@ export const AdminCourseCatalogPanel = () => {
                         disabled={!selectedCourse || savingField !== null}
                     />
                     <CourseTextAreaField
-                        label="Short Intro"
+                        label="Introducción breve"
                         value={draft.shortIntro}
                         onChange={(value) => updateDraftField('shortIntro', value)}
                         onBlur={() => void commitField('shortIntro')}
                         rows={2}
                         disabled={!selectedCourse || savingField !== null}
                     />
-                    <CourseTextField
-                        label="Category"
+                    <CatalogSelectField
+                        label="Categoría (obligatoria)"
                         value={draft.category}
-                        onChange={(value) => updateDraftField('category', value)}
-                        onBlur={() => void commitField('category')}
+                        options={COURSE_CATEGORIES}
+                        placeholder={CATEGORY_PLACEHOLDER}
+                        onSelect={(value) => updateDraftField('category', value)}
+                        onCommit={(value) => void commitField('category', value)}
                         disabled={!selectedCourse || savingField !== null}
                     />
                     <CourseTextField
-                        label="Sub Category"
+                        label="Subcategoría"
                         value={draft.subCategory}
                         onChange={(value) => updateDraftField('subCategory', value)}
                         onBlur={() => void commitField('subCategory')}
                         disabled={!selectedCourse || savingField !== null}
                     />
-                    <CourseTextField
-                        label="Course Type"
+                    <CatalogSelectField
+                        label="Nivel de dificultad (obligatorio)"
                         value={draft.courseType}
-                        onChange={(value) => updateDraftField('courseType', value)}
-                        onBlur={() => void commitField('courseType')}
+                        options={COURSE_DIFFICULTY_LEVELS}
+                        placeholder={LEVEL_PLACEHOLDER}
+                        onSelect={(value) => updateDraftField('courseType', value)}
+                        onCommit={(value) => void commitField('courseType', value)}
                         disabled={!selectedCourse || savingField !== null}
                     />
                     <CourseTextField
-                        label="Language"
+                        label="Idioma (obligatorio)"
                         value={draft.language}
                         onChange={(value) => updateDraftField('language', value)}
                         onBlur={() => void commitField('language')}
                         disabled={!selectedCourse || savingField !== null}
                     />
                     <CourseTextField
-                        label="Subtitle Languages"
+                        label="Idiomas de subtítulos (si no hay, se guarda 'Sin subtítulos')"
                         value={draft.subtitleLanguages}
                         onChange={(value) => updateDraftField('subtitleLanguages', value)}
                         onBlur={() => void commitField('subtitleLanguages')}
                         disabled={!selectedCourse || savingField !== null}
                     />
                     <CourseTextAreaField
-                        label="Skills"
+                        label="Habilidades"
                         value={draft.skills}
                         onChange={(value) => updateDraftField('skills', value)}
                         onBlur={() => void commitField('skills')}
@@ -503,7 +702,7 @@ export const AdminCourseCatalogPanel = () => {
                     />
 
                     <CourseTextField
-                        label="Rating"
+                        label="Valoración"
                         value={draft.rating}
                         onChange={(value) => updateDraftField('rating', value)}
                         onBlur={() => void commitField('rating')}
@@ -511,7 +710,7 @@ export const AdminCourseCatalogPanel = () => {
                         inputMode="decimal"
                     />
                     <CourseTextField
-                        label="Number of viewers"
+                        label="Número de visualizaciones"
                         value={draft.numOfViewers}
                         onChange={(value) => updateDraftField('numOfViewers', value)}
                         onBlur={() => void commitField('numOfViewers')}
@@ -519,16 +718,16 @@ export const AdminCourseCatalogPanel = () => {
                         inputMode="numeric"
                     />
                     <CourseTextField
-                        label="Duration"
+                        label="Duración (horas, > 0)"
                         value={draft.duration}
                         onChange={(value) => updateDraftField('duration', value)}
                         onBlur={() => void commitField('duration')}
-                        disabled={!selectedCourse || savingField !== null || isNumericBlocked}
+                        disabled={!selectedCourse || savingField !== null}
                         inputMode="decimal"
                     />
 
                     <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
-                        Site
+                        Sitio
                         <input
                             className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600"
                             value="COLE"

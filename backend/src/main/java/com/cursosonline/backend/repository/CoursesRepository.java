@@ -48,13 +48,12 @@ public interface CoursesRepository extends JpaRepository<Courses, Long> {
         List<Courses> findAllByAssignedUser_UserIdOrderByTitleAsc(@Param("userId") Long userId);
 
         /**
-         * Recupera las asignaturas asignadas al profesor autenticado tanto por la
-         * relación fuerte assigned_user_id como por el campo legacy instructors.
+         * Recupera las asignaturas asignadas al profesor autenticado mediante
+         * la relación fuerte assigned_user_id.
          */
         @Query("SELECT c FROM Courses c " +
-                        "WHERE (c.assignedUser IS NOT NULL AND c.assignedUser.username = :username) " +
-                        "   OR (c.instructors IS NOT NULL AND LOWER(c.instructors) LIKE LOWER(CONCAT('%', :username, '%'))) "
-                        +
+                        "WHERE c.assignedUser IS NOT NULL " +
+                        "AND LOWER(c.assignedUser.username) = LOWER(:username) " +
                         "ORDER BY c.title ASC")
         List<Courses> findAllAssignedToProfessor(@Param("username") String username);
 

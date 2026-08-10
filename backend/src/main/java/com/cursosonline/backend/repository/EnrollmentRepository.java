@@ -129,7 +129,8 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
          */
         @Query("SELECT COUNT(e) > 0 FROM Enrollment e " +
                         "WHERE e.enrollmentid = :enrollmentId " +
-                        "AND e.course.instructors LIKE %:instructorName%")
+                        "AND e.course.assignedUser IS NOT NULL " +
+                        "AND LOWER(e.course.assignedUser.username) = LOWER(:instructorName)")
         boolean isInstructorAuthorizedForEnrollment(
                         @Param("enrollmentId") Long enrollmentId,
                         @Param("instructorName") String instructorName);

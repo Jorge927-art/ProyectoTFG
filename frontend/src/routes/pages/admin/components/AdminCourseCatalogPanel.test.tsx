@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { AdminCourseCatalogPanel } from './AdminCourseCatalogPanel';
 import * as catalogService from '../../../../services/adminCourseCatalogService';
+import { COURSE_CATEGORIES } from '../../../../shared/courseCategories';
+import { COURSE_DIFFICULTY_LEVELS } from '../../../../shared/courseDifficultyLevels';
 
 vi.mock('../../../../services/adminCourseCatalogService', async () => {
     const actual = await vi.importActual<typeof import('../../../../services/adminCourseCatalogService')>(
@@ -26,11 +28,11 @@ const baseCatalog = [
         title: 'Arquitectura',
         url: null,
         shortIntro: null,
-        category: 'Ingenieria',
+        category: COURSE_CATEGORIES[0],
         subCategory: null,
-        courseType: null,
+        courseType: COURSE_DIFFICULTY_LEVELS[0],
         language: 'ES',
-        subtitleLanguages: null,
+        subtitleLanguages: 'ES',
         skills: null,
         instructors: null,
         rating: 4.2,
@@ -44,11 +46,11 @@ const baseCatalog = [
         title: 'Matematicas',
         url: null,
         shortIntro: null,
-        category: 'Ciencia',
+        category: COURSE_CATEGORIES[1],
         subCategory: null,
-        courseType: null,
+        courseType: COURSE_DIFFICULTY_LEVELS[1],
         language: 'ES',
-        subtitleLanguages: null,
+        subtitleLanguages: 'ES',
         skills: null,
         instructors: null,
         rating: 3.9,
@@ -71,14 +73,14 @@ describe('AdminCourseCatalogPanel', () => {
             shortIntro: null,
             category: null,
             subCategory: null,
-            courseType: null,
+            courseType: COURSE_DIFFICULTY_LEVELS[0],
             language: null,
             subtitleLanguages: null,
             skills: null,
             instructors: null,
             rating: null,
             numOfViewers: null,
-            duration: null,
+            duration: 12,
             site: 'COLE',
             used: false,
         });
@@ -120,6 +122,23 @@ describe('AdminCourseCatalogPanel', () => {
         fireEvent.change(screen.getByPlaceholderText('Ej. Arquitectura de Software'), {
             target: { value: 'Nuevo curso' },
         });
+        const createSection = screen.getByText('Alta de curso').closest('section');
+        expect(createSection).not.toBeNull();
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Categoría (obligatoria)'), {
+            target: { value: COURSE_CATEGORIES[0] },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Nivel de dificultad (obligatorio)'), {
+            target: { value: COURSE_DIFFICULTY_LEVELS[0] },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Idioma (obligatorio)'), {
+            target: { value: 'ES' },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText("Idiomas de subtítulos (si no hay, se guarda 'Sin subtítulos')"), {
+            target: { value: 'ES' },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Duración (horas, > 0)'), {
+            target: { value: '12' },
+        });
         fireEvent.click(screen.getByRole('button', { name: 'Dar de alta curso' }));
 
         await waitFor(() => {
@@ -130,10 +149,173 @@ describe('AdminCourseCatalogPanel', () => {
         expect(catalogService.createAdminCourse).toHaveBeenCalledWith(
             expect.objectContaining({
                 title: 'Nuevo curso',
+                category: COURSE_CATEGORIES[0],
+                courseType: COURSE_DIFFICULTY_LEVELS[0],
+                duration: 12,
                 url: null,
                 shortIntro: null,
             })
         );
+    });
+
+    it('alta negativa: rechaza formulario sin duración', async () => {
+        render(<AdminCourseCatalogPanel />);
+
+        await waitFor(() => {
+            expect(catalogService.getAdminCourseCatalog).toHaveBeenCalled();
+        });
+
+        fireEvent.change(screen.getByPlaceholderText('Ej. Arquitectura de Software'), {
+            target: { value: 'Nuevo curso' },
+        });
+        const createSection = screen.getByText('Alta de curso').closest('section');
+        expect(createSection).not.toBeNull();
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Categoría (obligatoria)'), {
+            target: { value: COURSE_CATEGORIES[0] },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Nivel de dificultad (obligatorio)'), {
+            target: { value: COURSE_DIFFICULTY_LEVELS[0] },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Idioma (obligatorio)'), {
+            target: { value: 'ES' },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText("Idiomas de subtítulos (si no hay, se guarda 'Sin subtítulos')"), {
+            target: { value: 'ES' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Dar de alta curso' }));
+
+        expect(screen.getByText('La duración es obligatoria y debe ser mayor que 0 horas.')).toBeInTheDocument();
+        expect(catalogService.createAdminCourse).not.toHaveBeenCalled();
+    });
+
+    it('alta negativa: rechaza duración igual a cero', async () => {
+        render(<AdminCourseCatalogPanel />);
+
+        await waitFor(() => {
+            expect(catalogService.getAdminCourseCatalog).toHaveBeenCalled();
+        });
+
+        fireEvent.change(screen.getByPlaceholderText('Ej. Arquitectura de Software'), {
+            target: { value: 'Nuevo curso' },
+        });
+        const createSection = screen.getByText('Alta de curso').closest('section');
+        expect(createSection).not.toBeNull();
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Categoría (obligatoria)'), {
+            target: { value: COURSE_CATEGORIES[0] },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Nivel de dificultad (obligatorio)'), {
+            target: { value: COURSE_DIFFICULTY_LEVELS[0] },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Idioma (obligatorio)'), {
+            target: { value: 'ES' },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText("Idiomas de subtítulos (si no hay, se guarda 'Sin subtítulos')"), {
+            target: { value: 'ES' },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Duración (horas, > 0)'), {
+            target: { value: '0' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Dar de alta curso' }));
+
+        expect(screen.getByText('La duración es obligatoria y debe ser mayor que 0 horas.')).toBeInTheDocument();
+        expect(catalogService.createAdminCourse).not.toHaveBeenCalled();
+    });
+
+    it('alta negativa: rechaza formulario sin categoría', async () => {
+        render(<AdminCourseCatalogPanel />);
+
+        await waitFor(() => {
+            expect(catalogService.getAdminCourseCatalog).toHaveBeenCalled();
+        });
+
+        fireEvent.change(screen.getByPlaceholderText('Ej. Arquitectura de Software'), {
+            target: { value: 'Nuevo curso' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Dar de alta curso' }));
+
+        expect(screen.getByText('La categoría es obligatoria.')).toBeInTheDocument();
+        expect(catalogService.createAdminCourse).not.toHaveBeenCalled();
+    });
+
+    it('alta negativa: rechaza formulario sin nivel de dificultad', async () => {
+        render(<AdminCourseCatalogPanel />);
+
+        await waitFor(() => {
+            expect(catalogService.getAdminCourseCatalog).toHaveBeenCalled();
+        });
+
+        fireEvent.change(screen.getByPlaceholderText('Ej. Arquitectura de Software'), {
+            target: { value: 'Nuevo curso' },
+        });
+        const createSection = screen.getByText('Alta de curso').closest('section');
+        expect(createSection).not.toBeNull();
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Categoría (obligatoria)'), {
+            target: { value: COURSE_CATEGORIES[0] },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Dar de alta curso' }));
+
+        expect(screen.getByText('El nivel de dificultad es obligatorio.')).toBeInTheDocument();
+        expect(catalogService.createAdminCourse).not.toHaveBeenCalled();
+    });
+
+    it('alta negativa: rechaza formulario sin idioma', async () => {
+        render(<AdminCourseCatalogPanel />);
+
+        await waitFor(() => {
+            expect(catalogService.getAdminCourseCatalog).toHaveBeenCalled();
+        });
+
+        fireEvent.change(screen.getByPlaceholderText('Ej. Arquitectura de Software'), {
+            target: { value: 'Nuevo curso' },
+        });
+        const createSection = screen.getByText('Alta de curso').closest('section');
+        expect(createSection).not.toBeNull();
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Categoría (obligatoria)'), {
+            target: { value: COURSE_CATEGORIES[0] },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Nivel de dificultad (obligatorio)'), {
+            target: { value: COURSE_DIFFICULTY_LEVELS[0] },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Duración (horas, > 0)'), {
+            target: { value: '12' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Dar de alta curso' }));
+
+        expect(screen.getByText('El idioma es obligatorio.')).toBeInTheDocument();
+        expect(catalogService.createAdminCourse).not.toHaveBeenCalled();
+    });
+
+    it('alta con subtítulos vacíos: envía texto informativo por defecto', async () => {
+        render(<AdminCourseCatalogPanel />);
+
+        await waitFor(() => {
+            expect(catalogService.getAdminCourseCatalog).toHaveBeenCalled();
+        });
+
+        fireEvent.change(screen.getByPlaceholderText('Ej. Arquitectura de Software'), {
+            target: { value: 'Nuevo curso' },
+        });
+        const createSection = screen.getByText('Alta de curso').closest('section');
+        expect(createSection).not.toBeNull();
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Categoría (obligatoria)'), {
+            target: { value: COURSE_CATEGORIES[0] },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Nivel de dificultad (obligatorio)'), {
+            target: { value: COURSE_DIFFICULTY_LEVELS[0] },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Idioma (obligatorio)'), {
+            target: { value: 'ES' },
+        });
+        fireEvent.change(within(createSection as HTMLElement).getByLabelText('Duración (horas, > 0)'), {
+            target: { value: '12' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Dar de alta curso' }));
+
+        await waitFor(() => {
+            expect(catalogService.createAdminCourse).toHaveBeenCalledWith(
+                expect.objectContaining({ subtitleLanguages: 'Sin subtítulos' })
+            );
+        });
     });
 
     it('alta negativa: rechaza formulario sin título', async () => {
@@ -166,20 +348,41 @@ describe('AdminCourseCatalogPanel', () => {
         const modSection = modSectionTitle.closest('section');
         expect(modSection).not.toBeNull();
 
-        const categoryInput = within(modSection as HTMLElement).getByLabelText('Category');
-        expect(categoryInput).not.toBeDisabled();
-        fireEvent.focus(categoryInput);
-        fireEvent.change(categoryInput, { target: { value: 'Data' } });
-        fireEvent.blur(categoryInput);
+        fireEvent.change(within(modSection as HTMLElement).getByLabelText('Categoría (obligatoria)'), {
+            target: { value: COURSE_CATEGORIES[2] },
+        });
 
         await waitFor(() => {
-            expect(catalogService.patchAdminCourse).toHaveBeenCalledWith(10, { category: 'Data' });
+            expect(catalogService.patchAdminCourse).toHaveBeenCalledWith(10, { category: COURSE_CATEGORIES[2] });
         });
 
         expect(screen.getByText('Campo actualizado correctamente.')).toBeInTheDocument();
     });
 
-    it('curso usado: bloquea edición de Rating, Number of viewers y Duration', async () => {
+    it('modificación parcial: envía PATCH del nivel de dificultad al cambiar el selector', async () => {
+        render(<AdminCourseCatalogPanel />);
+
+        await waitFor(() => {
+            expect(catalogService.getAdminCourseCatalog).toHaveBeenCalled();
+        });
+
+        fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: '10' } });
+
+        const modSection = screen.getByText('Modificación parcial').closest('section');
+        expect(modSection).not.toBeNull();
+
+        fireEvent.change(within(modSection as HTMLElement).getByLabelText('Nivel de dificultad (obligatorio)'), {
+            target: { value: COURSE_DIFFICULTY_LEVELS[2] },
+        });
+
+        await waitFor(() => {
+            expect(catalogService.patchAdminCourse).toHaveBeenCalledWith(10, { courseType: COURSE_DIFFICULTY_LEVELS[2] });
+        });
+
+        expect(screen.getByText('Campo actualizado correctamente.')).toBeInTheDocument();
+    });
+
+    it('curso usado: bloquea edición de Rating y Number of viewers, pero permite corregir Duration', async () => {
         render(<AdminCourseCatalogPanel />);
 
         await waitFor(() => {
@@ -189,14 +392,57 @@ describe('AdminCourseCatalogPanel', () => {
         fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: '20' } });
 
         const modSection = screen.getByText('Modificación parcial').closest('section') as HTMLElement;
-        const ratingInput = within(modSection).getByLabelText('Rating');
-        const viewersInput = within(modSection).getByLabelText('Number of viewers');
-        const durationInput = within(modSection).getByLabelText('Duration');
+        const ratingInput = within(modSection).getByLabelText('Valoración');
+        const viewersInput = within(modSection).getByLabelText('Número de visualizaciones');
+        const durationInput = within(modSection).getByLabelText('Duración (horas, > 0)');
 
         expect(ratingInput).toBeDisabled();
         expect(viewersInput).toBeDisabled();
-        expect(durationInput).toBeDisabled();
-        expect(screen.getByText(/Este curso ya está en uso y no permite editar Rating, Number of viewers ni Duration\./i)).toBeInTheDocument();
+        expect(durationInput).not.toBeDisabled();
+        expect(screen.getByText(/Este curso ya está en uso y no permite editar Valoración ni Número de visualizaciones\./i)).toBeInTheDocument();
+    });
+
+    it('modificación parcial: rechaza duration igual a cero antes de enviar PATCH', async () => {
+        render(<AdminCourseCatalogPanel />);
+
+        await waitFor(() => {
+            expect(catalogService.getAdminCourseCatalog).toHaveBeenCalled();
+        });
+
+        fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: '10' } });
+
+        const modSection = screen.getByText('Modificación parcial').closest('section');
+        expect(modSection).not.toBeNull();
+
+        fireEvent.change(within(modSection as HTMLElement).getByLabelText('Duración (horas, > 0)'), {
+            target: { value: '0' },
+        });
+        fireEvent.blur(within(modSection as HTMLElement).getByLabelText('Duración (horas, > 0)'));
+
+        expect(screen.getByText('La duración es obligatoria y debe ser mayor que 0 horas.')).toBeInTheDocument();
+        expect(catalogService.patchAdminCourse).not.toHaveBeenCalledWith(10, { duration: 0 });
+    });
+
+    it('modificación parcial: permite actualizar Duration en curso usado para corregir datos históricos', async () => {
+        render(<AdminCourseCatalogPanel />);
+
+        await waitFor(() => {
+            expect(catalogService.getAdminCourseCatalog).toHaveBeenCalled();
+        });
+
+        fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: '20' } });
+
+        const modSection = screen.getByText('Modificación parcial').closest('section');
+        expect(modSection).not.toBeNull();
+
+        fireEvent.change(within(modSection as HTMLElement).getByLabelText('Duración (horas, > 0)'), {
+            target: { value: '30' },
+        });
+        fireEvent.blur(within(modSection as HTMLElement).getByLabelText('Duración (horas, > 0)'));
+
+        await waitFor(() => {
+            expect(catalogService.patchAdminCourse).toHaveBeenCalledWith(20, { duration: 30 });
+        });
     });
 
     it('borrado negativo: muestra error de backend cuando curso activo no puede borrarse', async () => {

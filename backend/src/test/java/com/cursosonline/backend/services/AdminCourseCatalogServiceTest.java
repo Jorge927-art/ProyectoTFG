@@ -163,10 +163,157 @@ class AdminCourseCatalogServiceTest {
     }
 
     @Test
+    @DisplayName("createCourse rechaza categoría vacía")
+    void createCourse_WhenCategoryIsBlank_ShouldThrow() {
+        AdminCourseCreateRequestDTO request = new AdminCourseCreateRequestDTO(
+                "Arquitectura",
+                null,
+                null,
+                "   ",
+                null,
+                "Básico",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.createCourse(request));
+
+        assertEquals("La categoría es obligatoria.", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("createCourse rechaza nivel de dificultad vacío")
+    void createCourse_WhenCourseTypeIsBlank_ShouldThrow() {
+        AdminCourseCreateRequestDTO request = new AdminCourseCreateRequestDTO(
+                "Arquitectura",
+                null,
+                null,
+                "Ingenieria",
+                null,
+                "   ",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.createCourse(request));
+
+        assertEquals("El nivel de dificultad es obligatorio.", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("createCourse rechaza duración nula")
+    void createCourse_WhenDurationIsNull_ShouldThrow() {
+        AdminCourseCreateRequestDTO request = new AdminCourseCreateRequestDTO(
+                "Arquitectura",
+                null,
+                null,
+                "Ingenieria",
+                null,
+                "Básico",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.createCourse(request));
+
+        assertEquals("La duración es obligatoria y debe ser mayor que 0 horas.", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("createCourse rechaza duración igual a cero")
+    void createCourse_WhenDurationIsZero_ShouldThrow() {
+        AdminCourseCreateRequestDTO request = new AdminCourseCreateRequestDTO(
+                "Arquitectura",
+                null,
+                null,
+                "Ingenieria",
+                null,
+                "Básico",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0f);
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.createCourse(request));
+
+        assertEquals("La duración es obligatoria y debe ser mayor que 0 horas.", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("createCourse rechaza idioma vacío")
+    void createCourse_WhenLanguageIsBlank_ShouldThrow() {
+        AdminCourseCreateRequestDTO request = new AdminCourseCreateRequestDTO(
+                "Arquitectura",
+                null,
+                null,
+                "Ingenieria",
+                null,
+                "Básico",
+                "   ",
+                "ES",
+                null,
+                null,
+                null,
+                null,
+                10f);
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.createCourse(request));
+
+        assertEquals("El idioma es obligatorio.", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("createCourse autocompleta subtítulos cuando viene vacío")
+    void createCourse_WhenSubtitleLanguagesIsBlank_ShouldDefaultInformativeText() {
+        AdminCourseCreateRequestDTO request = new AdminCourseCreateRequestDTO(
+                "Arquitectura",
+                null,
+                null,
+                "Ingenieria",
+                null,
+                "Básico",
+                "ES",
+                "   ",
+                null,
+                null,
+                null,
+                null,
+                10f);
+
+        when(coursesRepository.existsByTitleKey("arquitectura")).thenReturn(false);
+        when(coursesRepository.saveAndFlush(any(Courses.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminCourseCatalogItemDTO result = adminCourseCatalogService.createCourse(request);
+
+        assertEquals("Sin subtítulos", result.subtitleLanguages());
+    }
+
+    @Test
     @DisplayName("createCourse rechaza duplicados por title_key")
     void createCourse_WhenDuplicateTitleKey_ShouldThrow() {
-        AdminCourseCreateRequestDTO request = new AdminCourseCreateRequestDTO("Arqui tec tura", null, null, null, null,
-                null, null, null, null, null, null, null, null);
+        AdminCourseCreateRequestDTO request = new AdminCourseCreateRequestDTO("Arqui tec tura", null, null,
+                "Ingenieria", null,
+                "Básico", "ES", "ES", null, null, null, null, 8f);
 
         when(coursesRepository.existsByTitleKey("arquitectura")).thenReturn(true);
 
@@ -213,15 +360,20 @@ class AdminCourseCatalogServiceTest {
     }
 
     @Test
-    @DisplayName("patchCourse bloquea rating/numOfViewers/duration en curso usado")
+    @DisplayName("patchCourse bloquea rating/numOfViewers en curso usado")
     void patchCourse_WhenUsedAndRestrictedField_ShouldThrow() {
         Courses course = new Courses();
         course.setCourse_id(10L);
         course.setEverUsed(true);
+        course.setCategory("Negocios");
+        course.setCourseType("Intermedio");
+        course.setDuration(12f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
         when(coursesRepository.findById(10L)).thenReturn(Optional.of(course));
 
         ServicesException ex = assertThrows(ServicesException.class,
-                () -> adminCourseCatalogService.patchCourse(10L, Map.of("duration", 40)));
+                () -> adminCourseCatalogService.patchCourse(10L, Map.of("rating", 40)));
 
         assertEquals("Curso activo.", ex.getMessage());
         verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
@@ -233,6 +385,11 @@ class AdminCourseCatalogServiceTest {
         Courses course = new Courses();
         course.setCourse_id(10L);
         course.setEverUsed(true);
+        course.setCategory("Previa");
+        course.setCourseType("Intermedio");
+        course.setDuration(8f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
         course.setSite("EXTERNAL");
         when(coursesRepository.findById(10L)).thenReturn(Optional.of(course));
         when(coursesRepository.saveAndFlush(any(Courses.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -252,6 +409,11 @@ class AdminCourseCatalogServiceTest {
         Courses course = new Courses();
         course.setCourse_id(11L);
         course.setEverUsed(false);
+        course.setCategory("Negocios");
+        course.setCourseType("Básico");
+        course.setDuration(5f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
         when(coursesRepository.findById(11L)).thenReturn(Optional.of(course));
         when(enrollmentRepository.existsEnrollmentByCourseId(11L)).thenReturn(false);
         when(coursesRepository.saveAndFlush(any(Courses.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -273,13 +435,76 @@ class AdminCourseCatalogServiceTest {
         Courses course = new Courses();
         course.setCourse_id(12L);
         course.setCategory("Previa");
+        course.setCourseType("Básico");
+        course.setDuration(4f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
         when(coursesRepository.findById(12L)).thenReturn(Optional.of(course));
         when(enrollmentRepository.existsEnrollmentByCourseId(12L)).thenReturn(false);
-        when(coursesRepository.saveAndFlush(any(Courses.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        adminCourseCatalogService.patchCourse(12L, Map.of("category", "   "));
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.patchCourse(12L, Map.of("category", "   ")));
 
-        assertNull(course.getCategory());
+        assertEquals("La categoría es obligatoria.", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("patchCourse rechaza dejar vacío el nivel de dificultad")
+    void patchCourse_WhenCourseTypeBlank_ShouldThrow() {
+        Courses course = new Courses();
+        course.setCourse_id(121L);
+        course.setCategory("Previa");
+        course.setCourseType("Intermedio");
+        course.setDuration(6f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
+        when(coursesRepository.findById(121L)).thenReturn(Optional.of(course));
+        when(enrollmentRepository.existsEnrollmentByCourseId(121L)).thenReturn(false);
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.patchCourse(121L, Map.of("courseType", "   ")));
+
+        assertEquals("El nivel de dificultad es obligatorio.", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("patchCourse rechaza guardar otros cambios si el curso sigue sin categoría obligatoria")
+    void patchCourse_WhenCategoryRemainsMissing_ShouldThrow() {
+        Courses course = new Courses();
+        course.setCourse_id(122L);
+        course.setCategory(null);
+        course.setCourseType("Intermedio");
+        course.setDuration(6f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
+        when(coursesRepository.findById(122L)).thenReturn(Optional.of(course));
+        when(enrollmentRepository.existsEnrollmentByCourseId(122L)).thenReturn(false);
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.patchCourse(122L, Map.of("language", "ES")));
+
+        assertEquals("La categoría es obligatoria.", ex.getMessage());
+        verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
+    }
+
+    @Test
+    @DisplayName("patchCourse rechaza guardar otros cambios si el curso sigue sin nivel obligatorio")
+    void patchCourse_WhenCourseTypeRemainsMissing_ShouldThrow() {
+        Courses course = new Courses();
+        course.setCourse_id(123L);
+        course.setCategory("Negocios");
+        course.setCourseType(null);
+        course.setDuration(6f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
+        when(coursesRepository.findById(123L)).thenReturn(Optional.of(course));
+        when(enrollmentRepository.existsEnrollmentByCourseId(123L)).thenReturn(false);
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.patchCourse(123L, Map.of("language", "ES")));
+
+        assertEquals("El nivel de dificultad es obligatorio.", ex.getMessage());
+        verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
     }
 
     @Test
@@ -287,6 +512,11 @@ class AdminCourseCatalogServiceTest {
     void patchCourse_WhenInvalidNumericValue_ShouldThrow() {
         Courses course = new Courses();
         course.setCourse_id(13L);
+        course.setCategory("Negocios");
+        course.setCourseType("Básico");
+        course.setDuration(4f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
         when(coursesRepository.findById(13L)).thenReturn(Optional.of(course));
         when(enrollmentRepository.existsEnrollmentByCourseId(13L)).thenReturn(false);
 
@@ -301,6 +531,11 @@ class AdminCourseCatalogServiceTest {
     void patchCourse_WhenTextFieldReceivesInvalidType_ShouldThrow() {
         Courses course = new Courses();
         course.setCourse_id(130L);
+        course.setCategory("Negocios");
+        course.setCourseType("Básico");
+        course.setDuration(4f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
         when(coursesRepository.findById(130L)).thenReturn(Optional.of(course));
         when(enrollmentRepository.existsEnrollmentByCourseId(130L)).thenReturn(false);
 
@@ -315,6 +550,11 @@ class AdminCourseCatalogServiceTest {
     void patchCourse_WhenNumericFieldReceivesInvalidType_ShouldThrow() {
         Courses course = new Courses();
         course.setCourse_id(131L);
+        course.setCategory("Negocios");
+        course.setCourseType("Básico");
+        course.setDuration(4f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
         when(coursesRepository.findById(131L)).thenReturn(Optional.of(course));
         when(enrollmentRepository.existsEnrollmentByCourseId(131L)).thenReturn(false);
 
@@ -330,6 +570,11 @@ class AdminCourseCatalogServiceTest {
         Courses course = new Courses();
         course.setCourse_id(132L);
         course.setTitle("Curso estable");
+        course.setCategory("Negocios");
+        course.setCourseType("Básico");
+        course.setDuration(6f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
         when(coursesRepository.findById(132L)).thenReturn(Optional.of(course));
         when(enrollmentRepository.existsEnrollmentByCourseId(132L)).thenReturn(false);
 
@@ -354,6 +599,9 @@ class AdminCourseCatalogServiceTest {
         Courses course = new Courses();
         course.setCourse_id(14L);
         course.setEverUsed(true);
+        course.setCategory("Negocios");
+        course.setCourseType("Básico");
+        course.setDuration(6f);
         when(coursesRepository.findById(14L)).thenReturn(Optional.of(course));
 
         ServicesException ex = assertThrows(ServicesException.class,
@@ -368,6 +616,9 @@ class AdminCourseCatalogServiceTest {
     void deleteCourse_WhenNotUsed_ShouldDelete() {
         Courses course = new Courses();
         course.setCourse_id(15L);
+        course.setCategory("Negocios");
+        course.setCourseType("Básico");
+        course.setDuration(6f);
         when(coursesRepository.findById(15L)).thenReturn(Optional.of(course));
         when(enrollmentRepository.existsEnrollmentByCourseId(15L)).thenReturn(false);
 
@@ -375,6 +626,126 @@ class AdminCourseCatalogServiceTest {
 
         verify(coursesRepository).delete(course);
         verify(coursesRepository).flush();
+    }
+
+    @Test
+    @DisplayName("patchCourse rechaza duración nula o vacía en el estado final")
+    void patchCourse_WhenDurationBecomesBlank_ShouldThrow() {
+        Courses course = new Courses();
+        course.setCourse_id(124L);
+        course.setCategory("Negocios");
+        course.setCourseType("Básico");
+        course.setDuration(6f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
+        when(coursesRepository.findById(124L)).thenReturn(Optional.of(course));
+        when(enrollmentRepository.existsEnrollmentByCourseId(124L)).thenReturn(false);
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.patchCourse(124L, Map.of("duration", "   ")));
+
+        assertEquals("La duración es obligatoria y debe ser mayor que 0 horas.", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("patchCourse rechaza duración menor o igual que cero")
+    void patchCourse_WhenDurationIsZeroOrNegative_ShouldThrow() {
+        Courses course = new Courses();
+        course.setCourse_id(125L);
+        course.setCategory("Negocios");
+        course.setCourseType("Básico");
+        course.setDuration(6f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
+        when(coursesRepository.findById(125L)).thenReturn(Optional.of(course));
+        when(enrollmentRepository.existsEnrollmentByCourseId(125L)).thenReturn(false);
+
+        ServicesException zeroEx = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.patchCourse(125L, Map.of("duration", 0)));
+        assertEquals("La duración es obligatoria y debe ser mayor que 0 horas.", zeroEx.getMessage());
+
+        ServicesException negativeEx = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.patchCourse(125L, Map.of("duration", -2)));
+        assertEquals("La duración es obligatoria y debe ser mayor que 0 horas.", negativeEx.getMessage());
+    }
+
+    @Test
+    @DisplayName("patchCourse permite corregir la duración de un curso usado")
+    void patchCourse_WhenUsedAndDurationNeedsCorrection_ShouldAllowUpdate() {
+        Courses course = new Courses();
+        course.setCourse_id(126L);
+        course.setCategory("Negocios");
+        course.setCourseType("Básico");
+        course.setDuration(1f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
+        course.setEverUsed(true);
+        when(coursesRepository.findById(126L)).thenReturn(Optional.of(course));
+        when(coursesRepository.saveAndFlush(any(Courses.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminCourseCatalogItemDTO dto = adminCourseCatalogService.patchCourse(126L, Map.of("duration", 12));
+
+        assertEquals(12f, course.getDuration());
+        assertEquals(12f, dto.duration());
+    }
+
+    @Test
+    @DisplayName("patchCourse rechaza otros cambios si el curso sigue sin duración válida")
+    void patchCourse_WhenDurationRemainsMissing_ShouldThrow() {
+        Courses course = new Courses();
+        course.setCourse_id(127L);
+        course.setCategory("Negocios");
+        course.setCourseType("Básico");
+        course.setDuration(null);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
+        when(coursesRepository.findById(127L)).thenReturn(Optional.of(course));
+        when(enrollmentRepository.existsEnrollmentByCourseId(127L)).thenReturn(false);
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.patchCourse(127L, Map.of("language", "ES")));
+
+        assertEquals("La duración es obligatoria y debe ser mayor que 0 horas.", ex.getMessage());
+        verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
+    }
+
+    @Test
+    @DisplayName("patchCourse rechaza guardar cambios si el curso queda sin idioma")
+    void patchCourse_WhenLanguageBecomesBlank_ShouldThrow() {
+        Courses course = new Courses();
+        course.setCourse_id(128L);
+        course.setCategory("Negocios");
+        course.setCourseType("Básico");
+        course.setDuration(8f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
+        when(coursesRepository.findById(128L)).thenReturn(Optional.of(course));
+        when(enrollmentRepository.existsEnrollmentByCourseId(128L)).thenReturn(false);
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.patchCourse(128L, Map.of("language", "   ")));
+
+        assertEquals("El idioma es obligatorio.", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("patchCourse autocompleta subtítulos cuando se limpia el campo")
+    void patchCourse_WhenSubtitleLanguagesBecomesBlank_ShouldDefaultInformativeText() {
+        Courses course = new Courses();
+        course.setCourse_id(129L);
+        course.setCategory("Negocios");
+        course.setCourseType("Básico");
+        course.setDuration(8f);
+        course.setLanguage("ES");
+        course.setSubtitleLanguages("ES");
+        when(coursesRepository.findById(129L)).thenReturn(Optional.of(course));
+        when(enrollmentRepository.existsEnrollmentByCourseId(129L)).thenReturn(false);
+        when(coursesRepository.saveAndFlush(any(Courses.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminCourseCatalogItemDTO dto = adminCourseCatalogService.patchCourse(129L, Map.of("subtitleLanguages", "   "));
+
+        assertEquals("Sin subtítulos", course.getSubtitleLanguages());
+        assertEquals("Sin subtítulos", dto.subtitleLanguages());
     }
 
     @Test

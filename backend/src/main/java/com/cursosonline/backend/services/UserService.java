@@ -33,8 +33,6 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Locale;
-import java.util.LinkedHashSet;
-import java.util.Set;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
@@ -417,138 +415,11 @@ public class UserService {
                 : userRepository.findByEmailIgnoreCase(principalIdentity);
 
         Users user = userByUsername.orElseGet(() -> userByEmail.orElse(null));
-        Set<String> aliases = buildProfessorAliases(principalIdentity, user);
-
-        Set<Long> seenCourseIds = new LinkedHashSet<>();
-        List<Courses> mergedCourses = new ArrayList<>();
-
-        for (String alias : aliases) {
-            List<Courses> relationalAndDirectMatches = coursesRepository.findAllAssignedToProfessor(alias);
-            for (Courses course : relationalAndDirectMatches) {
-                if (course.getCourse_id() == null || seenCourseIds.add(course.getCourse_id())) {
-                    mergedCourses.add(course);
-                }
-            }
+        if (user == null || user.getUser_id() == null) {
+            return List.of();
         }
 
-        if (!aliases.isEmpty()) {
-            List<Courses> legacyCandidates = coursesRepository.findAllByInstructorsIsNotNullOrderByTitleAsc();
-
-            for (Courses course : legacyCandidates) {
-                Long courseId = course.getCourse_id();
-                if (courseId != null && seenCourseIds.contains(courseId)) {
-                    continue;
-                }
-
-                if (isLegacyInstructorOwnedByProfessor(course.getInstructors(), aliases)) {
-                    mergedCourses.add(course);
-                    if (courseId != null) {
-                        seenCourseIds.add(courseId);
-                    }
-                }
-            }
-        }
-
-        return mergedCourses;
-    }
-
-    /**
-     * Construye un conjunto de alias normalizados para un profesor autenticado,
-     * combinando
-     * su identidad principal y los datos de la entidad Users si está disponible.
-     * 
-     * @param principalIdentity La identidad principal del profesor autenticado.
-     * @param user              La entidad Users asociada al profesor, si está
-     *                          disponible.
-     * @return Un conjunto de alias normalizados para el profesor.
-     */
-    private Set<String> buildProfessorAliases(String principalIdentity, Users user) {
-        Set<String> aliases = new LinkedHashSet<>();
-        addAlias(aliases, principalIdentity);
-        splitAndAddTokens(aliases, principalIdentity);
-
-        if (user != null) {
-            addAlias(aliases, user.getUsername());
-            addAlias(aliases, user.getEmail());
-
-            String email = user.getEmail();
-            if (email != null) {
-                int atIndex = email.indexOf('@');
-                if (atIndex > 0) {
-                    addAlias(aliases, email.substring(0, atIndex));
-                }
-            }
-
-            splitAndAddTokens(aliases, user.getUsername());
-            splitAndAddTokens(aliases, user.getEmail());
-        }
-
-        return aliases;
-    }
-
-    /**
-     * Divide un valor de cadena en tokens basados en delimitadores comunes y agrega
-     * cada token válido al conjunto de alias.
-     * 
-     * @param aliases  El conjunto de alias donde se agregarán los tokens.
-     * @param rawValue El valor de cadena que se dividirá en tokens.
-     */
-    private void splitAndAddTokens(Set<String> aliases, String rawValue) {
-        if (rawValue == null) {
-            return;
-        }
-
-        String[] parts = rawValue.split("[\\s._@-]+");
-        for (String part : parts) {
-            if (part != null && part.length() >= 3) {
-                addAlias(aliases, part);
-            }
-        }
-    }
-
-    /**
-     * Agrega un alias normalizado al conjunto de alias si no está vacío.
-     * 
-     * @param aliases  El conjunto de alias donde se agregará el alias.
-     * @param rawAlias El alias en bruto que se normalizará y agregará.
-     */
-    private void addAlias(Set<String> aliases, String rawAlias) {
-        if (rawAlias == null) {
-            return;
-        }
-
-        String normalized = rawAlias.trim().toLowerCase(Locale.ROOT);
-        if (!normalized.isEmpty()) {
-            aliases.add(normalized);
-        }
-    }
-
-    /**
-     * Verifica si un curso con un campo de instructores heredado (legacy) está
-     * asociado a un profesor específico mediante sus alias.
-     * 
-     * @param instructors El campo de instructores heredado del curso.
-     * @param aliases     El conjunto de alias del profesor.
-     * @return true si el curso está asociado al profesor, false en caso contrario.
-     */
-    private boolean isLegacyInstructorOwnedByProfessor(String instructors, Set<String> aliases) {
-        if (instructors == null || instructors.trim().isEmpty()) {
-            return false;
-        }
-
-        String[] tokens = instructors.split(",");
-        for (String token : tokens) {
-            String normalizedToken = token.trim().toLowerCase(Locale.ROOT);
-            if (normalizedToken.isEmpty()) {
-                continue;
-            }
-
-            if (aliases.contains(normalizedToken)) {
-                return true;
-            }
-        }
-
-        return false;
+        return coursesRepository.findAllByAssignedUser_UserIdOrderByTitleAsc(user.getUser_id());
     }
 
     /**
@@ -1000,6 +871,11 @@ public class UserService {
                     "Este curso está gestionado por Administración. La asignación solo puede modificarse por un administrador.");
         }
 
+        if (isLegacyInstructorLockedForSelfAssignment(course)) {
+            throw new ServicesException(
+                    "Este curso conserva un instructor heredado. Solo Administración puede regularizar su titularidad docente.");
+        }
+
         // Establecer la vinculación relacional fuerte (JPA mapeará la clave
         // assigned_user_id)
         course.setAssignedUser(user);
@@ -1014,6 +890,15 @@ public class UserService {
         Courses savedCourse = coursesRepository.saveAndFlush(course);
         adminCourseCatalogService.markCourseAsEverUsed(savedCourse.getCourse_id());
         return savedCourse;
+    }
+
+    private boolean isLegacyInstructorLockedForSelfAssignment(Courses course) {
+        if (course == null || course.getInstructors() == null) {
+            return false;
+        }
+
+        String normalizedInstructor = course.getInstructors().trim().toLowerCase(Locale.ROOT);
+        return !normalizedInstructor.isEmpty() && !normalizedInstructor.equals("por asignar");
     }
 
 }

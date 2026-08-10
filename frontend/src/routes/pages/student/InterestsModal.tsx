@@ -5,6 +5,8 @@ import { X, Layers, BarChart, Clock, Globe, Subtitles, Check, Loader2 } from 'lu
 import { apiClient } from '@/services/apiClient';
 import { useAuth } from '@/auth';
 import GenericButton from "../../../components/ui/genericButton/GenericButton";
+import { COURSE_CATEGORIES } from '../../../shared/courseCategories';
+import { STUDENT_DIFFICULTY_PREFERENCES } from '../../../shared/courseDifficultyLevels';
 
 
 interface InterestsModalProps {
@@ -22,8 +24,8 @@ interface InterestsModalProps {
 export const InterestsModal = ({ isOpen, onClose, onSave }: InterestsModalProps) => {
     const { user, updateUser } = useAuth();
     // 1. LISTAS DE DATOS ORIGINALES (Sincronizadas con el catálogo) [3]
-    const availableCategories = ['Ciencia de Datos', 'Negocios', 'Tecnología de la Información', 'Ciencias de la Computación', 'Artes y Humanidades', 'Aprendizaje de Idiomas', 'Desarrollo Personal', 'Salud', 'Ciencias Sociales', 'Ciencias Físicas e Ingeniería', 'Matemáticas y Lógica'];
-    const availableLevels = ['Principiante / Básico', 'Medio / Intermedio', 'Avanzado / Experto', 'Todos los niveles'];
+    const availableCategories = COURSE_CATEGORIES;
+    const availableLevels = STUDENT_DIFFICULTY_PREFERENCES;
     const availableDurations = ['Corto (< 1 semana)', 'Medio (1 - 6 semanas)', 'Largo (> 6 semanas)'];
     const availableLanguages = ['Español', 'Inglés', 'Portugués', 'Alemán', 'Francés'];
     const availableSubtitles = ['Con Subtítulos', 'Sin Subtítulos', 'Subtítulos en Inglés', 'Subtítulos en Español'];

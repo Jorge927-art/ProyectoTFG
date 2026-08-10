@@ -18,6 +18,7 @@ export const UserSearchPanel = ({ currentAdminUsername }: UserSearchPanelProps) 
         deleting,
         deletingPermanently,
         error,
+        successMessage,
         handleSearchUser,
         handleRoleChange,
         handleDeleteUser,
@@ -33,7 +34,7 @@ export const UserSearchPanel = ({ currentAdminUsername }: UserSearchPanelProps) 
                 <div>
                     <h3 className="text-base font-bold text-slate-900">Buscador de Usuarios</h3>
                     <p className="text-xs text-slate-900 font-medium">
-                        Consulta directa a PostgreSQL
+                        Consulta y gestión directa de usuarios en PostgreSQL
                     </p>
                 </div>
             </div>
@@ -63,6 +64,12 @@ export const UserSearchPanel = ({ currentAdminUsername }: UserSearchPanelProps) 
                 </div>
             )}
 
+            {successMessage && (
+                <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 p-3 rounded-xl text-xs font-semibold mb-2 animate-in fade-in duration-200">
+                    ✓ {successMessage}
+                </div>
+            )}
+
             {foundUser && (
                 <div className="mt-4 border-t border-slate-100 pt-4 animate-in fade-in zoom-in-95 duration-200">
                     <div className="bg-slate-50/50 p-3.5 rounded-xl border border-slate-100 flex flex-col gap-3">
@@ -74,7 +81,7 @@ export const UserSearchPanel = ({ currentAdminUsername }: UserSearchPanelProps) 
                                 </span>
                             </div>
                             <div className="flex flex-col items-end gap-0.5">
-                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Rol Actual</span>
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Rol actual</span>
                                 <span className="px-2.5 py-0.5 bg-blue-100 border border-blue-200 text-blue-700 rounded-full text-xs font-bold uppercase tracking-wide">
                                     {foundUser.role}
                                 </span>
@@ -97,9 +104,9 @@ export const UserSearchPanel = ({ currentAdminUsername }: UserSearchPanelProps) 
                                     onChange={(e) => handleRoleChange(foundUser.userId || 0, e.target.value)}
                                     className="flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-100"
                                 >
-                                    <option value="STUDENT">STUDENT (Alumno)</option>
-                                    <option value="PROFESSOR">PROFESSOR (Profesor)</option>
-                                    <option value="ADMIN">ADMIN (Administrador)</option>
+                                    <option value="STUDENT">Alumno (STUDENT)</option>
+                                    <option value="PROFESSOR">Profesor (PROFESSOR)</option>
+                                    <option value="ADMIN">Administrador (ADMIN)</option>
                                 </select>
                                 {updatingId !== null && (
                                     <div className="flex items-center justify-center p-1.5 bg-slate-200 rounded-lg text-slate-600">

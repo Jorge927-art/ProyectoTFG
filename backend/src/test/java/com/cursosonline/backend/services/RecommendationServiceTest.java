@@ -350,6 +350,46 @@ class RecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("Debe tratar 'Todos los niveles' como comodín real para cualquier dificultad del curso")
+    void getRecommendations_ShouldMatchAnyCourseWhenUserPrefersAllLevels() {
+        userInterests.setCategory(new ArrayList<>());
+        userInterests.setCourse_type(new ArrayList<>(Arrays.asList("Todos los niveles")));
+
+        course1.setCourseType("Intermedio");
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertFalse(results.isEmpty());
+        assertEquals(20, results.get(0).score());
+        assertTrue(results.get(0).reason().contains("nivel de experiencia"));
+    }
+
+    @Test
+    @DisplayName("Debe hacer compatible el nivel legacy del alumno con el nivel breve del curso en administración")
+    void getRecommendations_ShouldMatchLegacyStudentLevelWithAdminCourseLevel() {
+        userInterests.setCategory(new ArrayList<>());
+        userInterests.setCourse_type(new ArrayList<>(Arrays.asList("Principiante / Básico")));
+
+        course1.setCourseType("Básico");
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertFalse(results.isEmpty());
+        assertEquals(20, results.get(0).score());
+        assertTrue(results.get(0).reason().contains("nivel de experiencia"));
+    }
+
+    @Test
     @DisplayName("Debe devolver puntuación mínima cuando no hay coincidencias semánticas relevantes")
     void getRecommendations_ShouldReturnBaseScoreWhenNoPreferencesMatch() {
         userInterests.setCategory(new ArrayList<>(Arrays.asList("Arte")));

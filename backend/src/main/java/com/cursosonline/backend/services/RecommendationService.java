@@ -25,6 +25,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RecommendationService {
 
+    private static final String ALL_LEVELS_TOKEN = "all_levels";
+    private static final String BASIC_LEVEL_TOKEN = "basico";
+    private static final String INTERMEDIATE_LEVEL_TOKEN = "intermedio";
+    private static final String ADVANCED_LEVEL_TOKEN = "avanzado";
+
     private final CoursesRepository coursesRepository;
     private final InterestRepository interestRepository;
     private final EnrollmentRepository enrollmentRepository;
@@ -107,7 +112,7 @@ public class RecommendationService {
 
         Set<String> userCategoryTokens = interests != null ? normalizeCollection(interests.getCategory())
                 : Collections.emptySet();
-        Set<String> userLevelTokens = interests != null ? normalizeCollection(interests.getCourse_type())
+        Set<String> userLevelTokens = interests != null ? normalizeLevelCollection(interests.getCourse_type())
                 : Collections.emptySet();
         Set<String> userLanguageTokens = interests != null ? normalizeCollection(interests.getLanguage())
                 : Collections.emptySet();
@@ -156,8 +161,8 @@ public class RecommendationService {
         String courseCategoryToken = normalizeSingle(course.getCategory());
         boolean isCategoryMatch = userCategoryTokens.contains(courseCategoryToken);
 
-        String courseLevelToken = normalizeSingle(course.getCourseType());
-        boolean isLevelMatch = userLevelTokens.contains("ALL_LEVELS") || userLevelTokens.contains(courseLevelToken);
+        String courseLevelToken = normalizeLevelToken(course.getCourseType());
+        boolean isLevelMatch = userLevelTokens.contains(ALL_LEVELS_TOKEN) || userLevelTokens.contains(courseLevelToken);
 
         String courseLanguageToken = normalizeSingle(course.getLanguage());
         boolean isLanguageMatch = userLanguageTokens.contains(courseLanguageToken);
@@ -306,6 +311,18 @@ public class RecommendationService {
                 .replaceAll("\\s+", "_");
     }
 
+    private static String normalizeLevelToken(String input) {
+        String normalized = normalizeSingle(input);
+
+        return switch (normalized) {
+            case "todos_los_niveles", ALL_LEVELS_TOKEN -> ALL_LEVELS_TOKEN;
+            case "principiante", "basico", "principiante_basico" -> BASIC_LEVEL_TOKEN;
+            case "medio", "intermedio", "medio_intermedio" -> INTERMEDIATE_LEVEL_TOKEN;
+            case "avanzado", "experto", "avanzado_experto" -> ADVANCED_LEVEL_TOKEN;
+            default -> normalized;
+        };
+    }
+
     /**
      * Normaliza una colección de entradas a un conjunto de tokens semánticos
      * únicos.
@@ -318,26 +335,44 @@ public class RecommendationService {
      * @param input La colección de entradas a normalizar.
      * @return El conjunto de tokens semánticos normalizados.
      */
-    @SuppressWarnings("unchecked")
     private static Set<String> normalizeCollection(Object input) {
-        if (input == null) {
-            return Collections.emptySet();
-        }
-
-        List<String> rawElements;
-        if (input instanceof List) {
-            rawElements = (List<String>) input;
-        } else if (input instanceof String) {
-            rawElements = Arrays.asList(((String) input).split(","));
-        } else {
+        List<String> rawElements = extractStringElements(input);
+        if (rawElements.isEmpty()) {
             return Collections.emptySet();
         }
 
         return rawElements.stream()
-                .filter(Objects::nonNull) // 1. Filtro preventivo de nulos en la cabecera del Stream
-                .map(s -> s.trim()) // 2. Ejecución segura para evitar alertas de puntero nulo
+                .map(value -> value == null ? "" : value.trim())
                 .filter(s -> !s.isEmpty())
                 .map(RecommendationService::normalizeSingle)
                 .collect(Collectors.toSet());
+    }
+
+    private static Set<String> normalizeLevelCollection(Object input) {
+        List<String> rawElements = extractStringElements(input);
+        if (rawElements.isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        return rawElements.stream()
+                .map(value -> value == null ? "" : value.trim())
+                .filter(s -> !s.isEmpty())
+                .map(RecommendationService::normalizeLevelToken)
+                .collect(Collectors.toSet());
+    }
+
+    private static List<String> extractStringElements(Object input) {
+        if (input instanceof List<?> rawList) {
+            return rawList.stream()
+                    .filter(element -> element instanceof String)
+                    .map(element -> (String) element)
+                    .toList();
+        }
+
+        if (input instanceof String rawString) {
+            return Arrays.asList(rawString.split(","));
+        }
+
+        return Collections.emptyList();
     }
 }
