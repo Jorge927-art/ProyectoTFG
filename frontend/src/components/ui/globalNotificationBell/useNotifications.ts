@@ -10,7 +10,7 @@ import type { RecommendedCourse } from '../../../services/userDomains';
  * Contiene información sobre el tipo de notificación, título, mensaje y URL de redirección.
  */
 export interface NotificationDTO {
-    type: 'DOCUMENT_INBOX' | 'COURSE_PROGRESS' | 'STUDENT_NEAR_COMPLETION' | 'COURSE_ASSIGNMENT_CHANGE' | 'COURSE_RECOMMENDATION';
+    type: 'DOCUMENT_INBOX' | 'COURSE_PROGRESS' | 'STUDENT_NEAR_COMPLETION' | 'COURSE_ASSIGNMENT_CHANGE' | 'COURSE_RECOMMENDATION' | 'GRADE_PUBLISHED';
     title: string;
     message: string;
     redirectUrl: string;
@@ -263,6 +263,10 @@ export const useNotifications = () => {
                     return alert;
                 }
 
+                if (typeof alert.redirectUrl === 'string' && alert.redirectUrl.trim().length > 0) {
+                    return alert;
+                }
+
                 return {
                     ...alert,
                     redirectUrl: buildDocumentsRedirect(),
@@ -274,6 +278,12 @@ export const useNotifications = () => {
 
             const contextualizedAlerts = normalizedAlerts.map((alert) => {
                 if (alert.type !== 'DOCUMENT_INBOX') {
+                    return alert;
+                }
+
+                const redirectValue = typeof alert.redirectUrl === 'string' ? alert.redirectUrl.trim() : '';
+                const hasContext = redirectValue.includes('documentId=');
+                if (hasContext) {
                     return alert;
                 }
 

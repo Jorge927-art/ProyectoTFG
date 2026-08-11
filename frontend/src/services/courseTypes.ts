@@ -37,8 +37,10 @@ export interface EnrollmentInfo {
  * Modelo estándar que representa la calificación de un curso.
  */
 export interface CourseGradeInfo {
+    gradeId?: number;
     title: string; // Ej: "Examen Parcial", "Trabajo Fin de Curso"
     score: string; // Ej: "8.5", "10"
+    comments?: string;
 }
 
 /**

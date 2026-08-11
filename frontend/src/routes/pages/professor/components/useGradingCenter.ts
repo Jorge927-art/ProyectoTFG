@@ -12,11 +12,13 @@ import {
     getTeacherEnrollmentGrades,
     submitStudentGrade 
 } from '../../../../services/evaluationService';
-import { getDocumentsByEnrollment, getReceivedDocumentsByCourse, uploadProfessorDocument } from '../../../../services/documentService';
+import { getDocumentsByEnrollment, uploadProfessorDocument } from '../../../../services/documentService';
 import { useNotifications } from '../../../../components/ui/globalNotificationBell/useNotifications';
 
 const ERROR_MESSAGE_AUTO_DISMISS_MS = 6000;
 const GRADE_SUBMIT_FEEDBACK_AUTO_DISMISS_MS = 3500;
+export const PROFESSOR_FEEDBACK_MAX_LENGTH = 300;
+const GRADING_CENTER_DELIVERY_TYPE = 'TRABAJO';
 
 type GradeSubmitFeedbackStatus = 'success' | 'error' | null;
 type CalculatorMessageType = 'success' | 'info' | 'error' | null;
@@ -75,7 +77,6 @@ export const useGradingCenter = (courseId: number | null) => {
     const [selectedStudent, setSelectedStudent] = useState<StudentPerformanceDTO | null>(null);
     const [studentGrades, setStudentGrades] = useState<CourseGradeDTO[]>([]);
     const [studentDocuments, setStudentDocuments] = useState<DocumentMetadata[]>([]);
-    const [documentsLoadedFromCourseFallback, setDocumentsLoadedFromCourseFallback] = useState<boolean>(false);
     
     // Estados de carga de la API
     const [loadingData, setLoadingData] = useState<boolean>(false);
@@ -131,7 +132,6 @@ export const useGradingCenter = (courseId: number | null) => {
             setSelectedStudent(null);
             setStudentGrades([]);
             setStudentDocuments([]);
-            setDocumentsLoadedFromCourseFallback(false);
             setGradeSubmitFeedbackStatus(null);
             setFinalExamWeight('60');
             setCalculatorMessage('');
@@ -155,7 +155,6 @@ export const useGradingCenter = (courseId: number | null) => {
             setSelectedStudent(null); // Resetear selección al cambiar de asignatura
             setStudentGrades([]);
             setStudentDocuments([]);
-            setDocumentsLoadedFromCourseFallback(false);
             setSelectedFile(null);
             setFinalExamWeight('60');
             setCalculatorMessage('');
@@ -167,37 +166,21 @@ export const useGradingCenter = (courseId: number | null) => {
 
     const fetchStudentDocuments = async (student: StudentPerformanceDTO) => {
         setStudentDocuments([]);
-        setDocumentsLoadedFromCourseFallback(false);
         setErrorMessage('');
 
         try {
             setLoadingDocs(true);
 
-            // Camino principal: resolver por enrollmentId cuando el dataset del curso lo expone.
-            if (typeof student.enrollmentId === 'number') {
-                const docsByEnrollment = await getDocumentsByEnrollment(student.enrollmentId);
-
-                // Si el endpoint no devuelve datos, hacemos fallback por asignatura para evitar falsos vacíos.
-                if (docsByEnrollment.length > 0 || !courseId) {
-                    setDocumentsLoadedFromCourseFallback(false);
-                    setStudentDocuments(docsByEnrollment);
-                    return;
-                }
-            }
-
-            // Fallback robusto: cargar recibidos por asignatura y filtrar por el alumno emisor.
-            if (!courseId) {
-                setDocumentsLoadedFromCourseFallback(false);
+            // Contrato estricto: la recuperación de entregas del alumno se resuelve
+            // únicamente por enrollmentId válido.
+            if (typeof student.enrollmentId !== 'number') {
                 setStudentDocuments([]);
                 return;
             }
 
-            const docsByCourse = await getReceivedDocumentsByCourse(courseId);
-            const docsForStudent = docsByCourse.filter((doc) => doc.sender.userId === student.userId);
-            setDocumentsLoadedFromCourseFallback(true);
-            setStudentDocuments(docsForStudent);
+            const docsByEnrollment = await getDocumentsByEnrollment(student.enrollmentId);
+            setStudentDocuments(docsByEnrollment);
         } catch {
-            setDocumentsLoadedFromCourseFallback(false);
             setErrorMessage('No se pudieron recuperar las entregas físicas de este estudiante.');
         } finally {
             setLoadingDocs(false);
@@ -238,7 +221,6 @@ export const useGradingCenter = (courseId: number | null) => {
         if (!student) {
             setSelectedStudent(null);
             setStudentDocuments([]);
-            setDocumentsLoadedFromCourseFallback(false);
             return;
         }
         await handleSelectStudent(student);
@@ -262,8 +244,13 @@ export const useGradingCenter = (courseId: number | null) => {
     };
 
     const handleSendDocument = async () => {
-        if (!courseId || !selectedStudent || !selectedFile) {
-            setErrorMessage('Selecciona asignatura, alumno y archivo antes de enviar.');
+        if (!courseId || !selectedFile) {
+            setErrorMessage('Selecciona asignatura y archivo antes de enviar.');
+            return;
+        }
+
+        if (!selectedStudent) {
+            setErrorMessage('Selecciona un alumno antes de enviar el documento.');
             return;
         }
 
@@ -272,13 +259,18 @@ export const useGradingCenter = (courseId: number | null) => {
             setErrorMessage('');
             setSuccessMessage('');
 
-            await uploadProfessorDocument(selectedFile, courseId, selectedStudent.userId);
+            await uploadProfessorDocument(
+                selectedFile,
+                courseId,
+                selectedStudent.userId,
+                GRADING_CENTER_DELIVERY_TYPE
+            );
 
             setSelectedFile(null);
             setSuccessMessage(`Documento enviado a ${selectedStudent.username} correctamente.`);
             refreshNotifications();
         } catch {
-            setErrorMessage('No se pudo enviar el documento al alumno seleccionado.');
+            setErrorMessage('No se pudo enviar el documento con la configuración seleccionada.');
         } finally {
             setIsUploadingDocument(false);
         }
@@ -338,6 +330,13 @@ export const useGradingCenter = (courseId: number | null) => {
             return;
         }
 
+        const normalizedFeedback = feedback.trim();
+        if (normalizedFeedback.length > PROFESSOR_FEEDBACK_MAX_LENGTH) {
+            setErrorMessage(`La aclaración del profesor no puede superar ${PROFESSOR_FEEDBACK_MAX_LENGTH} caracteres.`);
+            setGradeSubmitFeedbackStatus('error');
+            return;
+        }
+
         const parsedScore = parseFloat(score);
         if (isNaN(parsedScore) || parsedScore < 0 || parsedScore > 10) {
             setErrorMessage('La nota debe ser un valor numérico entre 0 y 10.');
@@ -357,7 +356,7 @@ export const useGradingCenter = (courseId: number | null) => {
                 enrollmentId: targetEnrollmentId,
                 title: evaluationTitle,
                 score: parsedScore,
-                feedback: feedback
+                feedback: normalizedFeedback
             });
 
             setSuccessMessage(`Calificación registrada con éxito. Notificación enviada a la campana del alumno.`);
@@ -407,7 +406,6 @@ export const useGradingCenter = (courseId: number | null) => {
         selectedStudent,
         studentGrades,
         studentDocuments,
-        documentsLoadedFromCourseFallback,
         loadingData,
         loadingDocs,
         isSubmitting,

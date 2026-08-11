@@ -15,8 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 // Importaciones de Entidades y Repositorios necesarios
 import com.cursosonline.backend.entities.DocumentMetadata;
 import com.cursosonline.backend.entities.FolderType;
+import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.DocumentMetadataRepository;
 import com.cursosonline.backend.repository.UserRepository;
 
@@ -51,7 +53,11 @@ public class TeacherEvaluationFlowIntegrationTest {
         @Autowired
         private DocumentMetadataRepository documentMetadataRepository;
 
+        @Autowired
+        private CoursesRepository coursesRepository;
+
         private Users alumnoReceptor;
+        private Long testCourseId;
 
         @BeforeEach
         public void setUp() {
@@ -83,6 +89,14 @@ public class TeacherEvaluationFlowIntegrationTest {
                         u.setRole(Role.STUDENT);
                         return userRepository.save(u);
                 });
+
+                Courses testCourse = new Courses();
+                testCourse.setTitle("Curso Integración Profesor");
+                testCourse.setCategory("QA");
+                testCourse.setCourseType("Básico");
+                testCourse.setDuration(1.0f);
+                testCourse.setSite("COLE");
+                testCourseId = coursesRepository.save(testCourse).getCourse_id();
         }
 
         @Test
@@ -97,7 +111,7 @@ public class TeacherEvaluationFlowIntegrationTest {
                                 "application/pdf",
                                 "%PDF-1.4 ... datos ficticios binarios".getBytes());
 
-                Long courseId = 1L; // ID del curso gestionado actualmente por el profesor en la UI
+                Long courseId = testCourseId; // ID real del curso creado durante el setup
                 Long receiverId = alumnoReceptor.getUser_id(); // ID del alumno seleccionado en el desplegable de la
                                                                // clase
 

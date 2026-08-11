@@ -8,7 +8,6 @@ import {
 } from '../../../../services/evaluationService';
 import {
     getDocumentsByEnrollment,
-    getReceivedDocumentsByCourse,
     uploadProfessorDocument
 } from '../../../../services/documentService';
 import type { DocumentMetadata } from '../../../../services/documentService';
@@ -23,7 +22,6 @@ vi.mock('../../../../services/evaluationService', () => ({
 
 vi.mock('../../../../services/documentService', () => ({
     getDocumentsByEnrollment: vi.fn(),
-    getReceivedDocumentsByCourse: vi.fn(),
     uploadProfessorDocument: vi.fn()
 }));
 
@@ -74,7 +72,6 @@ describe('useGradingCenter', () => {
             { gradeId: 3, title: 'Examen Final', score: '8.0' }
         ]);
         vi.mocked(getDocumentsByEnrollment).mockResolvedValue(mockDocuments);
-        vi.mocked(getReceivedDocumentsByCourse).mockResolvedValue(mockDocuments);
         vi.mocked(uploadProfessorDocument).mockResolvedValue({
             message: 'ok',
             filename: 'doc.pdf',
@@ -124,7 +121,6 @@ describe('useGradingCenter', () => {
         expect(getTeacherEnrollmentGrades).toHaveBeenCalledWith(301);
         expect(result.current.studentDocuments).toEqual(mockDocuments);
         expect(result.current.studentGrades).toHaveLength(3);
-        expect(result.current.documentsLoadedFromCourseFallback).toBe(false);
     });
 
     it('vacia seleccion y documentos si el id de alumno no existe', async () => {
@@ -164,7 +160,7 @@ describe('useGradingCenter', () => {
             await result.current.handleSendDocument();
         });
 
-        expect(result.current.errorMessage).toBe('Selecciona asignatura, alumno y archivo antes de enviar.');
+        expect(result.current.errorMessage).toBe('Selecciona asignatura y archivo antes de enviar.');
         expect(uploadProfessorDocument).not.toHaveBeenCalled();
     });
 
@@ -185,7 +181,7 @@ describe('useGradingCenter', () => {
             await result.current.handleSendDocument();
         });
 
-        expect(uploadProfessorDocument).toHaveBeenCalledWith(file, 10, 11);
+        expect(uploadProfessorDocument).toHaveBeenCalledWith(file, 10, 11, 'TRABAJO');
         expect(result.current.successMessage).toBe('Documento enviado a ana correctamente.');
         expect(result.current.selectedFile).toBeNull();
         expect(mockRefreshNotifications).toHaveBeenCalledTimes(1);
@@ -211,6 +207,27 @@ describe('useGradingCenter', () => {
 
         expect(preventDefault).toHaveBeenCalledTimes(1);
         expect(result.current.errorMessage).toBe('La nota debe ser un valor numérico entre 0 y 10.');
+        expect(submitStudentGrade).not.toHaveBeenCalled();
+    });
+
+    it('bloquea el envio cuando la aclaracion del profesor supera 300 caracteres', async () => {
+        const { result } = renderHook(() => useGradingCenter(10));
+        await waitFor(() => expect(result.current.loadingData).toBe(false));
+
+        await act(async () => {
+            await result.current.handleSelectStudentById(11);
+        });
+
+        act(() => {
+            result.current.setScore('8.0');
+            result.current.setFeedback('a'.repeat(301));
+        });
+
+        await act(async () => {
+            await result.current.handleGradeSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+        });
+
+        expect(result.current.errorMessage).toBe('La aclaración del profesor no puede superar 300 caracteres.');
         expect(submitStudentGrade).not.toHaveBeenCalled();
     });
 
@@ -291,23 +308,7 @@ describe('useGradingCenter', () => {
         expect(result.current.loadingDocs).toBe(false);
     });
 
-    it('hace fallback por curso y filtra por sender cuando no hay enrollmentId', async () => {
-        const studentDocForUser12: DocumentMetadata = {
-            documentid: 2002,
-            filename: 'doc_2002.pdf',
-            originalname: 'actividad-2.pdf',
-            upload_date: '2026-07-25T11:00:00Z',
-            sender: { userId: 12, username: 'luis', email: 'luis@uni.es', role: 'STUDENT' },
-            receiver: { userId: 2, username: 'profesor', email: 'profe@uni.es', role: 'PROFESSOR' },
-            folder_type: 'RECEIVED',
-            isRead: false,
-        };
-
-        vi.mocked(getReceivedDocumentsByCourse).mockResolvedValueOnce([
-            mockDocuments[0],
-            studentDocForUser12,
-        ]);
-
+    it('no consulta documentos cuando el alumno no tiene enrollmentId', async () => {
         const { result } = renderHook(() => useGradingCenter(10));
         await waitFor(() => expect(result.current.loadingData).toBe(false));
 
@@ -316,9 +317,7 @@ describe('useGradingCenter', () => {
         });
 
         expect(getDocumentsByEnrollment).not.toHaveBeenCalledWith(12);
-        expect(getReceivedDocumentsByCourse).toHaveBeenCalledWith(10);
-        expect(result.current.studentDocuments).toEqual([studentDocForUser12]);
-        expect(result.current.documentsLoadedFromCourseFallback).toBe(true);
+        expect(result.current.studentDocuments).toEqual([]);
     });
 
     it('permite limpiar archivo seleccionado con valor null', () => {
@@ -354,7 +353,7 @@ describe('useGradingCenter', () => {
             await result.current.handleSendDocument();
         });
 
-        expect(result.current.errorMessage).toBe('No se pudo enviar el documento al alumno seleccionado.');
+        expect(result.current.errorMessage).toBe('No se pudo enviar el documento con la configuración seleccionada.');
         expect(result.current.isUploadingDocument).toBe(false);
     });
 

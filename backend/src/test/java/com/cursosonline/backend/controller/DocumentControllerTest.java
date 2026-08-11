@@ -17,6 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
@@ -104,7 +105,7 @@ public class DocumentControllerTest {
         @Test
         @DisplayName("Debe retornar lista vacía (HTTP 200) cuando el alumno no posee documentos recibidos en PostgreSQL")
         void debeRetornarListaVaciaCuandoNoHayDocumentos() {
-                Mockito.when(documentMetadataRepository.findReceivedDocumentsByUsername("luis_student"))
+                Mockito.when(documentMetadataRepository.findReceivedGeneralDocumentsByUsername("luis_student"))
                                 .thenReturn(Collections.emptyList());
 
                 ResponseEntity<?> response = documentController.getUserDocuments(authentication);
@@ -138,7 +139,7 @@ public class DocumentControllerTest {
                 doc2.setCourse(null);
                 doc2.setFolder_type(FolderType.RECEIVED);
 
-                Mockito.when(documentMetadataRepository.findReceivedDocumentsByUsername("luis_student"))
+                Mockito.when(documentMetadataRepository.findReceivedGeneralDocumentsByUsername("luis_student"))
                                 .thenReturn(Arrays.asList(doc1, doc2));
 
                 ResponseEntity<?> response = documentController.getUserDocuments(authentication);
@@ -565,6 +566,7 @@ public class DocumentControllerTest {
                 enrollmentB.setCourse(course);
 
                 Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
+                Mockito.when(coursesRepository.findById(2958L)).thenReturn(Optional.of(course));
                 Mockito.when(fileStorageService.storeDocumentFile(any(),
                                 eq(FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS)))
                                 .thenReturn("documents/uuid_bulk.pdf");
@@ -573,7 +575,8 @@ public class DocumentControllerTest {
 
                 ResponseEntity<?> response = documentController.professorUploadDocument(authentication, validFile,
                                 2958L,
-                                0L);
+                                0L,
+                                "DOCUMENTO");
 
                 assertEquals(HttpStatus.OK, response.getStatusCode());
                 Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
@@ -583,6 +586,147 @@ public class DocumentControllerTest {
 
                 // 2 alumnos => 4 registros (SENT + RECEIVED por alumno)
                 Mockito.verify(documentMetadataRepository, Mockito.times(4)).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("Debe enrutar TRABAJO individual a bandeja de asignaturas del alumno (course no nulo)")
+        void debeEnrutarTrabajoIndividualABandejaAsignaturas() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "trabajo_tema_3.pdf",
+                                "application/pdf",
+                                "Entrega individual de trabajo".getBytes());
+
+                Users professor = new Users();
+                professor.setUser_id(10L);
+                professor.setUsername("profesor_juan");
+                professor.setRole(Role.PROFESSOR);
+
+                Users student = new Users();
+                student.setUser_id(77L);
+                student.setUsername("student_objetivo");
+                student.setRole(Role.STUDENT);
+
+                Courses course = new Courses();
+                course.setCourse_id(3001L);
+                course.setTitle("Arquitectura de Software");
+
+                Mockito.when(authentication.getName()).thenReturn("profesor_juan");
+                Mockito.when(userRepository.findByUsername("profesor_juan")).thenReturn(Optional.of(professor));
+                Mockito.when(coursesRepository.findById(3001L)).thenReturn(Optional.of(course));
+                Mockito.when(userRepository.findById(77L)).thenReturn(Optional.of(student));
+                Mockito.when(fileStorageService.storeDocumentFile(any(),
+                                eq(FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS)))
+                                .thenReturn("documents/uuid_trabajo.pdf");
+
+                ResponseEntity<?> response = documentController.professorUploadDocument(
+                                authentication,
+                                validFile,
+                                3001L,
+                                77L,
+                                "TRABAJO");
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+
+                ArgumentCaptor<DocumentMetadata> metadataCaptor = ArgumentCaptor.forClass(DocumentMetadata.class);
+                Mockito.verify(documentMetadataRepository, Mockito.times(2)).save(metadataCaptor.capture());
+
+                List<DocumentMetadata> saved = metadataCaptor.getAllValues();
+                DocumentMetadata sent = saved.stream()
+                                .filter(d -> d.getFolder_type() == FolderType.SENT)
+                                .findFirst()
+                                .orElseThrow();
+                DocumentMetadata received = saved.stream()
+                                .filter(d -> d.getFolder_type() == FolderType.RECEIVED)
+                                .findFirst()
+                                .orElseThrow();
+
+                assertNotNull(sent.getCourse(), "SENT debe quedar asociado al curso de trabajo.");
+                assertEquals(3001L, sent.getCourse().getCourse_id());
+                assertEquals("TRABAJO", sent.getEvaluation_type());
+
+                assertNotNull(received.getCourse(), "RECEIVED de trabajo debe quedar en bandeja de asignaturas.");
+                assertEquals(3001L, received.getCourse().getCourse_id());
+                assertEquals("TRABAJO", received.getEvaluation_type());
+                assertEquals("student_objetivo", received.getReceiver().getUsername());
+        }
+
+        @Test
+        @DisplayName("Debe enrutar DOCUMENTO masivo a Gestion de Documentos Academicos (RECEIVED con course nulo)")
+        void debeEnrutarDocumentoMasivoABandejaGeneralAlumno() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "guia_general.pdf",
+                                "application/pdf",
+                                "Guia general para la clase".getBytes());
+
+                Users professor = new Users();
+                professor.setUser_id(10L);
+                professor.setUsername("profesor_juan");
+                professor.setRole(Role.PROFESSOR);
+
+                Users studentA = new Users();
+                studentA.setUser_id(21L);
+                studentA.setUsername("student_a");
+                studentA.setRole(Role.STUDENT);
+
+                Users studentB = new Users();
+                studentB.setUser_id(22L);
+                studentB.setUsername("student_b");
+                studentB.setRole(Role.STUDENT);
+
+                Courses course = new Courses();
+                course.setCourse_id(2958L);
+
+                Enrollment enrollmentA = new Enrollment();
+                enrollmentA.setEnrollmentid(5001L);
+                enrollmentA.setUser(studentA);
+                enrollmentA.setCourse(course);
+
+                Enrollment enrollmentB = new Enrollment();
+                enrollmentB.setEnrollmentid(5002L);
+                enrollmentB.setUser(studentB);
+                enrollmentB.setCourse(course);
+
+                Mockito.when(authentication.getName()).thenReturn("profesor_juan");
+                Mockito.when(userRepository.findByUsername("profesor_juan")).thenReturn(Optional.of(professor));
+                Mockito.when(coursesRepository.findById(2958L)).thenReturn(Optional.of(course));
+                Mockito.when(fileStorageService.storeDocumentFile(any(),
+                                eq(FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS)))
+                                .thenReturn("documents/uuid_bulk_doc.pdf");
+                Mockito.when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(2958L))
+                                .thenReturn(List.of(enrollmentA, enrollmentB));
+
+                ResponseEntity<?> response = documentController.professorUploadDocument(
+                                authentication,
+                                validFile,
+                                2958L,
+                                0L,
+                                "DOCUMENTO");
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+
+                ArgumentCaptor<DocumentMetadata> metadataCaptor = ArgumentCaptor.forClass(DocumentMetadata.class);
+                Mockito.verify(documentMetadataRepository, Mockito.times(4)).save(metadataCaptor.capture());
+
+                List<DocumentMetadata> saved = metadataCaptor.getAllValues();
+                List<DocumentMetadata> sentDocs = saved.stream()
+                                .filter(d -> d.getFolder_type() == FolderType.SENT)
+                                .toList();
+                List<DocumentMetadata> receivedDocs = saved.stream()
+                                .filter(d -> d.getFolder_type() == FolderType.RECEIVED)
+                                .toList();
+
+                assertEquals(2, sentDocs.size());
+                assertEquals(2, receivedDocs.size());
+
+                assertTrue(sentDocs.stream()
+                                .allMatch(d -> d.getCourse() != null && d.getCourse().getCourse_id() == 2958L),
+                                "Los registros SENT deben conservar el curso para trazabilidad del emisor.");
+
+                assertTrue(receivedDocs.stream().allMatch(d -> d.getCourse() == null),
+                                "Los registros RECEIVED de tipo DOCUMENTO deben caer en la bandeja general (sin curso).");
+                assertTrue(receivedDocs.stream().allMatch(d -> "DOCUMENTO".equals(d.getEvaluation_type())));
         }
 
         @Test
@@ -850,12 +994,14 @@ public class DocumentControllerTest {
                 Mockito.when(fileStorageService.storeDocumentFile(any(),
                                 eq(FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS)))
                                 .thenReturn("documents/uuid_case.pdf");
+                Mockito.when(coursesRepository.findById(2958L)).thenReturn(Optional.of(course));
                 Mockito.when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(2958L))
                                 .thenReturn(List.of(enrollment));
 
                 ResponseEntity<?> response = documentController.professorUploadDocument(authentication, validFile,
                                 2958L,
-                                0L);
+                                0L,
+                                "DOCUMENTO");
 
                 assertEquals(HttpStatus.OK, response.getStatusCode());
                 Mockito.verify(documentMetadataRepository, Mockito.times(2)).save(any(DocumentMetadata.class));
@@ -1129,7 +1275,7 @@ public class DocumentControllerTest {
         void debeDevolverErrorControladoEnSentDocumentsSiFallaRepositorio() {
                 Mockito.when(authentication.isAuthenticated()).thenReturn(true);
                 Mockito.when(authentication.getName()).thenReturn("luis_student");
-                Mockito.when(documentMetadataRepository.findSentDocumentsByUsername("luis_student"))
+                Mockito.when(documentMetadataRepository.findSentGeneralDocumentsByUsername("luis_student"))
                                 .thenThrow(new RuntimeException("boom-sent"));
 
                 ResponseEntity<?> response = documentController.getSentDocuments(authentication);
@@ -1248,13 +1394,17 @@ public class DocumentControllerTest {
                 Mockito.when(authentication.isAuthenticated()).thenReturn(true);
                 Mockito.when(authentication.getName()).thenReturn("profesor_juan");
                 Mockito.when(userRepository.findByUsername("profesor_juan")).thenReturn(Optional.of(professor));
+                Courses course = new Courses();
+                course.setCourse_id(77L);
+                Mockito.when(coursesRepository.findById(77L)).thenReturn(Optional.of(course));
                 Mockito.when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(77L)).thenReturn(List.of());
                 Mockito.when(fileStorageService.storeDocumentFile(any(),
                                 eq(FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS)))
                                 .thenReturn("documents/uuid_guide.pdf");
 
                 ResponseEntity<?> response = documentController.professorUploadDocument(authentication, validFile, 77L,
-                                0L);
+                                0L,
+                                "DOCUMENTO");
 
                 assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
                 Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
@@ -1286,7 +1436,8 @@ public class DocumentControllerTest {
                 Mockito.when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
                 ResponseEntity<?> response = documentController.professorUploadDocument(authentication, validFile, 200L,
-                                999L);
+                                999L,
+                                "DOCUMENTO");
 
                 assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
                 Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
@@ -1360,5 +1511,51 @@ public class DocumentControllerTest {
                 Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
                 assertTrue(bodyMap.get("error").toString().contains("Profesor no asignado"));
                 Mockito.verify(documentMetadataRepository, never()).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("Debe devolver 400 cuando professor-upload recibe una asignatura inexistente")
+        void debeRechazarProfessorUploadConAsignaturaInexistente() {
+                MockMultipartFile validFile = new MockMultipartFile(
+                                "file",
+                                "guia.pdf",
+                                "application/pdf",
+                                "Guia".getBytes());
+
+                Users professor = new Users();
+                professor.setUser_id(10L);
+                professor.setUsername("profesor_juan");
+                professor.setRole(Role.PROFESSOR);
+
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("profesor_juan");
+                Mockito.when(userRepository.findByUsername("profesor_juan")).thenReturn(Optional.of(professor));
+                Mockito.when(coursesRepository.findById(404L)).thenReturn(Optional.empty());
+
+                ResponseEntity<?> response = documentController.professorUploadDocument(authentication, validFile, 404L,
+                                21L,
+                                "DOCUMENTO");
+
+                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+                Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+                assertEquals("La asignatura seleccionada no existe.", bodyMap.get("error"));
+                Mockito.verify(documentMetadataRepository, never()).save(any(DocumentMetadata.class));
+        }
+
+        @Test
+        @DisplayName("No debe mezclar documentos legacy sin curso en recibidos por asignatura")
+        void noDebeMezclarLegacySinCursoEnReceivedByCourse() {
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("luis_student");
+                Mockito.when(documentMetadataRepository.findReceivedDocumentsByUsernameAndCourse("luis_student", 501L))
+                                .thenReturn(List.of());
+                Mockito.when(userRepository.findByUsername("luis_student")).thenReturn(Optional.of(mockSender));
+
+                ResponseEntity<?> response = documentController.getReceivedDocumentsByCourse(authentication, 501L);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertTrue(response.getBody() instanceof List);
+                List<?> payload = (List<?>) response.getBody();
+                assertTrue(payload.isEmpty());
         }
 }

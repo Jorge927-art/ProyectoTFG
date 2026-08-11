@@ -277,12 +277,14 @@ export const markDocumentAsRead = async (documentId: number): Promise<{ message:
 export const uploadProfessorDocument = async (
     file: File, 
     courseId: number, 
-    receiverId: number
+    receiverId: number,
+    deliveryType: 'DOCUMENTO' | 'TRABAJO' | 'EXAMEN' = 'DOCUMENTO'
 ): Promise<UploadDocumentResponse> => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('courseId', courseId.toString());
     formData.append('receiverId', receiverId.toString());
+    formData.append('deliveryType', deliveryType);
 
     const response = await apiClient.post<UploadDocumentResponse>(
         '/api/v1/documents/professor-upload',

@@ -184,8 +184,8 @@ export const DocumentManager = ({
     };
 
     return (
-        /* ALINEACIÓN GEOMÉTRICA CONSOLIDADA: Mantiene simetría exacta con tus otras tarjetas en h-109 */
-        <GenericCard className="flex flex-col h-109">
+        /* ALINEACIÓN GEOMÉTRICA CONSOLIDADA: hereda la altura del contenedor padre para mantener simetría */
+        <GenericCard className="flex flex-col h-full">
             {/* CABECERA DEL COMPONENTE */}
             <div className="flex items-center justify-between mb-3 shrink-0">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
@@ -295,7 +295,7 @@ export const DocumentManager = ({
                                         : !selectedReceiverId
                                             ? "Elige un destinatario arriba para desbloquear"
                                             : selectedFile
-                                                ? `Archivo listo: ${selectedFile.name}`
+                                                ? `Archivo seleccionado: ${selectedFile.name}`
                                                 : `Seleccionar archivo (${ACADEMIC_DOCUMENT_ALLOWED_LABEL})`
                                     }
                                 </span>

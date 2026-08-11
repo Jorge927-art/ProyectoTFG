@@ -31,8 +31,11 @@ import java.util.Optional;
 import java.util.List;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Locale;
+import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
@@ -52,6 +55,7 @@ public class UserService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(UserService.class);
     private static final int MAX_FAILED_LOGIN_ATTEMPTS = 3;
+    private static final String GRADE_PUBLISHED_NOTIFICATION_TYPE = "GRADE_PUBLISHED";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -164,14 +168,37 @@ public class UserService {
     }
 
     /**
-     * Recupera de forma transaccional todos los usuarios registrados en la
-     * plataforma.
+     * Recupera de forma transaccional todos los usuarios de la plataforma,
+     * ordenados alfabéticamente por nombre de usuario y, en caso de empate, por ID
+     * de usuario.
      * 
-     * @return Lista de todos los usuarios registrados en la plataforma.
+     * @return Lista de todos los usuarios de la plataforma, ordenados
+     *         alfabéticamente por nombre de usuario y, en caso de empate, por ID de
+     *         usuario.
      */
     @Transactional(readOnly = true)
     public List<Users> getAllUsers() {
-        return userRepository.findAll();
+        List<Users> users = new ArrayList<>(userRepository.findAll());
+
+        Collator spanishCollator = Collator.getInstance(Locale.forLanguageTag("es-ES"));
+        spanishCollator.setStrength(Collator.PRIMARY);
+        spanishCollator.setDecomposition(Collator.CANONICAL_DECOMPOSITION);
+
+        users.sort((left, right) -> {
+            String leftUsername = left != null && left.getUsername() != null ? left.getUsername().trim() : "";
+            String rightUsername = right != null && right.getUsername() != null ? right.getUsername().trim() : "";
+
+            int usernameOrder = spanishCollator.compare(leftUsername, rightUsername);
+            if (usernameOrder != 0) {
+                return usernameOrder;
+            }
+
+            long leftId = left != null && left.getUser_id() != null ? left.getUser_id() : Long.MAX_VALUE;
+            long rightId = right != null && right.getUser_id() != null ? right.getUser_id() : Long.MAX_VALUE;
+            return Long.compare(leftId, rightId);
+        });
+
+        return users;
     }
 
     /**
@@ -633,11 +660,12 @@ public class UserService {
         List<com.cursosonline.backend.entities.DocumentMetadata> unreadDocs = documentMetadataRepository
                 .findUnreadReceivedDocumentsByUsername(username);
         if (unreadDocs != null && !unreadDocs.isEmpty()) {
+            com.cursosonline.backend.entities.DocumentMetadata firstUnread = unreadDocs.get(0);
             alerts.add(new com.cursosonline.backend.dto.NotificationDTO(
                     "DOCUMENT_INBOX",
                     "Bandeja de Entrada",
                     "Tienes " + unreadDocs.size() + " documento(s) pendiente(s) en tu bandeja.",
-                    "/" + user.getRole().name().toLowerCase()));
+                    buildDocumentInboxRedirect(user, firstUnread)));
         }
 
         List<com.cursosonline.backend.entities.UserSystemNotification> unreadSystemNotifications = userSystemNotificationRepository
@@ -662,6 +690,38 @@ public class UserService {
         // ADMIN: no entra en los bloques 2 ni 3, solo puede recibir el bloque 1.
 
         return alerts;
+    }
+
+    private String buildDocumentInboxRedirect(Users user, DocumentMetadata document) {
+        String basePath = "/" + user.getRole().name().toLowerCase();
+        StringBuilder redirect = new StringBuilder(basePath).append("?focus=documents");
+
+        if (document != null && document.getDocumentid() != null && document.getDocumentid() > 0) {
+            redirect.append("&documentId=").append(document.getDocumentid());
+        }
+
+        if (user.getRole() == Role.STUDENT && document != null && document.getCourse() != null
+                && document.getCourse().getCourse_id() != null) {
+            redirect.append("&courseId=").append(document.getCourse().getCourse_id());
+        }
+
+        if (user.getRole() == Role.PROFESSOR && document != null && document.getSender() != null
+                && document.getSender().getUser_id() != null) {
+            redirect.append("&senderId=").append(document.getSender().getUser_id());
+        }
+
+        if (user.getRole() == Role.ADMIN && document != null && document.getReceiver() != null
+                && document.getReceiver().getUser_id() != null) {
+            redirect.append("&receiverId=").append(document.getReceiver().getUser_id());
+        }
+
+        // Encapsulamos un nombre amigable para trazabilidad opcional futura de UI.
+        if (document != null && document.getOriginalname() != null && !document.getOriginalname().isBlank()) {
+            String encodedName = URLEncoder.encode(document.getOriginalname(), StandardCharsets.UTF_8);
+            redirect.append("&doc=").append(encodedName);
+        }
+
+        return redirect.toString();
     }
 
     /**
@@ -689,6 +749,17 @@ public class UserService {
                     "Se omite ACK de alertas de progreso para usuario {} porque faltan columnas progress_alert_* en enrollment.",
                     username);
         }
+    }
+
+    /**
+     * Marca como leídas únicamente las alertas de nueva calificación para el
+     * usuario indicado.
+     *
+     * @param username El nombre de usuario del receptor.
+     */
+    @Transactional
+    public void dismissGradeNotifications(String username) {
+        userSystemNotificationRepository.markAllAsReadByUsernameAndType(username, GRADE_PUBLISHED_NOTIFICATION_TYPE);
     }
 
     /**

@@ -160,7 +160,11 @@ public class UserServiceTest {
                 student.setRole(Role.STUDENT);
 
                 DocumentMetadata unreadDoc = new DocumentMetadata();
+                unreadDoc.setDocumentid(900L);
                 unreadDoc.setRead(false);
+                Courses docCourse = new Courses();
+                docCourse.setCourse_id(200L);
+                unreadDoc.setCourse(docCourse);
 
                 UserSystemNotification systemNotification = new UserSystemNotification();
                 systemNotification.setType("SYSTEM_ALERT");
@@ -194,6 +198,13 @@ public class UserServiceTest {
 
                 assertEquals(3, alerts.size());
                 assertTrue(alerts.stream().anyMatch(alert -> "DOCUMENT_INBOX".equals(alert.type())));
+                com.cursosonline.backend.dto.NotificationDTO documentAlert = alerts.stream()
+                                .filter(alert -> "DOCUMENT_INBOX".equals(alert.type()))
+                                .findFirst()
+                                .orElseThrow();
+                assertTrue(documentAlert.redirectUrl().contains("focus=documents"));
+                assertTrue(documentAlert.redirectUrl().contains("documentId=900"));
+                assertTrue(documentAlert.redirectUrl().contains("courseId=200"));
                 assertTrue(alerts.stream().anyMatch(alert -> "SYSTEM_ALERT".equals(alert.type())));
                 assertTrue(alerts.stream().anyMatch(alert -> "COURSE_PROGRESS".equals(alert.type())));
         }
@@ -251,6 +262,30 @@ public class UserServiceTest {
                 Users secondResult = userService.deleteByUsername("Luis");
                 assertTrue(secondResult.isEnabled());
                 assertEquals(0, secondResult.getFailedLoginAttempts());
+        }
+
+        @Test
+        void getAllUsers_DebeOrdenarAlfabeticamenteConColacionEspanola() {
+                Users oscar = new Users(5L, "Óscar", "enc", Role.STUDENT, "oscar@demo.com", true,
+                                new java.util.ArrayList<>());
+                Users ana = new Users(2L, "ana", "enc", Role.STUDENT, "ana@demo.com", true,
+                                new java.util.ArrayList<>());
+                Users alvaro = new Users(1L, "Álvaro", "enc", Role.STUDENT, "alvaro@demo.com", true,
+                                new java.util.ArrayList<>());
+                Users nora = new Users(3L, "Nora", "enc", Role.STUDENT, "nora@demo.com", true,
+                                new java.util.ArrayList<>());
+                Users enie = new Users(4L, "Ñora", "enc", Role.STUDENT, "enie@demo.com", true,
+                                new java.util.ArrayList<>());
+
+                when(userRepository.findAll()).thenReturn(List.of(oscar, ana, alvaro, nora, enie));
+
+                List<Users> ordered = userService.getAllUsers();
+                List<String> orderedUsernames = ordered.stream()
+                                .map(user -> user.getUsername())
+                                .toList();
+
+                assertEquals(List.of("Álvaro", "ana", "Nora", "Ñora", "Óscar"), orderedUsernames);
+                verify(userRepository).findAll();
         }
 
         @Test
@@ -1079,7 +1114,7 @@ public class UserServiceTest {
 
                 assertEquals(1, alerts.size());
                 assertEquals("DOCUMENT_INBOX", alerts.get(0).type());
-                assertEquals("/admin", alerts.get(0).redirectUrl());
+                assertEquals("/admin?focus=documents", alerts.get(0).redirectUrl());
         }
 
         @Test

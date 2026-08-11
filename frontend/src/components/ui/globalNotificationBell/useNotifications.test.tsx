@@ -236,6 +236,25 @@ describe('useNotifications', () => {
         expect(hook.result.current.alerts[0].redirectUrl).toContain('documentId=1');
     });
 
+    it('respeta redirectUrl contextual cuando backend ya incluye courseId y documentId', async () => {
+        currentAlerts = [
+            {
+                type: 'DOCUMENT_INBOX',
+                title: 'Bandeja',
+                message: 'Tienes un documento pendiente',
+                redirectUrl: '/student?focus=documents&documentId=55&courseId=101'
+            }
+        ];
+
+        const hook = renderHook(() => useNotifications(), { wrapper: AuthWrapper });
+
+        await waitFor(() => {
+            expect(hook.result.current.loading).toBe(false);
+        });
+
+        expect(hook.result.current.alerts[0].redirectUrl).toBe('/student?focus=documents&documentId=55&courseId=101');
+    });
+
     it('activa DOCUMENT_INBOX con MP4 no leído en alumno igual que con PDF', async () => {
         currentAlerts = [];
         currentDocuments = [

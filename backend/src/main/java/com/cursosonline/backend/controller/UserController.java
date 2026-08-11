@@ -205,6 +205,22 @@ public class UserController {
     }
 
     /**
+     * Endpoint seguro para marcar como leídas únicamente las alertas de nueva
+     * calificación del alumno en sesión.
+     *
+     * @param principal El principal que representa al usuario autenticado.
+     * @return Una respuesta indicando el éxito de la operación.
+     */
+    @PatchMapping("/notifications/dismiss-grade-alerts")
+    public ResponseEntity<?> dismissGradeNotifications(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+        userService.dismissGradeNotifications(principal.getName());
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    /**
      * Endpoint seguro para recuperar la información del usuario autenticado.
      * Extrae la identidad mediante las credenciales del token JWT activo.
      * 

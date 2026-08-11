@@ -42,6 +42,18 @@ public interface UserSystemNotificationRepository extends JpaRepository<UserSyst
     int markAllAsReadByUsername(@Param("username") String username);
 
     /**
+     * Marca como leídas las notificaciones no leídas de un tipo concreto para un
+     * usuario específico.
+     *
+     * @param username El nombre de usuario del receptor.
+     * @param type     El tipo de notificación a marcar como leída.
+     * @return Número de notificaciones actualizadas.
+     */
+    @Modifying
+    @Query("UPDATE UserSystemNotification n SET n.read = true WHERE n.receiver.username = :username AND n.type = :type AND n.read = false")
+    int markAllAsReadByUsernameAndType(@Param("username") String username, @Param("type") String type);
+
+    /**
      * Elimina todas las notificaciones para un usuario específico.
      * Esto es útil para permitir que un usuario elimine todas sus notificaciones de
      * una sola vez.

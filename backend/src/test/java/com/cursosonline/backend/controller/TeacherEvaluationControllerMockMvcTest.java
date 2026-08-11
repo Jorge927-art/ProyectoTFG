@@ -5,6 +5,7 @@ import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.repository.CourseGradeRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
+import com.cursosonline.backend.repository.UserSystemNotificationRepository;
 import com.cursosonline.backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -53,6 +54,9 @@ class TeacherEvaluationControllerMockMvcTest {
 
         @Mock
         private UserRepository userRepository;
+
+        @Mock
+        private UserSystemNotificationRepository userSystemNotificationRepository;
 
         @Mock
         private Principal principal;

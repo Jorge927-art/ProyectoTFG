@@ -98,6 +98,42 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
         expect(screen.getByText('No has enviado ningún documento todavía.')).toBeInTheDocument();
     });
 
+    it('debe renderizar documentos enviados reales en la pestaña Enviados', () => {
+        const mockDocuments = [
+            {
+                documentid: 21,
+                filename: 'sent-assignment.pdf',
+                originalname: 'Entrega_Asig.pdf',
+                upload_date: '2026-07-06T10:00:00.000Z',
+                sender: { userId: 1, username: 'luis_student', email: 'luis@tfg.com', role: 'STUDENT' },
+                receiver: { userId: 2, username: 'profesor_juan', email: 'juan@tfg.com', role: 'PROFESSOR' },
+                folder_type: 'SENT' as const,
+                isRead: false
+            }
+        ];
+
+        useDocumentsSpy.mockReturnValue({
+            documentList: mockDocuments,
+            activeTab: 'SENT',
+            setActiveTab: mockSetActiveTab,
+            loadingDocuments: false,
+            isUploading: false,
+            documentError: '',
+            setDocumentError: mockSetDocumentError,
+            directory: [],
+            loadingDirectory: false,
+            selectedReceiverId: 2,
+            setSelectedReceiverId: mockSetSelectedReceiverId,
+            handleUpload: mockHandleUpload,
+            handleSecureDownload: mockHandleSecureDownload
+        });
+
+        render(<DocumentManager />);
+
+        expect(screen.getByText('Entrega_Asig.pdf')).toBeInTheDocument();
+        expect(screen.getByText('Para: profesor_juan')).toBeInTheDocument();
+    });
+
     it('debe renderizar la lista de metadatos reflejando el emisor o receptor según el flujo dirigido', () => {
         const mockDocuments = [
             {
@@ -369,6 +405,7 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
         fireEvent.change(fileInput, { target: { files: [validFile] } });
 
         expect(mockHandleUpload).not.toHaveBeenCalled();
+        expect(screen.getByText('Archivo seleccionado: Entrega.txt')).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: /Enviar documento/i }));
 

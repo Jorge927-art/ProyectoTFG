@@ -9,6 +9,7 @@ import type { StudentPerformanceDTO } from '../../../../services/evaluationServi
 import type { DocumentMetadata } from '../../../../services/documentService';
 
 vi.mock('./useGradingCenter', () => ({
+    PROFESSOR_FEEDBACK_MAX_LENGTH: 300,
     useGradingCenter: vi.fn()
 }));
 
@@ -80,7 +81,6 @@ describe('GradingCenter', () => {
         selectedStudent: null,
         studentGrades: [],
         studentDocuments: [],
-        documentsLoadedFromCourseFallback: false,
         loadingData: false,
         loadingDocs: false,
         isSubmitting: false,
@@ -158,10 +158,37 @@ describe('GradingCenter', () => {
         expect(mockHandleSelectStudentById).toHaveBeenCalledWith(10);
     });
 
+    it('no sobrescribe la seleccion manual del alumno cuando autoFocusDocuments esta activo', () => {
+        const secondStudent: StudentPerformanceDTO = {
+            userId: 20,
+            username: 'pedro',
+            email: 'pedro@uni.es',
+            individualGrade: 7.5,
+            groupAverage: 7.0,
+            enrollmentId: 302
+        };
+
+        vi.mocked(useGradingCenter).mockReturnValue({
+            ...baseHookReturn,
+            students: [mockStudent, secondStudent],
+            selectedStudent: secondStudent,
+        } as ReturnType<typeof useGradingCenter>);
+
+        render(
+            <GradingCenter
+                courseId={1}
+                availableCourses={availableCourses}
+                onCourseChange={mockOnCourseChange}
+                autoFocusDocuments
+            />
+        );
+
+        expect(mockHandleSelectStudentById).not.toHaveBeenCalled();
+    });
+
     it('muestra paneles de espera cuando no hay alumno seleccionado', () => {
         render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
 
-        expect(screen.getByText('Selecciona una asignatura y un alumno para habilitar el envio y la recepcion de documentos.')).toBeInTheDocument();
         expect(screen.getByText('Selecciona un alumno para habilitar el envio de notas.')).toBeInTheDocument();
         expect(screen.getByText('Selecciona un alumno para habilitar la calculadora de nota final.')).toBeInTheDocument();
     });
@@ -190,7 +217,7 @@ describe('GradingCenter', () => {
 
         render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Enviar al alumno seleccionado' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Enviar documento al alumno seleccionado' }));
         expect(mockHandleSendDocument).toHaveBeenCalledTimes(1);
     });
 
@@ -252,17 +279,16 @@ describe('GradingCenter', () => {
         expect(screen.getByText('Cargando archivos...')).toBeInTheDocument();
     });
 
-    it('muestra aviso contextual cuando la recepcion se obtiene por fallback de asignatura', () => {
+    it('no muestra aviso tecnico en la recepcion de entregas', () => {
         vi.mocked(useGradingCenter).mockReturnValue({
             ...baseHookReturn,
             selectedStudent: mockStudent,
-            documentsLoadedFromCourseFallback: true,
             studentDocuments: [mockStudentDocument],
         } as ReturnType<typeof useGradingCenter>);
 
         render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
 
-        expect(screen.getByText('Vista recuperada por verificacion de asignatura para evitar perdida de entregas en datos legacy.')).toBeInTheDocument();
+        expect(screen.queryByText('Vista recuperada por verificacion de asignatura para evitar perdida de entregas en datos legacy.')).not.toBeInTheDocument();
     });
 
     it('deshabilita envio de documento cuando esta subiendo archivo', () => {
@@ -328,7 +354,7 @@ describe('GradingCenter', () => {
 
         fireEvent.change(screen.getByLabelText('Tipo Evaluacion'), { target: { value: 'Examen Final' } });
         fireEvent.change(screen.getByLabelText('Calificacion (0-10)'), { target: { value: '9.2' } });
-        fireEvent.change(screen.getByLabelText('Feedback del profesor'), { target: { value: 'Excelente nivel' } });
+        fireEvent.change(screen.getByLabelText('Aclaracion del profesor'), { target: { value: 'Excelente nivel' } });
 
         expect(mockSetEvaluationTitle).toHaveBeenCalledWith('Examen Final');
         expect(mockSetScore).toHaveBeenCalledWith('9.2');

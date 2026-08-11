@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Objects;
+import java.util.Locale;
 
 /**
  * Controlador REST para gestionar las operaciones relacionadas con la
@@ -241,8 +242,8 @@ public class DocumentController {
             }
 
             String username = authentication.getName();
-            // Reemplaza la línea vieja por esta nueva versión limpia:
-            List<DocumentMetadata> documents = documentMetadataRepository.findReceivedDocumentsByUsername(username);
+            List<DocumentMetadata> documents = documentMetadataRepository
+                    .findReceivedGeneralDocumentsByUsername(username);
 
             return ResponseEntity.ok(documents.stream().map(this::toDocumentResponse).toList());
 
@@ -270,7 +271,8 @@ public class DocumentController {
             }
 
             String username = authentication.getName();
-            List<DocumentMetadata> documents = documentMetadataRepository.findSentDocumentsByUsername(username);
+            List<DocumentMetadata> documents = documentMetadataRepository
+                    .findSentGeneralDocumentsByUsername(username);
 
             return ResponseEntity.ok(documents.stream().map(this::toDocumentResponse).toList());
         } catch (Exception e) {
@@ -927,7 +929,8 @@ public class DocumentController {
             Authentication authentication,
             @RequestParam("file") MultipartFile file,
             @RequestParam("courseId") Long courseId,
-            @RequestParam("receiverId") Long receiverId) {
+            @RequestParam("receiverId") Long receiverId,
+            @RequestParam(name = "deliveryType", required = false, defaultValue = "DOCUMENTO") String deliveryType) {
 
         try {
             if (authentication == null || !authentication.isAuthenticated()) {
@@ -946,7 +949,10 @@ public class DocumentController {
             Users currentUser = resolveAuthenticatedUser(authentication.getName(),
                     "Usuario profesor emisor no encontrado.");
 
-            Courses selectedCourse = coursesRepository.findById(courseId).orElse(null);
+            Courses selectedCourse = coursesRepository.findById(courseId)
+                    .orElseThrow(() -> new IllegalArgumentException("La asignatura seleccionada no existe."));
+
+            String normalizedDeliveryType = normalizeProfessorDeliveryType(deliveryType);
 
             // Almacenamos el archivo una sola vez físicamente en el disco
             String relativePath = fileStorageService.storeDocumentFile(
@@ -977,6 +983,7 @@ public class DocumentController {
                         bulkSentPerStudent.setSender(currentUser);
                         bulkSentPerStudent.setReceiver(classStudent);
                         bulkSentPerStudent.setCourse(selectedCourse);
+                        bulkSentPerStudent.setEvaluation_type(normalizedDeliveryType);
                         bulkSentPerStudent.setFolder_type(FolderType.SENT);
                         documentMetadataRepository.save(bulkSentPerStudent);
 
@@ -986,7 +993,9 @@ public class DocumentController {
                         bulkReceived.setOriginalname(cleanOriginalName);
                         bulkReceived.setSender(currentUser);
                         bulkReceived.setReceiver(classStudent);
-                        bulkReceived.setCourse(selectedCourse);
+                        bulkReceived
+                                .setCourse(resolveReceivedCourseByDeliveryType(selectedCourse, normalizedDeliveryType));
+                        bulkReceived.setEvaluation_type(normalizedDeliveryType);
                         bulkReceived.setFolder_type(FolderType.RECEIVED);
                         bulkReceived.setRead(false);
                         documentMetadataRepository.save(bulkReceived);
@@ -1008,6 +1017,7 @@ public class DocumentController {
             singleSent.setSender(currentUser);
             singleSent.setReceiver(receiverUser);
             singleSent.setCourse(selectedCourse);
+            singleSent.setEvaluation_type(normalizedDeliveryType);
             singleSent.setFolder_type(FolderType.SENT);
             documentMetadataRepository.save(singleSent);
 
@@ -1016,13 +1026,15 @@ public class DocumentController {
             singleReceived.setOriginalname(cleanOriginalName);
             singleReceived.setSender(currentUser);
             singleReceived.setReceiver(receiverUser);
-            singleReceived.setCourse(selectedCourse);
+            singleReceived.setCourse(resolveReceivedCourseByDeliveryType(selectedCourse, normalizedDeliveryType));
+            singleReceived.setEvaluation_type(normalizedDeliveryType);
             singleReceived.setFolder_type(FolderType.RECEIVED);
             singleReceived.setRead(false);
             documentMetadataRepository.save(singleReceived);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Documento enviado con éxito de forma individual al alumno",
+                    "deliveryType", normalizedDeliveryType,
                     "receiver", receiverUser.getUsername()));
 
         } catch (IllegalArgumentException e) {
@@ -1067,6 +1079,23 @@ public class DocumentController {
         if (file.getSize() > maxBytes) {
             throw new IllegalArgumentException(errorMessage);
         }
+    }
+
+    private String normalizeProfessorDeliveryType(String deliveryType) {
+        if (deliveryType == null) {
+            return "DOCUMENTO";
+        }
+
+        String normalized = deliveryType.trim().toUpperCase(Locale.ROOT);
+        if (!normalized.equals("DOCUMENTO") && !normalized.equals("TRABAJO") && !normalized.equals("EXAMEN")) {
+            throw new IllegalArgumentException("Tipo de envío no válido. Usa DOCUMENTO, TRABAJO o EXAMEN.");
+        }
+
+        return normalized;
+    }
+
+    private Courses resolveReceivedCourseByDeliveryType(Courses selectedCourse, String deliveryType) {
+        return "DOCUMENTO".equals(deliveryType) ? null : selectedCourse;
     }
 
     /**

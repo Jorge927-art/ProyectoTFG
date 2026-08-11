@@ -90,12 +90,22 @@ const normalizeEnrollmentRecord = (enrollment: EnrollmentApiRecord): EnrollmentI
                 const score = typeof scoreValue === 'number' || typeof scoreValue === 'bigint'
                     ? String(scoreValue)
                     : String(scoreValue || '').trim();
+                const gradeIdRaw = gradeRecord.gradeId ?? gradeRecord.grade_id;
+                const parsedGradeId = Number(gradeIdRaw);
+                const comments = typeof gradeRecord.comments === 'string'
+                    ? gradeRecord.comments.trim()
+                    : '';
 
                 if (!title || !score) {
                     return null;
                 }
 
-                return { title, score };
+                return {
+                    gradeId: Number.isFinite(parsedGradeId) && parsedGradeId > 0 ? parsedGradeId : undefined,
+                    title,
+                    score,
+                    comments,
+                };
             })
             .filter((grade): grade is NonNullable<typeof grade> => grade !== null);
     };

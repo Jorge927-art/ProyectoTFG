@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Upload, FileText, Download, Loader2, AlertCircle, FileUp, Inbox, Send, UserCheck } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
@@ -12,7 +12,7 @@ import {
 import {
     downloadDocumentSecure,
     getProfessorRecipientsByCourse,
-    getReceivedDocumentsByCourse,
+    getUserDocuments,
     getSentDocumentsByCourse,
     markDocumentAsRead,
     uploadProfessorDocument,
@@ -34,6 +34,10 @@ export const ProfessorDocumentManager = ({
     focusDocumentId = null,
     className = '',
 }: ProfessorDocumentManagerProps) => {
+    const filterGeneralDocuments = (documents: DocumentMetadata[]) => (
+        documents.filter((document) => !document.course || typeof document.course.courseId !== 'number')
+    );
+
     const [activeTab, setActiveTab] = useState<'RECEIVED' | 'SENT'>('RECEIVED');
     const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
     const [selectedReceiverId, setSelectedReceiverId] = useState<number | ''>('');
@@ -102,7 +106,7 @@ export const ProfessorDocumentManager = ({
     }, [selectedCourseId]);
 
     useEffect(() => {
-        if (!selectedCourseId) {
+        if (activeTab === 'SENT' && !selectedCourseId) {
             setDocumentList([]);
             return;
         }
@@ -114,8 +118,8 @@ export const ProfessorDocumentManager = ({
             setDocumentError('');
             try {
                 const docs = activeTab === 'RECEIVED'
-                    ? await getReceivedDocumentsByCourse(selectedCourseId)
-                    : await getSentDocumentsByCourse(selectedCourseId);
+                    ? filterGeneralDocuments(await getUserDocuments())
+                    : await getSentDocumentsByCourse(selectedCourseId as number);
 
                 if (!cancelled) {
                     setDocumentList(docs);
@@ -174,14 +178,6 @@ export const ProfessorDocumentManager = ({
         };
     }, []);
 
-    const selectedCourseTitle = useMemo(() => {
-        if (!selectedCourseId) {
-            return 'Sin asignatura seleccionada';
-        }
-
-        return availableCourses.find((course) => course.id === selectedCourseId)?.title ?? 'Asignatura';
-    }, [availableCourses, selectedCourseId]);
-
     const resetUploadState = () => {
         setSelectedFile(null);
         setSelectedReceiverId('');
@@ -225,12 +221,10 @@ export const ProfessorDocumentManager = ({
         try {
             setIsUploading(true);
             setDocumentError('');
-            await uploadProfessorDocument(selectedFile, selectedCourseId, Number(selectedReceiverId));
+            await uploadProfessorDocument(selectedFile, selectedCourseId, Number(selectedReceiverId), 'DOCUMENTO');
             resetUploadState();
 
-            const updated = activeTab === 'RECEIVED'
-                ? await getReceivedDocumentsByCourse(selectedCourseId)
-                : await getSentDocumentsByCourse(selectedCourseId);
+            const updated = await getSentDocumentsByCourse(selectedCourseId);
             setDocumentList(updated);
         } catch (error) {
             console.error('Error al transmitir documento académico desde profesor:', error);
@@ -428,12 +422,6 @@ export const ProfessorDocumentManager = ({
                             label={isUploading ? 'Enviando...' : 'Enviar documento'}
                             className="w-full justify-center gap-2 py-2! text-xs! font-bold! rounded-lg!"
                         />
-                    </div>
-                )}
-
-                {activeTab === 'RECEIVED' && (
-                    <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-2.5 text-[11px] font-semibold text-blue-700 shrink-0">
-                        Mostrando documentos recibidos en {selectedCourseTitle}.
                     </div>
                 )}
 

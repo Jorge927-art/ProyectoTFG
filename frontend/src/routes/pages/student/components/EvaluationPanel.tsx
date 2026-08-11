@@ -50,8 +50,8 @@ export const EvaluationPanel = ({ hasEnrolledCourses = true }: EvaluationPanelPr
     };
 
     return (
-        <GenericCard className="h-full flex flex-col shadow-sm border-slate-200">
-            <div className="flex items-center gap-2 mb-6">
+        <GenericCard className="h-full flex flex-col min-h-0 overflow-hidden shadow-sm border-slate-200">
+            <div className="flex items-center gap-2 mb-5 shrink-0">
                 <div className="bg-blue-50 p-2 rounded-lg">
                     <Star className="text-blue-500 fill-blue-500" size={20} />
                 </div>
@@ -66,7 +66,7 @@ export const EvaluationPanel = ({ hasEnrolledCourses = true }: EvaluationPanelPr
             </div>
 
             {/* CONTENEDOR DE SCROLL [ADR-19][ADR-36] */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1 space-y-4">
                 {loadingPending ? (
                     <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                         <Loader2 className="animate-spin mb-2" size={24} />

@@ -2,7 +2,7 @@ import React from 'react';
 import { Users, FileText, Download, Award, Loader2, AlertCircle, CheckCircle, GraduationCap, MessageSquare, Send } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
-import { useGradingCenter } from './useGradingCenter';
+import { PROFESSOR_FEEDBACK_MAX_LENGTH, useGradingCenter } from './useGradingCenter';
 import { downloadDocumentSecure } from '../../../../services/documentService';
 import type { TaughtCourse } from '../../../../services/userDomains';
 
@@ -27,7 +27,6 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
         students,
         selectedStudent,
         studentDocuments,
-        documentsLoadedFromCourseFallback,
         loadingData,
         loadingDocs,
         isSubmitting,
@@ -59,7 +58,7 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
     const rowRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
 
     React.useEffect(() => {
-        if (!autoFocusDocuments || !courseId || students.length === 0) {
+        if (!autoFocusDocuments || !courseId || students.length === 0 || selectedStudent) {
             return;
         }
 
@@ -71,12 +70,8 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
             return;
         }
 
-        if (selectedStudent?.userId === preferredStudent.userId) {
-            return;
-        }
-
         void handleSelectStudentById(preferredStudent.userId);
-    }, [autoFocusDocuments, courseId, focusStudentUserId, handleSelectStudentById, selectedStudent?.userId, students]);
+    }, [autoFocusDocuments, courseId, focusStudentUserId, handleSelectStudentById, selectedStudent, students]);
 
     React.useEffect(() => {
         if (!autoFocusDocuments || loadingDocs || studentDocuments.length === 0) {
@@ -201,14 +196,14 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
                     Envio y recepcion de trabajos y examenes
                 </h2>
 
-                {!courseId || !selectedStudent ? (
+                {!courseId ? (
                     <div className="border border-dashed border-slate-200 rounded-lg p-4 text-xs text-slate-500 text-center">
-                        Selecciona una asignatura y un alumno para habilitar el envio y la recepcion de documentos.
+                        Selecciona una asignatura para habilitar el envio y la recepcion de documentos.
                     </div>
                 ) : (
                     <div className="space-y-3">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="space-y-1">
+                            <div className="space-y-1 md:col-span-2">
                                 <label htmlFor="professor-doc-upload" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                     Documento (PDF)
                                 </label>
@@ -224,13 +219,13 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
                                 )}
                             </div>
 
-                            <div className="flex items-end">
+                            <div className="flex items-end md:col-span-2">
                                 <GenericButton
                                     type="button"
                                     onClick={() => void handleSendDocument()}
-                                    disabled={!selectedFile || isUploadingDocument}
+                                    disabled={!selectedFile || isUploadingDocument || !selectedStudent}
                                     variant="primary"
-                                    label={isUploadingDocument ? 'Enviando documento...' : 'Enviar al alumno seleccionado'}
+                                    label={isUploadingDocument ? 'Enviando documento...' : 'Enviar documento al alumno seleccionado'}
                                     icon={isUploadingDocument ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                                     className="w-full justify-center text-xs! font-bold! py-2!"
                                 />
@@ -241,11 +236,6 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                 Recepcion de entregas del alumno seleccionado
                             </p>
-                            {documentsLoadedFromCourseFallback && !loadingDocs && (
-                                <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                                    Vista recuperada por verificacion de asignatura para evitar perdida de entregas en datos legacy.
-                                </p>
-                            )}
                             <div className="max-h-36 overflow-y-auto pr-1 bg-white border border-slate-200 rounded-lg p-1.5 space-y-1.5">
                                 {loadingDocs ? (
                                     <div className="flex items-center gap-1.5 justify-center py-2 text-slate-400">
@@ -338,15 +328,19 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
 
                         <div className="space-y-1">
                             <label htmlFor="eval-feedback" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                                <MessageSquare size={12} /> Feedback del profesor
+                                <MessageSquare size={12} /> Aclaracion del profesor
                             </label>
                             <textarea
                                 id="eval-feedback"
                                 placeholder="Introduce la justificacion de la nota..."
                                 value={feedback}
-                                onChange={(e) => setFeedback(e.target.value)}
+                                onChange={(e) => setFeedback(e.target.value.slice(0, PROFESSOR_FEEDBACK_MAX_LENGTH))}
+                                maxLength={PROFESSOR_FEEDBACK_MAX_LENGTH}
                                 className="w-full text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg p-2 focus:outline-none focus:border-blue-400 resize-none min-h-20"
                             />
+                            <p className="text-[10px] text-slate-400 text-right">
+                                {feedback.length}/{PROFESSOR_FEEDBACK_MAX_LENGTH}
+                            </p>
                         </div>
 
                         <GenericButton

@@ -23,6 +23,16 @@ public interface DocumentMetadataRepository extends JpaRepository<DocumentMetada
         List<DocumentMetadata> findReceivedDocumentsByUsername(@Param("username") String username);
 
         /**
+         * Recupera únicamente documentos RECIBIDOS de mensajería general (sin
+         * asignatura asociada), excluyendo entregas o envíos académicos de curso.
+         *
+         * @param username El nombre de usuario del receptor.
+         * @return Lista de documentos recibidos sin curso asociado.
+         */
+        @Query("SELECT d FROM DocumentMetadata d WHERE d.receiver.username = :username AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED AND d.course IS NULL ORDER BY d.documentid DESC")
+        List<DocumentMetadata> findReceivedGeneralDocumentsByUsername(@Param("username") String username);
+
+        /**
          * Recupera los documentos RECIBIDOS por el usuario (alumno) específicos de una
          * asignatura, filtrando estrictamente por FolderType.RECEIVED.
          * 
@@ -45,6 +55,16 @@ public interface DocumentMetadataRepository extends JpaRepository<DocumentMetada
         List<DocumentMetadata> findSentDocumentsByUsername(@Param("username") String username);
 
         /**
+         * Recupera únicamente documentos ENVIADOS de mensajería general (sin
+         * asignatura asociada), excluyendo entregas o envíos académicos de curso.
+         *
+         * @param username El nombre de usuario del emisor.
+         * @return Lista de documentos enviados sin curso asociado.
+         */
+        @Query("SELECT d FROM DocumentMetadata d WHERE d.sender.username = :username AND d.folder_type = com.cursosonline.backend.entities.FolderType.SENT AND d.course IS NULL ORDER BY d.documentid DESC")
+        List<DocumentMetadata> findSentGeneralDocumentsByUsername(@Param("username") String username);
+
+        /**
          * Recupera los documentos ENVIADOS por el usuario (alumno) específicos de una
          * asignatura, filtrando estrictamente por FolderType.SENT.
          * 
@@ -58,9 +78,8 @@ public interface DocumentMetadataRepository extends JpaRepository<DocumentMetada
 
         /**
          * Recupera las entregas RECIBIDAS por un profesor para una matrícula concreta.
-         * Tolera registros legacy sin curso asociado (d.course IS NULL) pero mantiene
-         * aislamiento por profesor receptor para evitar mezclar entregas de otros
-         * flujos.
+         * Se exige contrato estricto de curso: solo documentos vinculados al mismo
+         * curso de la matrícula y al profesor receptor autenticado.
          * 
          * @param enrollmentId       El ID de la matrícula.
          * @param instructorUsername El username del profesor autenticado.
@@ -70,7 +89,7 @@ public interface DocumentMetadataRepository extends JpaRepository<DocumentMetada
                         "WHERE e.enrollmentid = :enrollmentId " +
                         "AND d.receiver.username = :instructorUsername " +
                         "AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED " +
-                        "AND (d.course IS NULL OR e.course = d.course) " +
+                        "AND e.course = d.course " +
                         "ORDER BY d.documentid DESC")
         List<DocumentMetadata> findReceivedDocumentsByEnrollmentIdForInstructor(
                         @Param("enrollmentId") Long enrollmentId,
@@ -84,7 +103,9 @@ public interface DocumentMetadataRepository extends JpaRepository<DocumentMetada
          * @return Lista de documentos no leídos recibidos por el usuario.
          */
         @Query("SELECT d FROM DocumentMetadata d WHERE d.receiver.username = :username " +
-                        "AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED AND d.read = false")
+                        "AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED AND d.read = false "
+                        +
+                        "ORDER BY d.documentid DESC")
         List<DocumentMetadata> findUnreadReceivedDocumentsByUsername(@Param("username") String username);
 
         /**

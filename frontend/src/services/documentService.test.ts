@@ -194,6 +194,7 @@ describe('documentService - Suite de Pruebas Unitarias de Alta Fidelidad', () =>
         expect(url).toBe('/api/v1/documents/professor-upload');
         expect(formData.get('courseId')).toBe('202');
         expect(formData.get('receiverId')).toBe('0');
+        expect(formData.get('deliveryType')).toBe('DOCUMENTO');
     });
 
     it('debe transmitir un documento administrativo al grupo de alumnos de un curso', async () => {
