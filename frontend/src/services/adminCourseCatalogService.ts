@@ -30,7 +30,6 @@ export interface AdminCourseCreatePayload {
     language?: string | null;
     subtitleLanguages?: string | null;
     skills?: string | null;
-    instructors?: string | null;
     rating?: number | null;
     numOfViewers?: number | null;
     duration?: number | null;

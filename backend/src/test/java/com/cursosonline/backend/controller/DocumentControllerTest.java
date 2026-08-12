@@ -520,6 +520,52 @@ public class DocumentControllerTest {
         }
 
         @Test
+        @DisplayName("Debe ocultar lógicamente documentos generales recibidos del usuario autenticado")
+        void debeOcultarDocumentosGeneralesRecibidos() {
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("luis_student");
+                Mockito.when(documentMetadataRepository.hideAllReceivedGeneralDocumentsByUsername("luis_student"))
+                                .thenReturn(3);
+
+                ResponseEntity<?> response = documentController.hideAllReceivedGeneralDocuments(authentication);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                Map<?, ?> body = (Map<?, ?>) response.getBody();
+                assertNotNull(body);
+                assertEquals(3, body.get("hiddenCount"));
+                Mockito.verify(documentMetadataRepository, Mockito.times(1))
+                                .hideAllReceivedGeneralDocumentsByUsername("luis_student");
+        }
+
+        @Test
+        @DisplayName("Debe ocultar lógicamente documentos generales enviados del usuario autenticado")
+        void debeOcultarDocumentosGeneralesEnviados() {
+                Mockito.when(authentication.isAuthenticated()).thenReturn(true);
+                Mockito.when(authentication.getName()).thenReturn("luis_student");
+                Mockito.when(documentMetadataRepository.hideAllSentGeneralDocumentsByUsername("luis_student"))
+                                .thenReturn(4);
+
+                ResponseEntity<?> response = documentController.hideAllSentGeneralDocuments(authentication);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                Map<?, ?> body = (Map<?, ?>) response.getBody();
+                assertNotNull(body);
+                assertEquals(4, body.get("hiddenCount"));
+                Mockito.verify(documentMetadataRepository, Mockito.times(1))
+                                .hideAllSentGeneralDocumentsByUsername("luis_student");
+        }
+
+        @Test
+        @DisplayName("Debe devolver 401 si se intenta limpiar bandejas sin autenticación")
+        void debeRechazarOcultacionSinAutenticacion() {
+                ResponseEntity<?> receivedResponse = documentController.hideAllReceivedGeneralDocuments(null);
+                ResponseEntity<?> sentResponse = documentController.hideAllSentGeneralDocuments(null);
+
+                assertEquals(HttpStatus.UNAUTHORIZED, receivedResponse.getStatusCode());
+                assertEquals(HttpStatus.UNAUTHORIZED, sentResponse.getStatusCode());
+        }
+
+        @Test
         @DisplayName("Debe devolver 500 controlado si el repositorio falla al recuperar el directorio administrativo")
         void debeDevolverErrorControladoSiElRepositorioFalla() {
                 Mockito.when(authentication.isAuthenticated()).thenReturn(true);

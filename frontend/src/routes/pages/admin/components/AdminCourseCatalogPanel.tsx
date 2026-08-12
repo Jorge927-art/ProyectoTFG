@@ -12,7 +12,7 @@ import {
 } from '../../../../services/adminCourseCatalogService';
 import { COURSE_CATEGORIES } from '../../../../shared/courseCategories';
 import { COURSE_DIFFICULTY_LEVELS } from '../../../../shared/courseDifficultyLevels';
-import { getSubtitleLanguagesDisplay, NO_SUBTITLES_TEXT } from '../../../../shared/subtitleLanguages';
+import { NO_SUBTITLES_TEXT } from '../../../../shared/subtitleLanguages';
 
 type EditableCourseDraft = {
     url: string;
@@ -23,9 +23,6 @@ type EditableCourseDraft = {
     language: string;
     subtitleLanguages: string;
     skills: string;
-    instructors: string;
-    rating: string;
-    numOfViewers: string;
     duration: string;
 };
 
@@ -36,7 +33,6 @@ type CatalogSelectFieldProps = {
     placeholder: string;
     onSelect: (value: string) => void;
     disabled?: boolean;
-    onCommit?: (value: string) => void;
 };
 
 const EMPTY_DRAFT: EditableCourseDraft = {
@@ -48,9 +44,6 @@ const EMPTY_DRAFT: EditableCourseDraft = {
     language: '',
     subtitleLanguages: '',
     skills: '',
-    instructors: '',
-    rating: '',
-    numOfViewers: '',
     duration: '',
 };
 
@@ -100,9 +93,6 @@ const toDraft = (course: AdminCourseCatalogItem): EditableCourseDraft => ({
     language: course.language ?? '',
     subtitleLanguages: course.subtitleLanguages ?? '',
     skills: course.skills ?? '',
-    instructors: course.instructors ?? '',
-    rating: course.rating == null ? '' : String(course.rating),
-    numOfViewers: course.numOfViewers == null ? '' : String(course.numOfViewers),
     duration: course.duration == null ? '' : String(course.duration),
 });
 
@@ -121,7 +111,6 @@ const CatalogSelectField = ({
     placeholder,
     onSelect,
     disabled = false,
-    onCommit,
 }: CatalogSelectFieldProps) => (
     <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
         {label}
@@ -131,9 +120,6 @@ const CatalogSelectField = ({
             onChange={(event) => {
                 const selectedValue = event.target.value;
                 onSelect(selectedValue);
-                if (onCommit) {
-                    onCommit(selectedValue);
-                }
             }}
             disabled={disabled}
             required
@@ -153,6 +139,7 @@ const CatalogSelectField = ({
 export const AdminCourseCatalogPanel = () => {
     const [courses, setCourses] = useState<AdminCourseCatalogItem[]>([]);
     const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+    const [modificationKeyword, setModificationKeyword] = useState('');
     const [draft, setDraft] = useState<EditableCourseDraft>(EMPTY_DRAFT);
     const [createForm, setCreateForm] = useState({
         title: '',
@@ -164,14 +151,11 @@ export const AdminCourseCatalogPanel = () => {
         language: '',
         subtitleLanguages: '',
         skills: '',
-        instructors: '',
-        rating: '',
-        numOfViewers: '',
         duration: '',
     });
 
     const [loading, setLoading] = useState(false);
-    const [savingField, setSavingField] = useState<string | null>(null);
+    const [savingChanges, setSavingChanges] = useState(false);
     const [creating, setCreating] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState('');
@@ -182,6 +166,17 @@ export const AdminCourseCatalogPanel = () => {
         () => courses.find((course) => course.courseId === selectedCourseId) ?? null,
         [courses, selectedCourseId]
     );
+    const modificationSuggestions = useMemo(() => {
+        const normalized = modificationKeyword.trim().toLocaleLowerCase();
+        if (normalized.length < 1) {
+            return [] as AdminCourseCatalogItem[];
+        }
+
+        return courses.filter((course) =>
+            getCourseDisplayName(course).toLocaleLowerCase().startsWith(normalized)
+        );
+    }, [courses, modificationKeyword]);
+    const isCourseModificationBlocked = Boolean(selectedCourse?.used);
 
     const loadCatalog = useCallback(async () => {
         setLoading(true);
@@ -191,6 +186,7 @@ export const AdminCourseCatalogPanel = () => {
             setCourses(data);
             if (!data.length) {
                 setSelectedCourseId(null);
+                setModificationKeyword('');
                 setDraft(EMPTY_DRAFT);
                 return;
             }
@@ -239,9 +235,6 @@ export const AdminCourseCatalogPanel = () => {
         language: toNullableString(createForm.language),
         subtitleLanguages: normalizeSubtitleLanguagesInput(createForm.subtitleLanguages),
         skills: toNullableString(createForm.skills),
-        instructors: toNullableString(createForm.instructors),
-        rating: toNullableNumber(createForm.rating),
-        numOfViewers: toNullableNumber(createForm.numOfViewers),
         duration: toNullableNumber(createForm.duration),
     });
 
@@ -300,9 +293,6 @@ export const AdminCourseCatalogPanel = () => {
                 language: '',
                 subtitleLanguages: '',
                 skills: '',
-                instructors: '',
-                rating: '',
-                numOfViewers: '',
                 duration: '',
             });
             setSuccessMessage('Curso creado correctamente.');
@@ -319,106 +309,109 @@ export const AdminCourseCatalogPanel = () => {
         setSuccessMessage('');
     };
 
+    const handleSelectCourseFromSearch = (course: AdminCourseCatalogItem) => {
+        setModificationKeyword(getCourseDisplayName(course));
+        handleSelectCourse(course.courseId);
+    };
+
     const updateDraftField = (field: keyof EditableCourseDraft, value: string) => {
         setDraft((prev) => ({ ...prev, [field]: value }));
     };
 
-    const resolveMissingRequiredFieldError = (field: keyof EditableCourseDraft): string => {
-        const draftCategory = field === 'category' ? draft.category.trim() : draft.category.trim();
-        const draftCourseType = field === 'courseType' ? draft.courseType.trim() : draft.courseType.trim();
-        const draftLanguage = field === 'language' ? draft.language.trim() : draft.language.trim();
+    const resolveMissingRequiredFieldError = (): string => {
+        const draftCategory = draft.category.trim();
+        const draftCourseType = draft.courseType.trim();
+        const draftLanguage = draft.language.trim();
 
-        if (field !== 'category' && !selectedCourse?.category?.trim() && !draftCategory) {
+        if (!selectedCourse?.category?.trim() && !draftCategory) {
             return 'La categoría es obligatoria.';
         }
 
-        if (field !== 'courseType' && !selectedCourse?.courseType?.trim() && !draftCourseType) {
+        if (!selectedCourse?.courseType?.trim() && !draftCourseType) {
             return 'El nivel de dificultad es obligatorio.';
         }
 
-        if (field !== 'language' && !selectedCourse?.language?.trim() && !draftLanguage) {
+        if (!selectedCourse?.language?.trim() && !draftLanguage) {
             return LANGUAGE_ERROR_MESSAGE;
         }
 
-        if (field === 'language' && !draftLanguage) {
+        if (!draftLanguage) {
             return LANGUAGE_ERROR_MESSAGE;
         }
 
-        if (field !== 'duration') {
-            const hasPersistedPositiveDuration = selectedCourse?.duration != null && selectedCourse.duration > 0;
-            if (!hasPersistedPositiveDuration) {
-                const durationError = getPositiveDurationError(draft.duration);
-                if (durationError) {
-                    return durationError;
-                }
+        const hasPersistedPositiveDuration = selectedCourse?.duration != null && selectedCourse.duration > 0;
+        if (!hasPersistedPositiveDuration || draft.duration.trim().length > 0) {
+            const durationError = getPositiveDurationError(draft.duration);
+            if (durationError) {
+                return durationError;
             }
         }
 
         return '';
     };
 
-    const commitField = async (field: keyof EditableCourseDraft, explicitValue?: string) => {
+    const handleSaveChanges = async () => {
         if (!selectedCourse) {
             return;
         }
 
-        const missingFieldError = resolveMissingRequiredFieldError(field);
+        if (isCourseModificationBlocked) {
+            setError('Curso activo.');
+            setSuccessMessage('');
+            return;
+        }
+
+        const missingFieldError = resolveMissingRequiredFieldError();
         if (missingFieldError) {
             setError(missingFieldError);
             return;
         }
 
-        const currentValue = explicitValue ?? draft[field];
+        const normalizedPayload: Record<string, string | number | null> = {
+            url: toNullableString(draft.url),
+            shortIntro: toNullableString(draft.shortIntro),
+            category: toNullableString(draft.category),
+            subCategory: toNullableString(draft.subCategory),
+            courseType: toNullableString(draft.courseType),
+            language: toNullableString(draft.language),
+            subtitleLanguages: normalizeSubtitleLanguagesInput(draft.subtitleLanguages),
+            skills: toNullableString(draft.skills),
+            duration: toNullableNumber(draft.duration),
+        };
 
-        if (field === 'duration') {
-            const durationError = getPositiveDurationError(currentValue);
-            if (durationError) {
-                setError(durationError);
-                return;
-            }
-        }
+        const changedFields = Object.entries(normalizedPayload).reduce<Record<string, string | number | null>>(
+            (acc, [field, value]) => {
+                const previousValue = selectedCourse[field as keyof AdminCourseCatalogItem] as string | number | null;
+                if ((value ?? null) !== (previousValue ?? null)) {
+                    acc[field] = value;
+                }
+                return acc;
+            },
+            {}
+        );
 
-        let hasChanged = false;
-        let payloadValue: string | number | null = null;
-
-        if (field === 'rating' || field === 'numOfViewers' || field === 'duration') {
-            const parsed = toNullableNumber(currentValue);
-            const previousNumeric = field === 'rating'
-                ? selectedCourse.rating
-                : field === 'numOfViewers'
-                    ? selectedCourse.numOfViewers
-                    : selectedCourse.duration;
-
-            hasChanged = (parsed ?? null) !== (previousNumeric ?? null);
-            payloadValue = parsed;
-        } else {
-            const normalized = field === 'subtitleLanguages'
-                ? normalizeSubtitleLanguagesInput(currentValue)
-                : toNullableString(currentValue);
-            const previousValue = selectedCourse[field] as string | null;
-            hasChanged = (normalized ?? null) !== (previousValue ?? null);
-            payloadValue = normalized;
-        }
-
-        if (!hasChanged) {
+        if (Object.keys(changedFields).length === 0) {
+            setSuccessMessage('No hay cambios para guardar.');
+            setError('');
             return;
         }
 
-        setSavingField(field);
+        setSavingChanges(true);
         setError('');
         setSuccessMessage('');
 
         try {
-            const updated = await patchAdminCourse(selectedCourse.courseId, { [field]: payloadValue });
+            const updated = await patchAdminCourse(selectedCourse.courseId, changedFields);
             setCourses((prev) => prev.map((course) => (course.courseId === updated.courseId ? updated : course)));
-            setSuccessMessage('Campo actualizado correctamente.');
+            setDraft(toDraft(updated));
+            setSuccessMessage('Cambios guardados');
         } catch (err) {
             setError(resolveAdminCourseCatalogError(err));
             if (selectedCourse) {
                 setDraft(toDraft(selectedCourse));
             }
         } finally {
-            setSavingField(null);
+            setSavingChanges(false);
         }
     };
 
@@ -456,8 +449,6 @@ export const AdminCourseCatalogPanel = () => {
         }
     };
 
-    const isNumericBlocked = Boolean(selectedCourse?.used);
-
     return (
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-6 w-full">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
@@ -477,7 +468,7 @@ export const AdminCourseCatalogPanel = () => {
                     type="button"
                     variant="text"
                     onClick={() => void loadCatalog()}
-                    disabled={loading || creating || deleting || savingField !== null}
+                    disabled={loading || creating || deleting || savingChanges}
                     icon={loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                     label="Actualizar"
                     className="text-xs! font-bold! text-slate-600!"
@@ -535,9 +526,6 @@ export const AdminCourseCatalogPanel = () => {
                     <CourseTextField label="Idioma (obligatorio)" value={createForm.language} onChange={(value) => handleCreateInputChange('language', value)} />
                     <CourseTextField label="Idiomas de subtítulos (si no hay, se guarda 'Sin subtítulos')" value={createForm.subtitleLanguages} onChange={(value) => handleCreateInputChange('subtitleLanguages', value)} />
                     <CourseTextAreaField label="Habilidades" value={createForm.skills} onChange={(value) => handleCreateInputChange('skills', value)} rows={2} />
-                    <CourseTextField label="Instructor" value={createForm.instructors} onChange={(value) => handleCreateInputChange('instructors', value)} />
-                    <CourseTextField label="Valoración" value={createForm.rating} onChange={(value) => handleCreateInputChange('rating', value)} inputMode="decimal" />
-                    <CourseTextField label="Número de visualizaciones" value={createForm.numOfViewers} onChange={(value) => handleCreateInputChange('numOfViewers', value)} inputMode="numeric" />
                     <CourseTextField label="Duración (horas, > 0)" value={createForm.duration} onChange={(value) => handleCreateInputChange('duration', value)} inputMode="decimal" />
 
                     <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
@@ -567,32 +555,46 @@ export const AdminCourseCatalogPanel = () => {
 
                     <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
                         Curso a modificar
-                        <select
+                        <input
                             className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
-                            value={selectedCourseId ?? ''}
-                            onChange={(e) => handleSelectCourse(Number(e.target.value))}
+                            type="text"
+                            value={modificationKeyword}
+                            onChange={(e) => {
+                                setModificationKeyword(e.target.value);
+                                setError('');
+                                setSuccessMessage('');
+                            }}
+                            placeholder="Escribe el inicio del curso..."
                             disabled={loading || courses.length === 0}
-                        >
-                            {courses.length === 0 && <option value="">Sin cursos cargados</option>}
-                            {courses.map((course) => (
-                                <option key={course.courseId} value={course.courseId}>
-                                    {getCourseDisplayName(course)}
-                                </option>
-                            ))}
-                        </select>
+                        />
                     </label>
+
+                    {!loading && modificationKeyword.trim().length >= 1 && (
+                        <div className="max-h-52 overflow-y-auto pr-1 space-y-1.5">
+                            {modificationSuggestions.map((course) => (
+                                <button
+                                    key={course.courseId}
+                                    type="button"
+                                    onClick={() => handleSelectCourseFromSearch(course)}
+                                    className={`w-full text-left p-2.5 rounded-lg border transition-colors ${selectedCourseId === course.courseId
+                                        ? 'bg-indigo-50 border-indigo-200'
+                                        : 'bg-slate-50 border-slate-100 hover:bg-indigo-50'
+                                        }`}
+                                >
+                                    <p className="text-sm font-bold text-slate-700">{getCourseDisplayName(course)}</p>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {!loading && modificationKeyword.trim().length >= 1 && modificationSuggestions.length === 0 && (
+                        <p className="text-[11px] text-slate-400 italic">
+                            No hay cursos cuyo nombre comience por "{modificationKeyword.trim()}".
+                        </p>
+                    )}
 
                     {selectedCourse && (
                         <>
-                            <div className="text-[11px] text-slate-600 bg-white border border-slate-200 rounded-lg px-2.5 py-2">
-                                <p>
-                                    Curso seleccionado: <span className="font-semibold text-slate-800">{getCourseDisplayName(selectedCourse)}</span>
-                                </p>
-                                <p className="mt-1">
-                                    Subtítulos actuales: <span className="font-semibold text-slate-800">{getSubtitleLanguagesDisplay(selectedCourse.subtitleLanguages)}</span>
-                                </p>
-                            </div>
-
                             {!selectedCourse.category?.trim() && (
                                 <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2">
                                     Este curso todavía no tiene categoría. Debes seleccionar una antes de guardar cambios.
@@ -623,11 +625,12 @@ export const AdminCourseCatalogPanel = () => {
                                 </div>
                             )}
 
-                            {isNumericBlocked && (
+                            {isCourseModificationBlocked && (
                                 <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2">
-                                    Este curso ya está en uso y no permite editar Valoración ni Número de visualizaciones.
+                                    Este curso está activo o tiene uso histórico. No se permite modificar ningún campo.
                                 </div>
                             )}
+
                         </>
                     )}
 
@@ -635,16 +638,14 @@ export const AdminCourseCatalogPanel = () => {
                         label="URL"
                         value={draft.url}
                         onChange={(value) => updateDraftField('url', value)}
-                        onBlur={() => void commitField('url')}
-                        disabled={!selectedCourse || savingField !== null}
+                        disabled={!selectedCourse || savingChanges || isCourseModificationBlocked}
                     />
                     <CourseTextAreaField
                         label="Introducción breve"
                         value={draft.shortIntro}
                         onChange={(value) => updateDraftField('shortIntro', value)}
-                        onBlur={() => void commitField('shortIntro')}
                         rows={2}
-                        disabled={!selectedCourse || savingField !== null}
+                        disabled={!selectedCourse || savingChanges || isCourseModificationBlocked}
                     />
                     <CatalogSelectField
                         label="Categoría (obligatoria)"
@@ -652,15 +653,13 @@ export const AdminCourseCatalogPanel = () => {
                         options={COURSE_CATEGORIES}
                         placeholder={CATEGORY_PLACEHOLDER}
                         onSelect={(value) => updateDraftField('category', value)}
-                        onCommit={(value) => void commitField('category', value)}
-                        disabled={!selectedCourse || savingField !== null}
+                        disabled={!selectedCourse || savingChanges || isCourseModificationBlocked}
                     />
                     <CourseTextField
                         label="Subcategoría"
                         value={draft.subCategory}
                         onChange={(value) => updateDraftField('subCategory', value)}
-                        onBlur={() => void commitField('subCategory')}
-                        disabled={!selectedCourse || savingField !== null}
+                        disabled={!selectedCourse || savingChanges || isCourseModificationBlocked}
                     />
                     <CatalogSelectField
                         label="Nivel de dificultad (obligatorio)"
@@ -668,61 +667,33 @@ export const AdminCourseCatalogPanel = () => {
                         options={COURSE_DIFFICULTY_LEVELS}
                         placeholder={LEVEL_PLACEHOLDER}
                         onSelect={(value) => updateDraftField('courseType', value)}
-                        onCommit={(value) => void commitField('courseType', value)}
-                        disabled={!selectedCourse || savingField !== null}
+                        disabled={!selectedCourse || savingChanges || isCourseModificationBlocked}
                     />
                     <CourseTextField
                         label="Idioma (obligatorio)"
                         value={draft.language}
                         onChange={(value) => updateDraftField('language', value)}
-                        onBlur={() => void commitField('language')}
-                        disabled={!selectedCourse || savingField !== null}
+                        disabled={!selectedCourse || savingChanges || isCourseModificationBlocked}
                     />
                     <CourseTextField
                         label="Idiomas de subtítulos (si no hay, se guarda 'Sin subtítulos')"
                         value={draft.subtitleLanguages}
                         onChange={(value) => updateDraftField('subtitleLanguages', value)}
-                        onBlur={() => void commitField('subtitleLanguages')}
-                        disabled={!selectedCourse || savingField !== null}
+                        disabled={!selectedCourse || savingChanges || isCourseModificationBlocked}
                     />
                     <CourseTextAreaField
                         label="Habilidades"
                         value={draft.skills}
                         onChange={(value) => updateDraftField('skills', value)}
-                        onBlur={() => void commitField('skills')}
                         rows={2}
-                        disabled={!selectedCourse || savingField !== null}
-                    />
-                    <CourseTextField
-                        label="Instructor"
-                        value={draft.instructors}
-                        onChange={(value) => updateDraftField('instructors', value)}
-                        onBlur={() => void commitField('instructors')}
-                        disabled={!selectedCourse || savingField !== null}
+                        disabled={!selectedCourse || savingChanges || isCourseModificationBlocked}
                     />
 
-                    <CourseTextField
-                        label="Valoración"
-                        value={draft.rating}
-                        onChange={(value) => updateDraftField('rating', value)}
-                        onBlur={() => void commitField('rating')}
-                        disabled={!selectedCourse || savingField !== null || isNumericBlocked}
-                        inputMode="decimal"
-                    />
-                    <CourseTextField
-                        label="Número de visualizaciones"
-                        value={draft.numOfViewers}
-                        onChange={(value) => updateDraftField('numOfViewers', value)}
-                        onBlur={() => void commitField('numOfViewers')}
-                        disabled={!selectedCourse || savingField !== null || isNumericBlocked}
-                        inputMode="numeric"
-                    />
                     <CourseTextField
                         label="Duración (horas, > 0)"
                         value={draft.duration}
                         onChange={(value) => updateDraftField('duration', value)}
-                        onBlur={() => void commitField('duration')}
-                        disabled={!selectedCourse || savingField !== null}
+                        disabled={!selectedCourse || savingChanges || isCourseModificationBlocked}
                         inputMode="decimal"
                     />
 
@@ -738,10 +709,22 @@ export const AdminCourseCatalogPanel = () => {
                     <div className="pt-1">
                         <GenericButton
                             type="button"
+                            variant="primary"
+                            label={savingChanges ? 'Guardando...' : 'Guardar cambios'}
+                            icon={savingChanges ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
+                            disabled={!selectedCourse || deleting || loading || savingChanges || isCourseModificationBlocked}
+                            onClick={() => void handleSaveChanges()}
+                            className="text-xs! font-bold!"
+                        />
+                    </div>
+
+                    <div className="pt-1">
+                        <GenericButton
+                            type="button"
                             variant="dark"
                             label={deleting ? 'Eliminando...' : 'Borrado físico'}
                             icon={deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                            disabled={!selectedCourse || deleting || loading}
+                            disabled={!selectedCourse || deleting || loading || savingChanges}
                             onClick={() => void handleDeleteCourse()}
                             className="text-xs! font-bold!"
                         />

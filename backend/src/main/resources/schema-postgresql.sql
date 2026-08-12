@@ -118,6 +118,35 @@ WHERE c.assigned_user_id IS NOT NULL
         WHERE e.course_id = c.course_id
    );
 
+-- -----------------------------------------------------------------------------
+-- Borrado lógico de bandejas de documentos (sin hard delete)
+-- -----------------------------------------------------------------------------
+ALTER TABLE IF EXISTS document_metadata
+    ADD COLUMN IF NOT EXISTS hidden_for_sender BOOLEAN;
+
+ALTER TABLE IF EXISTS document_metadata
+    ADD COLUMN IF NOT EXISTS hidden_for_receiver BOOLEAN;
+
+UPDATE document_metadata
+SET hidden_for_sender = false
+WHERE hidden_for_sender IS NULL;
+
+UPDATE document_metadata
+SET hidden_for_receiver = false
+WHERE hidden_for_receiver IS NULL;
+
+ALTER TABLE IF EXISTS document_metadata
+    ALTER COLUMN hidden_for_sender SET DEFAULT false;
+
+ALTER TABLE IF EXISTS document_metadata
+    ALTER COLUMN hidden_for_receiver SET DEFAULT false;
+
+ALTER TABLE IF EXISTS document_metadata
+    ALTER COLUMN hidden_for_sender SET NOT NULL;
+
+ALTER TABLE IF EXISTS document_metadata
+    ALTER COLUMN hidden_for_receiver SET NOT NULL;
+
 ALTER TABLE IF EXISTS courses
     ALTER COLUMN ever_used SET DEFAULT false;
 

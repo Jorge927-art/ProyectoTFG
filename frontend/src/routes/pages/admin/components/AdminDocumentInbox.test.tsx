@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { AdminDocumentInbox } from './AdminDocumentInbox';
 import * as documentService from '../../../../services/documentService';
 import type { DocumentMetadata } from '../../../../services/documentService';
@@ -11,6 +11,8 @@ vi.mock('../../../../services/documentService', () => ({
     getAdminDocumentCourses: vi.fn(),
     getSentDocuments: vi.fn(),
     getUserDocuments: vi.fn(),
+    hideAllReceivedGeneralDocuments: vi.fn(),
+    hideAllSentGeneralDocuments: vi.fn(),
     downloadDocumentSecure: vi.fn(),
     markDocumentAsRead: vi.fn(),
     uploadStudentDocument: vi.fn(),
@@ -38,6 +40,7 @@ describe('AdminDocumentInbox', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.spyOn(window, 'confirm').mockReturnValue(true);
         Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
             configurable: true,
             value: scrollIntoViewSpy,
@@ -165,6 +168,60 @@ describe('AdminDocumentInbox', () => {
         });
     });
 
+    it('limpia lógicamente la bandeja de entrada del admin', async () => {
+        vi.mocked(documentService.getUserDocuments).mockResolvedValue([docUnread]);
+        vi.mocked(documentService.getSentDocuments).mockResolvedValue([]);
+        vi.mocked(documentService.hideAllReceivedGeneralDocuments).mockResolvedValue({
+            message: 'ok',
+            hiddenCount: 1,
+        });
+
+        render(<AdminDocumentInbox />);
+
+        await waitFor(() => {
+            expect(screen.getByText('evaluacion.pdf')).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Limpiar bandeja de entrada' }));
+
+        await waitFor(() => {
+            expect(documentService.hideAllReceivedGeneralDocuments).toHaveBeenCalledTimes(1);
+            expect(mockEmitNotificationsRefresh).toHaveBeenCalledTimes(1);
+            expect(screen.getByText(/Bandeja de entrada limpiada/i)).toBeInTheDocument();
+        });
+    });
+
+    it('limpia lógicamente la bandeja de salida del admin', async () => {
+        const sentDoc: DocumentMetadata = {
+            ...docUnread,
+            documentid: 120,
+            originalname: 'circular.pdf',
+            folder_type: 'SENT',
+            isRead: true,
+            receiver: { userId: 12, username: 'laura_student', email: 'laura@tfg.com', role: 'STUDENT' },
+        };
+
+        vi.mocked(documentService.getUserDocuments).mockResolvedValue([]);
+        vi.mocked(documentService.getSentDocuments).mockResolvedValue([sentDoc]);
+        vi.mocked(documentService.hideAllSentGeneralDocuments).mockResolvedValue({
+            message: 'ok',
+            hiddenCount: 1,
+        });
+
+        render(<AdminDocumentInbox />);
+
+        await waitFor(() => {
+            expect(screen.getByText('circular.pdf')).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Limpiar bandeja de salida' }));
+
+        await waitFor(() => {
+            expect(documentService.hideAllSentGeneralDocuments).toHaveBeenCalledTimes(1);
+            expect(screen.getByText(/Bandeja de salida limpiada/i)).toBeInTheDocument();
+        });
+    });
+
     it('si no hay documentos muestra estado vacío', async () => {
         vi.mocked(documentService.getUserDocuments).mockResolvedValue([]);
 
@@ -205,7 +262,8 @@ describe('AdminDocumentInbox', () => {
 
         await waitFor(() => {
             expect(screen.getByLabelText('Seleccionar usuario destinatario')).toBeInTheDocument();
-            expect(screen.getByRole('option', { name: 'laura (STUDENT)' })).toBeInTheDocument();
+            const recipientSelect = screen.getByLabelText('Seleccionar usuario destinatario');
+            expect(within(recipientSelect).getByRole('option', { name: 'laura (STUDENT)' })).toBeInTheDocument();
         });
 
         fireEvent.change(screen.getByLabelText('Seleccionar usuario destinatario'), {
@@ -254,6 +312,48 @@ describe('AdminDocumentInbox', () => {
         await waitFor(() => {
             expect(documentService.uploadAdminDocumentToCourse).toHaveBeenCalledWith(sentFile, 101);
             expect(screen.getByText('Documento transmitido con éxito al grupo de alumnos de la asignatura')).toBeInTheDocument();
+        });
+    });
+
+    it('ordena destinatarios por rol y dentro del rol por orden alfabético en español', async () => {
+        vi.mocked(documentService.getUserDocuments).mockResolvedValue([]);
+        vi.mocked(documentService.getAdminDocumentRecipients).mockResolvedValue([
+            { userId: 31, username: 'zoe_admin', role: 'ADMIN', enabled: true },
+            { userId: 32, username: 'Álvaro_admin', role: 'ADMIN', enabled: true },
+            { userId: 11, username: 'zeta_prof', role: 'PROFESSOR', enabled: true },
+            { userId: 12, username: 'andres_prof', role: 'PROFESSOR', enabled: true },
+            { userId: 21, username: 'Óscar_student', role: 'STUDENT', enabled: true },
+            { userId: 22, username: 'beatriz_student', role: 'STUDENT', enabled: true },
+        ]);
+
+        render(<AdminDocumentInbox />);
+
+        const expectedOrder = [
+            'Álvaro_admin (ADMIN)',
+            'zoe_admin (ADMIN)',
+            'andres_prof (PROFESSOR)',
+            'zeta_prof (PROFESSOR)',
+            'beatriz_student (STUDENT)',
+            'Óscar_student (STUDENT)',
+        ];
+
+        await waitFor(() => {
+            const userSendSelectOptions = screen
+                .getByLabelText('Seleccionar usuario destinatario')
+                .querySelectorAll('option');
+            const sentFilterSelectOptions = screen
+                .getByLabelText('Filtrar enviados por destinatario')
+                .querySelectorAll('option');
+
+            const userSendOptionLabels = Array.from(userSendSelectOptions)
+                .map((option) => option.textContent?.trim() ?? '')
+                .slice(1);
+            const sentFilterOptionLabels = Array.from(sentFilterSelectOptions)
+                .map((option) => option.textContent?.trim() ?? '')
+                .slice(1);
+
+            expect(userSendOptionLabels).toEqual(expectedOrder);
+            expect(sentFilterOptionLabels).toEqual(expectedOrder);
         });
     });
 });

@@ -5,6 +5,8 @@ import {
     downloadDocumentSecure,
     getAdminDocumentCourses,
     getAdminDocumentRecipients,
+    hideAllReceivedGeneralDocuments,
+    hideAllSentGeneralDocuments,
     getSentDocuments,
     getUserDocuments,
     markDocumentAsRead,
@@ -21,6 +23,29 @@ interface AdminDocumentInboxProps {
     autoFocusUnread?: boolean;
 }
 
+const rolePriority: Record<string, number> = {
+    ADMIN: 0,
+    PROFESSOR: 1,
+    STUDENT: 2,
+};
+
+const spanishUserCollator = new Intl.Collator('es', {
+    usage: 'sort',
+    sensitivity: 'base',
+    ignorePunctuation: true,
+});
+
+const sortRecipientsByRoleAndUsername = (users: AdminDocumentRecipient[]): AdminDocumentRecipient[] => (
+    [...users].sort((left, right) => {
+        const leftRolePriority = rolePriority[left.role] ?? Number.MAX_SAFE_INTEGER;
+        const rightRolePriority = rolePriority[right.role] ?? Number.MAX_SAFE_INTEGER;
+        if (leftRolePriority !== rightRolePriority) {
+            return leftRolePriority - rightRolePriority;
+        }
+        return spanishUserCollator.compare(left.username, right.username);
+    })
+);
+
 export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInboxProps) => {
     const [documents, setDocuments] = useState<DocumentMetadata[]>([]);
     const [sentDocuments, setSentDocuments] = useState<DocumentMetadata[]>([]);
@@ -33,6 +58,7 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
     const [selectedRecipientFile, setSelectedRecipientFile] = useState<File | null>(null);
     const [selectedCourseFile, setSelectedCourseFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
+    const [clearingTray, setClearingTray] = useState<'received' | 'sent' | null>(null);
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
@@ -69,9 +95,7 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                 getAdminDocumentCourses(),
             ]);
 
-            setRecipients(
-                recipientData.filter((user) => user.enabled)
-            );
+            setRecipients(sortRecipientsByRoleAndUsername(recipientData.filter((user) => user.enabled)));
             setCourses(courseData);
         } catch {
             setError('No se pudo preparar el formulario de envío de documentos del administrador.');
@@ -199,6 +223,51 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
             setSuccessMessage('');
         } finally {
             setSendingTarget(null);
+        }
+    };
+
+    const handleClearReceivedTray = async () => {
+        const confirmed = window.confirm(
+            '¿Deseas limpiar la bandeja de entrada?\n\nEsta acción oculta los documentos para tu usuario y no elimina datos en base de datos.'
+        );
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            setClearingTray('received');
+            setError('');
+            setSuccessMessage('');
+            const result = await hideAllReceivedGeneralDocuments();
+            await loadDocuments();
+            emitNotificationsRefresh();
+            setSuccessMessage(`Bandeja de entrada limpiada (${result.hiddenCount} documentos ocultados).`);
+        } catch {
+            setError('No se pudo limpiar la bandeja de entrada.');
+        } finally {
+            setClearingTray(null);
+        }
+    };
+
+    const handleClearSentTray = async () => {
+        const confirmed = window.confirm(
+            '¿Deseas limpiar la bandeja de salida?\n\nEsta acción oculta los documentos para tu usuario y no elimina datos en base de datos.'
+        );
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            setClearingTray('sent');
+            setError('');
+            setSuccessMessage('');
+            const result = await hideAllSentGeneralDocuments();
+            await loadDocuments();
+            setSuccessMessage(`Bandeja de salida limpiada (${result.hiddenCount} documentos ocultados).`);
+        } catch {
+            setError('No se pudo limpiar la bandeja de salida.');
+        } finally {
+            setClearingTray(null);
         }
     };
 
@@ -359,6 +428,18 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                     </span>
                 </div>
 
+                <div className="mb-3">
+                    <GenericButton
+                        type="button"
+                        variant="text"
+                        onClick={() => void handleClearReceivedTray()}
+                        disabled={loading || documents.length === 0 || clearingTray !== null}
+                        icon={clearingTray === 'received' ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                        label={clearingTray === 'received' ? 'Limpiando...' : 'Limpiar bandeja de entrada'}
+                        className="text-xs! font-bold! text-slate-600!"
+                    />
+                </div>
+
                 <div className="max-h-80 overflow-y-auto custom-scrollbar space-y-2 pr-1">
                     {loading ? (
                         <div className="py-10 flex flex-col items-center text-slate-400">
@@ -428,6 +509,18 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                     </span>
                 </div>
 
+                <div className="mb-3">
+                    <GenericButton
+                        type="button"
+                        variant="text"
+                        onClick={() => void handleClearSentTray()}
+                        disabled={loading || sentDocuments.length === 0 || clearingTray !== null}
+                        icon={clearingTray === 'sent' ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                        label={clearingTray === 'sent' ? 'Limpiando...' : 'Limpiar bandeja de salida'}
+                        className="text-xs! font-bold! text-slate-600!"
+                    />
+                </div>
+
                 <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white/70 p-3">
                     <select
                         aria-label="Filtrar enviados por destinatario"
@@ -438,7 +531,7 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                         <option value="">Todos los destinatarios</option>
                         {recipients.map((recipient) => (
                             <option key={recipient.userId} value={recipient.userId}>
-                                {recipient.username}
+                                {recipient.username} ({recipient.role})
                             </option>
                         ))}
                     </select>

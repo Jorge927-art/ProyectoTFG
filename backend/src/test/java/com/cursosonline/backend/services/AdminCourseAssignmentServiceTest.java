@@ -10,6 +10,7 @@ import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.exception.ResourceNotFoundException;
 import com.cursosonline.backend.exception.ServicesException;
 import com.cursosonline.backend.repository.CoursesRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
 import com.cursosonline.backend.repository.UserSystemNotificationRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +40,9 @@ class AdminCourseAssignmentServiceTest {
 
         @Mock
         private CoursesRepository coursesRepository;
+
+        @Mock
+        private EnrollmentRepository enrollmentRepository;
 
         @Mock
         private UserSystemNotificationRepository userSystemNotificationRepository;
@@ -128,6 +132,7 @@ class AdminCourseAssignmentServiceTest {
         @DisplayName("reassignCourseProfessor debe reasignar, actualizar instructors y emitir dos notificaciones")
         void reassignCourseProfessor_WithCurrentProfessor_ShouldNotifyBothSides() {
                 when(coursesRepository.findById(300L)).thenReturn(Optional.of(course));
+                when(enrollmentRepository.existsEnrollmentByCourseId(300L)).thenReturn(false);
                 when(userRepository.findById(20L)).thenReturn(Optional.of(professorB));
                 when(coursesRepository.saveAndFlush(any(Courses.class)))
                                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -160,6 +165,7 @@ class AdminCourseAssignmentServiceTest {
         @DisplayName("reassignCourseProfessor debe rechazar reasignar a un profesor que ya es titular del curso")
         void reassignCourseProfessor_WithSameProfessor_ShouldThrow() {
                 when(coursesRepository.findById(300L)).thenReturn(Optional.of(course));
+                when(enrollmentRepository.existsEnrollmentByCourseId(300L)).thenReturn(false);
                 when(userRepository.findById(10L)).thenReturn(Optional.of(professorA));
 
                 ServicesException ex = assertThrows(ServicesException.class,
@@ -178,6 +184,7 @@ class AdminCourseAssignmentServiceTest {
                 course.setInstructors(null);
 
                 when(coursesRepository.findById(300L)).thenReturn(Optional.of(course));
+                when(enrollmentRepository.existsEnrollmentByCourseId(300L)).thenReturn(false);
                 when(userRepository.findById(20L)).thenReturn(Optional.of(professorB));
                 when(coursesRepository.saveAndFlush(any(Courses.class)))
                                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -196,6 +203,7 @@ class AdminCourseAssignmentServiceTest {
         @DisplayName("reassignCourseProfessor debe rechazar profesor entrante deshabilitado")
         void reassignCourseProfessor_DisabledProfessor_ShouldThrow() {
                 when(coursesRepository.findById(300L)).thenReturn(Optional.of(course));
+                when(enrollmentRepository.existsEnrollmentByCourseId(300L)).thenReturn(false);
                 when(userRepository.findById(21L)).thenReturn(Optional.of(disabledProfessor));
 
                 ServicesException ex = assertThrows(ServicesException.class,
@@ -223,6 +231,7 @@ class AdminCourseAssignmentServiceTest {
         @DisplayName("reassignCourseProfessor debe rechazar usuarios entrantes sin rol PROFESSOR")
         void reassignCourseProfessor_WithIncomingNonProfessor_ShouldThrow() {
                 when(coursesRepository.findById(300L)).thenReturn(Optional.of(course));
+                when(enrollmentRepository.existsEnrollmentByCourseId(300L)).thenReturn(false);
                 when(userRepository.findById(30L)).thenReturn(Optional.of(studentUser));
 
                 ServicesException ex = assertThrows(ServicesException.class,
@@ -238,6 +247,7 @@ class AdminCourseAssignmentServiceTest {
         void reassignCourseProfessor_ShouldUseSafeCourseTitle_WhenTitleLiteralNull() {
                 course.setTitle(" null ");
                 when(coursesRepository.findById(300L)).thenReturn(Optional.of(course));
+                when(enrollmentRepository.existsEnrollmentByCourseId(300L)).thenReturn(false);
                 when(userRepository.findById(20L)).thenReturn(Optional.of(professorB));
                 when(coursesRepository.saveAndFlush(any(Courses.class)))
                                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -280,6 +290,7 @@ class AdminCourseAssignmentServiceTest {
         @DisplayName("reassignCourseProfessor debe lanzar ResourceNotFound si el profesor entrante no existe")
         void reassignCourseProfessor_WithUnknownNewProfessor_ShouldThrowNotFound() {
                 when(coursesRepository.findById(300L)).thenReturn(Optional.of(course));
+                when(enrollmentRepository.existsEnrollmentByCourseId(300L)).thenReturn(false);
                 when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
                 ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class,
@@ -288,5 +299,62 @@ class AdminCourseAssignmentServiceTest {
                 assertEquals("Profesor entrante no encontrado con id: 999", ex.getMessage());
                 verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
                 verify(userSystemNotificationRepository, never()).save(any(UserSystemNotification.class));
+        }
+
+        @Test
+        @DisplayName("reassignCourseProfessor debe rechazar cursos ya iniciados con matrículas históricas")
+        void reassignCourseProfessor_WithStartedCourse_ShouldThrow() {
+                when(coursesRepository.findById(300L)).thenReturn(Optional.of(course));
+                when(enrollmentRepository.existsEnrollmentByCourseId(300L)).thenReturn(true);
+
+                ServicesException ex = assertThrows(ServicesException.class,
+                                () -> adminCourseAssignmentService.reassignCourseProfessor(300L, 20L));
+
+                assertEquals("Acción inválida: solo se puede reasignar un curso que no se haya iniciado nunca.",
+                                ex.getMessage());
+                verify(userRepository, never()).findById(anyLong());
+                verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
+                verify(userSystemNotificationRepository, never()).save(any(UserSystemNotification.class));
+                verify(adminCourseCatalogService, never()).markCourseAsEverUsed(anyLong());
+        }
+
+        @Test
+        @DisplayName("reassignCourseProfessor debe rechazar cursos del dataset con instructor legacy")
+        void reassignCourseProfessor_WithLegacyDatasetInstructor_ShouldThrow() {
+                Courses datasetCourse = new Courses();
+                datasetCourse.setCourse_id(901L);
+                datasetCourse.setTitle("Curso legado dataset");
+                datasetCourse.setAssignedUser(null);
+                datasetCourse.setInstructors("Instructor Dataset");
+
+                when(coursesRepository.findById(901L)).thenReturn(Optional.of(datasetCourse));
+
+                ServicesException ex = assertThrows(ServicesException.class,
+                                () -> adminCourseAssignmentService.reassignCourseProfessor(901L, 20L));
+
+                assertEquals("Acción inválida: este curso pertenece al dataset y no admite reasignación administrativa.",
+                                ex.getMessage());
+                verify(enrollmentRepository, never()).existsEnrollmentByCourseId(anyLong());
+                verify(userRepository, never()).findById(anyLong());
+                verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
+                verify(userSystemNotificationRepository, never()).save(any(UserSystemNotification.class));
+                verify(adminCourseCatalogService, never()).markCourseAsEverUsed(anyLong());
+        }
+
+        @Test
+        @DisplayName("reassignCourseProfessor debe rechazar cursos con histórico everUsed aunque no haya matrículas actuales")
+        void reassignCourseProfessor_WithEverUsedHistoricalFlag_ShouldThrow() {
+                course.setEverUsed(true);
+                when(coursesRepository.findById(300L)).thenReturn(Optional.of(course));
+
+                ServicesException ex = assertThrows(ServicesException.class,
+                                () -> adminCourseAssignmentService.reassignCourseProfessor(300L, 20L));
+
+                assertEquals("Acción inválida: solo se puede reasignar un curso que no se haya iniciado nunca.",
+                                ex.getMessage());
+                verify(userRepository, never()).findById(anyLong());
+                verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
+                verify(userSystemNotificationRepository, never()).save(any(UserSystemNotification.class));
+                verify(adminCourseCatalogService, never()).markCourseAsEverUsed(anyLong());
         }
 }

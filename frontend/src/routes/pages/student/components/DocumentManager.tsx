@@ -4,7 +4,11 @@ import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import { useDocuments } from './useDocuments';
 import { emitNotificationsRefresh } from '../../../../components/ui/globalNotificationBell/useNotifications';
-import { markDocumentAsRead } from '../../../../services/documentService'; // <-- RECOMENDACIÓN NOTEBOOKLM: Importación del Servicio
+import {
+    hideAllReceivedGeneralDocuments,
+    hideAllSentGeneralDocuments,
+    markDocumentAsRead,
+} from '../../../../services/documentService'; // <-- RECOMENDACIÓN NOTEBOOKLM: Importación del Servicio
 import {
     ACADEMIC_DOCUMENT_ACCEPT,
     ACADEMIC_DOCUMENT_ALLOWED_LABEL,
@@ -46,6 +50,7 @@ export const DocumentManager = ({
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [highlightedDocumentId, setHighlightedDocumentId] = useState<number | null>(null);
+    const [clearingTray, setClearingTray] = useState(false);
     const highlightTimeoutRef = useRef<number | null>(null);
     const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
@@ -180,6 +185,41 @@ export const DocumentManager = ({
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
+        }
+    };
+
+    const handleClearCurrentTray = async () => {
+        const trayLabel = activeTab === 'RECEIVED' ? 'entrada' : 'salida';
+        const confirmed = window.confirm(
+            `¿Deseas limpiar tu bandeja de ${trayLabel}?\n\nEsta acción oculta los documentos para tu usuario y no borra datos en la base de datos.`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            setClearingTray(true);
+            setDocumentError('');
+
+            if (activeTab === 'RECEIVED') {
+                await hideAllReceivedGeneralDocuments();
+                emitNotificationsRefresh();
+            } else {
+                await hideAllSentGeneralDocuments();
+            }
+
+            setHighlightedDocumentId(null);
+            const originalTab: 'RECEIVED' | 'SENT' = activeTab;
+            const refreshTab: 'RECEIVED' | 'SENT' = originalTab === 'RECEIVED' ? 'SENT' : 'RECEIVED';
+            setActiveTab(refreshTab);
+            window.setTimeout(() => {
+                setActiveTab(originalTab);
+            }, 0);
+        } catch {
+            setDocumentError(`No se pudo limpiar la bandeja de ${trayLabel}.`);
+        } finally {
+            setClearingTray(false);
         }
     };
 
@@ -319,6 +359,18 @@ export const DocumentManager = ({
                         Mostrando documentos recibidos en tu bandeja.
                     </div>
                 )}
+
+                <div className="shrink-0">
+                    <GenericButton
+                        type="button"
+                        onClick={() => void handleClearCurrentTray()}
+                        disabled={loadingDocuments || documentList.length === 0 || clearingTray}
+                        variant="text"
+                        label={clearingTray ? 'Limpiando...' : activeTab === 'RECEIVED' ? 'Limpiar bandeja de entrada' : 'Limpiar bandeja de salida'}
+                        icon={clearingTray ? <Loader2 size={14} className="animate-spin" /> : <FileUp size={14} />}
+                        className="text-xs! font-bold! text-slate-600!"
+                    />
+                </div>
                 {/* ZONA DE LISTADO CON SCROLL GEOMÉTRICO CONTROLADO [ADR-19] */}
                 <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2 min-h-30">
                     {loadingDocuments ? (

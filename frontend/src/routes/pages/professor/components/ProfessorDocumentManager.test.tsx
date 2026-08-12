@@ -9,6 +9,7 @@ import { emitNotificationsRefresh } from '../../../../components/ui/globalNotifi
 vi.mock('../../../../services/documentService', () => ({
     downloadDocumentSecure: vi.fn(),
     getProfessorRecipientsByCourse: vi.fn(),
+    hideAllReceivedGeneralDocuments: vi.fn(),
     getUserDocuments: vi.fn(),
     getSentDocumentsByCourse: vi.fn(),
     markDocumentAsRead: vi.fn(),
@@ -72,6 +73,7 @@ const receivedUnreadVideoDoc: DocumentMetadata = {
 describe('ProfessorDocumentManager', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.spyOn(window, 'confirm').mockReturnValue(true);
 
         vi.mocked(documentService.getProfessorRecipientsByCourse).mockResolvedValue([
             { userId: 3, username: 'laura_student', email: 'laura@tfg.com', role: 'STUDENT' },
@@ -177,6 +179,27 @@ describe('ProfessorDocumentManager', () => {
             expect(documentService.downloadDocumentSecure).toHaveBeenCalledWith(11, 'feedback-algebra.pdf');
             expect(documentService.markDocumentAsRead).toHaveBeenCalledWith(11);
             expect(emitNotificationsRefresh).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    it('limpia lógicamente la bandeja recibida general del profesor', async () => {
+        vi.mocked(documentService.hideAllReceivedGeneralDocuments).mockResolvedValue({
+            message: 'ok',
+            hiddenCount: 1,
+        });
+
+        render(<ProfessorDocumentManager availableCourses={courses} />);
+
+        await waitFor(() => {
+            expect(screen.getByText('feedback-algebra.pdf')).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Limpiar bandeja de entrada' }));
+
+        await waitFor(() => {
+            expect(documentService.hideAllReceivedGeneralDocuments).toHaveBeenCalledTimes(1);
+            expect(emitNotificationsRefresh).toHaveBeenCalledTimes(1);
+            expect(vi.mocked(documentService.getUserDocuments).mock.calls.length).toBeGreaterThanOrEqual(2);
         });
     });
 

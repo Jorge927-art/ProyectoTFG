@@ -6,6 +6,7 @@ import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.exception.ResourceNotFoundException;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import com.cursosonline.backend.exception.ServicesException;
 import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
@@ -259,6 +260,35 @@ class AdminCourseCatalogServiceTest {
     }
 
     @Test
+    @DisplayName("createCourse traduce errores de persistencia a mensaje funcional")
+    void createCourse_WhenPersistenceFails_ShouldThrowServiceExceptionWithFriendlyMessage() {
+        AdminCourseCreateRequestDTO request = new AdminCourseCreateRequestDTO(
+                "Arquitectura",
+                null,
+                null,
+                "Ingenieria",
+                null,
+                "Básico",
+                "ES",
+                "ES",
+                null,
+                null,
+                null,
+                null,
+                10f);
+
+        when(coursesRepository.existsByTitleKey("arquitectura")).thenThrow(
+                new InvalidDataAccessResourceUsageException("column \"sub-category\" does not exist"));
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.createCourse(request));
+
+        assertEquals(
+                "No se pudo crear el curso por un conflicto de persistencia. Verifica formato de datos y esquema de base de datos.",
+                ex.getMessage());
+    }
+
+    @Test
     @DisplayName("createCourse rechaza idioma vacío")
     void createCourse_WhenLanguageIsBlank_ShouldThrow() {
         AdminCourseCreateRequestDTO request = new AdminCourseCreateRequestDTO(
@@ -360,8 +390,22 @@ class AdminCourseCatalogServiceTest {
     }
 
     @Test
-    @DisplayName("patchCourse bloquea rating/numOfViewers en curso usado")
-    void patchCourse_WhenUsedAndRestrictedField_ShouldThrow() {
+    @DisplayName("patchCourse rechaza modificación de instructor desde catálogo")
+    void patchCourse_WhenInstructorsIncluded_ShouldThrow() {
+        Courses course = new Courses();
+        course.setCourse_id(2L);
+        when(coursesRepository.findById(2L)).thenReturn(Optional.of(course));
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.patchCourse(2L, Map.of("instructors", "Profesor X")));
+
+        assertEquals("Campo no permitido en actualización parcial: instructors", ex.getMessage());
+        verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
+    }
+
+    @Test
+    @DisplayName("patchCourse rechaza modificar rating desde admin")
+    void patchCourse_WhenRatingPatchRequested_ShouldThrow() {
         Courses course = new Courses();
         course.setCourse_id(10L);
         course.setEverUsed(true);
@@ -375,13 +419,13 @@ class AdminCourseCatalogServiceTest {
         ServicesException ex = assertThrows(ServicesException.class,
                 () -> adminCourseCatalogService.patchCourse(10L, Map.of("rating", 40)));
 
-        assertEquals("Curso activo.", ex.getMessage());
+        assertEquals("Campo no permitido en actualización parcial: rating", ex.getMessage());
         verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
     }
 
     @Test
-    @DisplayName("patchCourse permite cambios descriptivos en curso usado y fuerza site COLE")
-    void patchCourse_WhenUsedAndDescriptiveFields_ShouldUpdate() {
+    @DisplayName("patchCourse bloquea cualquier cambio en curso usado")
+    void patchCourse_WhenUsed_ShouldThrow() {
         Courses course = new Courses();
         course.setCourse_id(10L);
         course.setEverUsed(true);
@@ -392,20 +436,17 @@ class AdminCourseCatalogServiceTest {
         course.setSubtitleLanguages("ES");
         course.setSite("EXTERNAL");
         when(coursesRepository.findById(10L)).thenReturn(Optional.of(course));
-        when(coursesRepository.saveAndFlush(any(Courses.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AdminCourseCatalogItemDTO result = adminCourseCatalogService.patchCourse(10L,
-                Map.of("category", "  Data  ", "site", "OTRO"));
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.patchCourse(10L, Map.of("category", "Data")));
 
-        assertEquals("Data", course.getCategory());
-        assertEquals("COLE", course.getSite());
-        assertTrue(result.used());
-        assertEquals("COLE", result.site());
+        assertEquals("Curso activo.", ex.getMessage());
+        verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
     }
 
     @Test
-    @DisplayName("patchCourse permite editar campos restringidos en curso no usado")
-    void patchCourse_WhenNotUsed_ShouldAllowRestrictedFields() {
+    @DisplayName("patchCourse rechaza modificar numOfViewers desde admin")
+    void patchCourse_WhenNumOfViewersPatchRequested_ShouldThrow() {
         Courses course = new Courses();
         course.setCourse_id(11L);
         course.setEverUsed(false);
@@ -415,18 +456,11 @@ class AdminCourseCatalogServiceTest {
         course.setLanguage("ES");
         course.setSubtitleLanguages("ES");
         when(coursesRepository.findById(11L)).thenReturn(Optional.of(course));
-        when(enrollmentRepository.existsEnrollmentByCourseId(11L)).thenReturn(false);
-        when(coursesRepository.saveAndFlush(any(Courses.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.patchCourse(11L, Map.of("numOfViewers", "200")));
 
-        adminCourseCatalogService.patchCourse(11L, Map.of(
-                "rating", "4.5",
-                "numOfViewers", "200",
-                "duration", 18));
-
-        assertEquals(4.5f, course.getRating());
-        assertEquals(200, course.getNumOfViewers());
-        assertEquals(18f, course.getDuration());
-        assertEquals("COLE", course.getSite());
+        assertEquals("Campo no permitido en actualización parcial: numOfViewers", ex.getMessage());
+        verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
     }
 
     @Test
@@ -508,8 +542,8 @@ class AdminCourseCatalogServiceTest {
     }
 
     @Test
-    @DisplayName("patchCourse rechaza número inválido")
-    void patchCourse_WhenInvalidNumericValue_ShouldThrow() {
+    @DisplayName("patchCourse rechaza número inválido para duration")
+    void patchCourse_WhenInvalidDurationValue_ShouldThrow() {
         Courses course = new Courses();
         course.setCourse_id(13L);
         course.setCategory("Negocios");
@@ -521,9 +555,9 @@ class AdminCourseCatalogServiceTest {
         when(enrollmentRepository.existsEnrollmentByCourseId(13L)).thenReturn(false);
 
         ServicesException ex = assertThrows(ServicesException.class,
-                () -> adminCourseCatalogService.patchCourse(13L, Map.of("numOfViewers", "abc")));
+                () -> adminCourseCatalogService.patchCourse(13L, Map.of("duration", "abc")));
 
-        assertEquals("Valor numérico inválido para numOfViewers.", ex.getMessage());
+        assertEquals("Valor numérico inválido para duration.", ex.getMessage());
     }
 
     @Test
@@ -670,8 +704,8 @@ class AdminCourseCatalogServiceTest {
     }
 
     @Test
-    @DisplayName("patchCourse permite corregir la duración de un curso usado")
-    void patchCourse_WhenUsedAndDurationNeedsCorrection_ShouldAllowUpdate() {
+    @DisplayName("patchCourse bloquea también cambios de duración en curso usado")
+    void patchCourse_WhenUsedAndDurationNeedsCorrection_ShouldThrow() {
         Courses course = new Courses();
         course.setCourse_id(126L);
         course.setCategory("Negocios");
@@ -681,12 +715,12 @@ class AdminCourseCatalogServiceTest {
         course.setSubtitleLanguages("ES");
         course.setEverUsed(true);
         when(coursesRepository.findById(126L)).thenReturn(Optional.of(course));
-        when(coursesRepository.saveAndFlush(any(Courses.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AdminCourseCatalogItemDTO dto = adminCourseCatalogService.patchCourse(126L, Map.of("duration", 12));
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> adminCourseCatalogService.patchCourse(126L, Map.of("duration", 12)));
 
-        assertEquals(12f, course.getDuration());
-        assertEquals(12f, dto.duration());
+        assertEquals("Curso activo.", ex.getMessage());
+        verify(coursesRepository, never()).saveAndFlush(any(Courses.class));
     }
 
     @Test

@@ -14,6 +14,8 @@ import {
     getSentDocumentsByCourse, 
     uploadAssignmentDocument, 
     markDocumentAsRead, 
+    hideAllReceivedGeneralDocuments,
+    hideAllSentGeneralDocuments,
     uploadProfessorDocument,
     uploadAdminDocumentToCourse 
 } from './documentService';
@@ -210,6 +212,21 @@ describe('documentService - Suite de Pruebas Unitarias de Alta Fidelidad', () =>
         expect(formData.get('courseId')).toBe('909');
         expect(config).toBeUndefined();
     });
+
+    it('debe invocar los endpoints de limpieza lógica de bandejas generales', async () => {
+        mockedApi.patch
+            .mockResolvedValueOnce({ data: { message: 'ok', hiddenCount: 2 } })
+            .mockResolvedValueOnce({ data: { message: 'ok', hiddenCount: 3 } });
+
+        const receivedResult = await hideAllReceivedGeneralDocuments();
+        const sentResult = await hideAllSentGeneralDocuments();
+
+        expect(receivedResult.hiddenCount).toBe(2);
+        expect(sentResult.hiddenCount).toBe(3);
+        expect(mockedApi.patch).toHaveBeenNthCalledWith(1, '/api/v1/documents/received/hide-all');
+        expect(mockedApi.patch).toHaveBeenNthCalledWith(2, '/api/v1/documents/sent/hide-all');
+    });
+
     // --- BLOQUE 4: DESCARGAS SEGURAS DE FLUJO DE BYTES (DOM SIMULATION) ---
     it('debe orquestar la descarga simulando los elementos nativos y revocación de URL en downloadDocumentSecure', async () => {
         const dummyBlobContent = 'bytes_simulados_tfg';

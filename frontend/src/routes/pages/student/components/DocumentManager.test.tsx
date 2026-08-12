@@ -5,6 +5,8 @@ import * as useDocumentsHook from './useDocuments';
 
 const mockEmitNotificationsRefresh = vi.fn();
 const mockMarkDocumentAsRead = vi.fn();
+const mockHideAllReceivedGeneralDocuments = vi.fn();
+const mockHideAllSentGeneralDocuments = vi.fn();
 
 vi.mock('../../../../components/ui/globalNotificationBell/useNotifications', () => ({
     emitNotificationsRefresh: () => mockEmitNotificationsRefresh(),
@@ -12,6 +14,8 @@ vi.mock('../../../../components/ui/globalNotificationBell/useNotifications', () 
 
 vi.mock('../../../../services/documentService', () => ({
     markDocumentAsRead: (...args: unknown[]) => mockMarkDocumentAsRead(...args),
+    hideAllReceivedGeneralDocuments: (...args: unknown[]) => mockHideAllReceivedGeneralDocuments(...args),
+    hideAllSentGeneralDocuments: (...args: unknown[]) => mockHideAllSentGeneralDocuments(...args),
 }));
 
 describe('DocumentManager Component [TFG Test Suite]', () => {
@@ -26,6 +30,7 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.spyOn(window, 'confirm').mockReturnValue(true);
         Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
             configurable: true,
             value: scrollIntoViewSpy,
@@ -55,6 +60,89 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
 
     afterEach(() => {
         vi.restoreAllMocks();
+    });
+
+    it('oculta lógicamente documentos de entrada al limpiar bandeja en Recibidos', async () => {
+        useDocumentsSpy.mockReturnValue({
+            documentList: [
+                {
+                    documentid: 1,
+                    filename: 'doc1.pdf',
+                    originalname: 'doc1.pdf',
+                    upload_date: '2026-01-01T00:00:00.000Z',
+                    sender: { userId: 2, username: 'profesor_juan', email: 'juan@tfg.com', role: 'PROFESSOR' },
+                    receiver: { userId: 1, username: 'luis_student', email: 'luis@tfg.com', role: 'STUDENT' },
+                    folder_type: 'RECEIVED' as const,
+                    isRead: false,
+                },
+            ],
+            activeTab: 'RECEIVED',
+            setActiveTab: mockSetActiveTab,
+            loadingDocuments: false,
+            isUploading: false,
+            documentError: '',
+            setDocumentError: mockSetDocumentError,
+            directory: [],
+            loadingDirectory: false,
+            selectedReceiverId: '',
+            setSelectedReceiverId: mockSetSelectedReceiverId,
+            handleUpload: mockHandleUpload,
+            handleSecureDownload: mockHandleSecureDownload,
+        });
+
+        mockHideAllReceivedGeneralDocuments.mockResolvedValue({ message: 'ok', hiddenCount: 1 });
+
+        render(<DocumentManager />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Limpiar bandeja de entrada' }));
+
+        await waitFor(() => {
+            expect(mockHideAllReceivedGeneralDocuments).toHaveBeenCalledTimes(1);
+            expect(mockEmitNotificationsRefresh).toHaveBeenCalledTimes(1);
+            expect(mockSetActiveTab).toHaveBeenCalledWith('SENT');
+            expect(mockSetActiveTab).toHaveBeenCalledWith('RECEIVED');
+        });
+    });
+
+    it('oculta lógicamente documentos de salida al limpiar bandeja en Enviados', async () => {
+        useDocumentsSpy.mockReturnValue({
+            documentList: [
+                {
+                    documentid: 2,
+                    filename: 'doc2.pdf',
+                    originalname: 'doc2.pdf',
+                    upload_date: '2026-01-01T00:00:00.000Z',
+                    sender: { userId: 1, username: 'luis_student', email: 'luis@tfg.com', role: 'STUDENT' },
+                    receiver: { userId: 2, username: 'profesor_juan', email: 'juan@tfg.com', role: 'PROFESSOR' },
+                    folder_type: 'SENT' as const,
+                    isRead: true,
+                },
+            ],
+            activeTab: 'SENT',
+            setActiveTab: mockSetActiveTab,
+            loadingDocuments: false,
+            isUploading: false,
+            documentError: '',
+            setDocumentError: mockSetDocumentError,
+            directory: [],
+            loadingDirectory: false,
+            selectedReceiverId: 2,
+            setSelectedReceiverId: mockSetSelectedReceiverId,
+            handleUpload: mockHandleUpload,
+            handleSecureDownload: mockHandleSecureDownload,
+        });
+
+        mockHideAllSentGeneralDocuments.mockResolvedValue({ message: 'ok', hiddenCount: 1 });
+
+        render(<DocumentManager />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Limpiar bandeja de salida' }));
+
+        await waitFor(() => {
+            expect(mockHideAllSentGeneralDocuments).toHaveBeenCalledTimes(1);
+            expect(mockSetActiveTab).toHaveBeenCalledWith('RECEIVED');
+            expect(mockSetActiveTab).toHaveBeenCalledWith('SENT');
+        });
     });
     it('debe renderizar el estado vacío contextualizado en la bandeja de entrada por defecto', () => {
         render(<DocumentManager />);

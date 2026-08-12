@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, RefreshCw, ShieldAlert, UserRoundCog, Users } from 'lucide-react';
+import { Loader2, RefreshCw, UserRoundCog, Users } from 'lucide-react';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import {
     getAdminCoursesByProfessor,
@@ -45,8 +45,14 @@ export const AdminCourseProfessorReassignmentPanel = () => {
         try {
             const data = await getAdminProfessorOptions();
             setProfessors(data);
+
+            const availableIds = new Set(data.map((professor) => professor.userId));
+            setSelectedOutgoingProfessorId((prev) => (prev !== null && availableIds.has(prev) ? prev : null));
+            setSelectedIncomingProfessorId((prev) => (prev !== null && availableIds.has(prev) ? prev : null));
         } catch (err) {
             setProfessors([]);
+            setSelectedOutgoingProfessorId(null);
+            setSelectedIncomingProfessorId(null);
             setError(resolveAdminCourseAssignmentError(err));
         } finally {
             setLoadingProfessors(false);
@@ -166,6 +172,7 @@ export const AdminCourseProfessorReassignmentPanel = () => {
                         disabled={loadingProfessors || reassigningCourseId !== null}
                         size={6}
                     >
+                        <option value="">Selecciona profesor saliente</option>
                         {professors.map((professor) => (
                             <option key={professor.userId} value={professor.userId}>
                                 {professor.username}
@@ -189,6 +196,7 @@ export const AdminCourseProfessorReassignmentPanel = () => {
                         disabled={loadingProfessors || reassigningCourseId !== null}
                         size={6}
                     >
+                        <option value="">Selecciona profesor entrante</option>
                         {incomingProfessorOptions.map((professor) => (
                             <option key={professor.userId} value={professor.userId}>
                                 {professor.username}
@@ -199,13 +207,6 @@ export const AdminCourseProfessorReassignmentPanel = () => {
                         El profesor entrante recibirá notificación en la campana de navegación.
                     </p>
                 </div>
-            </div>
-
-            <div className="mt-4 border border-amber-100 bg-amber-50 text-amber-800 rounded-xl px-3 py-2 text-[11px] font-semibold flex items-start gap-2">
-                <ShieldAlert size={14} className="mt-0.5 shrink-0" />
-                <span>
-                    Este curso está gestionado por Administración. La asignación solo puede modificarse por un administrador.
-                </span>
             </div>
 
             {error && (
@@ -250,6 +251,7 @@ export const AdminCourseProfessorReassignmentPanel = () => {
                             const disabled =
                                 isBusy ||
                                 selectedIncomingProfessorId === null ||
+                                !selectedIncomingProfessor ||
                                 selectedIncomingProfessorId === course.currentProfessorUserId;
 
                             return (

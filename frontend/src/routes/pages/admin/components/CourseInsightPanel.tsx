@@ -55,10 +55,6 @@ export const CourseInsightPanel = () => {
                 />
             </form>
 
-            <p className="text-[11px] text-slate-500">
-                Búsqueda predictiva: se actualiza automáticamente mientras escribes (mínimo 2 letras).
-            </p>
-
             {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
 
             {/* RESULTADOS DE BÚSQUEDA */}
@@ -82,7 +78,7 @@ export const CourseInsightPanel = () => {
                 </div>
             )}
 
-            {!loadingSearch && keyword.trim().length >= 2 && results.length === 0 && !selectedCourse && !error && (
+            {!loadingSearch && keyword.trim().length >= 1 && results.length === 0 && !selectedCourse && !error && (
                 <p className="text-[11px] text-slate-400 italic">
                     No hay cursos cuyo nombre comience por "{keyword.trim()}".
                 </p>

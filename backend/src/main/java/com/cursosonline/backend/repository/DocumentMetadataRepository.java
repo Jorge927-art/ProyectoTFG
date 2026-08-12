@@ -29,7 +29,7 @@ public interface DocumentMetadataRepository extends JpaRepository<DocumentMetada
          * @param username El nombre de usuario del receptor.
          * @return Lista de documentos recibidos sin curso asociado.
          */
-        @Query("SELECT d FROM DocumentMetadata d WHERE d.receiver.username = :username AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED AND d.course IS NULL ORDER BY d.documentid DESC")
+        @Query("SELECT d FROM DocumentMetadata d WHERE d.receiver.username = :username AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED AND d.course IS NULL AND d.hiddenForReceiver = false ORDER BY d.documentid DESC")
         List<DocumentMetadata> findReceivedGeneralDocumentsByUsername(@Param("username") String username);
 
         /**
@@ -61,7 +61,7 @@ public interface DocumentMetadataRepository extends JpaRepository<DocumentMetada
          * @param username El nombre de usuario del emisor.
          * @return Lista de documentos enviados sin curso asociado.
          */
-        @Query("SELECT d FROM DocumentMetadata d WHERE d.sender.username = :username AND d.folder_type = com.cursosonline.backend.entities.FolderType.SENT AND d.course IS NULL ORDER BY d.documentid DESC")
+        @Query("SELECT d FROM DocumentMetadata d WHERE d.sender.username = :username AND d.folder_type = com.cursosonline.backend.entities.FolderType.SENT AND d.course IS NULL AND d.hiddenForSender = false ORDER BY d.documentid DESC")
         List<DocumentMetadata> findSentGeneralDocumentsByUsername(@Param("username") String username);
 
         /**
@@ -103,7 +103,7 @@ public interface DocumentMetadataRepository extends JpaRepository<DocumentMetada
          * @return Lista de documentos no leídos recibidos por el usuario.
          */
         @Query("SELECT d FROM DocumentMetadata d WHERE d.receiver.username = :username " +
-                        "AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED AND d.read = false "
+                        "AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED AND d.read = false AND d.hiddenForReceiver = false "
                         +
                         "ORDER BY d.documentid DESC")
         List<DocumentMetadata> findUnreadReceivedDocumentsByUsername(@Param("username") String username);
@@ -117,8 +117,32 @@ public interface DocumentMetadataRepository extends JpaRepository<DocumentMetada
          */
         @org.springframework.data.jpa.repository.Modifying
         @Query("UPDATE DocumentMetadata d SET d.read = true WHERE d.receiver.username = :username " +
-                        "AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED AND d.read = false")
+                        "AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED AND d.read = false AND d.hiddenForReceiver = false")
         int markAllReceivedAsRead(@Param("username") String username);
+
+        /**
+         * Oculta de forma lógica todos los documentos generales recibidos para el
+         * usuario autenticado, sin borrar físicamente los registros.
+         */
+        @org.springframework.data.jpa.repository.Modifying
+        @Query("UPDATE DocumentMetadata d SET d.hiddenForReceiver = true " +
+                        "WHERE d.receiver.username = :username " +
+                        "AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED " +
+                        "AND d.course IS NULL " +
+                        "AND d.hiddenForReceiver = false")
+        int hideAllReceivedGeneralDocumentsByUsername(@Param("username") String username);
+
+        /**
+         * Oculta de forma lógica todos los documentos generales enviados por el
+         * usuario autenticado, sin borrar físicamente los registros.
+         */
+        @org.springframework.data.jpa.repository.Modifying
+        @Query("UPDATE DocumentMetadata d SET d.hiddenForSender = true " +
+                        "WHERE d.sender.username = :username " +
+                        "AND d.folder_type = com.cursosonline.backend.entities.FolderType.SENT " +
+                        "AND d.course IS NULL " +
+                        "AND d.hiddenForSender = false")
+        int hideAllSentGeneralDocumentsByUsername(@Param("username") String username);
 
         /**
          * Elimina todos los documentos asociados a un usuario específico, ya sea como

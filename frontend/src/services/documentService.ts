@@ -107,6 +107,11 @@ export interface UploadDocumentResponse {
     originalname: string;
 }
 
+export interface HideDocumentsResponse {
+    message: string;
+    hiddenCount: number;
+}
+
 export interface AdminDocumentRecipient {
     userId: number;
     username: string;
@@ -267,6 +272,16 @@ export const markDocumentAsRead = async (documentId: number): Promise<{ message:
     const response = await apiClient.patch<{ message: string; documentId: number; isRead: boolean }>(
         `/api/v1/documents/${documentId}/read`
     );
+    return response.data;
+};
+
+export const hideAllReceivedGeneralDocuments = async (): Promise<HideDocumentsResponse> => {
+    const response = await apiClient.patch<HideDocumentsResponse>('/api/v1/documents/received/hide-all');
+    return response.data;
+};
+
+export const hideAllSentGeneralDocuments = async (): Promise<HideDocumentsResponse> => {
+    const response = await apiClient.patch<HideDocumentsResponse>('/api/v1/documents/sent/hide-all');
     return response.data;
 };
 

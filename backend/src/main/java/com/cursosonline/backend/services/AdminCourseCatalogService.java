@@ -8,6 +8,7 @@ import com.cursosonline.backend.exception.ServicesException;
 import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,13 +41,8 @@ public class AdminCourseCatalogService {
             "language",
             "subtitleLanguages",
             "skills",
-            "instructors",
-            "rating",
-            "numOfViewers",
             "duration",
             "site");
-
-    private static final Set<String> RESTRICTED_FOR_USED = Set.of("rating", "numOfViewers");
 
     private final CoursesRepository coursesRepository;
     private final EnrollmentRepository enrollmentRepository;
@@ -99,37 +95,44 @@ public class AdminCourseCatalogService {
         String subtitleLanguages = normalizeSubtitleLanguages(request.subtitleLanguages());
         String titleKey = normalizeTitleKey(title);
 
-        if (coursesRepository.existsByTitleKey(titleKey)) {
-            throw new ServicesException("Este curso ya existe.");
+        try {
+            if (coursesRepository.existsByTitleKey(titleKey)) {
+                throw new ServicesException("Este curso ya existe.");
+            }
+
+            Courses course = new Courses();
+            course.setTitle(title);
+            course.setTitleKey(titleKey);
+            course.setUrl(normalizeOptionalString(request.url()));
+            course.setShortIntro(normalizeOptionalString(request.shortIntro()));
+            course.setCategory(category);
+            course.setSubCategory(normalizeOptionalString(request.subCategory()));
+            course.setCourseType(courseType);
+            course.setLanguage(language);
+            course.setSubtitleLanguages(subtitleLanguages);
+            course.setSkills(normalizeOptionalString(request.skills()));
+            // La asignación de profesor se gestiona exclusivamente en su panel dedicado.
+            course.setInstructors(null);
+            // Se mantienen fuera del alta administrativa: se calculan en runtime
+            // (valoraciones de alumnos / visualizaciones del sistema).
+            course.setRating(null);
+            course.setNumOfViewers(null);
+            course.setDuration(duration);
+            course.setSite(SITE_FIXED_VALUE);
+            course.setEverUsed(false);
+
+            Courses saved = coursesRepository.saveAndFlush(course);
+            return toCatalogItem(saved, false);
+        } catch (DataAccessException ex) {
+            throw new ServicesException(
+                    "No se pudo crear el curso por un conflicto de persistencia. Verifica formato de datos y esquema de base de datos.");
         }
-
-        Courses course = new Courses();
-        course.setTitle(title);
-        course.setTitleKey(titleKey);
-        course.setUrl(normalizeOptionalString(request.url()));
-        course.setShortIntro(normalizeOptionalString(request.shortIntro()));
-        course.setCategory(category);
-        course.setSubCategory(normalizeOptionalString(request.subCategory()));
-        course.setCourseType(courseType);
-        course.setLanguage(language);
-        course.setSubtitleLanguages(subtitleLanguages);
-        course.setSkills(normalizeOptionalString(request.skills()));
-        course.setInstructors(normalizeOptionalString(request.instructors()));
-        course.setRating(request.rating());
-        course.setNumOfViewers(request.numOfViewers());
-        course.setDuration(duration);
-        course.setSite(SITE_FIXED_VALUE);
-        course.setEverUsed(false);
-
-        Courses saved = coursesRepository.saveAndFlush(course);
-        return toCatalogItem(saved, false);
     }
 
     /**
      * Realiza una actualización parcial de un curso existente en el catálogo de
      * administración.
-     * Se pueden modificar campos específicos del curso, pero algunos campos están
-     * restringidos si el curso ya ha sido utilizado.
+     * Solo se permite modificar cursos que nunca se hayan usado.
      * 
      * @param courseId El ID del curso a actualizar.
      * @param changes  Un mapa que contiene los cambios a aplicar al curso.
@@ -152,7 +155,7 @@ public class AdminCourseCatalogService {
         validatePatchKeys(changes.keySet());
 
         boolean used = isCourseUsed(course, isCourseUsedByEnrollment(courseId));
-        if (used && changes.keySet().stream().anyMatch(RESTRICTED_FOR_USED::contains)) {
+        if (used) {
             throw new ServicesException("Curso activo.");
         }
 
@@ -240,9 +243,6 @@ public class AdminCourseCatalogService {
                 case "language" -> course.setLanguage(normalizeOptionalString(value));
                 case "subtitleLanguages" -> course.setSubtitleLanguages(normalizeSubtitleLanguages(value));
                 case "skills" -> course.setSkills(normalizeOptionalString(value));
-                case "instructors" -> course.setInstructors(normalizeOptionalString(value));
-                case "rating" -> course.setRating(parseFloatValue(value, "rating"));
-                case "numOfViewers" -> course.setNumOfViewers(parseIntegerValue(value, "numOfViewers"));
                 case "duration" -> course.setDuration(parseFloatValue(value, "duration"));
                 case "site" -> {
                     // La política de administración fija SITE en COLE de forma centralizada.
@@ -458,36 +458,4 @@ public class AdminCourseCatalogService {
         throw new ServicesException("Tipo de dato inválido para " + fieldName + ".");
     }
 
-    /**
-     * Parsea un valor a Integer, manejando diferentes tipos de entrada y validando
-     * el formato.
-     * 
-     * @param value     El valor a parsear.
-     * @param fieldName El nombre del campo para mensajes de error.
-     * @return El valor parseado como Integer, o null si el valor es nulo o vacío.
-     */
-    private Integer parseIntegerValue(Object value, String fieldName) {
-        if (value == null) {
-            return null;
-        }
-
-        if (value instanceof Number numberValue) {
-            return numberValue.intValue();
-        }
-
-        if (value instanceof String stringValue) {
-            String trimmed = stringValue.trim();
-            if (trimmed.isEmpty()) {
-                return null;
-            }
-
-            try {
-                return Integer.parseInt(trimmed);
-            } catch (NumberFormatException ex) {
-                throw new ServicesException("Valor numérico inválido para " + fieldName + ".");
-            }
-        }
-
-        throw new ServicesException("Tipo de dato inválido para " + fieldName + ".");
-    }
 }

@@ -28,7 +28,8 @@ public interface CoursesRepository extends JpaRepository<Courses, Long> {
          * @return true si existe un curso con la clave de título especificada, false en
          *         caso contrario.
          */
-        boolean existsByTitleKey(String titleKey);
+        @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM Courses c WHERE c.titleKey = :titleKey")
+        boolean existsByTitleKey(@Param("titleKey") String titleKey);
 
         /**
          * Recupera todos los cursos ordenados alfabéticamente por su título.

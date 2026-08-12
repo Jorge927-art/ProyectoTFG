@@ -105,10 +105,16 @@ describe('AdminCourseCatalogPanel', () => {
             expect(catalogService.getAdminCourseCatalog).toHaveBeenCalledTimes(1);
         });
 
-        expect(screen.getByRole('option', { name: 'Arquitectura' })).toBeInTheDocument();
-        expect(screen.getByRole('option', { name: 'Matematicas' })).toBeInTheDocument();
-        expect(screen.getByText('Curso seleccionado:')).toBeInTheDocument();
-        expect(screen.getAllByText('Arquitectura')).toHaveLength(2);
+        expect(screen.queryByRole('button', { name: 'Arquitectura' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Matematicas' })).not.toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: 'A' } });
+
+        expect(screen.getByRole('button', { name: 'Arquitectura' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Matematicas' })).not.toBeInTheDocument();
+        expect(screen.queryByText('Curso seleccionado:')).not.toBeInTheDocument();
+        expect(screen.queryByText('Subtítulos actuales:')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Instructor')).not.toBeInTheDocument();
         expect(screen.queryByText(/Estado de borrado:/i)).not.toBeInTheDocument();
     });
 
@@ -331,7 +337,7 @@ describe('AdminCourseCatalogPanel', () => {
         expect(catalogService.createAdminCourse).not.toHaveBeenCalled();
     });
 
-    it('modificación parcial: envía PATCH de campo descriptivo al perder foco', async () => {
+    it('modificación parcial: guarda cambios al pulsar el botón', async () => {
         render(<AdminCourseCatalogPanel />);
 
         await waitFor(() => {
@@ -339,7 +345,8 @@ describe('AdminCourseCatalogPanel', () => {
         });
 
         const courseSelector = screen.getByLabelText('Curso a modificar');
-        fireEvent.change(courseSelector, { target: { value: '10' } });
+        fireEvent.change(courseSelector, { target: { value: 'A' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Arquitectura' }));
 
         const sections = screen.getAllByText(/Modificación parcial|Alta de curso/i);
         expect(sections.length).toBeGreaterThan(0);
@@ -351,22 +358,24 @@ describe('AdminCourseCatalogPanel', () => {
         fireEvent.change(within(modSection as HTMLElement).getByLabelText('Categoría (obligatoria)'), {
             target: { value: COURSE_CATEGORIES[2] },
         });
+        fireEvent.click(within(modSection as HTMLElement).getByRole('button', { name: 'Guardar cambios' }));
 
         await waitFor(() => {
             expect(catalogService.patchAdminCourse).toHaveBeenCalledWith(10, { category: COURSE_CATEGORIES[2] });
         });
 
-        expect(screen.getByText('Campo actualizado correctamente.')).toBeInTheDocument();
+        expect(screen.getByText('Cambios guardados')).toBeInTheDocument();
     });
 
-    it('modificación parcial: envía PATCH del nivel de dificultad al cambiar el selector', async () => {
+    it('modificación parcial: no envía PATCH automático al tocar selectores', async () => {
         render(<AdminCourseCatalogPanel />);
 
         await waitFor(() => {
             expect(catalogService.getAdminCourseCatalog).toHaveBeenCalled();
         });
 
-        fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: '10' } });
+        fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: 'A' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Arquitectura' }));
 
         const modSection = screen.getByText('Modificación parcial').closest('section');
         expect(modSection).not.toBeNull();
@@ -375,41 +384,18 @@ describe('AdminCourseCatalogPanel', () => {
             target: { value: COURSE_DIFFICULTY_LEVELS[2] },
         });
 
-        await waitFor(() => {
-            expect(catalogService.patchAdminCourse).toHaveBeenCalledWith(10, { courseType: COURSE_DIFFICULTY_LEVELS[2] });
-        });
-
-        expect(screen.getByText('Campo actualizado correctamente.')).toBeInTheDocument();
+        expect(catalogService.patchAdminCourse).not.toHaveBeenCalled();
     });
 
-    it('curso usado: bloquea edición de Rating y Number of viewers, pero permite corregir Duration', async () => {
+    it('modificación parcial: rechaza duration igual a cero al guardar', async () => {
         render(<AdminCourseCatalogPanel />);
 
         await waitFor(() => {
             expect(catalogService.getAdminCourseCatalog).toHaveBeenCalled();
         });
 
-        fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: '20' } });
-
-        const modSection = screen.getByText('Modificación parcial').closest('section') as HTMLElement;
-        const ratingInput = within(modSection).getByLabelText('Valoración');
-        const viewersInput = within(modSection).getByLabelText('Número de visualizaciones');
-        const durationInput = within(modSection).getByLabelText('Duración (horas, > 0)');
-
-        expect(ratingInput).toBeDisabled();
-        expect(viewersInput).toBeDisabled();
-        expect(durationInput).not.toBeDisabled();
-        expect(screen.getByText(/Este curso ya está en uso y no permite editar Valoración ni Número de visualizaciones\./i)).toBeInTheDocument();
-    });
-
-    it('modificación parcial: rechaza duration igual a cero antes de enviar PATCH', async () => {
-        render(<AdminCourseCatalogPanel />);
-
-        await waitFor(() => {
-            expect(catalogService.getAdminCourseCatalog).toHaveBeenCalled();
-        });
-
-        fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: '10' } });
+        fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: 'A' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Arquitectura' }));
 
         const modSection = screen.getByText('Modificación parcial').closest('section');
         expect(modSection).not.toBeNull();
@@ -417,32 +403,34 @@ describe('AdminCourseCatalogPanel', () => {
         fireEvent.change(within(modSection as HTMLElement).getByLabelText('Duración (horas, > 0)'), {
             target: { value: '0' },
         });
-        fireEvent.blur(within(modSection as HTMLElement).getByLabelText('Duración (horas, > 0)'));
+        fireEvent.click(within(modSection as HTMLElement).getByRole('button', { name: 'Guardar cambios' }));
 
         expect(screen.getByText('La duración es obligatoria y debe ser mayor que 0 horas.')).toBeInTheDocument();
         expect(catalogService.patchAdminCourse).not.toHaveBeenCalledWith(10, { duration: 0 });
     });
 
-    it('modificación parcial: permite actualizar Duration en curso usado para corregir datos históricos', async () => {
+    it('modificación parcial: bloquea guardado en curso usado', async () => {
         render(<AdminCourseCatalogPanel />);
 
         await waitFor(() => {
             expect(catalogService.getAdminCourseCatalog).toHaveBeenCalled();
         });
 
-        fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: '20' } });
+        fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: 'M' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Matematicas' }));
 
         const modSection = screen.getByText('Modificación parcial').closest('section');
         expect(modSection).not.toBeNull();
 
+        expect(within(modSection as HTMLElement).getByText(/no se permite modificar ningún campo/i)).toBeInTheDocument();
+
         fireEvent.change(within(modSection as HTMLElement).getByLabelText('Duración (horas, > 0)'), {
             target: { value: '30' },
         });
-        fireEvent.blur(within(modSection as HTMLElement).getByLabelText('Duración (horas, > 0)'));
 
-        await waitFor(() => {
-            expect(catalogService.patchAdminCourse).toHaveBeenCalledWith(20, { duration: 30 });
-        });
+        expect(within(modSection as HTMLElement).getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+        expect(within(modSection as HTMLElement).getByLabelText('Duración (horas, > 0)')).toBeDisabled();
+        expect(catalogService.patchAdminCourse).not.toHaveBeenCalled();
     });
 
     it('borrado negativo: muestra error de backend cuando curso activo no puede borrarse', async () => {
@@ -454,7 +442,8 @@ describe('AdminCourseCatalogPanel', () => {
             expect(catalogService.getAdminCourseCatalog).toHaveBeenCalled();
         });
 
-        fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: '20' } });
+        fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: 'M' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Matematicas' }));
         fireEvent.click(screen.getByRole('button', { name: 'Borrado físico' }));
 
         await waitFor(() => {
@@ -471,7 +460,8 @@ describe('AdminCourseCatalogPanel', () => {
             expect(catalogService.getAdminCourseCatalog).toHaveBeenCalled();
         });
 
-        fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: '10' } });
+        fireEvent.change(screen.getByLabelText('Curso a modificar'), { target: { value: 'A' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Arquitectura' }));
         fireEvent.click(screen.getByRole('button', { name: 'Borrado físico' }));
 
         await waitFor(() => {

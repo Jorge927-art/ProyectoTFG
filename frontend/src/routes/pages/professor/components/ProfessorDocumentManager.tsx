@@ -12,6 +12,7 @@ import {
 import {
     downloadDocumentSecure,
     getProfessorRecipientsByCourse,
+    hideAllReceivedGeneralDocuments,
     getUserDocuments,
     getSentDocumentsByCourse,
     markDocumentAsRead,
@@ -50,6 +51,7 @@ export const ProfessorDocumentManager = ({
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
     const [highlightedDocumentId, setHighlightedDocumentId] = useState<number | null>(null);
+    const [clearingReceivedTray, setClearingReceivedTray] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -273,6 +275,30 @@ export const ProfessorDocumentManager = ({
         }
     };
 
+    const handleClearReceivedTray = async () => {
+        const confirmed = window.confirm(
+            '¿Deseas limpiar la bandeja de entrada?\n\nEsta acción oculta los documentos para tu usuario y no elimina datos en base de datos.'
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            setClearingReceivedTray(true);
+            setDocumentError('');
+            await hideAllReceivedGeneralDocuments();
+            emitNotificationsRefresh();
+            const docs = filterGeneralDocuments(await getUserDocuments());
+            setDocumentList(docs);
+            setHighlightedDocumentId(null);
+        } catch {
+            setDocumentError('No se pudo limpiar la bandeja de entrada.');
+        } finally {
+            setClearingReceivedTray(false);
+        }
+    };
+
     return (
         <GenericCard className={`flex flex-col h-118 ${className}`.trim()}>
             <div className="flex items-center justify-between mb-3 shrink-0">
@@ -336,6 +362,20 @@ export const ProfessorDocumentManager = ({
                         }`}
                 />
             </div>
+
+            {activeTab === 'RECEIVED' && (
+                <div className="mb-3 shrink-0">
+                    <GenericButton
+                        type="button"
+                        variant="text"
+                        onClick={() => void handleClearReceivedTray()}
+                        disabled={loadingDocuments || documentList.length === 0 || clearingReceivedTray}
+                        icon={clearingReceivedTray ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                        label={clearingReceivedTray ? 'Limpiando...' : 'Limpiar bandeja de entrada'}
+                        className="text-xs! font-bold! text-slate-600!"
+                    />
+                </div>
+            )}
 
             {documentError && (
                 <div className="mb-3 p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg flex items-center gap-2 shrink-0">

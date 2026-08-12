@@ -856,6 +856,56 @@ public class DocumentController {
     }
 
     /**
+     * Oculta de forma lógica todos los documentos de mensajería general de la
+     * bandeja de entrada del usuario autenticado. No elimina registros físicos.
+     */
+    @PatchMapping("/received/hide-all")
+    public ResponseEntity<?> hideAllReceivedGeneralDocuments(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            String username = authentication.getName();
+            int hiddenCount = documentMetadataRepository.hideAllReceivedGeneralDocumentsByUsername(username);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Bandeja de entrada limpiada correctamente.",
+                    "hiddenCount", hiddenCount));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error al limpiar la bandeja de entrada.",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
+    /**
+     * Oculta de forma lógica todos los documentos de mensajería general de la
+     * bandeja de salida del usuario autenticado. No elimina registros físicos.
+     */
+    @PatchMapping("/sent/hide-all")
+    public ResponseEntity<?> hideAllSentGeneralDocuments(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            String username = authentication.getName();
+            int hiddenCount = documentMetadataRepository.hideAllSentGeneralDocumentsByUsername(username);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Bandeja de salida limpiada correctamente.",
+                    "hiddenCount", hiddenCount));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error al limpiar la bandeja de salida.",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
+    /**
      * Convierte un objeto DocumentMetadata en un mapa de respuesta para la API.
      * 
      * @param document El objeto DocumentMetadata que se desea convertir.
