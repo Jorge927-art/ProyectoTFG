@@ -2,8 +2,7 @@ import type { AuthUser } from './authTypes';
 
 // [CORRECCIÓN CRÍTICA DE AUDITORÍA]: Unificamos bajo una única clave oficial eliminando la duplicidad física
 const USER_KEY = 'auth_user'; 
-const TOKEN_KEY = 'accessToken'; 
-const REFRESH_TOKEN_KEY = 'refreshToken';
+let inMemoryAccessToken: string | null = null;
 
 const EMPTY_INTERESTS = {
     categories: [] as string[],
@@ -37,186 +36,21 @@ function canUseBrowserStorage() {
     return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 }
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-    try {
-        const parts = token.split('.');
-        if (parts.length < 2) {
-            return null;
-        }
-
-        const payloadPart = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-        const padLength = (4 - (payloadPart.length % 4)) % 4;
-        const padded = payloadPart + '='.repeat(padLength);
-
-        if (typeof atob !== 'function') {
-            return null;
-        }
-
-        const jsonPayload = atob(padded);
-        const parsed = JSON.parse(jsonPayload);
-        return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
-    } catch {
-        return null;
-    }
-}
-
-function isTokenAlignedWithStoredUser(token: string, user: AuthUser): boolean {
-    const payload = decodeJwtPayload(token);
-    if (!payload) {
-        return true;
-    }
-
-    const tokenUserId = typeof payload.userId === 'number' ? payload.userId : null;
-    const tokenUsername = typeof payload.sub === 'string' ? payload.sub.trim().toLowerCase() : null;
-    const tokenEmail = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : null;
-
-    if (typeof user.userId === 'number' && tokenUserId !== null) {
-        return user.userId === tokenUserId;
-    }
-
-    const normalizedStoredUsername = typeof user.username === 'string' ? user.username.trim().toLowerCase() : '';
-    const normalizedStoredEmail = typeof user.email === 'string' ? user.email.trim().toLowerCase() : '';
-
-    if (tokenUsername && normalizedStoredUsername) {
-        return tokenUsername === normalizedStoredUsername;
-    }
-
-    if (tokenEmail && normalizedStoredEmail) {
-        return tokenEmail === normalizedStoredEmail;
-    }
-
-    return true;
-}
-
-function extractTokenFromStoredUser(): string | null {
-    if (!canUseBrowserStorage()) {
-        return null;
-    }
-
-    const rawValue = window.localStorage.getItem(USER_KEY) ?? window.localStorage.getItem('user');
-    if (!rawValue) {
-        return null;
-    }
-
-    try {
-        const parsedValue = JSON.parse(rawValue) as Record<string, unknown>;
-        const tokenCandidate =
-            typeof parsedValue.token === 'string'
-                ? parsedValue.token
-                : typeof parsedValue.accessToken === 'string'
-                    ? parsedValue.accessToken
-                    : typeof parsedValue.access_token === 'string'
-                        ? parsedValue.access_token
-                        : '';
-        const token = tokenCandidate.trim();
-        return token.length > 0 ? token : null;
-    } catch {
-        return null;
-    }
-}
-
-function extractRefreshTokenFromStoredUser(): string | null {
-    if (!canUseBrowserStorage()) {
-        return null;
-    }
-
-    const rawValue = window.localStorage.getItem(USER_KEY) ?? window.localStorage.getItem('user');
-    if (!rawValue) {
-        return null;
-    }
-
-    try {
-        const parsedValue = JSON.parse(rawValue) as Record<string, unknown>;
-        const tokenCandidate =
-            typeof parsedValue.refreshToken === 'string'
-                ? parsedValue.refreshToken
-                : typeof parsedValue.refresh_token === 'string'
-                    ? parsedValue.refresh_token
-                    : '';
-        const token = tokenCandidate.trim();
-        return token.length > 0 ? token : null;
-    } catch {
-        return null;
-    }
-}
-
-/**
- * Lee el token JWT guardado en el navegador de forma aislada.
- */
 export function readStoredToken(): string | null {
-    if (!canUseBrowserStorage()) {
-        return null;
-    }
-
-    const persistedToken = window.localStorage.getItem(TOKEN_KEY);
-    const userEmbeddedToken = extractTokenFromStoredUser();
-
-    // Si existe token embebido en auth_user y no coincide con accessToken, sincronizamos.
-    if (userEmbeddedToken && userEmbeddedToken !== persistedToken) {
-        window.localStorage.setItem(TOKEN_KEY, userEmbeddedToken);
-        return userEmbeddedToken;
-    }
-
-    if (persistedToken && persistedToken.trim().length > 0) {
-        return persistedToken;
-    }
-
-    // Fallback de compatibilidad: si no existe accessToken, usamos auth_user.token.
-    if (userEmbeddedToken) {
-        window.localStorage.setItem(TOKEN_KEY, userEmbeddedToken);
-        return userEmbeddedToken;
-    }
-
-    return null;
+    return inMemoryAccessToken;
 }
 
-/**
- * Persiste el token de acceso JWT en el navegador de forma segura.
- */
 export function writeStoredToken(token: string) {
-    if (!canUseBrowserStorage()) {
-        return;
-    }
-    window.localStorage.setItem(TOKEN_KEY, token);
+    const normalized = typeof token === 'string' ? token.trim() : '';
+    inMemoryAccessToken = normalized.length > 0 ? normalized : null;
 }
 
-/**
- * Lee el refresh token guardado en el navegador.
- */
 export function readStoredRefreshToken(): string | null {
-    if (!canUseBrowserStorage()) {
-        return null;
-    }
-
-    const persistedRefreshToken = window.localStorage.getItem(REFRESH_TOKEN_KEY);
-    const userEmbeddedRefreshToken = extractRefreshTokenFromStoredUser();
-
-    if (userEmbeddedRefreshToken && userEmbeddedRefreshToken !== persistedRefreshToken) {
-        window.localStorage.setItem(REFRESH_TOKEN_KEY, userEmbeddedRefreshToken);
-        return userEmbeddedRefreshToken;
-    }
-
-    if (persistedRefreshToken && persistedRefreshToken.trim().length > 0) {
-        return persistedRefreshToken;
-    }
-
-    if (userEmbeddedRefreshToken) {
-        window.localStorage.setItem(REFRESH_TOKEN_KEY, userEmbeddedRefreshToken);
-        return userEmbeddedRefreshToken;
-    }
-
+    // El refresh token vive en una cookie HttpOnly y nunca se expone a JavaScript.
     return null;
 }
 
-/**
- * Persiste el refresh token JWT en el navegador.
- */
-export function writeStoredRefreshToken(token: string) {
-    if (!canUseBrowserStorage()) {
-        return;
-    }
-    window.localStorage.setItem(REFRESH_TOKEN_KEY, token);
-}
+export function writeStoredRefreshToken(_token: string) { }
 
 /**
  * Lee la sesión del usuario guardada en el navegador validando estrictamente su tiempo de expiración.
@@ -239,25 +73,24 @@ export function readStoredAuthUser(): AuthUser | null {
             return null;
         }
 
-        // 🛡️ BLINDAJE TFG: Si existe el sello de tiempo y la hora actual superó la expiración, destruimos la sesión
-        if (parsedValue.expiresAt && Date.now() > parsedValue.expiresAt) {
-            console.warn("Sesión local caducada por límite temporal. Limpiando almacenamiento.");
-            clearStoredAuth();
-            return null; 
+        const {
+            token: _legacyToken,
+            accessToken: _legacyAccessToken,
+            access_token: _legacySnakeAccessToken,
+            refreshToken: _legacyRefreshToken,
+            refresh_token: _legacySnakeRefreshToken,
+            ...safeStoredUser
+        } = parsedValue;
+        if (_legacyToken || _legacyAccessToken || _legacySnakeAccessToken || _legacyRefreshToken || _legacySnakeRefreshToken) {
+            window.localStorage.setItem(USER_KEY, JSON.stringify(safeStoredUser));
+            window.localStorage.removeItem('accessToken');
+            window.localStorage.removeItem('refreshToken');
         }
-
         const normalizedUser = {
-            ...parsedValue,
+            ...safeStoredUser,
             username: parsedValue.username,
             interests: normalizeInterests((parsedValue as Record<string, unknown>).interests),
         } as AuthUser;
-
-        const tokenToValidate = readStoredToken();
-        if (tokenToValidate && !isTokenAlignedWithStoredUser(tokenToValidate, normalizedUser)) {
-            console.warn('Sesión inconsistente detectada (usuario/token desalineados). Limpiando almacenamiento.');
-            clearStoredAuth();
-            return null;
-        }
 
         return normalizedUser;
     } catch {
@@ -273,16 +106,17 @@ export function writeStoredAuthUser(user: AuthUser) {
         return;
     }
     // Escribe únicamente en la fuente de verdad oficial ('auth_user')
-    window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+    const {
+        token: _token,
+        accessToken: _accessToken,
+        access_token: _snakeAccessToken,
+        refreshToken: _refreshToken,
+        refresh_token: _snakeRefreshToken,
+        ...safeUser
+    } = user;
+    window.localStorage.setItem(USER_KEY, JSON.stringify(safeUser));
 
-    // Mantiene sincronizado el bearer token para los interceptores HTTP.
-    if (typeof user.token === 'string' && user.token.trim().length > 0) {
-        window.localStorage.setItem(TOKEN_KEY, user.token);
-    }
-
-    if (typeof user.refreshToken === 'string' && user.refreshToken.trim().length > 0) {
-        window.localStorage.setItem(REFRESH_TOKEN_KEY, user.refreshToken);
-    }
+    // Los tokens no se serializan: access vive en memoria y refresh en cookie HttpOnly.
 }
 
 /**
@@ -292,9 +126,9 @@ export function clearStoredAuth() {
     if (!canUseBrowserStorage()) {
         return;
     }
-    // Borra la clave oficial, la del token y ejecuta la purga reactiva de la clave antigua legacy
+    inMemoryAccessToken = null;
     window.localStorage.removeItem(USER_KEY);
-    window.localStorage.removeItem(TOKEN_KEY); 
-    window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+    window.localStorage.removeItem('accessToken');
+    window.localStorage.removeItem('refreshToken');
     window.localStorage.removeItem('user'); // <── Purga preventiva de la clave legacy 'user'
 }

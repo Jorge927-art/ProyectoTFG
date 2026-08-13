@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     clearStoredAuth,
     readStoredAuthUser,
@@ -6,341 +6,66 @@ import {
     readStoredToken,
     writeStoredAuthUser,
     writeStoredRefreshToken,
-    writeStoredToken
+    writeStoredToken,
 } from './authStorage';
 import type { AuthUser } from './authTypes';
 
-describe('AuthStorage - Suite de Pruebas Unitarias de Almacenamiento Local', () => {
-    const USER_KEY = 'auth_user';
-    const TOKEN_KEY = 'accessToken';
-    const REFRESH_TOKEN_KEY = 'refreshToken';
-    const LEGACY_KEY = 'user';
-
-    let localStorageMockStore: Record<string, string> = {};
-
-    const sampleValidUser: AuthUser = {
-        username: 'juan_tfg',
-        interests: {
-            categories: ['Backend', 'Spring Boot'],
-            levels: ['Advanced'],
-            durations: ['Medio'],
-            languages: ['Spanish'],
-            subtitles: ['English']
-        }
-    };
+describe('AuthStorage - metadata persistida y credenciales no persistentes', () => {
+    let store: Record<string, string> = {};
+    const user: AuthUser = { username: 'alumno', role: 'STUDENT' };
 
     beforeEach(() => {
         vi.clearAllMocks();
-        localStorageMockStore = {};
-
+        store = {};
         vi.stubGlobal('localStorage', {
-            getItem: vi.fn((key: string): string | null => localStorageMockStore[key] || null),
-            setItem: vi.fn((key: string, value: string): void => { localStorageMockStore[key] = value; }),
-            removeItem: vi.fn((key: string): void => { delete localStorageMockStore[key]; }),
-            clear: vi.fn(() => { localStorageMockStore = {}; })
+            getItem: vi.fn((key: string) => store[key] ?? null),
+            setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
+            removeItem: vi.fn((key: string) => { delete store[key]; }),
         });
         vi.stubGlobal('window', { localStorage });
+        clearStoredAuth();
     });
 
-    afterEach(() => {
-        vi.unstubAllGlobals();
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('mantiene el access token únicamente en memoria', () => {
+        writeStoredToken('access-memory');
+        expect(readStoredToken()).toBe('access-memory');
+        expect(store).not.toHaveProperty('accessToken');
     });
 
-    /* =========================================================================
-       1. CONTROL DE DISPONIBILIDAD DEL ENTORNO (BROWSER STORAGE SAFETY)
-       ========================================================================= */
-    it('Debería retornar null o abortar operaciones si window o localStorage no están definidos', () => {
-        vi.stubGlobal('window', undefined);
-        
+    it('nunca expone ni persiste el refresh token desde JavaScript', () => {
+        writeStoredRefreshToken('refresh-secret');
+        expect(readStoredRefreshToken()).toBeNull();
+        expect(store).not.toHaveProperty('refreshToken');
+    });
+
+    it('persiste metadata de usuario pero elimina tokens embebidos', () => {
+        writeStoredAuthUser({ ...user, token: 'access-secret', refreshToken: 'refresh-secret' });
+        expect(JSON.parse(store.auth_user)).toEqual(user);
+        expect(store).not.toHaveProperty('accessToken');
+        expect(store).not.toHaveProperty('refreshToken');
+    });
+
+    it('hidrata metadata aunque el expiresAt antiguo haya pasado', () => {
+        store.auth_user = JSON.stringify({ ...user, expiresAt: Date.now() - 1000 });
+        expect(readStoredAuthUser()?.username).toBe('alumno');
+    });
+
+    it('purga metadata y memoria al cerrar sesión', () => {
+        writeStoredToken('access-memory');
+        writeStoredAuthUser(user);
+        store.user = JSON.stringify(user);
+        clearStoredAuth();
         expect(readStoredToken()).toBeNull();
-        expect(readStoredAuthUser()).toBeNull();
-        
-        writeStoredToken('test-jwt');
-        writeStoredAuthUser(sampleValidUser);
-        clearStoredAuth();
-
-        expect(localStorage.setItem).not.toHaveBeenCalled();
+        expect(store).not.toHaveProperty('auth_user');
+        expect(store).not.toHaveProperty('user');
     });
 
-    /* =========================================================================
-       2. CONTROL OPERATIVO DE TOKENS JWT (TOKEN_KEY)
-       ========================================================================= */
-    it('Debería leer, escribir y persistir correctamente el token de acceso JWT', () => {
-        writeStoredToken('jwt-valido-secreto-123');
-        expect(localStorage.setItem).toHaveBeenCalledWith(TOKEN_KEY, 'jwt-valido-secreto-123');
-
-        const token = readStoredToken();
-        expect(token).toBe('jwt-valido-secreto-123');
-    });
-
-    it('Debería leer y escribir correctamente el refresh token dedicado', () => {
-        writeStoredRefreshToken('refresh-valido-secreto-123');
-        expect(localStorage.setItem).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, 'refresh-valido-secreto-123');
-
-        const token = readStoredRefreshToken();
-        expect(token).toBe('refresh-valido-secreto-123');
-    });
-
-    it('Debería tolerar escritura de refresh token sin storage disponible sin provocar side effects', () => {
+    it('es seguro cuando no existe window', () => {
         vi.stubGlobal('window', undefined);
-
-        writeStoredRefreshToken('refresh-inaccesible');
-
-        expect(localStorage.setItem).not.toHaveBeenCalled();
-    });
-
-    it('Debería usar el token embebido en auth_user cuando accessToken no existe', () => {
-        localStorageMockStore[USER_KEY] = JSON.stringify({
-            ...sampleValidUser,
-            token: 'jwt-desde-auth-user'
-        });
-
-        const token = readStoredToken();
-
-        expect(token).toBe('jwt-desde-auth-user');
-        expect(localStorage.setItem).toHaveBeenCalledWith(TOKEN_KEY, 'jwt-desde-auth-user');
-    });
-
-    it('Debería usar token legacy desde auth_user.accessToken si no existe auth_user.token', () => {
-        localStorageMockStore[USER_KEY] = JSON.stringify({
-            ...sampleValidUser,
-            accessToken: 'jwt-legacy-access-token'
-        });
-
-        const token = readStoredToken();
-
-        expect(token).toBe('jwt-legacy-access-token');
-        expect(localStorage.setItem).toHaveBeenCalledWith(TOKEN_KEY, 'jwt-legacy-access-token');
-    });
-
-    it('Debería usar refresh token embebido en auth_user si la clave dedicada no existe', () => {
-        localStorageMockStore[USER_KEY] = JSON.stringify({
-            ...sampleValidUser,
-            refreshToken: 'refresh-legacy-auth-user'
-        });
-
-        const token = readStoredRefreshToken();
-
-        expect(token).toBe('refresh-legacy-auth-user');
-        expect(localStorage.setItem).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, 'refresh-legacy-auth-user');
-    });
-
-    it('Debería usar refresh_token legacy desde auth_user si no existe refreshToken dedicado', () => {
-        localStorageMockStore[USER_KEY] = JSON.stringify({
-            ...sampleValidUser,
-            refresh_token: ' refresh-legacy-snake '
-        });
-
-        const token = readStoredRefreshToken();
-
-        expect(token).toBe('refresh-legacy-snake');
-        expect(localStorage.setItem).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, 'refresh-legacy-snake');
-    });
-
-    it('Debería sincronizar accessToken si difiere del token embebido en auth_user', () => {
-        localStorageMockStore[TOKEN_KEY] = 'jwt-antiguo';
-        localStorageMockStore[USER_KEY] = JSON.stringify({
-            ...sampleValidUser,
-            token: 'jwt-actual'
-        });
-
-        const token = readStoredToken();
-
-        expect(token).toBe('jwt-actual');
-        expect(localStorage.setItem).toHaveBeenCalledWith(TOKEN_KEY, 'jwt-actual');
-    });
-
-    /* =========================================================================
-       3. CONTROL DE MIGRACIÓN Y PURGA DE SESIÓN (USER_KEY & LEGACY_KEY)
-       ========================================================================= */
-    it('Debería escribir el usuario estructurado únicamente bajo la clave oficial unificada', () => {
-        writeStoredAuthUser(sampleValidUser);
-
-        expect(localStorage.setItem).toHaveBeenCalledWith(USER_KEY, JSON.stringify(sampleValidUser));
-        expect(localStorageMockStore[LEGACY_KEY]).toBeUndefined();
-    });
-
-    it('Debería sincronizar accessToken al guardar un usuario con token embebido', () => {
-        writeStoredAuthUser({
-            ...sampleValidUser,
-            token: 'jwt-sincronizado',
-            refreshToken: 'refresh-sincronizado'
-        });
-
-        expect(localStorage.setItem).toHaveBeenCalledWith(USER_KEY, expect.any(String));
-        expect(localStorage.setItem).toHaveBeenCalledWith(TOKEN_KEY, 'jwt-sincronizado');
-        expect(localStorage.setItem).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, 'refresh-sincronizado');
-    });
-
-    it('Debería ser capaz de leer de la clave legacy "user" si la clave unificada oficial no está inicializada', () => {
-        localStorageMockStore[LEGACY_KEY] = JSON.stringify(sampleValidUser);
-
-        const retrievedUser = readStoredAuthUser();
-
-        expect(retrievedUser).not.toBeNull();
-        expect(retrievedUser!.username).toBe('juan_tfg');
-        expect(localStorage.getItem).toHaveBeenCalledWith(USER_KEY);
-        expect(localStorage.getItem).toHaveBeenCalledWith(LEGACY_KEY);
-    });
-
-    it('Debería retornar null si el usuario no tiene nombre de usuario o si el json está corrupto', () => {
-        localStorageMockStore[USER_KEY] = '{"username": "   ", "interests": {}}';
         expect(readStoredAuthUser()).toBeNull();
-
-        localStorageMockStore[USER_KEY] = 'json-malformado-invalido';
-        expect(readStoredAuthUser()).toBeNull();
-    });
-
-    /* =========================================================================
-       4. AUDITORÍA DE SEGURIDAD TEMPORAL: CONTROL DE EXPIRACIÓN
-       ========================================================================= */
-    it('Debería destruir y purgar la sesión si el sello de tiempo expiresAt es anterior a la hora actual', () => {
-        const expiredSession = {
-            ...sampleValidUser,
-            expiresAt: Date.now() - 5000
-        };
-        localStorageMockStore[USER_KEY] = JSON.stringify(expiredSession);
-        localStorageMockStore[TOKEN_KEY] = 'jwt-token-a-destruir';
-
-        const retrievedUser = readStoredAuthUser();
-
-        expect(retrievedUser).toBeNull();
-        expect(localStorageMockStore[USER_KEY]).toBeUndefined();
-        expect(localStorageMockStore[TOKEN_KEY]).toBeUndefined();
-        expect(localStorageMockStore[LEGACY_KEY]).toBeUndefined();
-    });
-
-    it('Debería retornar el usuario intacto si el sello de tiempo expiresAt es posterior a la hora actual', () => {
-        const activeSession = {
-            ...sampleValidUser,
-            expiresAt: Date.now() + 60000
-        };
-        localStorageMockStore[USER_KEY] = JSON.stringify(activeSession);
-
-        const retrievedUser = readStoredAuthUser();
-
-        expect(retrievedUser).not.toBeNull();
-        expect(retrievedUser!.username).toBe('juan_tfg');
-    });
-
-    it('Debería aceptar el usuario si el JWT no aporta userId, sub ni email comparables', () => {
-        const tokenPayload = btoa(JSON.stringify({ role: 'STUDENT' }))
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
-            .replace(/=+$/, '');
-
-        localStorageMockStore[TOKEN_KEY] = `x.${tokenPayload}.y`;
-        localStorageMockStore[USER_KEY] = JSON.stringify({
-            ...sampleValidUser,
-            username: 'juan_tfg',
-            email: 'juan@tfg.com'
-        });
-
-        const retrievedUser = readStoredAuthUser();
-
-        expect(retrievedUser).not.toBeNull();
-        expect(retrievedUser!.username).toBe('juan_tfg');
-    });
-
-    it('Debería invalidar sesión si el JWT activo pertenece a otra identidad', () => {
-        const tokenPayload = btoa(JSON.stringify({ sub: 'otro_usuario', role: 'STUDENT' }))
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
-            .replace(/=+$/, '');
-        localStorageMockStore[TOKEN_KEY] = `x.${tokenPayload}.y`;
-        localStorageMockStore[USER_KEY] = JSON.stringify({
-            ...sampleValidUser,
-            username: 'juan_tfg'
-        });
-
-        const retrievedUser = readStoredAuthUser();
-
-        expect(retrievedUser).toBeNull();
-        expect(localStorageMockStore[USER_KEY]).toBeUndefined();
-        expect(localStorageMockStore[TOKEN_KEY]).toBeUndefined();
-    });
-
-        /* =========================================================================
-       5. ABSORCIÓN NATIVA DE INTERESES (NORMALIZACIÓN DE ESTRUCTURAS)
-       ========================================================================= */
-    it('Debería aplicar arrays vacíos por defecto en intereses si la propiedad viene corrupta o nula', () => {
-        const corruptInterestsUser = {
-            username: 'ana_tfg',
-            interests: {
-                categories: 'NoSoyUnArraySinoUnStringMalformado',
-                levels: null,
-                durations: [123, 'Medio', true]
-            }
-        };
-        localStorageMockStore[USER_KEY] = JSON.stringify(corruptInterestsUser);
-
-        const retrievedUser = readStoredAuthUser();
-
-        expect(retrievedUser).not.toBeNull();
-
-        // [SOLUCCIÓN MATEMÁTICA DEFINITIVA]: Validamos de forma conjunta la existencia del usuario y de su nodo opcional de intereses
-        if (retrievedUser && retrievedUser.interests) {
-            expect(retrievedUser.interests.categories).toEqual([]);
-            expect(retrievedUser.interests.levels).toEqual([]);
-            expect(retrievedUser.interests.durations).toEqual(['Medio']);
-            expect(retrievedUser.interests.languages).toEqual([]);
-            expect(retrievedUser.interests.subtitles).toEqual([]);
-        }
-    });
-
-           it('Debería aplicar EMPTY_INTERESTS si el nodo interests no es un objeto o no existe en el JSON', () => {
-        const simpleUserNoInterests = { username: 'pedro_tfg', interests: null };
-        localStorageMockStore[USER_KEY] = JSON.stringify(simpleUserNoInterests);
-
-        const retrievedUser = readStoredAuthUser();
-
-        expect(retrievedUser).not.toBeNull();
-
-        // Aplicamos la misma doble validación síncrona
-        if (retrievedUser && retrievedUser.interests) {
-            expect(retrievedUser.interests).toEqual({
-                categories: [],
-                levels: [],
-                durations: [],
-                languages: [],
-                subtitles: []
-            });
-        }
-    });
-
-    /* =========================================================================
-       6. PURGA RADICAL AL CERRAR SESIÓN (CLEAR STORED AUTH)
-       ========================================================================= */
-    it('Debería borrar la clave oficial, la de token y ejecutar la purga reactiva preventiva de la clave legacy user', () => {
-        localStorageMockStore[USER_KEY] = JSON.stringify(sampleValidUser);
-        localStorageMockStore[TOKEN_KEY] = 'jwt-activo';
-        localStorageMockStore[REFRESH_TOKEN_KEY] = 'refresh-activo';
-        localStorageMockStore[LEGACY_KEY] = 'datos-antiguos-de-sesion';
-
-        clearStoredAuth();
-
-        expect(localStorage.removeItem).toHaveBeenCalledWith(USER_KEY);
-        expect(localStorage.removeItem).toHaveBeenCalledWith(TOKEN_KEY);
-        expect(localStorage.removeItem).toHaveBeenCalledWith(REFRESH_TOKEN_KEY);
-        expect(localStorage.removeItem).toHaveBeenCalledWith(LEGACY_KEY);
-
-        expect(localStorageMockStore[USER_KEY]).toBeUndefined();
-        expect(localStorageMockStore[TOKEN_KEY]).toBeUndefined();
-        expect(localStorageMockStore[REFRESH_TOKEN_KEY]).toBeUndefined();
-        expect(localStorageMockStore[LEGACY_KEY]).toBeUndefined();
-    });
-
-    it('Debería no sincronizar accessToken ni refreshToken si el usuario los trae vacíos o en blanco', () => {
-        writeStoredAuthUser({
-            ...sampleValidUser,
-            token: '   ',
-            refreshToken: ''
-        });
-
-        expect(localStorage.setItem).toHaveBeenCalledWith(USER_KEY, expect.any(String));
-        expect(localStorage.setItem).not.toHaveBeenCalledWith(TOKEN_KEY, expect.anything());
-        expect(localStorage.setItem).not.toHaveBeenCalledWith(REFRESH_TOKEN_KEY, expect.anything());
+        writeStoredToken('access-memory');
+        expect(readStoredToken()).toBe('access-memory');
     });
 });
-
-

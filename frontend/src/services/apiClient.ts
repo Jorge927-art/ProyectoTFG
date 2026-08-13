@@ -1,11 +1,7 @@
 import axios from 'axios';
 import {
     clearStoredAuth,
-    readStoredAuthUser,
-    readStoredRefreshToken,
     readStoredToken,
-    writeStoredAuthUser,
-    writeStoredRefreshToken,
     writeStoredToken
 } from '../auth/authStorage';
 
@@ -17,6 +13,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 export const apiClient = axios.create({
     baseURL: API_URL,
     timeout: 5000,
+    withCredentials: true,
 });
 
 type RefreshResponse = {
@@ -25,11 +22,13 @@ type RefreshResponse = {
     expiresIn?: number;
 };
 
+export type AccessTokenRefreshResult = RefreshResponse;
+
 type RetriableRequestConfig = import('axios').InternalAxiosRequestConfig & {
     _retry?: boolean;
 };
 
-let refreshRequestInFlight: Promise<string | null> | null = null;
+let refreshRequestInFlight: Promise<AccessTokenRefreshResult | null> | null = null;
 
 const AUTH_PATHS_WITHOUT_RETRY = [
     '/api/auth/login',
@@ -46,17 +45,12 @@ function shouldBypassRefresh(url?: string): boolean {
     return AUTH_PATHS_WITHOUT_RETRY.some((path) => url.includes(path));
 }
 
-async function requestNewAccessToken(): Promise<string | null> {
-    const refreshToken = readStoredRefreshToken();
-    if (!refreshToken) {
-        return null;
-    }
-
+async function performRefreshAccessToken(): Promise<AccessTokenRefreshResult | null> {
     try {
         const response = await axios.post<RefreshResponse>(
             `${API_URL}/api/auth/refresh`,
-            { refreshToken },
-            { timeout: 5000 }
+            undefined,
+            { timeout: 5000, withCredentials: true }
         );
 
         const newAccessToken = typeof response.data?.accessToken === 'string'
@@ -68,30 +62,22 @@ async function requestNewAccessToken(): Promise<string | null> {
         }
 
         writeStoredToken(newAccessToken);
-
-        const newRefreshToken = typeof response.data?.refreshToken === 'string'
-            ? response.data.refreshToken.trim()
-            : '';
-        if (newRefreshToken) {
-            writeStoredRefreshToken(newRefreshToken);
-        }
-
-        const currentUser = readStoredAuthUser();
-        if (currentUser) {
-            const expiresIn = typeof response.data?.expiresIn === 'number' ? response.data.expiresIn : 0;
-            const sessionLifespanMs = expiresIn > 0 ? expiresIn * 1000 : 15 * 60 * 1000;
-            writeStoredAuthUser({
-                ...currentUser,
-                token: newAccessToken,
-                refreshToken: newRefreshToken || currentUser.refreshToken,
-                expiresAt: Date.now() + sessionLifespanMs
-            });
-        }
-
-        return newAccessToken;
+        window.dispatchEvent(new CustomEvent('auth-session-refreshed', {
+            detail: { expiresIn: response.data?.expiresIn ?? 0 }
+        }));
+        return response.data;
     } catch {
         return null;
     }
+}
+
+export function refreshAccessToken(): Promise<AccessTokenRefreshResult | null> {
+    if (!refreshRequestInFlight) {
+        refreshRequestInFlight = performRefreshAccessToken().finally(() => {
+            refreshRequestInFlight = null;
+        });
+    }
+    return refreshRequestInFlight;
 }
 
 /**
@@ -130,13 +116,7 @@ apiClient.interceptors.response.use(
 
         originalRequest._retry = true;
 
-        if (!refreshRequestInFlight) {
-            refreshRequestInFlight = requestNewAccessToken().finally(() => {
-                refreshRequestInFlight = null;
-            });
-        }
-
-        const renewedAccessToken = await refreshRequestInFlight;
+        const renewedAccessToken = (await refreshAccessToken())?.accessToken ?? null;
         if (!renewedAccessToken) {
             clearStoredAuth();
             window.dispatchEvent(new Event('auth-session-expired'));

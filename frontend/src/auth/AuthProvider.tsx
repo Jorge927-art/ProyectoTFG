@@ -6,17 +6,16 @@ import {
     clearStoredAuth,
     readStoredAuthUser,
     writeStoredAuthUser,
-    writeStoredRefreshToken,
     writeStoredToken
 } from './authStorage';
 import { resolveAvatarUrl } from './avatarUrl';
+import { apiClient, refreshAccessToken } from '../services/apiClient';
 
 interface AuthProviderProps {
     children: ReactNode;
 }
 
-// Constante de inactividad: 15 minutos en milisegundos (Exigencia de Auditoría)
-const INACTIVITY_LIFESPAN_MS = 15 * 60 * 1000;
+const DEFAULT_ACCESS_TOKEN_LIFESPAN_MS = 15 * 60 * 1000;
 
 const EMPTY_INTERESTS = {
     categories: [] as string[],
@@ -52,45 +51,16 @@ function normalizeInterests(interests: unknown) {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Estado de usuario autenticado, inicializado desde el almacenamiento local
     const [user, setUser] = useState<AuthUser | null>(() => readStoredAuthUser());
-
-    // Ref inicializada de forma pura con 0 para satisfacer las reglas de compilación estricta
-    const lastActivityRef = useRef<number>(0);
-
-    // Inicialización segura del timestamp del marcador al montar el componente en el navegador
-    useEffect(() => {
-        lastActivityRef.current = Date.now();
-    }, []);
+    const [isLoading, setIsLoading] = useState(true);
+    const refreshInFlightRef = useRef(false);
 
     /**
      * Cierra la sesión del usuario limpiando el estado y el almacenamiento.
      */
     const logout = useCallback(() => {
+        void Promise.resolve(apiClient.post?.('/api/auth/logout')).catch(() => undefined);
         setUser(null);
         clearStoredAuth();
-    }, []);
-
-    /**
-     * Resetea el temporizador de inactividad actualizando el instante de expiración en caliente [ADR-34]
-     */
-    const resetInactivityTimeout = useCallback(() => {
-        const now = Date.now();
-        // Throttle de 2 segundos: Evita actualizar el estado de React de forma masiva en mousemove concurrentes
-        if (now - lastActivityRef.current < 2000) return;
-
-        lastActivityRef.current = now;
-
-        setUser((currentUser) => {
-            if (!currentUser) return null;
-
-            const updatedUser = {
-                ...currentUser,
-                expiresAt: now + INACTIVITY_LIFESPAN_MS
-            };
-
-            // Sincronizamos en el storage para que si recarga la pestaña se mantenga el tiempo ganado
-            writeStoredAuthUser(updatedUser);
-            return updatedUser;
-        });
     }, []);
 
     /**
@@ -101,7 +71,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const seconds = tokenData.expiresIn;
 
         // Punto de partida inicial: 15 min por defecto si falla o no viene el dato
-        const lifespanMs = (typeof seconds === 'number' && seconds > 0) ? seconds * 1000 : INACTIVITY_LIFESPAN_MS;
+        const lifespanMs = (typeof seconds === 'number' && seconds > 0) ? seconds * 1000 : DEFAULT_ACCESS_TOKEN_LIFESPAN_MS;
         const expiresAt = Date.now() + lifespanMs;
 
         // Extraer los datos e inyectar el sello de caducidad y el array de cursos matriculados
@@ -114,17 +84,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             interests: normalizeInterests(tokenData.interests),
             photo: resolveAvatarUrl(tokenData.avatarPath),
             token: tokenData.accessToken,
-            refreshToken: tokenData.refreshToken,
-            expiresAt: expiresAt
+            expiresAt
         };
 
-        lastActivityRef.current = Date.now();
         setUser(nextUser);
+        setIsLoading(false);
         writeStoredAuthUser(nextUser);
         writeStoredToken(tokenData.accessToken);
-        if (typeof tokenData.refreshToken === 'string' && tokenData.refreshToken.trim().length > 0) {
-            writeStoredRefreshToken(tokenData.refreshToken);
-        }
     };
 
     /**
@@ -144,45 +110,35 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         });
     }, []);
 
-    /**
-     * MONITOR DE ACTIVIDAD GLOBAL DEL USUARIO (DOM LISTENERS) [ADR-34]
-     * Captura las interacciones humanas reales para posponer de forma transparente la expulsión.
-     */
     useEffect(() => {
-        if (!user) return;
-
-        window.addEventListener('mousemove', resetInactivityTimeout);
-        window.addEventListener('keydown', resetInactivityTimeout);
-        window.addEventListener('click', resetInactivityTimeout);
-        window.addEventListener('scroll', resetInactivityTimeout);
-
-        return () => {
-            window.removeEventListener('mousemove', resetInactivityTimeout);
-            window.removeEventListener('keydown', resetInactivityTimeout);
-            window.removeEventListener('click', resetInactivityTimeout);
-            window.removeEventListener('scroll', resetInactivityTimeout);
+        const refreshSilently = async () => {
+            if (refreshInFlightRef.current) return false;
+            refreshInFlightRef.current = true;
+            try {
+                const result = await refreshAccessToken();
+                if (!result?.accessToken) return false;
+                const expiresIn = typeof result.expiresIn === 'number' && result.expiresIn > 0
+                    ? result.expiresIn * 1000
+                    : DEFAULT_ACCESS_TOKEN_LIFESPAN_MS;
+                setUser((currentUser) => {
+                    if (!currentUser) return currentUser;
+                    const updatedUser = { ...currentUser, expiresAt: Date.now() + expiresIn };
+                    writeStoredAuthUser(updatedUser);
+                    return updatedUser;
+                });
+                return true;
+            } finally {
+                refreshInFlightRef.current = false;
+            }
         };
-    }, [user, resetInactivityTimeout]);
-
-    /**
-     * BLINDAJE TFG ESTRÉPITO (Auditoría NotebookLM): Desconexión Proactiva Anti-Congelación.
-     * Evalúa el timestamp "expiresAt" dinámico mutado por el monitor de actividad.
-     */
-    useEffect(() => {
-        const userWithExpiry = user as (AuthUser & { expiresAt?: number }) | null;
-
-        if (!userWithExpiry || !userWithExpiry.expiresAt) return;
 
         const checkTokenExpiration = () => {
-            if (Date.now() >= userWithExpiry.expiresAt!) {
-                console.warn("Sesión expirada por inactividad prolongada (Límite 15m alcanzado).");
-                logout();
-                return true;
-            }
-            return false;
+            const expiresAt = (user as (AuthUser & { expiresAt?: number }) | null)?.expiresAt;
+            if (!expiresAt || Date.now() < expiresAt) return;
+            void refreshSilently().then((renewed) => {
+                if (!renewed) logout();
+            });
         };
-
-        if (checkTokenExpiration()) return;
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
@@ -201,6 +157,50 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [user, logout]);
+
+    useEffect(() => {
+        const bootstrap = async () => {
+            if (!user) {
+                setIsLoading(false);
+                return;
+            }
+            const result = await refreshAccessToken();
+            if (!result?.accessToken) {
+                logout();
+            } else {
+                const expiresIn = typeof result.expiresIn === 'number' && result.expiresIn > 0
+                    ? result.expiresIn * 1000
+                    : DEFAULT_ACCESS_TOKEN_LIFESPAN_MS;
+                setUser((currentUser) => {
+                    if (!currentUser) return currentUser;
+                    const updatedUser = { ...currentUser, expiresAt: Date.now() + expiresIn };
+                    writeStoredAuthUser(updatedUser);
+                    return updatedUser;
+                });
+            }
+            setIsLoading(false);
+        };
+        void bootstrap();
+        // Solo se ejecuta una vez para recuperar la sesión tras recarga.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        const handleSessionRefreshed = (event: Event) => {
+            const expiresIn = (event as CustomEvent<{ expiresIn?: number }>).detail?.expiresIn;
+            const lifespan = typeof expiresIn === 'number' && expiresIn > 0
+                ? expiresIn * 1000
+                : DEFAULT_ACCESS_TOKEN_LIFESPAN_MS;
+            setUser((currentUser) => {
+                if (!currentUser) return currentUser;
+                const updatedUser = { ...currentUser, expiresAt: Date.now() + lifespan };
+                writeStoredAuthUser(updatedUser);
+                return updatedUser;
+            });
+        };
+        window.addEventListener('auth-session-refreshed', handleSessionRefreshed);
+        return () => window.removeEventListener('auth-session-refreshed', handleSessionRefreshed);
+    }, []);
 
     /**
      * CIRCUITO DE RESPUESTA REACTIVA ANTE CADUCIDAD (Solución al Hallazgo de Axios)
@@ -221,12 +221,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         () => ({
             user,
             isAuthenticated: Boolean(user),
-            isLoading: false,
+            isLoading,
             login,
             updateUser,
             logout,
         }),
-        [user, logout, updateUser]
+        [user, isLoading, logout, updateUser]
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

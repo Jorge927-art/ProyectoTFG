@@ -90,7 +90,8 @@ class UserControllerTest {
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.username").value("Luis"))
                                 .andExpect(jsonPath("$.enrolledCourseIds[0]").value(101))
-                                .andExpect(jsonPath("$.refreshToken").value("refresh-token"));
+                                .andExpect(result -> org.junit.jupiter.api.Assertions.assertTrue(
+                                                result.getResponse().getHeader("Set-Cookie").contains("HttpOnly")));
         }
 
         @Test
@@ -157,7 +158,8 @@ class UserControllerTest {
                                 .andExpect(jsonPath("$.interests.subtitles[0]").value("Subtítulos en Español"))
                                 .andExpect(jsonPath("$.enrolledCourseIds[0]").value(101))
                                 .andExpect(jsonPath("$.enrolledCourseIds[1]").value(202))
-                                .andExpect(jsonPath("$.refreshToken").value("refresh-token"));
+                                .andExpect(result -> org.junit.jupiter.api.Assertions.assertTrue(
+                                                result.getResponse().getHeader("Set-Cookie").contains("HttpOnly")));
         }
 
         @Test
@@ -174,7 +176,8 @@ class UserControllerTest {
                                 .content("{\"refreshToken\":\"refresh-viejo\"}"))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.accessToken").value("access-nuevo"))
-                                .andExpect(jsonPath("$.refreshToken").value("refresh-nuevo"))
+                                .andExpect(result -> org.junit.jupiter.api.Assertions.assertTrue(
+                                                result.getResponse().getHeader("Set-Cookie").contains("refresh-nuevo")))
                                 .andExpect(jsonPath("$.tokenType").value("Bearer"));
         }
 

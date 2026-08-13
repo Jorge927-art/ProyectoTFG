@@ -27,6 +27,7 @@ describe('apiClient - Suite de Pruebas Unitarias de Interceptores de Red', () =>
     it('Debe inicializar la instancia de Axios con los límites técnicos de timeout y baseURL', () => {
         expect(apiClient.defaults.timeout).toBe(5000);
         expect(apiClient.defaults.baseURL).toBeDefined();
+        expect(apiClient.defaults.withCredentials).toBe(true);
     });
 
         /* =========================================================================
@@ -131,11 +132,11 @@ describe('apiClient - Suite de Pruebas Unitarias de Interceptores de Red', () =>
 
         expect(axiosPostSpy).toHaveBeenCalledWith(
             expect.stringContaining('/api/auth/refresh'),
-            { refreshToken: 'refresh_antiguo_123' },
-            expect.any(Object)
+            undefined,
+            expect.objectContaining({ withCredentials: true })
         );
         expect(authStorageModule.writeStoredToken).toHaveBeenCalledWith('access_nuevo_123');
-        expect(authStorageModule.writeStoredRefreshToken).toHaveBeenCalledWith('refresh_nuevo_123');
+        expect(authStorageModule.writeStoredRefreshToken).not.toHaveBeenCalled();
         expect(requestSpy).toHaveBeenCalled();
         expect(dispatchEventSpy).not.toHaveBeenCalledWith(
             expect.objectContaining({ type: 'auth-session-expired' })
@@ -354,10 +355,7 @@ describe('apiClient - Suite de Pruebas Unitarias de Interceptores de Red', () =>
         await expect(responseInterceptor.rejected(authError)).resolves.toEqual({ status: 200 });
 
         expect(authStorageModule.writeStoredRefreshToken).not.toHaveBeenCalled();
-        expect(authStorageModule.writeStoredAuthUser).toHaveBeenCalledWith(expect.objectContaining({
-            token: 'nuevo_access_token',
-            refreshToken: 'refresh_original'
-        }));
+        expect(authStorageModule.writeStoredAuthUser).not.toHaveBeenCalled();
         expect(requestSpy).toHaveBeenCalled();
     });
 

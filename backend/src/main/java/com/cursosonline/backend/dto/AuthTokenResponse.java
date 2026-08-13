@@ -3,8 +3,10 @@ package com.cursosonline.backend.dto;
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Users;
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 // Definición canónica del Record con sus campos correctamente separados por comas
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record AuthTokenResponse(
         String accessToken,
         String refreshToken,

@@ -20,10 +20,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.web.bind.annotation.*;
-import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.Map;
+import java.time.Duration;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
 import java.time.Instant;
 import java.util.List;
 import java.security.Principal;
@@ -42,11 +47,25 @@ import java.util.LinkedHashMap;
 @RequiredArgsConstructor
 public class UserController {
 
+    private static final String DEFAULT_REFRESH_COOKIE_NAME = "cursosonline_refresh";
+
     private final UserService userService;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final EnrollmentRepository enrollmentRepository;
     private final UserProfileRepository userProfileRepository;
+
+    @Value("${app.auth.refresh-cookie-name:cursosonline_refresh}")
+    private String refreshCookieName = DEFAULT_REFRESH_COOKIE_NAME;
+
+    @Value("${app.auth.refresh-cookie-secure:false}")
+    private boolean refreshCookieSecure = false;
+
+    @Value("${app.auth.refresh-cookie-same-site:Strict}")
+    private String refreshCookieSameSite = "Strict";
+
+    @Value("${app.jwt.refresh-token-expiration-days:7}")
+    private long refreshTokenExpirationDays = 7;
 
     /**
      * Endpoint para registrar un nuevo usuario (alumno) en la plataforma.
@@ -96,9 +115,8 @@ public class UserController {
                 ? (expirationInstant.getEpochSecond() - Instant.now().getEpochSecond())
                 : 0;
 
-        return ResponseEntity
-                .ok(AuthTokenResponse.from(user, jwtToken, refreshToken, expiresInSeconds, enrolledCourseIds,
-                        avatarPath, interests));
+        return withRefreshCookie(AuthTokenResponse.from(user, jwtToken, null, expiresInSeconds, enrolledCourseIds,
+                avatarPath, interests), refreshToken);
     }
 
     /**
@@ -108,11 +126,18 @@ public class UserController {
      * @return Una respuesta con el nuevo token JWT y el refresh token actualizado.
      */
     @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(@RequestBody RefreshTokenRequest request) {
+    public ResponseEntity<?> refresh(@RequestBody(required = false) RefreshTokenRequest request,
+            HttpServletRequest httpRequest) {
         try {
-            String refreshToken = request != null ? request.refreshToken() : null;
+            String refreshToken = readRefreshCookie(httpRequest);
+            if (refreshToken == null && request != null) {
+                refreshToken = request.refreshToken();
+            }
             RefreshTokenResponse response = refreshTokenService.rotate(refreshToken);
-            return ResponseEntity.ok(response);
+            return withRefreshCookie(Map.of(
+                    "accessToken", response.accessToken(),
+                    "tokenType", response.tokenType(),
+                    "expiresIn", response.expiresIn()), response.refreshToken());
         } catch (RuntimeException ex) {
             return ResponseEntity.status(401).body(Map.of("error", ex.getMessage()));
         }
@@ -125,10 +150,52 @@ public class UserController {
      * @return Una respuesta indicando el éxito de la operación.
      */
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(@RequestBody(required = false) RefreshTokenRequest request) {
-        String refreshToken = request != null ? request.refreshToken() : null;
+    public ResponseEntity<?> logout(@RequestBody(required = false) RefreshTokenRequest request,
+            HttpServletRequest httpRequest) {
+        String refreshToken = readRefreshCookie(httpRequest);
+        if (refreshToken == null && request != null) {
+            refreshToken = request.refreshToken();
+        }
         refreshTokenService.revokeIfPresent(refreshToken);
-        return ResponseEntity.ok(Map.of("success", true));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, buildRefreshCookie(null, Duration.ZERO).toString())
+                .body(Map.of("success", true));
+    }
+
+    private <T> ResponseEntity<T> withRefreshCookie(T body, String refreshToken) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE,
+                        buildRefreshCookie(refreshToken, Duration.ofDays(refreshTokenExpirationDays)).toString())
+                .body(body);
+    }
+
+    private ResponseCookie buildRefreshCookie(String value, Duration maxAge) {
+        String cookieName = refreshCookieName == null || refreshCookieName.isBlank()
+                ? DEFAULT_REFRESH_COOKIE_NAME
+                : refreshCookieName.trim();
+        return ResponseCookie.from(cookieName, value == null ? "" : value)
+                .httpOnly(true)
+                .secure(refreshCookieSecure)
+                .sameSite(refreshCookieSameSite)
+                .path("/api/auth")
+                .maxAge(maxAge)
+                .build();
+    }
+
+    private String readRefreshCookie(HttpServletRequest request) {
+        if (request == null || request.getCookies() == null) {
+            return null;
+        }
+        String cookieName = refreshCookieName == null || refreshCookieName.isBlank()
+                ? DEFAULT_REFRESH_COOKIE_NAME
+                : refreshCookieName.trim();
+        for (Cookie cookie : request.getCookies()) {
+            if (cookieName.equals(cookie.getName()) && cookie.getValue() != null
+                    && !cookie.getValue().isBlank()) {
+                return cookie.getValue();
+            }
+        }
+        return null;
     }
 
     /**

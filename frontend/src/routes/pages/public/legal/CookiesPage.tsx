@@ -14,9 +14,9 @@ const CookiesPage = () => {
             <section>
                 <h2>Tecnologías propias utilizadas</h2>
                 <p>
-                    La autenticación de la SPA se basa principalmente en tokens de acceso y refresco almacenados en
-                    localStorage del navegador, junto con cabeceras Authorization de tipo Bearer en las peticiones API.
-                    Este flujo no depende de cookies de autenticación propias para mantener sesión en el cliente.
+                    La autenticación utiliza un token de acceso temporal mantenido en memoria y una cookie técnica de
+                    renovación configurada como HttpOnly, Secure en producción y SameSite. El navegador gestiona esta
+                    cookie automáticamente; el código de la aplicación no puede leerla ni almacenarla en localStorage.
                 </p>
             </section>
 
