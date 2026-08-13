@@ -8,7 +8,7 @@ import { apiClient } from '../../../../services/apiClient';
 interface EnrolledCoursesProps {
     enrolledList: EnrollmentInfo[];
     loadingEnrollments: boolean;
-    onRefresh: () => void;
+    onRefresh: () => void | Promise<void>;
     className?: string;
 }
 
@@ -47,7 +47,7 @@ export const EnrolledCourses = ({ enrolledList, loadingEnrollments, onRefresh, c
         setMutatingEnrollmentId(enrollmentId);
         try {
             await apiClient.post(`/api/auth/enrollment/${enrollmentId}/start`);
-            onRefresh();
+            await onRefresh();
         } catch (error) {
             console.error('Error al iniciar el cronómetro del curso:', error);
         } finally {

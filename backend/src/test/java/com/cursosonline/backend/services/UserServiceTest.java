@@ -72,6 +72,9 @@ public class UserServiceTest {
         private AdminCourseCatalogService adminCourseCatalogService;
 
         @Mock
+        private ProfessorCourseAlertService professorCourseAlertService;
+
+        @Mock
         private com.cursosonline.backend.repository.AcademicEvaluationRepository academicEvaluationRepository;
 
         @Mock
@@ -470,6 +473,28 @@ public class UserServiceTest {
                 assertNotNull(enrollment.getStarted_at());
                 assertEquals("EN_CURSO", enrollment.getStatus());
                 verify(enrollmentRepository).save(enrollment);
+                verify(professorCourseAlertService).createInitialEnrollmentAlertIfApplicable(enrollment);
+        }
+
+        @Test
+        void enrollStudentInCourse_NoDebeCrearAvisoInicialHastaIniciarCurso() {
+                Users student = new Users(20L, "student_start", "enc", Role.STUDENT, "student@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses course = new Courses();
+                course.setCourse_id(200L);
+
+                when(userRepository.findByUsername("student_start")).thenReturn(Optional.of(student));
+                when(coursesRepository.findById(200L)).thenReturn(Optional.of(course));
+                when(enrollmentRepository.findByUserIdAndCourseId(20L, 200L)).thenReturn(Optional.empty());
+                when(enrollmentRepository.saveAndFlush(any(Enrollment.class)))
+                                .thenAnswer(invocation -> invocation.getArgument(0));
+
+                Enrollment savedEnrollment = userService.enrollStudentInCourse("student_start", 200L);
+
+                assertNotNull(savedEnrollment);
+                verify(adminCourseCatalogService).markCourseAsEverUsed(200L);
+                verify(professorCourseAlertService, never())
+                                .createInitialEnrollmentAlertIfApplicable(any(Enrollment.class));
         }
 
         @Test
@@ -650,7 +675,6 @@ public class UserServiceTest {
                                 .thenReturn(List.of());
                 when(userSystemNotificationRepository.findUnreadByUsername("profesor")).thenReturn(List.of());
                 when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(2);
-                when(coursesRepository.findAllByAssignedUser_UserIdOrderByTitleAsc(10L)).thenReturn(List.of());
 
                 List<com.cursosonline.backend.dto.NotificationDTO> alerts = userService
                                 .getUserNotifications("profesor");

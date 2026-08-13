@@ -1115,7 +1115,7 @@ Migrar de forma integral la resolución de identidad en los controladores hacia 
 * *Mitigación:* Al tratarse el `userId` de un tipo numérico largo (`Long`), el peso en bytes añadido al token es técnicamente insignificante, quedando plenamente compensado por el ahorro computacional de omitir un `SELECT` secuencial en la base de datos para recuperar ese mismo dato.
 
   ---
-  
+
 # ADR-30: Hidratación Síncrona de Matrículas en el DTO de Sesión
 
 ## Estatus
@@ -1152,7 +1152,7 @@ Rediseñar el registro (*Record*) de transferencia de datos `AuthTokenResponse.j
 * *Mitigación:* Al estar el núcleo de la plataforma estructurado específicamente en torno al progreso académico y matriculaciones del usuario, consolidar este array atómico de IDs en el login es una licencia de diseño pragmática que reduce el tráfico de red general en un 50% durante el arranque, quedando plenamente justificada su eficiencia frente al tribunal.
 
   ---
-  
+
 # ADR-31: Estrategia de Carga Transaccional (Join Fetch vs OSIV)
 
 ## Estatus
@@ -1189,7 +1189,7 @@ Implementar consultas explícitas utilizando cláusulas **`JOIN FETCH`** en los 
 * *Mitigación:* Se segregaron los métodos del repositorio, manteniendo las consultas simples de JPA para operaciones atómicas de validación de IDs y reservando los métodos optimizados con `JOIN FETCH` exclusivamente para los endpoints del directorio académico y el panel de seguimiento, donde la carga del curso es mandatoria para la interfaz.
 
   ---
-  
+
 # ADR-32: Algoritmo de Filtrado Basado en Contenido para el Motor de Recomendaciones
 
 ## Estatus
@@ -1643,8 +1643,8 @@ Se establece un principio estricto de **Purificación Semántica y Abstracción 
 
 # ADR-46: Arquitectura de Agregación Analítica Disociada y Micro-indicadores
 
-**Fecha:** Julio 2026  
-**Estatus:** Aceptado  
+**Fecha:** Julio 2026
+**Estatus:** Aceptado
 
 ## Status
 
@@ -2205,7 +2205,7 @@ Reutilizar el mecanismo de baja lógica ya existente (`enabled = false`) como bl
   * *Mitigación:* decisión consciente y documentada aquí; el proyecto prioriza consistencia interna y menor superficie de cambio sobre semántica HTTP pura en este endpoint concreto.
 
   ---
-  
+
 # Notas de Migración: Transición a JWT y Compatibilidad
 
 **Fecha de análisis:** Junio 2026
@@ -2548,3 +2548,73 @@ Reglas consolidadas:
 
 * **Dependencia del evento global de refresco:** una omisión del broadcast puede degradar la sincronización visual de la campana.
 * *Mitigación:* conservar patrón único `emitNotificationsRefresh()` tras marcado de lectura y validar con pruebas de integración de flujo.
+
+---
+
+# ADR-065: Panel Operativo de Avisos Docentes y Desacoplamiento de la Campana Global
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Agosto 2026
+
+## Contexto
+
+La evolución funcional del módulo docente requería abandonar un esquema de notificaciones genéricas para adoptar un modelo con trazabilidad real por alumno, curso y estado de gestión. El mecanismo previo mezclaba la señal de aviso con la gestión operativa, lo que dificultaba la priorización, favorecía la duplicidad y no permitía distinguir con claridad entre un aviso simplemente visualizado y un aviso efectivamente resuelto.
+
+Además, la asignación de cursos por parte del profesorado debía quedar condicionada a una configuración previa obligatoria. Al pulsar "Impartir curso", la consolidación de la asignación no debía completarse hasta definir el reparto de envíos de material por partes, ya que de ese parámetro depende la generación posterior de avisos intermedios y del aviso final.
+
+## Decisión
+
+Se adopta una arquitectura de avisos docentes separada en dos canales complementarios:
+
+1. La campana global actúa como canal de señal inmediata y muestra avisos pendientes por ver.
+2. El panel docente actúa como canal operativo y permite gestionar cada aviso con un ciclo de vida propio.
+3. La asignación docente queda supeditada a una configuración obligatoria de partes, sin la cual no se consolida el alta.
+4. Los avisos se generan por matrícula y checkpoint, con deduplicación estricta para evitar repeticiones.
+
+## Justificación
+
+Esta decisión mejora la separación de responsabilidades funcionales entre notificación y gestión. La campana informa; el panel opera. El sistema refleja así mejor el dominio académico real, donde el profesorado necesita distinguir entre recibir un aviso, revisarlo y resolverlo.
+
+La configuración por curso también aporta flexibilidad, ya que permite ajustar la frecuencia de avisos sin modificar la lógica principal de negocio ni acoplar el comportamiento al frontend.
+
+## Consecuencias
+
+### Impacto positivo
+
+* Se obtiene trazabilidad completa del trabajo docente por alumno, curso y estado.
+* Se reduce el ruido por duplicidad mediante restricciones de unicidad y control de generación.
+* La experiencia de usuario mejora al separar claramente el canal de señal del canal de gestión.
+* El sistema queda preparado para futuras métricas de carga operativa y tiempos de resolución.
+
+### Riesgos y mitigaciones
+
+* La solución añade complejidad de dominio y persistencia.
+* Mitigación: se emplean DTOs explícitos, servicios especializados y pruebas de flujo.
+
+* Puede aparecer desalineación temporal entre campana y panel.
+* Mitigación: refresco centralizado de notificaciones, dismiss individual idempotente y rehidratación tras operaciones exitosas.
+
+## Trazabilidad de Implementación
+
+| Decisión arquitectónica | Materialización en backend | Materialización en frontend |
+| --- | --- | --- |
+| La asignación docente queda supeditada a una configuración previa obligatoria | `controller/CourseController.java` expone el endpoint `/assign-teacher-with-alert-config` y `services/UserService.java` consolida la asignación transaccional con configuración asociada | `routes/pages/professor/components/ProfessorCoursePicker.tsx` incorpora el modal obligatorio de configuración y `services/useCourseCatalog.ts` controla el resultado de la operación |
+| La configuración por curso se persiste como parte del dominio docente | `entities/CourseMaterialDispatchConfig.java`, `repository/CourseMaterialDispatchConfigRepository.java` y `resources/schema-postgresql.sql` formalizan la tabla `course_material_dispatch_config` | `services/professorAlertService.ts` expone las operaciones de alta y consulta de configuración |
+| Los avisos se generan por matrícula y checkpoint, con garantía de no duplicidad | `entities/ProfessorCourseAlert.java`, `entities/ProfessorAlertType.java`, `entities/ProfessorAlertStatus.java`, `repository/ProfessorCourseAlertRepository.java` y la restricción única definida en `resources/schema-postgresql.sql` | `routes/pages/professor/components/ProfessorTeachingAlertsPanel.tsx` presenta y gestiona los avisos por estado |
+| Se separa el canal de notificación inmediata del canal operativo de gestión | `services/ProfessorCourseAlertService.java`, `controller/ProfessorCourseAlertController.java` y `controller/UserController.java` implementan las acciones de dismiss y transición de estado | `components/ui/globalNotificationBell/GlobalNotificationBell.tsx` y `components/ui/globalNotificationBell/useNotifications.ts` gestionan la campana; el panel docente conserva el flujo operativo |
+| Tras cada alta exitosa se evita la persistencia de estados visuales obsoletos | `controller/CourseController.java` devuelve una respuesta coherente y estable | `routes/pages/professor/ProfessorDashboard.tsx` rehidrata las asignaturas desde backend y `routes/pages/professor/components/ProfessorCoursePicker.tsx` mantiene el modal abierto en caso de error |
+
+## Evidencias de Validación
+
+| Escenario de validación | Evidencia registrada | Resultado observado |
+| --- | --- | --- |
+| Alta docente condicionada a la configuración de `dispatchParts` | Modal de configuración en `ProfessorCoursePicker.tsx` y endpoint `POST /api/courses/{courseId}/assign-teacher-with-alert-config` | La asignación no se consolida hasta completar y guardar la configuración |
+| Generación persistente de avisos sin duplicidad | Entidades `CourseMaterialDispatchConfig` y `ProfessorCourseAlert` con restricción única por `enrollment_id, alert_type, checkpoint_index` | Los avisos quedan vinculados a matrícula, curso y checkpoint de forma unívoca |
+| Consumo independiente del aviso en la campana | `dismissSingleNotification` en `useNotifications.ts` y `dismiss-one` en `UserController.java` | La campana se actualiza sin alterar el estado operativo del panel |
+| Gestión secuencial del estado del aviso | `ProfessorTeachingAlertsPanel.tsx` y `ProfessorCourseAlertController.java` | Se aplica el flujo `PENDING -> VIEWED -> RESOLVED` sin transición inversa |
+| Refresco de asignaturas tras guardar la configuración | `ProfessorDashboard.tsx` con rehidratación explícita | La lista "Tus asignaturas asignadas" se actualiza desde backend tras una alta correcta |

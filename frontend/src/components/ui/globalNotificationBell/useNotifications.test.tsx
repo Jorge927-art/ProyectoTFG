@@ -70,7 +70,6 @@ const NoAuthWrapper = ({ children }: { children: React.ReactNode }) => {
 describe('useNotifications', () => {
     let currentAlerts: NotificationDTO[];
     let currentDocuments: DocumentMetadata[];
-    let currentRecommendations: Array<{ id: number; title: string; instructor: string; category: string; rating: number; reason: string }>;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -85,13 +84,7 @@ describe('useNotifications', () => {
             },
         ];
         currentDocuments = [buildDoc(false)];
-        currentRecommendations = [];
-
-        vi.spyOn(apiClient, 'get').mockImplementation(async (url: string) => {
-            if (url === '/api/courses/recommendations') {
-                return { data: currentRecommendations } as never;
-            }
-
+        vi.spyOn(apiClient, 'get').mockImplementation(async () => {
             return { data: currentAlerts } as never;
         });
         vi.spyOn(documentService, 'getUserDocuments').mockImplementation(async () => currentDocuments);
@@ -307,19 +300,9 @@ describe('useNotifications', () => {
         expect(hook.result.current.alerts[0].redirectUrl).toContain('senderId=42');
     });
 
-    it('activa aviso de campana cuando aparece un nuevo curso recomendado para el estudiante', async () => {
+    it('muestra una alarma de recomendación persistida por el backend y no la calcula desde el catálogo', async () => {
         currentAlerts = [];
         currentDocuments = [buildDoc(true)];
-        currentRecommendations = [
-            {
-                id: 101,
-                title: 'Curso base recomendado',
-                instructor: 'Profesor A',
-                category: 'Datos',
-                rating: 4.8,
-                reason: 'Coincide con tus intereses',
-            },
-        ];
 
         const patchSpy = vi.spyOn(apiClient, 'patch').mockResolvedValue({} as never);
         const hook = renderHook(() => useNotifications(), { wrapper: AuthWrapper });
@@ -331,17 +314,13 @@ describe('useNotifications', () => {
         // Primera carga: se crea baseline y no debe aparecer aviso por histórico.
         expect(hook.result.current.alerts.some((alert) => alert.type === 'COURSE_RECOMMENDATION')).toBe(false);
 
-        currentRecommendations = [
-            ...currentRecommendations,
-            {
-                id: 202,
-                title: 'Nuevo curso recomendado',
-                instructor: 'Profesora B',
-                category: 'IA',
-                rating: 4.9,
-                reason: 'Nuevo match por tus preferencias',
-            },
-        ];
+        currentAlerts = [{
+            notificationId: 202,
+            type: 'COURSE_RECOMMENDATION',
+            title: 'Nuevas recomendaciones para ti',
+            message: 'La asignatura "Nuevo curso recomendado" coincide con tus intereses.',
+            redirectUrl: '/student',
+        }];
 
         await act(async () => {
             await hook.result.current.refreshNotifications();
@@ -350,7 +329,7 @@ describe('useNotifications', () => {
         await waitFor(() => {
             const recommendationAlert = hook.result.current.alerts.find((alert) => alert.type === 'COURSE_RECOMMENDATION');
             expect(recommendationAlert).toBeDefined();
-            expect(recommendationAlert?.title).toContain('recomendación');
+            expect(recommendationAlert?.title).toMatch(/recomendaciones/i);
             expect(recommendationAlert?.redirectUrl).toBe('/student');
         });
 
@@ -360,6 +339,7 @@ describe('useNotifications', () => {
 
         expect(patchSpy).toHaveBeenCalledWith('/api/auth/notifications/dismiss');
 
+        currentAlerts = [];
         await act(async () => {
             await hook.result.current.refreshNotifications();
         });

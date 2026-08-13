@@ -5,6 +5,8 @@ import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Interest;
 import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.entities.UserSystemNotification;
+import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.InterestRepository;
@@ -40,6 +42,9 @@ class RecommendationServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private com.cursosonline.backend.repository.UserSystemNotificationRepository userSystemNotificationRepository;
 
     @InjectMocks
     private RecommendationService recommendationService;
@@ -443,5 +448,92 @@ class RecommendationServiceTest {
         assertEquals(101L, topRecommendation.id());
         assertEquals(50, topRecommendation.score(),
                 "El peso total esperado debe ser 50 (30 por categoría + 20 por historial >= 100). ");
+    }
+
+    @Test
+    @DisplayName("Crea una alarma una sola vez cuando el curso asignado coincide con los intereses del alumno")
+    void notifyStudentsAboutNewCourse_CreatesOneNotificationForMatchingStudent() {
+        mockUser.setRole(Role.STUDENT);
+        mockUser.setEnabled(true);
+        Users professor = new Users();
+        professor.setUser_id(2L);
+        professor.setRole(Role.PROFESSOR);
+        course1.setAssignedUser(professor);
+
+        when(userRepository.findByRole(Role.STUDENT)).thenReturn(List.of(mockUser));
+        when(coursesRepository.findAll()).thenReturn(List.of(course1));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(List.of());
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(userSystemNotificationRepository.existsRecommendationNotification(
+                1L, "COURSE_RECOMMENDATION", 101L)).thenReturn(false);
+
+        recommendationService.notifyStudentsAboutNewCourse(course1);
+
+        verify(userSystemNotificationRepository).save(argThat(notification -> notification.getReceiver() == mockUser
+                && notification.getRelatedCourseId().equals(101L)
+                && notification.getType().equals("COURSE_RECOMMENDATION")));
+    }
+
+    @Test
+    @DisplayName("No crea alarma si el curso asignado no tiene coincidencia ponderada")
+    void notifyStudentsAboutNewCourse_DoesNotNotifyWhenScoreIsZero() {
+        mockUser.setRole(Role.STUDENT);
+        mockUser.setEnabled(true);
+        Users professor = new Users();
+        professor.setUser_id(2L);
+        professor.setRole(Role.PROFESSOR);
+        course1.setAssignedUser(professor);
+        userInterests.setCategory(new ArrayList<>(List.of("Arte")));
+        userInterests.setCourse_type(new ArrayList<>(List.of("Avanzado")));
+        userInterests.setLanguage(new ArrayList<>(List.of("Frances")));
+
+        when(userRepository.findByRole(Role.STUDENT)).thenReturn(List.of(mockUser));
+        when(coursesRepository.findAll()).thenReturn(List.of(course1));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(List.of());
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+
+        recommendationService.notifyStudentsAboutNewCourse(course1);
+
+        verify(userSystemNotificationRepository, never()).save(any(UserSystemNotification.class));
+    }
+
+    @Test
+    @DisplayName("No duplica la alarma cuando ya existe para el mismo alumno y curso")
+    void notifyStudentsAboutNewCourse_DoesNotDuplicateExistingNotification() {
+        mockUser.setRole(Role.STUDENT);
+        mockUser.setEnabled(true);
+        Users professor = new Users();
+        professor.setUser_id(2L);
+        professor.setRole(Role.PROFESSOR);
+        course1.setAssignedUser(professor);
+
+        when(userRepository.findByRole(Role.STUDENT)).thenReturn(List.of(mockUser));
+        when(coursesRepository.findAll()).thenReturn(List.of(course1));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(List.of());
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(userSystemNotificationRepository.existsRecommendationNotification(
+                1L, "COURSE_RECOMMENDATION", 101L)).thenReturn(true);
+
+        recommendationService.notifyStudentsAboutNewCourse(course1);
+
+        verify(userSystemNotificationRepository, never()).save(any(UserSystemNotification.class));
+    }
+
+    @Test
+    void notifyStudentsAboutNewCourseSkipsInvalidCourseAndDisabledStudents() {
+        recommendationService.notifyStudentsAboutNewCourse(null);
+        course1.setAssignedUser(null);
+        recommendationService.notifyStudentsAboutNewCourse(course1);
+
+        course1.setAssignedUser(new Users());
+        mockUser.setRole(Role.STUDENT);
+        mockUser.setEnabled(false);
+        when(userRepository.findByRole(Role.STUDENT)).thenReturn(List.of(mockUser));
+        when(coursesRepository.findAll()).thenReturn(List.of(course1));
+
+        recommendationService.notifyStudentsAboutNewCourse(course1);
+
+        verify(userSystemNotificationRepository, never()).save(any(UserSystemNotification.class));
+        verifyNoInteractions(interestRepository, enrollmentRepository);
     }
 }

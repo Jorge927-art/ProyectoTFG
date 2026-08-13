@@ -4,11 +4,14 @@ import com.cursosonline.backend.dto.RecommendationDTO;
 import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Interest;
+import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.entities.UserSystemNotification;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.InterestRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
+import com.cursosonline.backend.repository.UserSystemNotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,12 +37,15 @@ public class RecommendationService {
     private final InterestRepository interestRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
+    private final UserSystemNotificationRepository userSystemNotificationRepository;
+
+    private static final String COURSE_RECOMMENDATION_NOTIFICATION_TYPE = "COURSE_RECOMMENDATION";
 
     /**
      * Obtiene una lista de recomendaciones de cursos para un usuario dado.
      * La recomendación se basa en los intereses del usuario, su historial de
      * matrículas y la afinidad de los cursos disponibles.
-     * 
+     *
      * @param username El nombre de usuario del cual se obtendrán las
      *                 recomendaciones.
      * @return Una lista de objetos RecommendationDTO que representan los cursos
@@ -68,7 +74,7 @@ public class RecommendationService {
      * ID.
      * La recomendación se basa en los intereses del usuario, su historial de
      * matrículas y la afinidad de los cursos disponibles.
-     * 
+     *
      * @param userId El ID del usuario para el cual se obtendrán las
      *               recomendaciones.
      * @return Una lista de objetos RecommendationDTO que representan los cursos
@@ -87,10 +93,51 @@ public class RecommendationService {
         return buildRecommendations(interests, myEnrollments, allCourses);
     }
 
+    @Transactional
+    public void notifyStudentsAboutNewCourse(Courses course) {
+        if (course == null || course.getCourse_id() == null || course.getAssignedUser() == null) {
+            return;
+        }
+
+        List<Users> students = userRepository.findByRole(Role.STUDENT);
+        if (students == null) {
+            return;
+        }
+
+        List<Courses> allCourses = coursesRepository.findAll();
+
+        for (Users student : students) {
+            if (student == null || student.getUser_id() == null || !student.isEnabled()) {
+                continue;
+            }
+
+            List<Enrollment> enrollments = enrollmentRepository.findAllByUserIdWithCourses(student.getUser_id());
+            Interest interests = interestRepository.findByUser_Username(student.getUsername()).orElse(null);
+            boolean isRecommended = buildRecommendations(interests, enrollments, allCourses).stream()
+                    .anyMatch(recommendation -> course.getCourse_id().equals(recommendation.id())
+                            && recommendation.score() > 0);
+            if (!isRecommended || userSystemNotificationRepository.existsRecommendationNotification(
+                    student.getUser_id(), COURSE_RECOMMENDATION_NOTIFICATION_TYPE, course.getCourse_id())) {
+                continue;
+            }
+
+            UserSystemNotification notification = new UserSystemNotification();
+            notification.setReceiver(student);
+            notification.setRelatedCourseId(course.getCourse_id());
+            notification.setType(COURSE_RECOMMENDATION_NOTIFICATION_TYPE);
+            notification.setTitle("Nuevas recomendaciones para ti");
+            notification.setMessage("La asignatura \"" + safeCourseTitle(course)
+                    + "\" coincide con tus intereses y ya aparece en tus recomendaciones personalizadas.");
+            notification.setRedirectUrl("/student");
+            notification.setRead(false);
+            userSystemNotificationRepository.save(notification);
+        }
+    }
+
     /**
      * Construye una lista de recomendaciones de cursos basada en los intereses del
      * usuario, su historial de matrículas y la afinidad de los cursos disponibles.
-     * 
+     *
      * @param interests     Los intereses del usuario.
      * @param myEnrollments El historial de matrículas del usuario.
      * @param allCourses    Todos los cursos disponibles.
@@ -134,7 +181,7 @@ public class RecommendationService {
     /**
      * Calcula la afinidad de un curso con los intereses del usuario y su historial
      * de matrículas.
-     * 
+     *
      * @param course             El curso para el cual se calcula la afinidad.
      * @param userCategoryTokens Los tokens de categoría del usuario.
      * @param userLevelTokens    Los tokens de nivel del usuario.
@@ -264,7 +311,7 @@ public class RecommendationService {
 
     /**
      * Verifica si la duración del curso coincide con las preferencias del usuario.
-     * 
+     *
      * @param courseHours        La duración del curso en horas.
      * @param preferredDurations Las duraciones preferidas por el usuario.
      * @return true si la duración del curso coincide con las preferencias del
@@ -292,7 +339,7 @@ public class RecommendationService {
      * - Eliminación de acentos.
      * - Reemplazo de espacios por guiones bajos.
      * - Eliminación de caracteres no alfanuméricos.
-     * 
+     *
      * @param input La cadena de entrada a normalizar.
      * @return El token semántico normalizado.
      */
@@ -309,6 +356,10 @@ public class RecommendationService {
                 .replace("ú", "u")
                 .replaceAll("[^a-z0-8_\\s-]", "")
                 .replaceAll("\\s+", "_");
+    }
+
+    private String safeCourseTitle(Courses course) {
+        return course.getTitle() == null || course.getTitle().isBlank() ? "Nuevo curso" : course.getTitle().trim();
     }
 
     private static String normalizeLevelToken(String input) {
@@ -331,7 +382,7 @@ public class RecommendationService {
      * - Eliminación de acentos.
      * - Reemplazo de espacios por guiones bajos.
      * - Eliminación de caracteres no alfanuméricos.
-     * 
+     *
      * @param input La colección de entradas a normalizar.
      * @return El conjunto de tokens semánticos normalizados.
      */

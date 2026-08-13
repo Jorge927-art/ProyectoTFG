@@ -8,7 +8,9 @@ import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.DocumentMetadata;
 import com.cursosonline.backend.entities.CourseGrade;
+import com.cursosonline.backend.entities.ProfessorAlertType;
 import com.cursosonline.backend.dto.InterestDTO;
+import com.cursosonline.backend.dto.ProfessorBellAlertSummaryDTO;
 import com.cursosonline.backend.repository.UserRepository;
 import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.DocumentMetadataRepository;
@@ -68,6 +70,8 @@ public class UserService {
     private final com.cursosonline.backend.repository.AcademicEvaluationRepository academicEvaluationRepository;
     private final com.cursosonline.backend.repository.UserProfileRepository userProfileRepository;
     private final AdminCourseCatalogService adminCourseCatalogService;
+    private final ProfessorCourseAlertService professorCourseAlertService;
+    private final RecommendationService recommendationService;
     private final JdbcTemplate jdbcTemplate;
     private Clock clock = Clock.systemUTC();
 
@@ -77,7 +81,7 @@ public class UserService {
     /**
      * Permite buscar un usuario por su nombre de usuario de forma transaccional,
      * devolviendo un Optional que puede estar vacío si no se encuentra.
-     * 
+     *
      * @param username El nombre de usuario del usuario a buscar.
      * @return Un Optional que contiene el usuario si se encuentra, o está vacío si
      *         no se encuentra.
@@ -101,7 +105,7 @@ public class UserService {
      * Registra un nuevo usuario en la plataforma, asegurando que el nombre de
      * usuario sea único y que la contraseña se almacene de forma segura mediante
      * codificación.
-     * 
+     *
      * @param user El objeto Users que contiene los datos del nuevo usuario.
      * @return El usuario registrado con su ID generado y la contraseña codificada.
      * @throws UserAlreadyExistsException Si el nombre de usuario ya está en uso.
@@ -122,7 +126,7 @@ public class UserService {
     /**
      * Permite autenticar a un usuario verificando su nombre de usuario y
      * contraseña.
-     * 
+     *
      * @param username    El nombre de usuario del usuario que intenta autenticarse.
      * @param rawPassword La contraseña en texto plano proporcionada por el usuario.
      * @return El usuario autenticado si las credenciales son correctas.
@@ -171,7 +175,7 @@ public class UserService {
      * Recupera de forma transaccional todos los usuarios de la plataforma,
      * ordenados alfabéticamente por nombre de usuario y, en caso de empate, por ID
      * de usuario.
-     * 
+     *
      * @return Lista de todos los usuarios de la plataforma, ordenados
      *         alfabéticamente por nombre de usuario y, en caso de empate, por ID de
      *         usuario.
@@ -204,7 +208,7 @@ public class UserService {
     /**
      * Permite actualizar el rol de un usuario de forma transaccional, asegurando
      * que los cambios se persistan correctamente.
-     * 
+     *
      * @param username El nombre de usuario del usuario cuyo rol se va a actualizar.
      * @param newRole  El nuevo rol que se asignará al usuario.
      * @return El usuario actualizado con el nuevo rol.
@@ -221,7 +225,7 @@ public class UserService {
     /**
      * Permite habilitar o deshabilitar un usuario de forma transaccional, cambiando
      * su estado de "enabled".
-     * 
+     *
      * @param username El nombre de usuario del usuario a habilitar o deshabilitar.
      * @return El usuario actualizado con el estado de "enabled" modificado.
      */
@@ -243,7 +247,7 @@ public class UserService {
     /**
      * Permite eliminar permanentemente un usuario de la plataforma, junto con sus
      * documentos, valoraciones y matrículas según corresponda.
-     * 
+     *
      * @param username          El nombre de usuario del usuario a eliminar.
      * @param requesterUsername El nombre de usuario del solicitante de la
      *                          eliminación.
@@ -306,7 +310,7 @@ public class UserService {
 
     /**
      * Recupera de forma transaccional los intereses de un usuario específico.
-     * 
+     *
      * @param username El nombre de usuario del usuario cuyos intereses se van a
      *                 recuperar.
      * @return Un objeto InterestDTO que contiene los intereses del usuario.
@@ -354,7 +358,7 @@ public class UserService {
      * Permite guardar o actualizar de forma transaccional los intereses de un
      * usuario específico, preservando la integridad de las referencias de Hibernate
      * y evitando la creación de nuevas listas.
-     * 
+     *
      * @param username El nombre de usuario del usuario cuyos intereses se van a
      *                 guardar o actualizar.
      * @param dto      El objeto InterestDTO que contiene los nuevos intereses del
@@ -393,7 +397,7 @@ public class UserService {
      * Permite actualizar de forma transaccional una colección de cadenas de texto
      * preservando la referencia de Hibernate y evitando la creación de nuevas
      * listas.
-     * 
+     *
      * @param current La colección actual gestionada por Hibernate.
      * @param next    La nueva colección de valores a actualizar.
      */
@@ -408,7 +412,7 @@ public class UserService {
      * Recupera de forma transaccional las asignaturas que coinciden con una palabra
      * clave de búsqueda, limitando el resultado a 12 elementos para la UI.
      * Si la palabra clave está vacía, devuelve los primeros 12 cursos del catálogo.
-     * 
+     *
      * @param keyword La palabra clave de búsqueda para filtrar los cursos.
      * @return Lista de cursos que coinciden con la palabra clave de búsqueda,
      *         limitada a 12 elementos.
@@ -430,7 +434,7 @@ public class UserService {
      * Recupera de forma transaccional las asignaturas asignadas a un profesor
      * autenticado, considerando su identidad principal y posibles alias derivados
      * de su cuenta de usuario. La búsqueda es robusta y evita duplicidades.
-     * 
+     *
      * @param principalIdentity La identidad principal del profesor autenticado.
      * @return Lista de asignaturas asignadas al profesor autenticado.
      */
@@ -453,7 +457,7 @@ public class UserService {
      * Permite matricular a un estudiante en un curso específico, asegurando que no
      * exista duplicidad y que tanto el usuario como el curso existan en la base de
      * datos. La operación es transaccional y garantiza la integridad de los datos.
-     * 
+     *
      * @param username El nombre de usuario del estudiante.
      * @param courseId El ID del curso.
      * @return La entidad Enrollment creada y persistida.
@@ -491,7 +495,7 @@ public class UserService {
      * Marca la fecha de inicio de un curso para un estudiante específico,
      * asegurando
      * que solo pueda iniciar su propio curso y mitigando ataques de sondeo de IDs.
-     * 
+     *
      * @param enrollmentId          El ID de la matrícula.
      * @param authenticatedUsername El nombre de usuario autenticado del estudiante.
      */
@@ -511,6 +515,9 @@ public class UserService {
             enrollment.setStarted_at(LocalDateTime.now(clock));
             enrollment.setStatus("EN_CURSO");
             enrollmentRepository.save(enrollment);
+            if (professorCourseAlertService != null) {
+                professorCourseAlertService.createInitialEnrollmentAlertIfApplicable(enrollment);
+            }
         }
     }
 
@@ -519,7 +526,7 @@ public class UserService {
      * la
      * fecha de inicio y la duración total del curso. Devuelve un porcentaje entre 0
      * y 100, acotado estrictamente. Si el curso no ha sido iniciado, devuelve 0.
-     * 
+     *
      * @param enrollment La matrícula del estudiante en el curso.
      * @return El progreso actual como un porcentaje entero entre 0 y 100.
      *         Devuelve 0 si el curso no ha sido iniciado o si la duración es
@@ -558,7 +565,7 @@ public class UserService {
      * tiempo.
      * Esto facilita la simulación de escenarios temporales y garantiza la
      * consistencia de los cálculos de progreso.
-     * 
+     *
      * @param clock El reloj personalizado a inyectar.
      */
     public void setClock(Clock clock) {
@@ -570,7 +577,7 @@ public class UserService {
      * calcula
      * su progreso dinámico en cada una de ellas. Evita consultas N+1 y fuerza la
      * inicialización de las notas para su posterior serialización.
-     * 
+     *
      * @param userId El ID del usuario (estudiante).
      * @return Lista de matrículas activas del estudiante con el progreso calculado.
      */
@@ -619,7 +626,7 @@ public class UserService {
     /**
      * Recupera de forma transaccional las estadísticas analíticas de un curso
      * específico.
-     * 
+     *
      * @param courseId El ID del curso.
      * @return Objeto CourseStatsDTO con las estadísticas analíticas del curso.
      */
@@ -644,7 +651,7 @@ public class UserService {
     /**
      * Recupera de forma transaccional las notificaciones activas de un usuario
      * específico.
-     * 
+     *
      * @param username El nombre de usuario del receptor de las notificaciones.
      * @return Lista de notificaciones activas del usuario.
      */
@@ -673,11 +680,23 @@ public class UserService {
         if (unreadSystemNotifications != null) {
             for (com.cursosonline.backend.entities.UserSystemNotification notification : unreadSystemNotifications) {
                 alerts.add(new com.cursosonline.backend.dto.NotificationDTO(
+                        notification.getNotificationId(),
                         notification.getType(),
                         notification.getTitle(),
                         notification.getMessage(),
                         notification.getRedirectUrl()));
             }
+        }
+
+        if (user.getRole() == Role.PROFESSOR && professorCourseAlertService != null) {
+            Optional<ProfessorBellAlertSummaryDTO> bellSummary = professorCourseAlertService
+                    .getOldestBellAlertSummary(username);
+            bellSummary.ifPresent(summary -> alerts.add(0, new com.cursosonline.backend.dto.NotificationDTO(
+                    summary.alertId(),
+                    "PROFESSOR_TASK_ALERT",
+                    summary.title(),
+                    summary.message(),
+                    "/professor")));
         }
 
         if (hasProgressAlertColumns()) {
@@ -729,7 +748,7 @@ public class UserService {
      * actualiza
      * los estados de progreso de cursos para estudiantes y profesores según
      * corresponda.
-     * 
+     *
      * @param username El nombre de usuario del receptor de las notificaciones.
      */
     @Transactional
@@ -751,6 +770,34 @@ public class UserService {
         }
     }
 
+    @Transactional
+    public void dismissSingleNotification(String username, Long notificationId, String type) {
+        if (type != null && "PROFESSOR_TASK_ALERT".equalsIgnoreCase(type)) {
+            if (notificationId != null && notificationId > 0) {
+                if (professorCourseAlertService != null) {
+                    professorCourseAlertService.dismissBellAlert(username, notificationId);
+                }
+            }
+            return;
+        }
+
+        if (notificationId != null && notificationId > 0) {
+            userSystemNotificationRepository.markAsReadByIdAndUsername(notificationId, username);
+            return;
+        }
+
+        if (type != null) {
+            try {
+                ProfessorAlertType parsedType = ProfessorAlertType.valueOf(type.trim().toUpperCase(Locale.ROOT));
+                if (professorCourseAlertService != null) {
+                    professorCourseAlertService.dismissBellAlertByTypeFallback(username, parsedType);
+                }
+            } catch (IllegalArgumentException ignored) {
+                // Fallback de compatibilidad: si no se reconoce el tipo no forzamos error.
+            }
+        }
+    }
+
     /**
      * Marca como leídas únicamente las alertas de nueva calificación para el
      * usuario indicado.
@@ -765,7 +812,7 @@ public class UserService {
     /**
      * Verifica de forma segura si la tabla de matrícula (enrollment) contiene las
      * columnas necesarias para las alertas de progreso de estudiantes y profesores.
-     * 
+     *
      * @return true si las columnas necesarias existen, false en caso contrario.
      */
     private boolean hasProgressAlertColumns() {
@@ -787,7 +834,7 @@ public class UserService {
      * Agrega de forma segura las notificaciones de progreso para estudiantes y
      * profesores, evitando errores de esquema si faltan columnas en la tabla de
      * matrícula (enrollment).
-     * 
+     *
      * @param user     El usuario autenticado.
      * @param username El nombre de usuario del usuario autenticado.
      * @param alerts   La lista de notificaciones a la que se agregarán las alertas
@@ -814,29 +861,8 @@ public class UserService {
                 }
             }
 
-            // Profesor: alumno propio al 90% de tiempo consumido de su asignatura
-            if (user.getRole() == Role.PROFESSOR) {
-                List<Long> courseIds = getAssignedCoursesForProfessor(username).stream()
-                        .map(course -> course != null ? course.getCourse_id() : null)
-                        .filter(java.util.Objects::nonNull)
-                        .toList();
-                if (!courseIds.isEmpty()) {
-                    List<Enrollment> studentEnrollments = enrollmentRepository
-                            .findActiveStudentEnrollmentsByCourseIds(courseIds);
-                    for (Enrollment enrollment : studentEnrollments) {
-                        int progress = calculateCurrentProgress(enrollment);
-                        if (progress >= 90 && progress < 100 && !enrollment.isProgressAlertProfessorAck()) {
-                            alerts.add(new com.cursosonline.backend.dto.NotificationDTO(
-                                    "STUDENT_NEAR_COMPLETION",
-                                    "Alumno a punto de finalizar",
-                                    "'" + enrollment.getUser().getUsername() + "' en '"
-                                            + enrollment.getCourse().getTitle() + "' está al " + progress
-                                            + "%. Prepara el examen final.",
-                                    "/professor"));
-                        }
-                    }
-                }
-            }
+            // Profesor: los avisos operativos de progreso (material y examen) se
+            // gestionan ahora mediante ProfessorCourseAlertService + panel dedicado.
         } catch (RuntimeException ex) {
             LOGGER.warn(
                     "No se pudieron calcular alertas de progreso para usuario {}. Se devuelven solo alertas de documentos.",
@@ -848,7 +874,7 @@ public class UserService {
      * Marca de forma segura las notificaciones de progreso como reconocidas (ACK)
      * para estudiantes y profesores, evitando errores de esquema si faltan columnas
      * en la tabla de matrícula (enrollment).
-     * 
+     *
      * @param user     El usuario autenticado.
      * @param username El nombre de usuario del usuario autenticado.
      */
@@ -890,7 +916,7 @@ public class UserService {
      * usuario específico. Si la operación de actualización masiva falla, se aplica
      * un
      * fallback por entidad.
-     * 
+     *
      * @param username El nombre de usuario del receptor de los documentos.
      */
     private void markAllReceivedAsReadSafely(String username) {
@@ -960,6 +986,24 @@ public class UserService {
         // Volcar los cambios de forma transaccional directa a PostgreSQL
         Courses savedCourse = coursesRepository.saveAndFlush(course);
         adminCourseCatalogService.markCourseAsEverUsed(savedCourse.getCourse_id());
+        if (recommendationService != null) {
+            recommendationService.notifyStudentsAboutNewCourse(savedCourse);
+        }
+        return savedCourse;
+    }
+
+    @Transactional
+    public Courses assignUserToCourseWithDispatchConfig(String username, Long courseId, Integer dispatchParts) {
+        if (dispatchParts == null) {
+            throw new ServicesException("Debes seleccionar el número de partes antes de guardar.");
+        }
+
+        Courses savedCourse = assignUserToCourse(username, courseId);
+        Users professor = savedCourse.getAssignedUser();
+        if (professorCourseAlertService == null) {
+            throw new ServicesException("No se pudo preparar la configuración de avisos para el curso.");
+        }
+        professorCourseAlertService.createConfigForCourse(savedCourse, professor, dispatchParts);
         return savedCourse;
     }
 

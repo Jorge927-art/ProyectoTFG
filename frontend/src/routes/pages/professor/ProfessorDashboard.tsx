@@ -14,6 +14,7 @@ import { ProfessorCoursePicker } from './components/ProfessorCoursePicker';
 import { GradingCenter } from './components/GradingCenter';
 import { TeachingMetricsPanel } from './components/TeachingMetricsPanel';
 import { ProfessorDocumentManager } from './components/ProfessorDocumentManager';
+import { ProfessorTeachingAlertsPanel } from './components/ProfessorTeachingAlertsPanel';
 
 // IMPORTACIÓN CENTRALIZADA DE DOMINIOS [DRY]
 import type { TaughtCourse } from '../../../services/userDomains';
@@ -102,58 +103,60 @@ const ProfessorDashboard = () => {
         return request;
     }, []);
 
-    useEffect(() => {
-        let cancelled = false;
+    const hydrateAssignedCourses = useCallback(async () => {
+        const assignedCourses = await getProfessorAssignedCourses();
 
-        const hydrateAssignedCourses = async () => {
-            try {
-                const assignedCourses = await getProfessorAssignedCourses();
+        const baseCourses = assignedCourses.map((course) => ({
+            id: course.course_id,
+            title: course.title,
+            category: normalizeCategory(course),
+            studentsCount: 0,
+            averageProgress: 0
+        } as TaughtCourse));
 
-                const baseCourses = assignedCourses.map((course) => ({
+        setMyCourses((previousCourses) => [
+            ...baseCourses,
+            ...previousCourses.filter((course) => !baseCourses.some((assignedCourse) => assignedCourse.id === course.id))
+        ]);
+
+        const coursesWithCounts = await Promise.all(
+            assignedCourses.map(async (course) => {
+                let studentsCount = 0;
+
+                try {
+                    const studentsData = await getStudentsForCourse(course.course_id);
+                    studentsCount = studentsData.length;
+                } catch (error) {
+                    console.error(`Error cargando el conteo de alumnos para el curso ${course.course_id}:`, error);
+                }
+
+                return {
                     id: course.course_id,
                     title: course.title,
                     category: normalizeCategory(course),
-                    studentsCount: 0,
+                    studentsCount,
                     averageProgress: 0
-                } as TaughtCourse));
+                } as TaughtCourse;
+            })
+        );
 
-                if (cancelled) return;
-                setMyCourses(baseCourses);
+        setMyCourses((previousCourses) => [
+            ...coursesWithCounts,
+            ...previousCourses.filter((course) => !coursesWithCounts.some((assignedCourse) => assignedCourse.id === course.id))
+        ]);
+    }, [getStudentsForCourse]);
 
-                const coursesWithCounts = await Promise.all(
-                    assignedCourses.map(async (course) => {
-                        let studentsCount = 0;
-
-                        try {
-                            const studentsData = await getStudentsForCourse(course.course_id);
-                            studentsCount = studentsData.length;
-                        } catch (error) {
-                            console.error(`Error cargando el conteo de alumnos para el curso ${course.course_id}:`, error);
-                        }
-
-                        return {
-                            id: course.course_id,
-                            title: course.title,
-                            category: normalizeCategory(course),
-                            studentsCount,
-                            averageProgress: 0
-                        } as TaughtCourse;
-                    })
-                );
-
-                if (cancelled) return;
-                setMyCourses(coursesWithCounts);
+    useEffect(() => {
+        const loadAssignedCourses = async () => {
+            try {
+                await hydrateAssignedCourses();
             } catch (error) {
                 console.error('Error hidratando asignaturas asignadas del profesor:', error);
             }
         };
 
-        hydrateAssignedCourses();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [getStudentsForCourse]);
+        void loadAssignedCourses();
+    }, [hydrateAssignedCourses]);
 
     useEffect(() => {
         if (!shouldFocusDocuments) {
@@ -262,7 +265,13 @@ const ProfessorDashboard = () => {
             if (prevCourses.some(c => c.id === adaptedCourse.id)) return prevCourses;
             return [...prevCourses, adaptedCourse];
         });
-    }, [getStudentsForCourse]);
+
+        try {
+            await hydrateAssignedCourses();
+        } catch (error) {
+            console.error('Error refrescando asignaturas asignadas tras guardar configuración docente:', error);
+        }
+    }, [getStudentsForCourse, hydrateAssignedCourses]);
 
     return (
         <ProfessorLayout>
@@ -281,8 +290,8 @@ const ProfessorDashboard = () => {
                     }
                 />
 
-                {/* 
-                   1. EL BUSCADOR EN ANCHO COMPLETO PANORÁMICO (FUERA DEL GRID): 
+                {/*
+                   1. EL BUSCADOR EN ANCHO COMPLETO PANORÁMICO (FUERA DEL GRID):
                    Ocupa de forma independiente todo el ancho horizontal superior sin deformar las columnas.
                 */}
                 <div className="w-full block overflow-x-hidden">
@@ -292,6 +301,8 @@ const ProfessorDashboard = () => {
                         currentProfessorAliases={professorAliases}
                     />
                 </div>
+
+                <ProfessorTeachingAlertsPanel />
 
                 <div className="space-y-8 xl:space-y-9">
                     <section className="bg-white border border-slate-100 rounded-2xl p-4 xl:p-5 2xl:p-6 shadow-sm">

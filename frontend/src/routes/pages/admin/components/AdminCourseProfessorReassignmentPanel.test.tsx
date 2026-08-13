@@ -28,6 +28,7 @@ describe('AdminCourseProfessorReassignmentPanel', () => {
             refreshAlerts: vi.fn(),
             refreshNotifications,
             dismissNotifications: vi.fn(),
+            dismissSingleAlert: vi.fn(async () => undefined),
             loading: false
         });
 

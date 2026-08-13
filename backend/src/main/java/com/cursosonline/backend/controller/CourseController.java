@@ -1,6 +1,7 @@
 package com.cursosonline.backend.controller;
 
 import com.cursosonline.backend.dto.RecommendationDTO;
+import com.cursosonline.backend.dto.AssignTeacherWithDispatchConfigRequestDTO;
 import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Users;
@@ -38,7 +39,7 @@ public class CourseController {
      * Endpoint para buscar cursos en el catálogo utilizando un término de búsqueda
      * (keyword).
      * GET /api/courses/search?keyword=data
-     * 
+     *
      * @param keyword El término de búsqueda utilizado para filtrar los cursos.
      * @return ResponseEntity con la lista de cursos que coinciden con el término de
      *         búsqueda.
@@ -52,7 +53,7 @@ public class CourseController {
     /**
      * Endpoint para obtener las asignaturas asignadas al profesor autenticado.
      * GET /api/courses/assigned-to-me
-     * 
+     *
      * @param principal Objeto Principal que contiene la información del usuario
      *                  autenticado.
      * @return ResponseEntity con la lista de cursos asignados al profesor o un
@@ -78,7 +79,7 @@ public class CourseController {
     /**
      * Endpoint transaccional seguro para procesar la matrícula de un estudiante.
      * POST /api/courses/enroll/{courseId}
-     * 
+     *
      * @param courseId  El ID del curso en el cual se desea matricular al
      *                  estudiante.
      * @param principal Objeto Principal que contiene la información del usuario
@@ -105,7 +106,7 @@ public class CourseController {
      * Endpoint para obtener recomendaciones inteligentes para el estudiante
      * autenticado.
      * GET /api/courses/recommendations
-     * 
+     *
      * @param principal Objeto Principal que contiene la información del usuario
      *                  autenticado.
      * @return ResponseEntity con la lista de recomendaciones personalizadas o un
@@ -133,7 +134,7 @@ public class CourseController {
      * Endpoint transaccional seguro para procesar la asignación relacional de un
      * curso.
      * POST /api/courses/{courseId}/assign-teacher
-     * 
+     *
      * @param courseId  El ID del curso al cual se desea asignar un profesor.
      * @param principal Objeto Principal que contiene la información del usuario
      *                  autenticado.
@@ -164,6 +165,40 @@ public class CourseController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Ocurrió un error inesperado al procesar la vinculación relacional."));
+        }
+    }
+
+    @PostMapping("/{courseId}/assign-teacher-with-alert-config")
+    @PreAuthorize("hasAuthority('PROFESSOR')")
+    public ResponseEntity<?> assignTeacherToCourseWithAlertConfig(
+            @PathVariable Long courseId,
+            @RequestBody AssignTeacherWithDispatchConfigRequestDTO request,
+            Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
+        try {
+            Courses updatedCourse = userService.assignUserToCourseWithDispatchConfig(
+                    principal.getName(),
+                    courseId,
+                    request != null ? request.dispatchParts() : null);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Curso asignado y configuración de avisos guardada correctamente.",
+                    "courseId", updatedCourse.getCourse_id(),
+                    "title", updatedCourse.getTitle(),
+                    "assignedUserId", updatedCourse.getAssignedUser().getUser_id(),
+                    "assignedUsername", updatedCourse.getAssignedUser().getUsername(),
+                    "role", updatedCourse.getAssignedUser().getRole().name()));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (ServicesException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error",
+                            "Ocurrió un error inesperado al asignar el curso y guardar la configuración."));
         }
     }
 }

@@ -39,21 +39,31 @@ export const useCourseCatalog = (onActionSuccess?: (course: DBModelCourse) => vo
         }
     };
 
-    const executeCourseAction = async (courseId: number, apiEndpoint: string, httpMethod: 'post' | 'put' = 'post') => {
+    const executeCourseAction = async (
+        courseId: number,
+        apiEndpoint: string,
+        httpMethod: 'post' | 'put' = 'post',
+        payload?: unknown
+    ): Promise<boolean> => {
         setActionExecutionId(courseId);
         setCatalogError('');
 
         try {
-            const response = httpMethod === 'post' 
-                ? await apiClient.post(apiEndpoint)
-                : await apiClient.put(apiEndpoint);
+            const response = httpMethod === 'post'
+                ? (payload === undefined
+                    ? await apiClient.post(apiEndpoint)
+                    : await apiClient.post(apiEndpoint, payload))
+                : (payload === undefined
+                    ? await apiClient.put(apiEndpoint)
+                    : await apiClient.put(apiEndpoint, payload));
 
             if (response.status >= 200 && response.status < 300) {
                 const targetCourse = catalogCourses.find(c => c.course_id === courseId);
                 if (targetCourse && onActionSuccess) {
                     onActionSuccess(targetCourse);
                 }
-                fetchCatalogData(searchKeyword);
+                void fetchCatalogData(searchKeyword);
+                return true;
             }
         } catch (err) {
             console.error("Error al ejecutar la acción operativa sobre el curso:", err);
@@ -63,9 +73,12 @@ export const useCourseCatalog = (onActionSuccess?: (course: DBModelCourse) => vo
                 message = payload?.message ?? payload?.error ?? message;
             }
             setCatalogError(message);
+            return false;
         } finally {
             setActionExecutionId(null);
         }
+
+        return false;
     };
 
         return {

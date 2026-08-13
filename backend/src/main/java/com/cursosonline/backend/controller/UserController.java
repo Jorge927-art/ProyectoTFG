@@ -5,6 +5,7 @@ import com.cursosonline.backend.dto.InterestDTO;
 import com.cursosonline.backend.dto.LoginRequest;
 import com.cursosonline.backend.dto.RefreshTokenRequest;
 import com.cursosonline.backend.dto.RefreshTokenResponse;
+import com.cursosonline.backend.dto.DismissSingleNotificationRequestDTO;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Enrollment;
@@ -50,7 +51,7 @@ public class UserController {
     /**
      * Endpoint para registrar un nuevo usuario (alumno) en la plataforma.
      * Asigna automáticamente el rol de STUDENT al usuario registrado.
-     * 
+     *
      * @param user El usuario a registrar.
      * @return Una respuesta con los datos mínimos del usuario registrado.
      */
@@ -69,7 +70,7 @@ public class UserController {
     /**
      * Endpoint para el inicio de sesión de usuarios.
      * Valida las credenciales y genera un token JWT para el usuario autenticado.
-     * 
+     *
      * @param loginRequest La solicitud de inicio de sesión que contiene el nombre
      *                     de usuario y la contraseña.
      * @return Una respuesta con el token JWT y la información del usuario
@@ -102,7 +103,7 @@ public class UserController {
 
     /**
      * Endpoint para refrescar el token JWT utilizando un refresh token válido.
-     * 
+     *
      * @param request La solicitud que contiene el refresh token.
      * @return Una respuesta con el nuevo token JWT y el refresh token actualizado.
      */
@@ -119,7 +120,7 @@ public class UserController {
 
     /**
      * Endpoint para cerrar la sesión del usuario y revocar el refresh token.
-     * 
+     *
      * @param request La solicitud que contiene el refresh token.
      * @return Una respuesta indicando el éxito de la operación.
      */
@@ -134,7 +135,7 @@ public class UserController {
      * Endpoint seguro para recuperar los intereses y criterios de filtrado del
      * alumno en sesión.
      * Extrae la identidad mediante las credenciales del token JWT activo.
-     * 
+     *
      * @param principal El principal que representa al usuario autenticado.
      * @return Una respuesta con los intereses y criterios de filtrado del alumno.
      */
@@ -150,7 +151,7 @@ public class UserController {
     /**
      * Endpoint para guardar o actualizar los intereses y criterios de filtrado del
      * alumno en sesión.
-     * 
+     *
      * @param interestDTO Los intereses y criterios de filtrado del alumno.
      * @param principal   El principal que representa al usuario autenticado.
      * @return Una respuesta indicando el éxito de la operación.
@@ -173,7 +174,7 @@ public class UserController {
     /**
      * Endpoint seguro para recuperar las alertas dinámicas del alumno en sesión.
      * Extrae la identidad mediante las credenciales del token JWT activo.
-     * 
+     *
      * @param principal El principal que representa al usuario autenticado.
      * @return Una respuesta con la lista de alertas dinámicas del alumno.
      */
@@ -191,7 +192,7 @@ public class UserController {
      * Endpoint seguro para descartar todas las alertas dinámicas del alumno en
      * sesión.
      * Extrae la identidad mediante las credenciales del token JWT activo.
-     * 
+     *
      * @param principal El principal que representa al usuario autenticado.
      * @return Una respuesta indicando el éxito de la operación.
      */
@@ -201,6 +202,21 @@ public class UserController {
             return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
         }
         userService.dismissUserNotifications(principal.getName());
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    @PatchMapping("/notifications/dismiss-one")
+    public ResponseEntity<?> dismissSingleNotification(
+            Principal principal,
+            @RequestBody(required = false) DismissSingleNotificationRequestDTO request) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
+        userService.dismissSingleNotification(
+                principal.getName(),
+                request != null ? request.notificationId() : null,
+                request != null ? request.type() : null);
         return ResponseEntity.ok(Map.of("success", true));
     }
 
@@ -223,7 +239,7 @@ public class UserController {
     /**
      * Endpoint seguro para recuperar la información del usuario autenticado.
      * Extrae la identidad mediante las credenciales del token JWT activo.
-     * 
+     *
      * @param principal El principal que representa al usuario autenticado.
      * @return Una respuesta con la información del usuario autenticado.
      */
@@ -247,7 +263,7 @@ public class UserController {
     /**
      * Endpoint para recuperar la lista de cursos activos del alumno autenticado.
      * Extrae la identidad mediante las credenciales del token JWT activo.
-     * 
+     *
      * @param principal El principal autenticado de la sesión/token.
      * @param username  Fallback legacy opcional por compatibilidad de clientes.
      * @return Una respuesta con la lista de cursos activos del alumno.
@@ -325,7 +341,7 @@ public class UserController {
     /**
      * Endpoint exclusivo para que el Administrador recupere la lista completa de
      * usuarios registrados en la plataforma.
-     * 
+     *
      * @return Una respuesta con la lista de usuarios.
      */
     @GetMapping
@@ -337,7 +353,7 @@ public class UserController {
     /**
      * Endpoint exclusivo para que el Administrador cambie el rol de un usuario.
      * Se asegura de que el Administrador no pueda cambiar su propio rol.
-     * 
+     *
      * @param username    El nombre de usuario del usuario cuyo rol se desea
      *                    cambiar.
      * @param requestBody Un mapa que contiene el nuevo rol bajo la clave "role".
@@ -370,7 +386,7 @@ public class UserController {
      * Endpoint exclusivo para que el Administrador elimine (baja lógica) o reactive
      * un usuario.
      * Se asegura de que el Administrador no pueda eliminar su propia cuenta.
-     * 
+     *
      * @param username  El nombre de usuario del usuario a eliminar o reactivar.
      * @param principal El principal que representa al Administrador autenticado.
      * @return Una respuesta indicando el éxito de la operación.
@@ -399,7 +415,7 @@ public class UserController {
      * Endpoint exclusivo para que el Administrador elimine permanentemente un
      * usuario de la plataforma.
      * Esto incluye la eliminación de documentos, segúncorresponda.
-     * 
+     *
      * @param username  El nombre de usuario del usuario a eliminar permanentemente.
      * @param principal El principal que representa al Administrador autenticado.
      * @return Una respuesta indicando el éxito de la operación.
@@ -420,7 +436,7 @@ public class UserController {
     /**
      * Endpoint para obtener el perfil completo de un usuario específico.
      * Solo accesible para el Administrador o el propio usuario autenticado.
-     * 
+     *
      * @param username El nombre de usuario del perfil a obtener.
      * @return El objeto Users correspondiente al perfil solicitado.
      */
@@ -437,7 +453,7 @@ public class UserController {
      * de usuarios.
      * Este método asegura que solo se expongan los campos necesarios y evita la
      * exposición de información sensible como contraseñas.
-     * 
+     *
      * @param user El objeto Users a convertir.
      * @return Un mapa con los campos relevantes del usuario.
      */
@@ -454,7 +470,7 @@ public class UserController {
     /**
      * Endpoint seguro para iniciar un curso específico para el alumno autenticado.
      * Valida la propiedad del curso mediante el username del token JWT activo.
-     * 
+     *
      * @param id        El ID de la matrícula del curso a iniciar.
      * @param principal El principal que representa al usuario autenticado.
      * @return Una respuesta indicando el éxito de la operación.

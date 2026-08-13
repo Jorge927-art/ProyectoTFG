@@ -41,6 +41,16 @@ ALTER TABLE IF EXISTS users
     ADD COLUMN IF NOT EXISTS failed_login_attempts integer NOT NULL DEFAULT 0;
 
 -- -----------------------------------------------------------------------------
+-- Referencia de curso para notificaciones de recomendaciones idempotentes
+-- -----------------------------------------------------------------------------
+ALTER TABLE IF EXISTS user_system_notifications
+    ADD COLUMN IF NOT EXISTS related_course_id BIGINT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_user_notification_recommendation_course
+    ON user_system_notifications (receiver_user_id, type, related_course_id)
+    WHERE type = 'COURSE_RECOMMENDATION' AND related_course_id IS NOT NULL;
+
+-- -----------------------------------------------------------------------------
 -- Histórico anual del panel estadístico global de administración
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS admin_global_stats_history (
@@ -155,3 +165,67 @@ ALTER TABLE IF EXISTS courses
 
 CREATE INDEX IF NOT EXISTS idx_courses_title_key
     ON courses (title_key);
+
+-- -----------------------------------------------------------------------------
+-- Configuración de reparto de material por curso (docencia)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS course_material_dispatch_config (
+    config_id BIGSERIAL PRIMARY KEY,
+    course_id BIGINT NOT NULL UNIQUE,
+    dispatch_parts INTEGER NOT NULL,
+    exam_threshold NUMERIC(5,2) NOT NULL DEFAULT 90.00,
+    created_by_user_id BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_dispatch_config_course
+        FOREIGN KEY (course_id)
+        REFERENCES courses(course_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_dispatch_config_user
+        FOREIGN KEY (created_by_user_id)
+        REFERENCES users(user_id)
+        ON DELETE RESTRICT
+);
+
+-- -----------------------------------------------------------------------------
+-- Avisos docentes por alumno y checkpoints
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS professor_course_alerts (
+    alert_id BIGSERIAL PRIMARY KEY,
+    professor_user_id BIGINT NOT NULL,
+    student_user_id BIGINT NOT NULL,
+    course_id BIGINT NOT NULL,
+    enrollment_id BIGINT NOT NULL,
+    alert_type VARCHAR(32) NOT NULL,
+    checkpoint_index INTEGER NOT NULL,
+    checkpoint_percent NUMERIC(5,2) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+    bell_dismissed BOOLEAN NOT NULL DEFAULT FALSE,
+    title VARCHAR(180) NOT NULL,
+    message VARCHAR(600) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_prof_alert_professor
+        FOREIGN KEY (professor_user_id)
+        REFERENCES users(user_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_prof_alert_student
+        FOREIGN KEY (student_user_id)
+        REFERENCES users(user_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_prof_alert_course
+        FOREIGN KEY (course_id)
+        REFERENCES courses(course_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_prof_alert_enrollment
+        FOREIGN KEY (enrollment_id)
+        REFERENCES enrollment(enrollmentid)
+        ON DELETE CASCADE,
+    CONSTRAINT uk_prof_alert_enrollment_type_checkpoint
+        UNIQUE (enrollment_id, alert_type, checkpoint_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_prof_alert_professor_created
+    ON professor_course_alerts (professor_user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_prof_alert_professor_bell
+    ON professor_course_alerts (professor_user_id, bell_dismissed, created_at ASC);
