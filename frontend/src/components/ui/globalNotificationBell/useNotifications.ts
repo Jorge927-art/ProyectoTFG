@@ -210,7 +210,7 @@ export const useNotifications = () => {
                 broadcastRefresh();
             }
         }
-    }, [broadcastRefresh, normalizedRole, userId]);
+    }, [broadcastRefresh]);
 
     const dismissSingleAlert = useCallback(async (alert: NotificationDTO, index: number) => {
         try {

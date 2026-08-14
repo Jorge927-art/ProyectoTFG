@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 // SE ACTUALIZAN LOS ICONOS: Añadimos FileText, Download y Loader2 para el listado de documentos recibidos
@@ -52,7 +52,7 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
     // CICLO REACTIVO: Recupera los archivos reales de la asignatura seleccionada
-    const fetchCourseDocuments = async () => {
+    const fetchCourseDocuments = useCallback(async () => {
         if (!currentSelectedId) return;
         try {
             setLoadingDocuments(true);
@@ -73,11 +73,11 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
         } finally {
             setLoadingDocuments(false);
         }
-    };
+    }, [activeTab, currentSelectedId]);
 
     useEffect(() => {
         void fetchCourseDocuments();
-    }, [currentSelectedId, activeTab]);
+    }, [fetchCourseDocuments]);
 
 
     // Función para simular el click sobre el input oculto al pulsar la dropzone

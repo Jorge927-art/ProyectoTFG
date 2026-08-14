@@ -337,6 +337,90 @@ class AdminCourseInsightServiceTest {
         assertTrue(stats.studentStatistics().get(0).passed());
     }
 
+    @Test
+    @DisplayName("getCourseCollectiveStats debe devolver ceros cuando faltan históricos y no hay alumnos activos")
+    void getCourseCollectiveStats_SinAlumnosNiHistoricos_DebeGenerarComparacionesVacias() {
+        when(coursesRepository.existsById(300L)).thenReturn(true);
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(300L)).thenReturn(List.of());
+        when(enrollmentRepository.findAllByCourseId(300L)).thenReturn(List.of());
+        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(300L)).thenReturn(List.of());
+        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(List.of(300L))).thenReturn(null);
+        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(List.of(300L))).thenReturn(null);
+
+        AdminCourseCollectiveStatsDTO stats = adminCourseInsightService.getCourseCollectiveStats(300L);
+
+        assertEquals(0, stats.activeStudentsInCourse());
+        assertEquals(0, stats.courseAverageProgressPercentage());
+        assertEquals(2, stats.yearlyComparisons().size());
+        assertEquals(0, stats.yearlyComparisons().get(0).activeStudentsInCourse());
+        assertEquals(0, stats.yearlyComparisons().get(0).courseAverageProgressPercentage());
+        assertNull(stats.yearlyComparisons().get(0).averageCourseRating());
+        assertFalse(stats.yearlyComparisons().get(0).realData());
+    }
+
+    @Test
+    @DisplayName("getCourseCollectiveStats debe conservar históricos reales existentes")
+    void getCourseCollectiveStats_ConHistoricoReal_DebeMapearComparaciones() {
+        when(coursesRepository.existsById(300L)).thenReturn(true);
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(300L)).thenReturn(List.of());
+        when(enrollmentRepository.findAllByCourseId(300L)).thenReturn(List.of());
+        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(300L)).thenReturn(List.of());
+        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(List.of(300L))).thenReturn(4.1);
+        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(List.of(300L))).thenReturn(4.6);
+
+        AdminCourseStatsHistory history = new AdminCourseStatsHistory();
+        history.setSnapshotYear(java.time.Year.now().getValue() - 1);
+        history.setActiveStudentsInCourse(9);
+        history.setCourseAverageProgressPercentage(82);
+        history.setApprovalIndexPercentage(77);
+        history.setAverageCourseRating(4.2);
+        history.setAverageInstructorRating(4.4);
+        history.setAverageGrade(7.9);
+        history.setAverageWorkGrade(8.1);
+        history.setAverageFinalExamGrade(7.7);
+        history.setRealData(true);
+        when(courseHistoryRepository.findAllByCourseAndYears(eq(300L), anyList())).thenReturn(List.of(history));
+
+        AdminCourseCollectiveStatsDTO stats = adminCourseInsightService.getCourseCollectiveStats(300L);
+
+        assertEquals(9, stats.yearlyComparisons().get(0).activeStudentsInCourse());
+        assertEquals(82, stats.yearlyComparisons().get(0).courseAverageProgressPercentage());
+        assertEquals(77, stats.yearlyComparisons().get(0).approvalIndexPercentage());
+        assertEquals(4.2, stats.yearlyComparisons().get(0).averageCourseRating());
+        assertTrue(stats.yearlyComparisons().get(0).realData());
+        assertEquals(0, stats.yearlyComparisons().get(1).activeStudentsInCourse());
+    }
+
+    @Test
+    @DisplayName("finalizePreviousYearCourseStatsNow debe crear y persistir el histórico del curso")
+    void finalizePreviousYearCourseStatsNow_SinHistorico_DebePersistirMetricasActuales() {
+        when(coursesRepository.existsById(300L)).thenReturn(true);
+        when(coursesRepository.findById(300L)).thenReturn(Optional.of(course));
+        Enrollment activeEnrollment = new Enrollment();
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(300L)).thenReturn(List.of(activeEnrollment));
+        when(userService.calculateCurrentProgress(activeEnrollment)).thenReturn(68);
+        when(enrollmentRepository.findAllByCourseId(300L)).thenReturn(List.of(activeEnrollment));
+        when(courseGradeRepository.countStudentsWithPassingGradeByCourseId(300L)).thenReturn(1L);
+        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(300L)).thenReturn(List.of());
+        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(List.of(300L))).thenReturn(4.3);
+        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(List.of(300L))).thenReturn(4.7);
+        when(courseHistoryRepository.findByCourseAndYear(eq(300L), anyInt())).thenReturn(Optional.empty());
+
+        int finalizedYear = adminCourseInsightService.finalizePreviousYearCourseStatsNow(300L);
+
+        assertEquals(java.time.Year.now().getValue() - 1, finalizedYear);
+        org.mockito.ArgumentCaptor<AdminCourseStatsHistory> captor = org.mockito.ArgumentCaptor
+                .forClass(AdminCourseStatsHistory.class);
+        org.mockito.Mockito.verify(courseHistoryRepository).save(captor.capture());
+        AdminCourseStatsHistory saved = captor.getValue();
+        assertSame(course, saved.getCourse());
+        assertEquals(1, saved.getActiveStudentsInCourse());
+        assertEquals(68, saved.getCourseAverageProgressPercentage());
+        assertEquals(100, saved.getApprovalIndexPercentage());
+        assertEquals(4.3, saved.getAverageCourseRating());
+        assertTrue(saved.isRealData());
+    }
+
     private CourseGrade gradeFor(Enrollment enrollment, String title, String score) {
         CourseGrade grade = new CourseGrade();
         grade.setEnrollment(enrollment);

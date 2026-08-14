@@ -3,6 +3,7 @@ import type { AuthUser } from './authTypes';
 // [CORRECCIÓN CRÍTICA DE AUDITORÍA]: Unificamos bajo una única clave oficial eliminando la duplicidad física
 const USER_KEY = 'auth_user'; 
 let inMemoryAccessToken: string | null = null;
+const LEGACY_TOKEN_KEYS = ['token', 'accessToken', 'access_token', 'refreshToken', 'refresh_token'] as const;
 
 const EMPTY_INTERESTS = {
     categories: [] as string[],
@@ -31,6 +32,17 @@ function normalizeInterests(interests: unknown) {
     };
 }
 
+function stripLegacyTokens(user: Partial<AuthUser>) {
+    const safeUser = { ...user } as Record<string, unknown>;
+    const hadLegacyToken = LEGACY_TOKEN_KEYS.some((key) => Boolean(safeUser[key]));
+
+    LEGACY_TOKEN_KEYS.forEach((key) => {
+        delete safeUser[key];
+    });
+
+    return { safeUser, hadLegacyToken };
+}
+
 
 function canUseBrowserStorage() {
     return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -50,7 +62,9 @@ export function readStoredRefreshToken(): string | null {
     return null;
 }
 
-export function writeStoredRefreshToken(_token: string) { }
+export function writeStoredRefreshToken(token: string) {
+    void token;
+}
 
 /**
  * Lee la sesión del usuario guardada en el navegador validando estrictamente su tiempo de expiración.
@@ -73,15 +87,8 @@ export function readStoredAuthUser(): AuthUser | null {
             return null;
         }
 
-        const {
-            token: _legacyToken,
-            accessToken: _legacyAccessToken,
-            access_token: _legacySnakeAccessToken,
-            refreshToken: _legacyRefreshToken,
-            refresh_token: _legacySnakeRefreshToken,
-            ...safeStoredUser
-        } = parsedValue;
-        if (_legacyToken || _legacyAccessToken || _legacySnakeAccessToken || _legacyRefreshToken || _legacySnakeRefreshToken) {
+        const { safeUser: safeStoredUser, hadLegacyToken } = stripLegacyTokens(parsedValue);
+        if (hadLegacyToken) {
             window.localStorage.setItem(USER_KEY, JSON.stringify(safeStoredUser));
             window.localStorage.removeItem('accessToken');
             window.localStorage.removeItem('refreshToken');
@@ -106,14 +113,7 @@ export function writeStoredAuthUser(user: AuthUser) {
         return;
     }
     // Escribe únicamente en la fuente de verdad oficial ('auth_user')
-    const {
-        token: _token,
-        accessToken: _accessToken,
-        access_token: _snakeAccessToken,
-        refreshToken: _refreshToken,
-        refresh_token: _snakeRefreshToken,
-        ...safeUser
-    } = user;
+    const { safeUser } = stripLegacyTokens(user);
     window.localStorage.setItem(USER_KEY, JSON.stringify(safeUser));
 
     // Los tokens no se serializan: access vive en memoria y refresh en cookie HttpOnly.
