@@ -77,6 +77,26 @@ CREATE TABLE IF NOT EXISTS admin_global_top_course_history (
 );
 
 -- -----------------------------------------------------------------------------
+-- Histórico anual de estadísticas del panel de cursos
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS admin_course_stats_history (
+    id BIGSERIAL PRIMARY KEY,
+    course_id BIGINT NOT NULL,
+    snapshot_year INTEGER NOT NULL,
+    active_students_in_course INTEGER NOT NULL,
+    course_average_progress_percentage INTEGER NOT NULL,
+    approval_index_percentage INTEGER NOT NULL,
+    average_course_rating DOUBLE PRECISION,
+    average_instructor_rating DOUBLE PRECISION,
+    average_grade DOUBLE PRECISION,
+    average_work_grade DOUBLE PRECISION,
+    average_final_exam_grade DOUBLE PRECISION,
+    real_data BOOLEAN NOT NULL DEFAULT FALSE,
+    generated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uk_admin_course_stats_history_course_year UNIQUE (course_id, snapshot_year)
+);
+
+-- -----------------------------------------------------------------------------
 -- Persistencia de refresh tokens JWT con rotación y revocación
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS auth_refresh_tokens (

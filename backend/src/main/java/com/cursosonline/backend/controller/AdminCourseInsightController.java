@@ -119,6 +119,14 @@ public class AdminCourseInsightController {
         return ResponseEntity.ok(adminCourseInsightService.getCourseCollectiveStats(courseId));
     }
 
+    @PostMapping("/{courseId}/collective-stats/finalize-previous-year")
+    public ResponseEntity<Map<String, Object>> finalizePreviousYearCourseStats(@PathVariable Long courseId) {
+        int finalizedYear = adminCourseInsightService.finalizePreviousYearCourseStatsNow(courseId);
+        return ResponseEntity.ok(Map.of(
+                "message", "Histórico anual del curso consolidado correctamente.",
+                "finalizedYear", finalizedYear));
+    }
+
     /**
      * Endpoint para obtener las estadísticas de un usuario específico dentro de un
      * curso en el panel de administración.

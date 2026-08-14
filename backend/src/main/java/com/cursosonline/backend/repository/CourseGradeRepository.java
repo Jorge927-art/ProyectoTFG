@@ -59,6 +59,11 @@ public interface CourseGradeRepository extends JpaRepository<CourseGrade, Long> 
                         "AND cg.enrollment.user.enabled = true")
         List<CourseGrade> findAllByCourseIdAndEnabledStudent(@Param("courseId") Long courseId);
 
+        @Query("SELECT cg FROM CourseGrade cg JOIN FETCH cg.enrollment e JOIN FETCH e.user u "
+                        + "WHERE e.course.course_id = :courseId AND u.enabled = true AND u.role = 'STUDENT' "
+                        + "ORDER BY e.enrollmentid ASC, cg.gradeId ASC")
+        List<CourseGrade> findAllByCourseIdWithStudentEnrollment(@Param("courseId") Long courseId);
+
         /**
          * [CONSOLA DOCENTE - NOTA INDIVIDUAL]: Obtiene la nota media de un estudiante
          * específico

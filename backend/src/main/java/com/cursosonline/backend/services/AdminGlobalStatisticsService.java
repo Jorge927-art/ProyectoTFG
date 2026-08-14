@@ -6,6 +6,8 @@ import com.cursosonline.backend.dto.AdminGlobalYearComparisonDTO;
 import com.cursosonline.backend.entities.AdminGlobalStatsHistory;
 import com.cursosonline.backend.entities.AdminGlobalTopCourseHistory;
 import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.dto.AdminProfessorRatingDTO;
 import com.cursosonline.backend.repository.AdminGlobalStatsHistoryRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
@@ -22,6 +24,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
+import java.util.Comparator;
 
 /**
  * Servicio del panel estadístico global de administración.
@@ -36,6 +40,7 @@ public class AdminGlobalStatisticsService {
     private final UserRepository userRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final AdminGlobalStatsHistoryRepository historyRepository;
+    private final com.cursosonline.backend.repository.AcademicEvaluationRepository academicEvaluationRepository;
 
     private Clock clock = Clock.systemDefaultZone();
 
@@ -80,6 +85,28 @@ public class AdminGlobalStatisticsService {
                 current.totalProfessors(),
                 current.topCourses(),
                 comparisons);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminProfessorRatingDTO> searchProfessorRatings(String keyword) {
+        String normalized = keyword == null ? "" : keyword.trim().toLowerCase(Locale.ROOT);
+        List<AdminProfessorRatingDTO> results = new ArrayList<>();
+        for (Users professor : userRepository.findByRole(Role.PROFESSOR)) {
+            if (professor == null || !Boolean.TRUE.equals(professor.getEnabled())
+                    || professor.getUsername() == null) {
+                continue;
+            }
+            String username = professor.getUsername();
+            if (!normalized.isEmpty() && !username.toLowerCase(Locale.ROOT).contains(normalized)) {
+                continue;
+            }
+            results.add(new AdminProfessorRatingDTO(
+                    professor.getUser_id(), username,
+                    academicEvaluationRepository.getAverageInstructorScoreByProfessorId(professor.getUser_id())));
+        }
+        results.sort(Comparator.comparing(
+                professor -> professor.username() == null ? "" : professor.username().toLowerCase(Locale.ROOT)));
+        return results;
     }
 
     /**

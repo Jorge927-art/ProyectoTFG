@@ -1,5 +1,7 @@
 package com.cursosonline.backend.dto;
 
+import java.util.List;
+
 /**
  * DTO con métricas colectivas del curso para el panel estadístico de admin.
  *
@@ -20,12 +22,42 @@ package com.cursosonline.backend.dto;
  *                                        hay.
  */
 public record AdminCourseCollectiveStatsDTO(
-        int activeStudentsInCourse,
-        int courseAverageProgressPercentage,
-        int completionRatePercentage,
-        Double averageCourseRating,
-        Double averageInstructorRating,
-        Double averageGrade,
-        Double averageWorkGrade,
-        Double averageFinalExamGrade) {
+                int activeStudentsInCourse,
+                int courseAverageProgressPercentage,
+                int completionRatePercentage,
+                Double averageCourseRating,
+                Double averageInstructorRating,
+                Double averageGrade,
+                Double averageWorkGrade,
+                Double averageFinalExamGrade,
+                List<AdminCourseYearComparisonDTO> yearlyComparisons,
+                List<AdminCourseStudentStatsDTO> studentStatistics) {
+
+        public AdminCourseCollectiveStatsDTO(
+                        int activeStudentsInCourse,
+                        int courseAverageProgressPercentage,
+                        int completionRatePercentage,
+                        Double averageCourseRating,
+                        Double averageInstructorRating,
+                        Double averageGrade,
+                        Double averageWorkGrade,
+                        Double averageFinalExamGrade,
+                        List<AdminCourseYearComparisonDTO> yearlyComparisons) {
+                this(activeStudentsInCourse, courseAverageProgressPercentage, completionRatePercentage,
+                                averageCourseRating, averageInstructorRating, averageGrade, averageWorkGrade,
+                                averageFinalExamGrade, yearlyComparisons, List.of());
+        }
+
+        public record AdminCourseYearComparisonDTO(
+                        int year,
+                        int activeStudentsInCourse,
+                        int courseAverageProgressPercentage,
+                        int approvalIndexPercentage,
+                        Double averageCourseRating,
+                        Double averageInstructorRating,
+                        Double averageGrade,
+                        Double averageWorkGrade,
+                        Double averageFinalExamGrade,
+                        boolean realData) {
+        }
 }

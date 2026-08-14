@@ -3,6 +3,7 @@ package com.cursosonline.backend.services;
 import com.cursosonline.backend.dto.AdminGlobalStatisticsDTO;
 import com.cursosonline.backend.entities.AdminGlobalStatsHistory;
 import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.repository.AdminGlobalStatsHistoryRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
@@ -21,6 +22,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -45,6 +47,9 @@ class AdminGlobalStatisticsServiceTest {
 
     @Mock
     private AdminGlobalStatsHistoryRepository historyRepository;
+
+    @Mock
+    private com.cursosonline.backend.repository.AcademicEvaluationRepository academicEvaluationRepository;
 
     @InjectMocks
     private AdminGlobalStatisticsService service;
@@ -83,6 +88,19 @@ class AdminGlobalStatisticsServiceTest {
         assertTrue(dto.yearlyComparisons().get(0).realData());
 
         verify(historyRepository, times(2)).save(any(AdminGlobalStatsHistory.class));
+    }
+
+    @Test
+    void searchProfessorRatingsOnlyReturnsRegisteredProfessors() {
+        Users professor = new Users(7L, "profesor_real", "enc", Role.PROFESSOR, "p@test.com", true, new ArrayList<>());
+        when(userRepository.findByRole(Role.PROFESSOR)).thenReturn(List.of(professor));
+        when(academicEvaluationRepository.getAverageInstructorScoreByProfessorId(7L)).thenReturn(4.5);
+
+        List<com.cursosonline.backend.dto.AdminProfessorRatingDTO> results = service.searchProfessorRatings("real");
+
+        assertEquals(1, results.size());
+        assertEquals("profesor_real", results.get(0).username());
+        assertEquals(4.5, results.get(0).averageRating());
     }
 
     @Test

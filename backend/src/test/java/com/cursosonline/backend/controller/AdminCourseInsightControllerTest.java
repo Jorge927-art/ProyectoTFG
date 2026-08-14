@@ -268,7 +268,8 @@ class AdminCourseInsightControllerTest {
                                 4.6,
                                 7.8,
                                 7.4,
-                                8.1);
+                                8.1,
+                                List.of());
                 when(adminCourseInsightService.getCourseCollectiveStats(300L)).thenReturn(dto);
 
                 mockMvc.perform(get("/api/admin/courses/300/collective-stats"))

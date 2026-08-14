@@ -14,6 +14,7 @@ vi.mock('../../../../services/adminCourseInsightService', () => ({
     getCourseDetail: vi.fn(),
     getCourseUserStats: vi.fn(),
     getCourseCollectiveStats: vi.fn(),
+    finalizePreviousYearCourseStats: vi.fn(),
     resolveCourseInsightErrorMessage: vi.fn()
 }));
 
@@ -46,7 +47,12 @@ const sampleCollectiveStats = {
     averageInstructorRating: 4.6,
     averageGrade: 7.8,
     averageWorkGrade: 7.4,
-    averageFinalExamGrade: 8.1
+    averageFinalExamGrade: 8.1,
+    yearlyComparisons: [
+        { year: 2025, activeStudentsInCourse: 10, courseAverageProgressPercentage: 55, approvalIndexPercentage: 70, averageCourseRating: 4.0, averageInstructorRating: 4.3, averageGrade: 7.1, averageWorkGrade: 6.8, averageFinalExamGrade: 7.5, realData: false },
+        { year: 2024, activeStudentsInCourse: 8, courseAverageProgressPercentage: 50, approvalIndexPercentage: 65, averageCourseRating: 3.8, averageInstructorRating: 4.1, averageGrade: 6.9, averageWorkGrade: 6.5, averageFinalExamGrade: 7.2, realData: false },
+    ],
+    studentStatistics: []
 };
 
 describe('useCourseInsight', () => {

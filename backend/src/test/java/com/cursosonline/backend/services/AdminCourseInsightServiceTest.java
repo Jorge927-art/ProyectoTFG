@@ -25,6 +25,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Suite de Pruebas Unitarias para AdminCourseInsightService")
@@ -48,6 +49,9 @@ class AdminCourseInsightServiceTest {
     @Mock
     private AcademicEvaluationRepository academicEvaluationRepository;
 
+    @Mock
+    private AdminCourseStatsHistoryRepository courseHistoryRepository;
+
     @InjectMocks
     private AdminCourseInsightService adminCourseInsightService;
 
@@ -57,6 +61,10 @@ class AdminCourseInsightServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(courseHistoryRepository.findAllByCourseAndYears(anyLong(), anyList()))
+                .thenReturn(List.of());
+        lenient().when(courseGradeRepository.findAllByCourseIdWithStudentEnrollment(anyLong()))
+                .thenReturn(List.of());
         studentUser = new Users(10L, "laura_student", "enc", Role.STUDENT, "laura@a.com", true, new ArrayList<>());
         professorUser = new Users(20L, "laura_teacher", "enc", Role.PROFESSOR, "laura.t@a.com", true,
                 new ArrayList<>());
@@ -296,5 +304,44 @@ class AdminCourseInsightServiceTest {
         assertEquals(7.0, stats.averageGrade());
         assertEquals(7.5, stats.averageWorkGrade());
         assertEquals(6.0, stats.averageFinalExamGrade());
+    }
+
+    @Test
+    @DisplayName("getCourseCollectiveStats debe incluir el alumno activo en sus estadísticas individuales")
+    void getCourseCollectiveStats_DebeIncluirEstadisticasPorAlumno() {
+        when(coursesRepository.existsById(300L)).thenReturn(true);
+        Enrollment enrollment = new Enrollment();
+        enrollment.setEnrollmentid(301L);
+        enrollment.setUser(studentUser);
+        enrollment.setCourse(course);
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(300L)).thenReturn(List.of(enrollment));
+        when(enrollmentRepository.findAllByCourseId(300L)).thenReturn(List.of(enrollment));
+        when(userService.calculateCurrentProgress(enrollment)).thenReturn(70);
+        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(300L)).thenReturn(List.of());
+        when(courseGradeRepository.findAllByCourseIdWithStudentEnrollment(300L)).thenReturn(List.of(
+                gradeFor(enrollment, "Trabajo 1", "8.0"),
+                gradeFor(enrollment, "Examen final", "6.0")));
+        when(courseGradeRepository.countStudentsWithPassingGradeByCourseId(300L)).thenReturn(1L);
+        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(List.of(300L))).thenReturn(null);
+        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(List.of(300L))).thenReturn(null);
+
+        AdminCourseCollectiveStatsDTO stats = adminCourseInsightService.getCourseCollectiveStats(300L);
+
+        assertEquals(1, stats.activeStudentsInCourse());
+        assertEquals(1, stats.studentStatistics().size());
+        assertEquals("laura_student", stats.studentStatistics().get(0).username());
+        assertEquals(70, stats.studentStatistics().get(0).progressPercentage());
+        assertEquals(new BigDecimal("7.0"), stats.studentStatistics().get(0).averageGrade());
+        assertEquals(new BigDecimal("8.0"), stats.studentStatistics().get(0).averageWorkGrade());
+        assertEquals(new BigDecimal("6.0"), stats.studentStatistics().get(0).averageFinalExamGrade());
+        assertTrue(stats.studentStatistics().get(0).passed());
+    }
+
+    private CourseGrade gradeFor(Enrollment enrollment, String title, String score) {
+        CourseGrade grade = new CourseGrade();
+        grade.setEnrollment(enrollment);
+        grade.setTitle(title);
+        grade.setScore(new BigDecimal(score));
+        return grade;
     }
 }

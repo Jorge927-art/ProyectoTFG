@@ -5,11 +5,13 @@ import {
     finalizeAdminGlobalPreviousYear,
     getAdminGlobalStatistics,
     resolveAdminGlobalStatisticsErrorMessage,
+    searchAdminProfessorRatings,
 } from '../../../../services/adminGlobalStatisticsService';
 
 vi.mock('../../../../services/adminGlobalStatisticsService', () => ({
     getAdminGlobalStatistics: vi.fn(),
     finalizeAdminGlobalPreviousYear: vi.fn(),
+    searchAdminProfessorRatings: vi.fn(),
     resolveAdminGlobalStatisticsErrorMessage: vi.fn(),
 }));
 
@@ -33,6 +35,7 @@ describe('GlobalStatisticsPanel', () => {
         vi.clearAllMocks();
         vi.mocked(resolveAdminGlobalStatisticsErrorMessage)
             .mockReturnValue('No se pudo cargar el panel estadístico global.');
+        vi.mocked(searchAdminProfessorRatings).mockResolvedValue([]);
     });
 
     it('renderiza métricas y ranking cuando la carga es correcta', async () => {

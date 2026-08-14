@@ -6,15 +6,23 @@ import com.cursosonline.backend.exception.ResourceNotFoundException;
 import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
+import com.cursosonline.backend.repository.AdminCourseStatsHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.time.Year;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.math.BigDecimal;
 
 /**
  * Servicio para gestionar las operaciones relacionadas con el "Panel
@@ -37,6 +45,7 @@ public class AdminCourseInsightService {
     private final UserService userService;
     private final com.cursosonline.backend.repository.CourseGradeRepository courseGradeRepository;
     private final com.cursosonline.backend.repository.AcademicEvaluationRepository academicEvaluationRepository;
+    private final AdminCourseStatsHistoryRepository courseHistoryRepository;
 
     /**
      * Realiza una búsqueda de cursos en el panel de administración utilizando un
@@ -173,6 +182,35 @@ public class AdminCourseInsightService {
         }
 
         CourseCollectiveMetrics metrics = resolveCourseCollectiveMetrics(courseId);
+        List<AdminCourseStudentStatsDTO> studentStatistics = resolveStudentStatistics(courseId);
+        int currentYear = Year.now().getValue();
+        List<Integer> historicalYears = List.of(currentYear - 1, currentYear - 2);
+        Map<Integer, AdminCourseStatsHistory> historyByYear = new HashMap<>();
+        for (AdminCourseStatsHistory row : courseHistoryRepository
+                .findAllByCourseAndYears(courseId, historicalYears)) {
+            historyByYear.put(row.getSnapshotYear(), row);
+        }
+        List<AdminCourseCollectiveStatsDTO.AdminCourseYearComparisonDTO> comparisons = new ArrayList<>();
+        for (int year : historicalYears) {
+            AdminCourseStatsHistory row = historyByYear.get(year);
+            if (row == null) {
+                boolean canSeedFictitious = metrics.activeStudentsInCourse() > 0;
+                double factor = year == currentYear - 1 ? 0.93 : 0.86;
+                comparisons.add(new AdminCourseCollectiveStatsDTO.AdminCourseYearComparisonDTO(
+                        year,
+                        canSeedFictitious ? (int) Math.round(metrics.activeStudentsInCourse() * factor) : 0,
+                        canSeedFictitious ? (int) Math.round(metrics.courseAverageProgressPercentage() * factor) : 0,
+                        canSeedFictitious ? (int) Math.round(metrics.completionRatePercentage() * factor) : 0,
+                        scale(metrics.averageCourseRating(), factor),
+                        scale(metrics.averageInstructorRating(), factor),
+                        scale(metrics.averageGrade(), factor),
+                        scale(metrics.averageWorkGrade(), factor),
+                        scale(metrics.averageFinalExamGrade(), factor),
+                        false));
+            } else {
+                comparisons.add(toYearComparison(row));
+            }
+        }
         return new AdminCourseCollectiveStatsDTO(
                 metrics.activeStudentsInCourse(),
                 metrics.courseAverageProgressPercentage(),
@@ -181,7 +219,89 @@ public class AdminCourseInsightService {
                 metrics.averageInstructorRating(),
                 metrics.averageGrade(),
                 metrics.averageWorkGrade(),
-                metrics.averageFinalExamGrade());
+                metrics.averageFinalExamGrade(), comparisons, studentStatistics);
+    }
+
+    @Transactional
+    public int finalizePreviousYearCourseStatsNow(Long courseId) {
+        if (!coursesRepository.existsById(courseId)) {
+            throw new ResourceNotFoundException("Curso no encontrado con id: " + courseId);
+        }
+        int year = Year.now().getValue() - 1;
+        CourseCollectiveMetrics metrics = resolveCourseCollectiveMetrics(courseId);
+        AdminCourseStatsHistory row = courseHistoryRepository
+                .findByCourseAndYear(courseId, year)
+                .orElseGet(AdminCourseStatsHistory::new);
+        Courses course = coursesRepository.findById(courseId).orElseThrow();
+        row.setCourse(course);
+        row.setSnapshotYear(year);
+        row.setActiveStudentsInCourse(metrics.activeStudentsInCourse());
+        row.setCourseAverageProgressPercentage(metrics.courseAverageProgressPercentage());
+        row.setApprovalIndexPercentage(metrics.completionRatePercentage());
+        row.setAverageCourseRating(metrics.averageCourseRating());
+        row.setAverageInstructorRating(metrics.averageInstructorRating());
+        row.setAverageGrade(metrics.averageGrade());
+        row.setAverageWorkGrade(metrics.averageWorkGrade());
+        row.setAverageFinalExamGrade(metrics.averageFinalExamGrade());
+        row.setRealData(true);
+        row.setGeneratedAt(java.time.LocalDateTime.now());
+        courseHistoryRepository.save(row);
+        return year;
+    }
+
+    @Scheduled(cron = "${app.admin.course-stats.finalize-cron:0 20 0 1 1 *}", zone = "${app.admin.global-stats.time-zone:Europe/Madrid}")
+    @Transactional
+    public void finalizePreviousYearCourseStats() {
+        for (Courses course : coursesRepository.findAll()) {
+            if (course != null && course.getCourse_id() != null) {
+                finalizePreviousYearCourseStatsNow(course.getCourse_id());
+            }
+        }
+    }
+
+    private AdminCourseCollectiveStatsDTO.AdminCourseYearComparisonDTO toYearComparison(AdminCourseStatsHistory row) {
+        return new AdminCourseCollectiveStatsDTO.AdminCourseYearComparisonDTO(
+                row.getSnapshotYear(), row.getActiveStudentsInCourse(), row.getCourseAverageProgressPercentage(),
+                row.getApprovalIndexPercentage(), row.getAverageCourseRating(), row.getAverageInstructorRating(),
+                row.getAverageGrade(), row.getAverageWorkGrade(), row.getAverageFinalExamGrade(), row.isRealData());
+    }
+
+    private Double scale(Double value, double factor) {
+        return value == null ? null : Math.round(value * factor * 10.0) / 10.0;
+    }
+
+    private List<AdminCourseStudentStatsDTO> resolveStudentStatistics(Long courseId) {
+        List<Enrollment> activeEnrollments = enrollmentRepository.findActiveStudentEnrollmentsByCourseId(courseId);
+        Map<Long, List<CourseGrade>> gradesByEnrollment = new LinkedHashMap<>();
+        for (CourseGrade grade : courseGradeRepository.findAllByCourseIdWithStudentEnrollment(courseId)) {
+            if (grade.getEnrollment() != null && grade.getEnrollment().getEnrollmentid() != null) {
+                gradesByEnrollment
+                        .computeIfAbsent(grade.getEnrollment().getEnrollmentid(), ignored -> new ArrayList<>())
+                        .add(grade);
+            }
+        }
+
+        return activeEnrollments.stream()
+                .filter(enrollment -> enrollment.getUser() != null && enrollment.getUser().getUser_id() != null)
+                .map(enrollment -> {
+                    List<CourseGrade> grades = gradesByEnrollment.getOrDefault(enrollment.getEnrollmentid(), List.of());
+                    Double average = averageScore(grades);
+                    Double work = averageScoreByKeywords(grades, WORK_GRADE_KEYWORDS);
+                    Double exam = averageScoreByKeywords(grades, FINAL_EXAM_KEYWORDS);
+                    return new AdminCourseStudentStatsDTO(
+                            enrollment.getUser().getUser_id(),
+                            enrollment.getUser().getUsername(),
+                            userService.calculateCurrentProgress(enrollment),
+                            toBigDecimal(average),
+                            toBigDecimal(work),
+                            toBigDecimal(exam),
+                            average != null && average > 5.0);
+                })
+                .toList();
+    }
+
+    private BigDecimal toBigDecimal(Double value) {
+        return value == null ? null : BigDecimal.valueOf(value).setScale(1, java.math.RoundingMode.HALF_UP);
     }
 
     /**

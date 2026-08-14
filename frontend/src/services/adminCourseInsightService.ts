@@ -47,6 +47,31 @@ export interface CourseCollectiveStats {
     averageGrade: number | null;
     averageWorkGrade: number | null;
     averageFinalExamGrade: number | null;
+    yearlyComparisons: CourseYearComparison[];
+    studentStatistics: CourseStudentStats[];
+}
+
+export interface CourseStudentStats {
+    userId: number;
+    username: string;
+    progressPercentage: number;
+    averageGrade: number | null;
+    averageWorkGrade: number | null;
+    averageFinalExamGrade: number | null;
+    passed: boolean;
+}
+
+export interface CourseYearComparison {
+    year: number;
+    activeStudentsInCourse: number;
+    courseAverageProgressPercentage: number;
+    approvalIndexPercentage: number;
+    averageCourseRating: number | null;
+    averageInstructorRating: number | null;
+    averageGrade: number | null;
+    averageWorkGrade: number | null;
+    averageFinalExamGrade: number | null;
+    realData: boolean;
 }
 
 export const searchCourses = async (keyword: string): Promise<CourseSearchResult[]> => {
@@ -80,4 +105,10 @@ export const resolveCourseInsightErrorMessage = (err: unknown): string => {
         }
     }
     return 'Error al consultar la información estadística del curso.';
+};
+
+export const finalizePreviousYearCourseStats = async (courseId: number): Promise<{ message: string; finalizedYear: number }> => {
+    const response = await apiClient.post<{ message: string; finalizedYear: number }>(
+        `/api/admin/courses/${courseId}/collective-stats/finalize-previous-year`);
+    return response.data;
 };

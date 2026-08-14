@@ -92,6 +92,10 @@ public interface AcademicEvaluationRepository extends JpaRepository<AcademicEval
         @Query("SELECT AVG(ae.instructor_score) FROM AcademicEvaluation ae WHERE ae.course.course_id IN :courseIds")
         Double getAverageInstructorScoreByCourseIds(@Param("courseIds") List<Long> courseIds);
 
+        @Query("SELECT AVG(ae.instructor_score) FROM AcademicEvaluation ae "
+                        + "WHERE ae.course.assignedUser.user_id = :professorId")
+        Double getAverageInstructorScoreByProfessorId(@Param("professorId") Long professorId);
+
         /**
          * Recupera todas las evaluaciones académicas asociadas a un usuario específico,
          * usadas para anonimizarlas (no borrarlas) durante la baja permanente de una

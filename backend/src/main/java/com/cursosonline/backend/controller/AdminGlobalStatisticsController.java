@@ -9,8 +9,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import com.cursosonline.backend.dto.AdminProfessorRatingDTO;
 
 import java.util.Map;
+import java.util.List;
 
 /**
  * Controlador REST del panel estadístico global de administración.
@@ -31,6 +34,12 @@ public class AdminGlobalStatisticsController {
     @GetMapping("/global")
     public ResponseEntity<AdminGlobalStatisticsDTO> getGlobalStatistics() {
         return ResponseEntity.ok(adminGlobalStatisticsService.getGlobalStatistics());
+    }
+
+    @GetMapping("/professors/search")
+    public ResponseEntity<List<AdminProfessorRatingDTO>> searchProfessorRatings(
+            @RequestParam(name = "keyword", defaultValue = "") String keyword) {
+        return ResponseEntity.ok(adminGlobalStatisticsService.searchProfessorRatings(keyword));
     }
 
     /**
