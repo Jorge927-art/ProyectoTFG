@@ -193,7 +193,7 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
             <GenericCard className="space-y-3">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                     <FileText size={18} className="text-blue-600" />
-                    Envio y recepcion de trabajos y examenes
+                    Envío y recepción de exámenes
                 </h2>
 
                 {!courseId ? (
@@ -205,7 +205,7 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="space-y-1 md:col-span-2">
                                 <label htmlFor="professor-doc-upload" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                    Documento (PDF)
+                                    Examen (PDF o vídeo)
                                 </label>
                                 <input
                                     id="professor-doc-upload"
@@ -225,7 +225,7 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
                                     onClick={() => void handleSendDocument()}
                                     disabled={!selectedFile || isUploadingDocument || !selectedStudent}
                                     variant="primary"
-                                    label={isUploadingDocument ? 'Enviando documento...' : 'Enviar documento al alumno seleccionado'}
+                                    label={isUploadingDocument ? 'Enviando examen...' : 'Enviar examen al alumno seleccionado'}
                                     icon={isUploadingDocument ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                                     className="w-full justify-center text-xs! font-bold! py-2!"
                                 />

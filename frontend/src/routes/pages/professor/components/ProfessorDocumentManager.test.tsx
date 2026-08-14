@@ -158,7 +158,7 @@ describe('ProfessorDocumentManager', () => {
         const file = new File(['contenido-video'], 'rubrica.mp4', { type: 'video/mp4' });
         fireEvent.change(fileInput, { target: { files: [file] } });
 
-        fireEvent.click(screen.getByRole('button', { name: 'Enviar documento' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Enviar documentación o trabajo' }));
 
         await waitFor(() => {
             expect(documentService.uploadProfessorDocument).toHaveBeenCalledWith(file, 101, 3, 'DOCUMENTO');

@@ -181,7 +181,7 @@ describe('useGradingCenter', () => {
             await result.current.handleSendDocument();
         });
 
-        expect(uploadProfessorDocument).toHaveBeenCalledWith(file, 10, 11, 'TRABAJO');
+        expect(uploadProfessorDocument).toHaveBeenCalledWith(file, 10, 11, 'EXAMEN');
         expect(result.current.successMessage).toBe('Documento enviado a ana correctamente.');
         expect(result.current.selectedFile).toBeNull();
         expect(mockRefreshNotifications).toHaveBeenCalledTimes(1);

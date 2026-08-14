@@ -284,4 +284,24 @@ class ProfessorCourseAlertServiceTest {
         service.dismissBellAlertByTypeFallback("profesor", null);
         verify(alertRepository).save(alert);
     }
+
+    @Test
+    void resolvesOnlyOldestViewedAlertForEligibleDeliveryType() {
+        ProfessorCourseAlert oldest = new ProfessorCourseAlert();
+        oldest.setStatus(ProfessorAlertStatus.VIEWED);
+        when(alertRepository.findOldestViewedByProfessorStudentCourseAndTypes(
+                eq("profesor"), eq(20L), eq(30L), anyCollection()))
+                .thenReturn(List.of(oldest));
+
+        service.resolveOldestViewedAlertAfterSuccessfulDelivery("profesor", 20L, 30L, false);
+
+        assertEquals(ProfessorAlertStatus.RESOLVED, oldest.getStatus());
+        verify(alertRepository).save(oldest);
+
+        reset(alertRepository);
+        service.resolveOldestViewedAlertAfterSuccessfulDelivery("profesor", 20L, 30L, true);
+        verify(alertRepository).findOldestViewedByProfessorStudentCourseAndTypes(
+                eq("profesor"), eq(20L), eq(30L), argThat(types -> types.contains(ProfessorAlertType.FINAL_EXAM)));
+        verify(alertRepository, never()).save(any());
+    }
 }

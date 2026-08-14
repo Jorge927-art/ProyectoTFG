@@ -18,7 +18,7 @@ import { useNotifications } from '../../../../components/ui/globalNotificationBe
 const ERROR_MESSAGE_AUTO_DISMISS_MS = 6000;
 const GRADE_SUBMIT_FEEDBACK_AUTO_DISMISS_MS = 3500;
 export const PROFESSOR_FEEDBACK_MAX_LENGTH = 300;
-const GRADING_CENTER_DELIVERY_TYPE = 'TRABAJO';
+const GRADING_CENTER_DELIVERY_TYPE = 'EXAMEN';
 
 type GradeSubmitFeedbackStatus = 'success' | 'error' | null;
 type CalculatorMessageType = 'success' | 'info' | 'error' | null;

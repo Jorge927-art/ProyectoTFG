@@ -32,7 +32,6 @@ const getPriority = (alert: ProfessorCourseAlert): number => {
 
 const getNextStatus = (status: ProfessorAlertStatus): ProfessorAlertStatus | null => {
     if (status === 'PENDING') return 'VIEWED';
-    if (status === 'VIEWED') return 'RESOLVED';
     return null;
 };
 
@@ -144,12 +143,6 @@ export const ProfessorTeachingAlertsPanel = () => {
                     sortedAlerts.map((alert) => {
                         const status = statusMeta[alert.status];
                         const nextStatus = getNextStatus(alert.status);
-                        const statusActionLabel = nextStatus === 'VIEWED'
-                            ? 'Marcar como visto'
-                            : nextStatus === 'RESOLVED'
-                                ? 'Marcar como resuelto'
-                                : 'Resuelto';
-
                         return (
                             <article
                                 key={alert.alertId}
@@ -171,21 +164,23 @@ export const ProfessorTeachingAlertsPanel = () => {
                                     <span className="px-2 py-0.5 bg-white/80 border border-slate-200 rounded-full">{formatCheckpointLabel(alert)}</span>
                                 </div>
 
-                                <div className="mt-3 flex justify-end">
-                                    <GenericButton
-                                        type="button"
-                                        variant="text"
-                                        disabled={updatingAlertId === alert.alertId || nextStatus === null}
-                                        onClick={() => void handleAdvanceStatus(alert)}
-                                        icon={
-                                            updatingAlertId === alert.alertId
-                                                ? <Loader2 size={13} className="animate-spin" />
-                                                : <CheckCircle2 size={13} />
-                                        }
-                                        label={statusActionLabel}
-                                        className="text-[11px]! font-bold!"
-                                    />
-                                </div>
+                                {nextStatus === 'VIEWED' && (
+                                    <div className="mt-3 flex justify-end">
+                                        <GenericButton
+                                            type="button"
+                                            variant="text"
+                                            disabled={updatingAlertId === alert.alertId}
+                                            onClick={() => void handleAdvanceStatus(alert)}
+                                            icon={
+                                                updatingAlertId === alert.alertId
+                                                    ? <Loader2 size={13} className="animate-spin" />
+                                                    : <CheckCircle2 size={13} />
+                                            }
+                                            label="Marcar como visto"
+                                            className="text-[11px]! font-bold!"
+                                        />
+                                    </div>
+                                )}
                             </article>
                         );
                     })

@@ -12,6 +12,7 @@ import com.cursosonline.backend.repository.DocumentMetadataRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
 import com.cursosonline.backend.services.FileStorageService;
+import com.cursosonline.backend.services.ProfessorCourseAlertService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -69,6 +70,9 @@ public class DocumentControllerTest {
         // automáticamente en el controlador
         @Mock
         private EnrollmentRepository enrollmentRepository;
+
+        @Mock
+        private ProfessorCourseAlertService professorCourseAlertService;
 
         @Mock
         private Authentication authentication;

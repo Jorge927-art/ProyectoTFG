@@ -12,6 +12,7 @@ import com.cursosonline.backend.repository.DocumentMetadataRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
 import com.cursosonline.backend.services.FileStorageService;
+import com.cursosonline.backend.services.ProfessorCourseAlertService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -44,6 +45,7 @@ public class DocumentController {
     private final CoursesRepository coursesRepository;
     private final UserRepository userRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final ProfessorCourseAlertService professorCourseAlertService;
 
     /**
      * Constructor de la clase DocumentController.
@@ -59,12 +61,14 @@ public class DocumentController {
             DocumentMetadataRepository documentMetadataRepository,
             CoursesRepository coursesRepository,
             UserRepository userRepository,
-            EnrollmentRepository enrollmentRepository) {
+            EnrollmentRepository enrollmentRepository,
+            ProfessorCourseAlertService professorCourseAlertService) {
         this.fileStorageService = fileStorageService;
         this.documentMetadataRepository = documentMetadataRepository;
         this.coursesRepository = coursesRepository;
         this.userRepository = userRepository;
         this.enrollmentRepository = enrollmentRepository;
+        this.professorCourseAlertService = professorCourseAlertService;
     }
 
     /**
@@ -1049,6 +1053,9 @@ public class DocumentController {
                         bulkReceived.setFolder_type(FolderType.RECEIVED);
                         bulkReceived.setRead(false);
                         documentMetadataRepository.save(bulkReceived);
+                        professorCourseAlertService.resolveOldestViewedAlertAfterSuccessfulDelivery(
+                                currentUser.getUsername(), classStudent.getUser_id(), courseId,
+                                "EXAMEN".equals(normalizedDeliveryType));
                     }
                 }
 
@@ -1081,6 +1088,9 @@ public class DocumentController {
             singleReceived.setFolder_type(FolderType.RECEIVED);
             singleReceived.setRead(false);
             documentMetadataRepository.save(singleReceived);
+            professorCourseAlertService.resolveOldestViewedAlertAfterSuccessfulDelivery(
+                    currentUser.getUsername(), receiverUser.getUser_id(), courseId,
+                    "EXAMEN".equals(normalizedDeliveryType));
 
             return ResponseEntity.ok(Map.of(
                     "message", "Documento enviado con éxito de forma individual al alumno",

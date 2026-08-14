@@ -25,6 +25,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
@@ -250,6 +251,28 @@ public class ProfessorCourseAlertService {
                 return;
             }
         }
+    }
+
+    @Transactional
+    public void resolveOldestViewedAlertAfterSuccessfulDelivery(
+            String professorUsername, Long studentId, Long courseId, boolean finalExamDelivery) {
+        if (professorUsername == null || professorUsername.isBlank() || studentId == null || courseId == null) {
+            return;
+        }
+
+        Collection<ProfessorAlertType> eligibleTypes = finalExamDelivery
+                ? EnumSet.of(ProfessorAlertType.FINAL_EXAM)
+                : EnumSet.of(ProfessorAlertType.INITIAL_CONTACT, ProfessorAlertType.MATERIAL_DISPATCH);
+        List<ProfessorCourseAlert> viewedAlerts = alertRepository
+                .findOldestViewedByProfessorStudentCourseAndTypes(
+                        professorUsername, studentId, courseId, eligibleTypes);
+        if (viewedAlerts.isEmpty()) {
+            return;
+        }
+
+        ProfessorCourseAlert oldest = viewedAlerts.get(0);
+        oldest.setStatus(ProfessorAlertStatus.RESOLVED);
+        alertRepository.save(oldest);
     }
 
     public int suggestPartsByDuration(Float durationHours) {

@@ -2575,6 +2575,12 @@ Se adopta una arquitectura de avisos docentes separada en dos canales complement
 2. El panel docente actúa como canal operativo y permite gestionar cada aviso con un ciclo de vida propio.
 3. La asignación docente queda supeditada a una configuración obligatoria de partes, sin la cual no se consolida el alta.
 4. Los avisos se generan por matrícula y checkpoint, con deduplicación estricta para evitar repeticiones.
+5. El panel operativo mantiene los avisos en una cola ordenada por antigüedad. El profesor puede pasar un aviso de `PENDIENTE` a `VISTO`, pero la resolución posterior ya no depende de pulsar "Marcar como resuelto".
+6. Un envío correcto de documentación, vídeo o trabajo desde el panel "Documentación y trabajos académicos" consume el aviso `VISTO` más antiguo del mismo profesor, alumno y curso, siempre que sea `INITIAL_CONTACT` o `MATERIAL_DISPATCH`.
+7. El panel "Envío y recepción de exámenes" queda reservado para exámenes y solo puede resolver avisos `FINAL_EXAM` en estado `VISTO`.
+8. No se inspeccionan títulos, nombres de archivo, encabezados, extensiones ni contenido para inferir la intención del profesor. La elección del canal es la declaración operativa del profesor.
+9. La transición a `RESUELTO` se ejecuta únicamente después de persistir correctamente el envío y sus registros de recepción. Cualquier error mantiene el aviso en `VISTO`.
+10. Las reglas de resolución se aplican desde este cambio también a avisos que ya estuvieran en estado `VISTO`; no se generan ni resuelven avisos retroactivamente por lecturas del panel.
 
 ## Justificación
 
@@ -2590,6 +2596,8 @@ La configuración por curso también aporta flexibilidad, ya que permite ajustar
 * Se reduce el ruido por duplicidad mediante restricciones de unicidad y control de generación.
 * La experiencia de usuario mejora al separar claramente el canal de señal del canal de gestión.
 * El sistema queda preparado para futuras métricas de carga operativa y tiempos de resolución.
+* La responsabilidad funcional queda explícitamente en el profesor: un envío exitoso por el canal elegido consume el siguiente aviso compatible, sin heurísticas sobre el contenido.
+* La cola evita saltos de estado y garantiza que los avisos intermedios y el examen final se procesen en orden.
 
 ### Riesgos y mitigaciones
 
@@ -2607,6 +2615,7 @@ La configuración por curso también aporta flexibilidad, ya que permite ajustar
 | La configuración por curso se persiste como parte del dominio docente | `entities/CourseMaterialDispatchConfig.java`, `repository/CourseMaterialDispatchConfigRepository.java` y `resources/schema-postgresql.sql` formalizan la tabla `course_material_dispatch_config` | `services/professorAlertService.ts` expone las operaciones de alta y consulta de configuración |
 | Los avisos se generan por matrícula y checkpoint, con garantía de no duplicidad | `entities/ProfessorCourseAlert.java`, `entities/ProfessorAlertType.java`, `entities/ProfessorAlertStatus.java`, `repository/ProfessorCourseAlertRepository.java` y la restricción única definida en `resources/schema-postgresql.sql` | `routes/pages/professor/components/ProfessorTeachingAlertsPanel.tsx` presenta y gestiona los avisos por estado |
 | Se separa el canal de notificación inmediata del canal operativo de gestión | `services/ProfessorCourseAlertService.java`, `controller/ProfessorCourseAlertController.java` y `controller/UserController.java` implementan las acciones de dismiss y transición de estado | `components/ui/globalNotificationBell/GlobalNotificationBell.tsx` y `components/ui/globalNotificationBell/useNotifications.ts` gestionan la campana; el panel docente conserva el flujo operativo |
+| La resolución automática consume la cola de avisos vistos después de un envío correcto | `repository/ProfessorCourseAlertRepository.java` localiza el aviso `VIEWED` más antiguo y `services/ProfessorCourseAlertService.java` separa tipos intermedios y examen final; `controller/DocumentController.java` invoca la resolución después de persistir el envío | `ProfessorDocumentManager.tsx` se presenta como "Documentación y trabajos académicos" y `GradingCenter.tsx` como "Envío y recepción de exámenes"; `useGradingCenter.ts` envía `EXAMEN` |
 | Tras cada alta exitosa se evita la persistencia de estados visuales obsoletos | `controller/CourseController.java` devuelve una respuesta coherente y estable | `routes/pages/professor/ProfessorDashboard.tsx` rehidrata las asignaturas desde backend y `routes/pages/professor/components/ProfessorCoursePicker.tsx` mantiene el modal abierto en caso de error |
 
 ## Evidencias de Validación
@@ -2616,5 +2625,9 @@ La configuración por curso también aporta flexibilidad, ya que permite ajustar
 | Alta docente condicionada a la configuración de `dispatchParts` | Modal de configuración en `ProfessorCoursePicker.tsx` y endpoint `POST /api/courses/{courseId}/assign-teacher-with-alert-config` | La asignación no se consolida hasta completar y guardar la configuración |
 | Generación persistente de avisos sin duplicidad | Entidades `CourseMaterialDispatchConfig` y `ProfessorCourseAlert` con restricción única por `enrollment_id, alert_type, checkpoint_index` | Los avisos quedan vinculados a matrícula, curso y checkpoint de forma unívoca |
 | Consumo independiente del aviso en la campana | `dismissSingleNotification` en `useNotifications.ts` y `dismiss-one` en `UserController.java` | La campana se actualiza sin alterar el estado operativo del panel |
-| Gestión secuencial del estado del aviso | `ProfessorTeachingAlertsPanel.tsx` y `ProfessorCourseAlertController.java` | Se aplica el flujo `PENDING -> VIEWED -> RESOLVED` sin transición inversa |
+| Gestión secuencial del estado del aviso | `ProfessorTeachingAlertsPanel.tsx`, `ProfessorCourseAlertController.java` y `ProfessorCourseAlertService.java` | Se mantiene `PENDING -> VIEWED`; `VIEWED -> RESOLVED` ocurre automáticamente por envío exitoso y consume la entrada más antigua compatible |
+| Separación del canal intermedio y del examen final | `DocumentController.java` clasifica el envío `EXAMEN` frente a `DOCUMENTO/TRABAJO` antes de resolver avisos | `ProfessorDocumentManager.tsx` gestiona documentación/trabajos y `GradingCenter.tsx` queda limitado al envío de exámenes |
 | Refresco de asignaturas tras guardar la configuración | `ProfessorDashboard.tsx` con rehidratación explícita | La lista "Tus asignaturas asignadas" se actualiza desde backend tras una alta correcta |
+| Resolución automática de avisos intermedios | `DocumentController.java`, `ProfessorCourseAlertService.java` y `ProfessorCourseAlertServiceTest.java` | Un envío correcto de documentación, vídeo o trabajo resuelve solo el aviso `VIEWED` más antiguo compatible |
+| Resolución exclusiva del aviso final por el canal de examen | `DocumentController.java` distingue `EXAMEN` y `ProfessorCourseAlertServiceTest.java` cubre la separación de tipos | Un envío desde el panel de documentación no resuelve `FINAL_EXAM`; solo lo hace el canal de exámenes |
+| Fallo durante el envío | Transacción de `DocumentController.java` y resolución posterior a la persistencia | Si el envío no termina correctamente, el aviso permanece en estado `VIEWED` |

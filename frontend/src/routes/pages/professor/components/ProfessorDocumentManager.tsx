@@ -224,6 +224,7 @@ export const ProfessorDocumentManager = ({
             setIsUploading(true);
             setDocumentError('');
             await uploadProfessorDocument(selectedFile, selectedCourseId, Number(selectedReceiverId), 'DOCUMENTO');
+            emitNotificationsRefresh();
             resetUploadState();
 
             const updated = await getSentDocumentsByCourse(selectedCourseId);
@@ -304,7 +305,7 @@ export const ProfessorDocumentManager = ({
             <div className="flex items-center justify-between mb-3 shrink-0">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                     <FileUp size={18} className="text-blue-600" />
-                    <span>Gestión de Documentos Académicos</span>
+                    <span>Documentación y trabajos académicos</span>
                 </h2>
                 <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">
                     {documentList.length}
@@ -313,7 +314,7 @@ export const ProfessorDocumentManager = ({
 
             <div className="bg-slate-50/60 border border-slate-100 rounded-xl p-2.5 mb-3 shrink-0">
                 <label htmlFor="professor-doc-course-selector" className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
-                    Asignatura activa para documentos
+                    Asignatura activa para documentación y trabajos
                 </label>
                 <select
                     id="professor-doc-course-selector"
@@ -459,7 +460,7 @@ export const ProfessorDocumentManager = ({
                             disabled={isUploading || !selectedReceiverId || !selectedFile}
                             variant="primary"
                             icon={isUploading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                            label={isUploading ? 'Enviando...' : 'Enviar documento'}
+                            label={isUploading ? 'Enviando...' : 'Enviar documentación o trabajo'}
                             className="w-full justify-center gap-2 py-2! text-xs! font-bold! rounded-lg!"
                         />
                     </div>

@@ -202,7 +202,7 @@ describe('GradingCenter', () => {
 
         render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
 
-        const fileInput = screen.getByLabelText('Documento (PDF)');
+        const fileInput = screen.getByLabelText('Examen (PDF o vídeo)');
         fireEvent.change(fileInput, { target: { files: [selectedFile] } });
 
         expect(mockHandleFileSelection).toHaveBeenCalledWith(selectedFile);
@@ -217,7 +217,7 @@ describe('GradingCenter', () => {
 
         render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Enviar documento al alumno seleccionado' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Enviar examen al alumno seleccionado' }));
         expect(mockHandleSendDocument).toHaveBeenCalledTimes(1);
     });
 
@@ -301,7 +301,7 @@ describe('GradingCenter', () => {
 
         render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
 
-        const sendButton = screen.getByRole('button', { name: 'Enviando documento...' });
+        const sendButton = screen.getByRole('button', { name: 'Enviando examen...' });
         expect(sendButton).toBeDisabled();
     });
 
