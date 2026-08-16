@@ -21,8 +21,7 @@ public class ErrorResponse {
     private Map<String, String> errors;
 
     /**
-     * Constructor para crear una instancia de ErrorResponse sin errores de
-     * validación.
+     * Constructor de la clase ErrorResponse.
      * 
      * @param status
      * @param message
