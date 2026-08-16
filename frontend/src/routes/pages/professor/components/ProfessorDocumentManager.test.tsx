@@ -163,6 +163,7 @@ describe('ProfessorDocumentManager', () => {
         await waitFor(() => {
             expect(documentService.uploadProfessorDocument).toHaveBeenCalledWith(file, 101, 3, 'DOCUMENTO');
             expect(documentService.getSentDocumentsByCourse).toHaveBeenCalledWith(101);
+            expect(screen.getByText('Documento enviado correctamente: rubrica.mp4.')).toBeInTheDocument();
         });
     });
 

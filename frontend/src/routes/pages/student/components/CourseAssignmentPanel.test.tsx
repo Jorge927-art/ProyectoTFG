@@ -69,7 +69,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
     it('debe renderizar el estado inicial vacío si no hay ninguna asignatura seleccionada', () => {
         render(<CourseAssignmentPanel activeCourseId={null} enrolledList={[]} />);
 
-        expect(screen.getByText(/ASIGNATURAS/i)).toBeInTheDocument();
+        expect(screen.getByText(/EXAMENES/i)).toBeInTheDocument();
         expect(screen.getByText(/Selecciona una asignatura activa/i)).toBeInTheDocument();
     });
 
@@ -106,7 +106,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
     it('debe mostrar el flujo de entrega y permitir cambiar de asignatura', async () => {
         render(<CourseAssignmentPanel activeCourseId={101} enrolledList={mockEnrolledList} />);
 
-        expect(screen.getByRole('button', { name: /Enviar trabajo \/ examen/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Enviar examen/i })).toBeInTheDocument();
         expect(screen.queryByText(/CALIFICACIONES/i)).not.toBeInTheDocument();
 
         const selectElement = screen.getByDisplayValue('Desarrollo de Aplicaciones Cloud');
@@ -198,15 +198,16 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
 
         const file = new File(['payload'], 'trabajo.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
         fireEvent.change(input, { target: { files: [file] } });
-        fireEvent.click(screen.getByRole('button', { name: /Enviar trabajo \/ examen/i }));
+        fireEvent.click(screen.getByRole('button', { name: /Enviar examen/i }));
 
         await waitFor(() => expect(apiClient.post).toHaveBeenCalledTimes(1));
 
         const [url, formData] = vi.mocked(apiClient.post).mock.calls[0] as [string, FormData];
         expect(url).toBe('/api/v1/documents/upload/assignment');
         expect(formData.get('courseId')).toBe('101');
-        expect(formData.get('evaluationType')).toBe('TRABAJO');
+        expect(formData.get('evaluationType')).toBe('EXAMEN');
         expect(formData.get('file')).toBe(file);
+        expect(await screen.findByText('Documento enviado correctamente: trabajo.docx.')).toBeInTheDocument();
     });
 
     it('debe limpiar error tras timeout cuando falla la subida', async () => {
@@ -220,7 +221,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
         const input = container.querySelector('input[type="file"]') as HTMLInputElement;
         const file = new File(['payload'], 'examen.pdf', { type: 'application/pdf' });
         fireEvent.change(input, { target: { files: [file] } });
-        fireEvent.click(screen.getByRole('button', { name: /Enviar trabajo \/ examen/i }));
+        fireEvent.click(screen.getByRole('button', { name: /Enviar examen/i }));
 
         await act(async () => {
             await Promise.resolve();
@@ -229,7 +230,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
         expect(apiClient.post).toHaveBeenCalledTimes(1);
 
         const [, formData] = vi.mocked(apiClient.post).mock.calls[0] as [string, FormData];
-        expect(formData.get('evaluationType')).toBe('TRABAJO');
+        expect(formData.get('evaluationType')).toBe('EXAMEN');
         expect(screen.getByText('Archivo no permitido por política')).toBeInTheDocument();
 
         await act(async () => {
@@ -240,7 +241,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
         expect(screen.queryByText('Archivo no permitido por política')).not.toBeInTheDocument();
     });
 
-    it('no debe enviar automáticamente al seleccionar archivo; solo al pulsar Enviar trabajo / examen', async () => {
+    it('no debe enviar automáticamente al seleccionar archivo; solo al pulsar Enviar examen', async () => {
         const { container } = render(<CourseAssignmentPanel activeCourseId={101} enrolledList={mockEnrolledList} />);
         const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
@@ -249,7 +250,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
 
         expect(apiClient.post).not.toHaveBeenCalled();
 
-        fireEvent.click(screen.getByRole('button', { name: /Enviar trabajo \/ examen/i }));
+        fireEvent.click(screen.getByRole('button', { name: /Enviar examen/i }));
 
         await waitFor(() => {
             expect(apiClient.post).toHaveBeenCalledTimes(1);

@@ -6,6 +6,7 @@ import * as alertService from '../../../../services/professorAlertService';
 vi.mock('../../../../services/professorAlertService', () => ({
     getProfessorAlerts: vi.fn(),
     updateProfessorAlertStatus: vi.fn(),
+    PROFESSOR_ALERTS_REFRESH_EVENT: 'professor-alerts:refresh',
 }));
 
 const buildAlert = (status: 'PENDING' | 'VIEWED' | 'RESOLVED') => ({
@@ -70,5 +71,14 @@ describe('ProfessorTeachingAlertsPanel - transición operativa', () => {
             expect(alertService.updateProfessorAlertStatus).toHaveBeenCalledWith(1, 'VIEWED');
         });
         expect(screen.queryByRole('button', { name: /resuelto/i })).not.toBeInTheDocument();
+    });
+
+    it('recarga los avisos al recibir el evento específico de envío de material', async () => {
+        render(<ProfessorTeachingAlertsPanel />);
+        await waitFor(() => expect(alertService.getProfessorAlerts).toHaveBeenCalledTimes(1));
+
+        window.dispatchEvent(new Event(alertService.PROFESSOR_ALERTS_REFRESH_EVENT));
+
+        await waitFor(() => expect(alertService.getProfessorAlerts).toHaveBeenCalledTimes(2));
     });
 });

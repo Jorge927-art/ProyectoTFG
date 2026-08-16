@@ -246,6 +246,18 @@ describe('AdminDocumentInbox', () => {
         });
     });
 
+    it('no muestra punto rojo de no leído en Recepción de Documentos', async () => {
+        vi.mocked(documentService.getUserDocuments).mockResolvedValue([docUnread]);
+
+        render(<AdminDocumentInbox />);
+
+        await waitFor(() => {
+            expect(screen.getByText(docUnread.originalname)).toBeInTheDocument();
+        });
+
+        expect(screen.queryByTitle('No leído')).not.toBeInTheDocument();
+    });
+
     it('envía un documento a un usuario concreto desde el panel admin', async () => {
         const sentFile = new File(['contenido'], 'aviso.pdf', { type: 'application/pdf' });
         vi.mocked(documentService.getUserDocuments).mockResolvedValue([]);

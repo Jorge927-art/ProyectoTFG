@@ -239,6 +239,14 @@ public class ProfessorCourseAlertService {
     }
 
     @Transactional
+    public void dismissAllBellAlerts(String professorUsername) {
+        if (professorUsername == null || professorUsername.isBlank()) {
+            return;
+        }
+        alertRepository.dismissAllBellAlertsByProfessorUsername(professorUsername);
+    }
+
+    @Transactional
     public void dismissBellAlertByTypeFallback(String professorUsername, ProfessorAlertType alertType) {
         if (alertType == null) {
             return;

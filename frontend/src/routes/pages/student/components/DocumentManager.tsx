@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileText, Download, Loader2, AlertCircle, FileUp, Inbox, Send, UserCheck } from 'lucide-react';
+import { Upload, FileText, Download, Loader2, AlertCircle, FileUp, Inbox, Send, UserCheck, CheckCircle } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import { useDocuments } from './useDocuments';
+import type { EnrollmentInfo } from '../../../../services/courseTypes';
 import { emitNotificationsRefresh } from '../../../../components/ui/globalNotificationBell/useNotifications';
 import {
     hideAllReceivedGeneralDocuments,
@@ -23,11 +24,13 @@ import {
 interface DocumentManagerProps {
     autoFocusDocuments?: boolean;
     focusDocumentId?: number | null;
+    enrolledList?: EnrollmentInfo[];
 }
 
 export const DocumentManager = ({
     autoFocusDocuments = false,
     focusDocumentId = null,
+    enrolledList = [],
 }: DocumentManagerProps) => {
     const {
         documentList,
@@ -41,7 +44,10 @@ export const DocumentManager = ({
         loadingDirectory,
         selectedReceiverId,
         setSelectedReceiverId,
+        fetchDirectoryForCourse = async () => undefined,
         handleUpload,
+        clearReceivedDocuments = () => undefined,
+        clearSentDocuments = () => undefined,
         handleSecureDownload
     } = useDocuments();
 
@@ -49,16 +55,43 @@ export const DocumentManager = ({
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [uploadSuccess, setUploadSuccess] = useState('');
+    const [selectedCourseId, setSelectedCourseId] = useState<number | ''>('');
     const [highlightedDocumentId, setHighlightedDocumentId] = useState<number | null>(null);
     const [clearingTray, setClearingTray] = useState(false);
     const highlightTimeoutRef = useRef<number | null>(null);
     const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
+    const autoFocusAppliedRef = useRef(false);
 
     React.useEffect(() => {
-        if (!autoFocusDocuments) {
+        setSelectedCourseId((current) => {
+            if (current && enrolledList.some((enrollment) => enrollment.course.course_id === current)) {
+                return current;
+            }
+            return '';
+        });
+    }, [enrolledList]);
+
+    React.useEffect(() => {
+        if (!selectedCourseId) {
+            setSelectedReceiverId('');
             return;
         }
 
+        void fetchDirectoryForCourse(selectedCourseId);
+    }, [fetchDirectoryForCourse, selectedCourseId, setSelectedReceiverId]);
+
+    React.useEffect(() => {
+        if (!autoFocusDocuments) {
+            autoFocusAppliedRef.current = false;
+            return;
+        }
+
+        if (autoFocusAppliedRef.current) {
+            return;
+        }
+
+        autoFocusAppliedRef.current = true;
         if (activeTab !== 'RECEIVED') {
             setActiveTab('RECEIVED');
         }
@@ -121,6 +154,7 @@ export const DocumentManager = ({
 
             setSelectedFile(file);
             setDocumentError('');
+            setUploadSuccess('');
         }
     };
 
@@ -136,13 +170,17 @@ export const DocumentManager = ({
         }
 
         try {
-            const success = await handleUpload(selectedFile);
+            const success = selectedCourseId
+                ? await handleUpload(selectedFile, selectedCourseId)
+                : await handleUpload(selectedFile);
             if (success && fileInputRef.current) {
                 fileInputRef.current.value = '';
                 setSelectedFile(null);
+                setUploadSuccess(`Documento enviado correctamente: ${selectedFile.name}.`);
             }
         } catch (error) {
             console.error('Error al transmitir el documento:', error);
+            setUploadSuccess('');
             setDocumentError('No se pudo subir el documento. Inténtalo de nuevo.');
         }
     };
@@ -204,18 +242,14 @@ export const DocumentManager = ({
 
             if (activeTab === 'RECEIVED') {
                 await hideAllReceivedGeneralDocuments();
+                clearReceivedDocuments();
                 emitNotificationsRefresh();
             } else {
                 await hideAllSentGeneralDocuments();
+                clearSentDocuments();
             }
 
             setHighlightedDocumentId(null);
-            const originalTab: 'RECEIVED' | 'SENT' = activeTab;
-            const refreshTab: 'RECEIVED' | 'SENT' = originalTab === 'RECEIVED' ? 'SENT' : 'RECEIVED';
-            setActiveTab(refreshTab);
-            window.setTimeout(() => {
-                setActiveTab(originalTab);
-            }, 0);
         } catch {
             setDocumentError(`No se pudo limpiar la bandeja de ${trayLabel}.`);
         } finally {
@@ -230,11 +264,62 @@ export const DocumentManager = ({
             <div className="flex items-center justify-between mb-3 shrink-0">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                     <FileUp size={18} className="text-blue-600" />
-                    <span>Gestión de Documentos Académicos</span>
+                    <span>Gestión documentos/trabajos</span>
                 </h2>
                 <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">
                     {documentList.length}
                 </span>
+            </div>
+
+            <div className="bg-slate-50/60 border border-slate-100 rounded-xl p-2.5 mb-3 shrink-0 space-y-2">
+                <label htmlFor="student-document-course-selector" className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+                    Asignatura del documento
+                </label>
+                <select
+                    id="student-document-course-selector"
+                    aria-label="Seleccionar asignatura"
+                    value={selectedCourseId}
+                    onChange={(event) => {
+                        const value = Number(event.target.value);
+                        setSelectedCourseId(Number.isFinite(value) && value > 0 ? value : '');
+                        setDocumentError('');
+                    }}
+                    disabled={isUploading}
+                    className="w-full text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-blue-400 transition-colors disabled:opacity-60"
+                >
+                    <option value="">Cursos</option>
+                    {enrolledList.map((enrollment) => (
+                        <option key={enrollment.enrollmentid} value={enrollment.course.course_id}>
+                            {enrollment.course.title}
+                        </option>
+                    ))}
+                </select>
+                {selectedCourseId && (
+                    <div className="flex items-center gap-2">
+                        <UserCheck size={14} className="text-slate-400 shrink-0" />
+                        <select
+                            value={selectedReceiverId}
+                            aria-label="Seleccionar destinatario"
+                            onChange={(event) => {
+                                setSelectedReceiverId(event.target.value ? Number(event.target.value) : '');
+                                setDocumentError('');
+                            }}
+                            disabled={isUploading || loadingDirectory}
+                            className="w-full text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-blue-400 transition-colors disabled:opacity-60"
+                        >
+                            <option value="">-- Seleccionar Destinatario --</option>
+                            {loadingDirectory ? (
+                                <option disabled>Cargando directorio legítimo...</option>
+                            ) : (
+                                directory.map((user) => (
+                                    <option key={user.userId} value={user.userId}>
+                                        {user.username} ({user.role})
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                    </div>
+                )}
             </div>
 
             {/* BOTONERA DE PESTAÑAS (TABS) INTERACTIVAS */}
@@ -270,37 +355,18 @@ export const DocumentManager = ({
                     <p className="truncate">{documentError}</p>
                 </div>
             )}
+            {uploadSuccess && (
+                <div className="mb-3 p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-lg flex items-center gap-2 shrink-0">
+                    <CheckCircle size={14} className="shrink-0" />
+                    <p className="truncate">{uploadSuccess}</p>
+                </div>
+            )}
 
             {/* CONTENEDOR FLEX PRINCIPAL */}
             <div className="flex-1 flex flex-col space-y-3 min-h-0">
 
                 {activeTab === 'SENT' && (
                     <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-3 space-y-2.5 shrink-0">
-                        <div className="flex items-center gap-2">
-                            <UserCheck size={14} className="text-slate-400 shrink-0" />
-                            <select
-                                value={selectedReceiverId}
-                                aria-label="Seleccionar destinatario"
-                                onChange={(e) => {
-                                    setSelectedReceiverId(e.target.value ? Number(e.target.value) : '');
-                                    setDocumentError('');
-                                }}
-                                disabled={isUploading || loadingDirectory}
-                                className="w-full text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:border-blue-400 transition-colors disabled:opacity-60"
-                            >
-                                <option value="">-- Seleccionar Destinatario --</option>
-                                {loadingDirectory ? (
-                                    <option disabled>Cargando directorio legítimo...</option>
-                                ) : (
-                                    directory?.map((user) => (
-                                        <option key={user.userId} value={user.userId}>
-                                            {user.username} ({user.role})
-                                        </option>
-                                    ))
-                                )}
-                            </select>
-                        </div>
-
                         <div className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-lg p-2.5 text-center transition-all bg-white group">
                             <input
                                 type="file"
@@ -320,6 +386,12 @@ export const DocumentManager = ({
                             >
                                 {isUploading ? (
                                     <Loader2 className="text-blue-500 animate-spin" size={20} />
+                                ) : selectedFile ? (
+                                    <>
+                                        <CheckCircle className="text-emerald-500" size={20} />
+                                        <span className="text-[11px] font-bold text-slate-700 truncate max-w-full px-1.5">Archivo seleccionado: {selectedFile.name}</span>
+                                        <span className="text-[10px] text-slate-500 font-semibold">Archivo seleccionado para enviar</span>
+                                    </>
                                 ) : (
                                     <Upload
                                         className={`transition-colors ${selectedReceiverId
@@ -329,16 +401,16 @@ export const DocumentManager = ({
                                         size={20}
                                     />
                                 )}
-                                <span className="text-[11px] font-bold text-slate-600">
-                                    {isUploading
-                                        ? "Transmitiendo payload seguro..."
-                                        : !selectedReceiverId
-                                            ? "Elige un destinatario arriba para desbloquear"
-                                            : selectedFile
-                                                ? `Archivo seleccionado: ${selectedFile.name}`
+                                {!selectedFile && (
+                                    <span className="text-[11px] font-bold text-slate-600">
+                                        {isUploading
+                                            ? "Transmitiendo payload seguro..."
+                                            : !selectedReceiverId
+                                                ? "Elige un destinatario arriba para desbloquear"
                                                 : `Seleccionar archivo (${ACADEMIC_DOCUMENT_ALLOWED_LABEL})`
-                                    }
-                                </span>
+                                        }
+                                    </span>
+                                )}
                             </label>
                         </div>
 

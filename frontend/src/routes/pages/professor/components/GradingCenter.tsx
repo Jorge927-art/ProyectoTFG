@@ -215,7 +215,11 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
                                     className="w-full text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg p-1.5"
                                 />
                                 {selectedFile && (
-                                    <p className="text-[10px] text-slate-500 truncate">Archivo preparado: {selectedFile.name}</p>
+                                    <div className="mt-2 flex flex-col items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50/50 px-2 py-2">
+                                        <CheckCircle className="text-emerald-500" size={20} />
+                                        <p className="text-[11px] font-bold text-slate-700 truncate max-w-full">Archivo preparado: {selectedFile.name}</p>
+                                        <p className="text-[10px] font-semibold text-slate-500">Archivo seleccionado para enviar</p>
+                                    </div>
                                 )}
                             </div>
 

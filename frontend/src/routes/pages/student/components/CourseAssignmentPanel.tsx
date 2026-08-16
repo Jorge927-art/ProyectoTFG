@@ -20,7 +20,7 @@ interface CourseAssignmentPanelProps {
     enrolledList: EnrollmentInfo[];
 }
 
-const DEFAULT_ASSIGNMENT_EVALUATION_TYPE = 'TRABAJO';
+const DEFAULT_ASSIGNMENT_EVALUATION_TYPE = 'EXAMEN';
 
 /**
  * Panel de Seguimiento de Asignatura (Tareas y Exámenes) [ADR-47].
@@ -46,6 +46,7 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
     const [isUploading, setIsUploading] = useState<boolean>(false);
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
     const [panelError, setPanelError] = useState<string>('');
+    const [panelSuccess, setPanelSuccess] = useState<string>('');
 
     // REFERENCIA Y ESTADO: Control del archivo físico adjunto y feedback visual
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -103,6 +104,7 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
         try {
             setIsUploading(true);
             setPanelError('');
+            setPanelSuccess('');
 
             const formData = new FormData();
             formData.append('file', fileToSend);
@@ -119,6 +121,7 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                 fileInputRef.current.value = '';
             }
             setPanelError('');
+            setPanelSuccess(`Documento enviado correctamente: ${fileToSend.name}.`);
         } catch (err: unknown) {
             console.error("Fallo en la subida del documento:", err);
 
@@ -132,6 +135,7 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
             const serverMessage = errorData.response?.data?.error || "Error al transmitir el documento al servidor.";
 
             setPanelError(serverMessage);
+            setPanelSuccess('');
 
             // TEMPORIZADOR AUTOMÁTICO: Borra la advertencia de la pantalla tras 7 segundos (7000 ms)
             setTimeout(() => {
@@ -151,6 +155,7 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
             const file = files[0];
             setSelectedFile(file);
             setPanelError('');
+            setPanelSuccess('');
         }
     };
 
@@ -195,7 +200,7 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                 </div>
                 <div className="flex-1 min-w-0">
                     <h2 className="text-base font-bold text-slate-800 leading-tight truncate uppercase">
-                        ASIGNATURAS
+                        EXAMENES
                     </h2>
                 </div>
 
@@ -222,6 +227,12 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                     {panelError && (
                         <div className="p-2 bg-red-50 border border-red-200 text-red-700 text-[11px] font-semibold rounded-lg shrink-0">
                             {panelError}
+                        </div>
+                    )}
+                    {panelSuccess && (
+                        <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold rounded-lg shrink-0 flex items-center gap-2">
+                            <CheckCircle size={14} className="shrink-0" />
+                            <span>{panelSuccess}</span>
                         </div>
                     )}
 
@@ -261,7 +272,7 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                                         type="file"
                                         ref={fileInputRef}
                                         onChange={handleFileChange}
-                                        accept=".pdf,.docx"
+                                        accept="application/pdf,.pdf"
                                         className="hidden"
                                         disabled={isUploading}
                                     />
@@ -288,7 +299,7 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                                                 <Upload className="h-5 w-5 text-slate-400 mx-auto mb-1 group-hover:text-blue-500 transition-colors" />
                                                 {/* Mensaje principal integrado y unificado */}
                                                 <p className="text-[10px] text-slate-800 font-black uppercase tracking-wider mb-0.5">
-                                                    Enviar trabajo / examen
+                                                    Enviar examen
                                                 </p>
                                                 <p className="text-[9px] text-slate-500 font-semibold">
                                                     Selecciona o suelta tu documento aquí
@@ -306,7 +317,7 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                                         disabled={isUploading || !selectedFile}
                                         variant="primary"
                                         icon={isUploading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                                        label={isUploading ? 'Enviando...' : 'Enviar trabajo / examen'}
+                                        label={isUploading ? 'Enviando...' : 'Enviar examen'}
                                         className="w-full justify-center gap-2 py-2! text-xs! font-bold! rounded-xl!"
                                     />
 

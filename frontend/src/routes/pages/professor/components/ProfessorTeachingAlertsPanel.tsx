@@ -3,11 +3,11 @@ import { AlertCircle, CheckCircle2, ClipboardList, Loader2 } from 'lucide-react'
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import {
     getProfessorAlerts,
+    PROFESSOR_ALERTS_REFRESH_EVENT,
     type ProfessorCourseAlert,
     type ProfessorAlertStatus,
     updateProfessorAlertStatus,
 } from '../../../../services/professorAlertService';
-import { NOTIFICATIONS_REFRESH_EVENT } from '../../../../components/ui/globalNotificationBell/useNotifications';
 
 const statusMeta: Record<ProfessorAlertStatus, { label: string; className: string }> = {
     PENDING: {
@@ -73,9 +73,9 @@ export const ProfessorTeachingAlertsPanel = () => {
         const handler = () => {
             void loadAlerts();
         };
-        window.addEventListener(NOTIFICATIONS_REFRESH_EVENT, handler);
+        window.addEventListener(PROFESSOR_ALERTS_REFRESH_EVENT, handler);
         return () => {
-            window.removeEventListener(NOTIFICATIONS_REFRESH_EVENT, handler);
+            window.removeEventListener(PROFESSOR_ALERTS_REFRESH_EVENT, handler);
         };
     }, [loadAlerts]);
 

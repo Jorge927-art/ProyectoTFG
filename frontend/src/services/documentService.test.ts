@@ -169,6 +169,17 @@ describe('documentService - Suite de Pruebas Unitarias de Alta Fidelidad', () =>
         expect(config.headers['Content-Type']).toBe('multipart/form-data');
     });
 
+    it('debe incluir courseId opcional al enviar un documento académico del alumno', async () => {
+        mockedApi.post.mockResolvedValueOnce({ data: { message: 'Ok', filename: 'f.pdf', originalname: 'o.pdf' } });
+        const dummyFile = new File([new Uint8Array()], 'doc.pdf', { type: 'application/pdf' });
+
+        await uploadStudentDocument(dummyFile, 42, 77);
+
+        const [, formData] = mockedApi.post.mock.calls[0] as [string, FormData];
+        expect(formData.get('receiverId')).toBe('42');
+        expect(formData.get('courseId')).toBe('77');
+    });
+
     it('debe omitir cabeceras explícitas para delegar el boundary del navegador en uploadAssignmentDocument', async () => {
         const mockResponse: UploadDocumentResponse = { message: 'Ok', filename: 'a.pdf', originalname: 'o.pdf' };
         mockedApi.post.mockResolvedValueOnce({ data: mockResponse });

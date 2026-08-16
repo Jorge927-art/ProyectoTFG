@@ -142,6 +142,33 @@ public class DocumentController {
      * asignatura: alumnado activo del curso, profesorado asociado al curso y
      * administradores globales.
      */
+    @GetMapping("/directory/course/{courseId}")
+    @PreAuthorize("hasAuthority('STUDENT')")
+    public ResponseEntity<?> getStudentCourseDirectory(
+            Authentication authentication,
+            @PathVariable("courseId") Long courseId) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            Users currentUser = resolveAuthenticatedUser(authentication.getName(),
+                    "Usuario autenticado no encontrado.");
+            if (!enrollmentRepository.existsByUsernameAndCourseId(currentUser.getUsername(), courseId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error",
+                                "Solo puedes consultar usuarios de asignaturas en las que estás matriculado."));
+            }
+
+            return getProfessorRecipientsByCourse(authentication, courseId);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error al recuperar usuarios de la asignatura",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
     @GetMapping("/professor/courses/{courseId}/recipients")
     @PreAuthorize("hasAnyAuthority('PROFESSOR','ADMIN')")
     public ResponseEntity<?> getProfessorRecipientsByCourse(
@@ -405,7 +432,8 @@ public class DocumentController {
     public ResponseEntity<?> uploadDocument(
             Authentication authentication,
             @RequestParam("file") MultipartFile file,
-            @RequestParam("receiverId") Long receiverId) {
+            @RequestParam("receiverId") Long receiverId,
+            @RequestParam(name = "courseId", required = false) Long courseId) {
 
         try {
             if (authentication == null || !authentication.isAuthenticated()) {
@@ -431,12 +459,26 @@ public class DocumentController {
             Users receiverUser = userRepository.findById(receiverId)
                     .orElseThrow(() -> new RuntimeException("El usuario destinatario no existe."));
 
+            Courses selectedCourse = null;
+            if (courseId != null) {
+                if (!enrollmentRepository.existsByUsernameAndCourseId(authentication.getName(), courseId)) {
+                    throw new IllegalArgumentException(
+                            "No puedes enviar documentos en una asignatura en la que no estás matriculado.");
+                }
+                selectedCourse = coursesRepository.findById(courseId)
+                        .orElseThrow(() -> new IllegalArgumentException("La asignatura seleccionada no existe."));
+            }
+
             String relativePath = fileStorageService.storeDocumentFile(
                     file,
                     FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS);
             String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
 
-            persistDirectedDocumentPair(relativePath, cleanOriginalName, currentUser, receiverUser, null);
+            Courses receivedCourse = currentUser.getRole() == Role.STUDENT
+                    ? null
+                    : selectedCourse;
+            persistDirectedDocumentPair(relativePath, cleanOriginalName, currentUser, receiverUser, selectedCourse,
+                    receivedCourse);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Documento enviado con éxito al destinatario",
@@ -450,6 +492,13 @@ public class DocumentController {
                     "error", "Error crítico al procesar el intercambio del documento",
                     "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
         }
+    }
+
+    public ResponseEntity<?> uploadDocument(
+            Authentication authentication,
+            MultipartFile file,
+            Long receiverId) {
+        return uploadDocument(authentication, file, receiverId, null);
     }
 
     /**
@@ -556,6 +605,8 @@ public class DocumentController {
             validateFileSize(file, STANDARD_DOCUMENT_MAX_BYTES,
                     "El archivo excede el límite de 5MB configurado para entregas académicas.");
 
+            validateExamFile(file, evaluationType);
+
             Users currentUser = resolveAuthenticatedUser(authentication.getName(), "Usuario emisor no encontrado.");
 
             // Selección determinista y acotada al alumno autenticado para evitar
@@ -603,6 +654,9 @@ public class DocumentController {
                     file,
                     FileStorageService.DocumentValidationProfile.BASIC_DOCUMENTS);
             String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
+            String normalizedEvaluationType = evaluationType == null
+                    ? ""
+                    : evaluationType.trim().toUpperCase(Locale.ROOT);
 
             DocumentMetadata sentMetadata = new DocumentMetadata();
             sentMetadata.setFilename(relativePath);
@@ -610,6 +664,7 @@ public class DocumentController {
             sentMetadata.setSender(currentUser);
             sentMetadata.setReceiver(receiverUser);
             sentMetadata.setCourse(enrollment.getCourse());
+            sentMetadata.setEvaluation_type(normalizedEvaluationType);
             sentMetadata.setFolder_type(FolderType.SENT);
             documentMetadataRepository.save(sentMetadata);
 
@@ -619,6 +674,7 @@ public class DocumentController {
             receivedMetadata.setSender(currentUser);
             receivedMetadata.setReceiver(receiverUser);
             receivedMetadata.setCourse(enrollment.getCourse());
+            receivedMetadata.setEvaluation_type(normalizedEvaluationType);
             receivedMetadata.setFolder_type(FolderType.RECEIVED);
             documentMetadataRepository.save(receivedMetadata);
 
@@ -1008,6 +1064,8 @@ public class DocumentController {
 
             String normalizedDeliveryType = normalizeProfessorDeliveryType(deliveryType);
 
+            validateExamFile(file, normalizedDeliveryType);
+
             // Almacenamos el archivo una sola vez físicamente en el disco
             String relativePath = fileStorageService.storeDocumentFile(
                     file,
@@ -1154,6 +1212,19 @@ public class DocumentController {
         return normalized;
     }
 
+    private void validateExamFile(MultipartFile file, String deliveryType) {
+        if (!"EXAMEN".equalsIgnoreCase(deliveryType)) {
+            return;
+        }
+
+        String filename = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase(Locale.ROOT) : "";
+        String contentType = file.getContentType() != null ? file.getContentType().toLowerCase(Locale.ROOT) : "";
+        if (!filename.endsWith(".pdf") || !"application/pdf".equals(contentType)) {
+            throw new IllegalArgumentException(
+                    "Los exámenes solo admiten archivos PDF; los vídeos no están permitidos.");
+        }
+    }
+
     private Courses resolveReceivedCourseByDeliveryType(Courses selectedCourse, String deliveryType) {
         return "DOCUMENTO".equals(deliveryType) ? null : selectedCourse;
     }
@@ -1171,12 +1242,17 @@ public class DocumentController {
     private void persistDirectedDocumentPair(String relativePath, String cleanOriginalName, Users sender,
             Users receiver,
             Courses course) {
+        persistDirectedDocumentPair(relativePath, cleanOriginalName, sender, receiver, course, course);
+    }
+
+    private void persistDirectedDocumentPair(String relativePath, String cleanOriginalName, Users sender,
+            Users receiver, Courses sentCourse, Courses receivedCourse) {
         DocumentMetadata sentMetadata = new DocumentMetadata();
         sentMetadata.setFilename(relativePath);
         sentMetadata.setOriginalname(cleanOriginalName);
         sentMetadata.setSender(sender);
         sentMetadata.setReceiver(receiver);
-        sentMetadata.setCourse(course);
+        sentMetadata.setCourse(sentCourse);
         sentMetadata.setFolder_type(FolderType.SENT);
         sentMetadata.setRead(true);
         documentMetadataRepository.save(sentMetadata);
@@ -1186,7 +1262,7 @@ public class DocumentController {
         receivedMetadata.setOriginalname(cleanOriginalName);
         receivedMetadata.setSender(sender);
         receivedMetadata.setReceiver(receiver);
-        receivedMetadata.setCourse(course);
+        receivedMetadata.setCourse(receivedCourse);
         receivedMetadata.setFolder_type(FolderType.RECEIVED);
         receivedMetadata.setRead(false);
         documentMetadataRepository.save(receivedMetadata);

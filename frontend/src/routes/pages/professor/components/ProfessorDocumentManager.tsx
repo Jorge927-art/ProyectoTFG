@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Upload, FileText, Download, Loader2, AlertCircle, FileUp, Inbox, Send, UserCheck } from 'lucide-react';
+import { Upload, FileText, Download, Loader2, AlertCircle, FileUp, Inbox, Send, UserCheck, CheckCircle } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import type { TaughtCourse } from '../../../../services/userDomains';
@@ -20,6 +20,7 @@ import {
     type DocumentMetadata,
     type UserDirectoryDTO,
 } from '../../../../services/documentService';
+import { emitProfessorAlertsRefresh } from '../../../../services/professorAlertService';
 import { emitNotificationsRefresh } from '../../../../components/ui/globalNotificationBell/useNotifications';
 
 interface ProfessorDocumentManagerProps {
@@ -47,6 +48,7 @@ export const ProfessorDocumentManager = ({
     const [loadingDocuments, setLoadingDocuments] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [documentError, setDocumentError] = useState('');
+    const [documentSuccess, setDocumentSuccess] = useState('');
     const [documentList, setDocumentList] = useState<DocumentMetadata[]>([]);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
@@ -202,6 +204,7 @@ export const ProfessorDocumentManager = ({
 
         setSelectedFile(file);
         setDocumentError('');
+        setDocumentSuccess('');
     };
 
     const handleManualUpload = async () => {
@@ -223,9 +226,11 @@ export const ProfessorDocumentManager = ({
         try {
             setIsUploading(true);
             setDocumentError('');
+            setDocumentSuccess('');
             await uploadProfessorDocument(selectedFile, selectedCourseId, Number(selectedReceiverId), 'DOCUMENTO');
-            emitNotificationsRefresh();
+            emitProfessorAlertsRefresh();
             resetUploadState();
+            setDocumentSuccess(`Documento enviado correctamente: ${selectedFile.name}.`);
 
             const updated = await getSentDocumentsByCourse(selectedCourseId);
             setDocumentList(updated);
@@ -246,6 +251,7 @@ export const ProfessorDocumentManager = ({
                 || backendError.response?.data?.detalles
                 || 'No se pudo enviar el documento académico. Inténtalo de nuevo.'
             );
+            setDocumentSuccess('');
         } finally {
             setIsUploading(false);
         }
@@ -384,6 +390,12 @@ export const ProfessorDocumentManager = ({
                     <p className="truncate">{documentError}</p>
                 </div>
             )}
+            {documentSuccess && (
+                <div className="mb-3 p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-lg flex items-center gap-2 shrink-0">
+                    <CheckCircle size={14} className="shrink-0" />
+                    <p className="truncate">{documentSuccess}</p>
+                </div>
+            )}
 
             <div className="flex-1 flex flex-col space-y-3 min-h-0">
                 {activeTab === 'SENT' && (
@@ -432,6 +444,8 @@ export const ProfessorDocumentManager = ({
                             >
                                 {isUploading ? (
                                     <Loader2 className="text-blue-500 animate-spin" size={20} />
+                                ) : selectedFile ? (
+                                    <CheckCircle className="text-emerald-500" size={20} />
                                 ) : (
                                     <Upload
                                         className={`transition-colors ${selectedReceiverId
@@ -441,16 +455,21 @@ export const ProfessorDocumentManager = ({
                                         size={20}
                                     />
                                 )}
-                                <span className="text-[11px] font-bold text-slate-600">
-                                    {isUploading
-                                        ? 'Transmitiendo payload seguro...'
-                                        : !selectedReceiverId
+                                {isUploading ? (
+                                    <span className="text-[11px] font-bold text-slate-600">Transmitiendo payload seguro...</span>
+                                ) : selectedFile ? (
+                                    <>
+                                        <span className="text-[11px] font-bold text-slate-700 truncate max-w-full px-1.5">{selectedFile.name}</span>
+                                        <span className="text-[10px] text-slate-500 font-semibold">Archivo seleccionado para enviar</span>
+                                    </>
+                                ) : (
+                                    <span className="text-[11px] font-bold text-slate-600">
+                                        {!selectedReceiverId
                                             ? 'Selecciona destinatario para desbloquear'
-                                            : selectedFile
-                                                ? `Archivo listo: ${selectedFile.name}`
-                                                : `Seleccionar archivo (${ACADEMIC_DOCUMENT_ALLOWED_LABEL})`
-                                    }
-                                </span>
+                                            : `Seleccionar archivo (${ACADEMIC_DOCUMENT_ALLOWED_LABEL})`
+                                        }
+                                    </span>
+                                )}
                             </label>
                         </div>
 

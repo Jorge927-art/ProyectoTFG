@@ -39,6 +39,65 @@ const buildDocumentRedirectWithContext = (role: string, document?: DocumentMetad
     return `${rolePath}?${params.toString()}`;
 };
 
+const buildDocumentInboxMessage = (role: string, documents: DocumentMetadata[]): string => {
+    if (role === 'ADMIN') {
+        return `Tienes avisos pendientes. ${buildTrayMessage(
+            'Recepción de Documentos',
+            documents,
+            role,
+            false,
+            documents.length,
+        )}.`;
+    }
+
+    const examCount = documents.filter((document) =>
+        document.evaluation_type?.trim().toUpperCase() === 'EXAMEN'
+        || (role === 'PROFESSOR' && Boolean(document.course))
+    ).length;
+    const documentOrWorkCount = documents.length - examCount;
+    const trayMessages: string[] = [];
+
+    if (examCount > 0) {
+        trayMessages.push(buildTrayMessage(
+            'Bandeja de envío y recepción de exámenes',
+            documents,
+            role,
+            true,
+            examCount,
+        ));
+    }
+    if (documentOrWorkCount > 0) {
+        trayMessages.push(buildTrayMessage(
+            'Bandeja de documentos y trabajos',
+            documents,
+            role,
+            false,
+            documentOrWorkCount,
+        ));
+    }
+
+    return `Tienes avisos pendientes. ${trayMessages.join('. ')}.`;
+};
+
+const buildTrayMessage = (
+    trayName: string,
+    documents: DocumentMetadata[],
+    role: string,
+    examTray: boolean,
+    count: number,
+): string => {
+    const senders = Array.from(new Set(
+        documents
+            .filter((document) => (
+                (role !== 'ADMIN' && document.evaluation_type?.trim().toUpperCase() === 'EXAMEN')
+                || (role === 'PROFESSOR' && Boolean(document.course))
+            ) === examTray)
+            .map((document) => document.sender?.username || 'remitente no disponible'),
+    ));
+    const senderLabel = senders.length === 1 ? 'Remitente: ' : 'Remitentes: ';
+    return `${trayName}: ${count} documento(s). ${senderLabel}${senders.join(', ')}`;
+};
+
 type NotificationApiPayload =
     | NotificationDTO[]
     | {
@@ -164,7 +223,7 @@ export const useNotifications = () => {
                 ? [{
                     type: 'DOCUMENT_INBOX' as const,
                     title: 'Bandeja de Entrada',
-                    message: `Tienes ${unreadDocuments.length} documento(s) pendiente(s) en tu bandeja.`,
+                    message: buildDocumentInboxMessage(normalizedRole, unreadDocuments),
                     redirectUrl: buildDocumentContextRedirect(firstUnreadDocument),
                 }]
                 : [];
@@ -220,6 +279,7 @@ export const useNotifications = () => {
             console.error('Error al descartar la notificación individual:', err);
         } finally {
             setAlerts((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+            emitNotificationsRefresh();
         }
     }, []);
 

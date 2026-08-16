@@ -300,6 +300,42 @@ describe('useNotifications', () => {
         expect(hook.result.current.alerts[0].redirectUrl).toContain('senderId=42');
     });
 
+    it('distingue la bandeja de exámenes de la bandeja de documentos y trabajos', async () => {
+        currentAlerts = [];
+        currentDocuments = [
+            { ...buildDoc(false), documentid: 101, evaluation_type: 'EXAMEN' },
+            { ...buildDoc(false), documentid: 102, evaluation_type: 'TRABAJO' },
+        ];
+
+        const hook = renderHook(() => useNotifications(), { wrapper: ProfessorAuthWrapper });
+
+        await waitFor(() => {
+            expect(hook.result.current.loading).toBe(false);
+        });
+
+        expect(hook.result.current.alerts[0].message).toContain('Bandeja de envío y recepción de exámenes: 1 documento(s)');
+        expect(hook.result.current.alerts[0].message).toContain('Bandeja de documentos y trabajos: 1 documento(s)');
+    });
+
+    it('usa Recepción de Documentos para la alarma del administrador e incluye remitente', async () => {
+        currentAlerts = [];
+        currentDocuments = [{
+            ...buildDoc(false),
+            documentid: 103,
+            evaluation_type: 'EXAMEN',
+            sender: { userId: 42, username: 'Luis', email: 'luis@tfg.com', role: 'STUDENT' },
+        }];
+
+        const hook = renderHook(() => useNotifications(), { wrapper: AdminAuthWrapper });
+
+        await waitFor(() => {
+            expect(hook.result.current.loading).toBe(false);
+        });
+
+        expect(hook.result.current.alerts[0].message).toContain('Recepción de Documentos: 1 documento(s)');
+        expect(hook.result.current.alerts[0].message).toContain('Remitente: Luis');
+    });
+
     it('muestra una alarma de recomendación persistida por el backend y no la calcula desde el catálogo', async () => {
         currentAlerts = [];
         currentDocuments = [buildDoc(true)];

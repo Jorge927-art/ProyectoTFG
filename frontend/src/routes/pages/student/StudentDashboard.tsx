@@ -253,15 +253,16 @@ const StudentDashboard = () => {
                         <div
                             ref={documentsPanelRef}
                             id="documents-panel"
-                            className="xl:min-w-85 h-109 xl:h-112 2xl:h-120"
+                            className="xl:min-w-85 h-136 xl:h-144 2xl:h-152"
                         >
                             <DocumentManager
                                 autoFocusDocuments={shouldFocusDocuments}
                                 focusDocumentId={focusDocumentId}
+                                enrolledList={enrolledList}
                             />
                         </div>
 
-                        <div className="h-109 xl:h-112 2xl:h-120">
+                        <div className="h-136 xl:h-144 2xl:h-152">
                             <CourseAssignmentPanel
                                 activeCourseId={activeCourseId}
                                 enrolledList={enrolledList}

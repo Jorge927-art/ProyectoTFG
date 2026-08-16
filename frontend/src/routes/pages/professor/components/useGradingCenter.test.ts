@@ -26,6 +26,7 @@ vi.mock('../../../../services/documentService', () => ({
 }));
 
 vi.mock('../../../../components/ui/globalNotificationBell/useNotifications', () => ({
+    NOTIFICATIONS_REFRESH_EVENT: 'global-notifications:refresh',
     useNotifications: () => ({
         refreshNotifications: mockRefreshNotifications
     })
@@ -123,6 +124,24 @@ describe('useGradingCenter', () => {
         expect(result.current.studentGrades).toHaveLength(3);
     });
 
+    it('refresca las entregas recibidas al recibir el evento global de notificaciones', async () => {
+        const { result } = renderHook(() => useGradingCenter(10));
+        await waitFor(() => expect(result.current.loadingData).toBe(false));
+
+        await act(async () => {
+            await result.current.handleSelectStudentById(11);
+        });
+        vi.mocked(getDocumentsByEnrollment).mockClear();
+
+        await act(async () => {
+            window.dispatchEvent(new Event('global-notifications:refresh'));
+        });
+
+        await waitFor(() => {
+            expect(getDocumentsByEnrollment).toHaveBeenCalledWith(301);
+        });
+    });
+
     it('vacia seleccion y documentos si el id de alumno no existe', async () => {
         const { result } = renderHook(() => useGradingCenter(10));
         await waitFor(() => expect(result.current.loadingData).toBe(false));
@@ -184,7 +203,7 @@ describe('useGradingCenter', () => {
         expect(uploadProfessorDocument).toHaveBeenCalledWith(file, 10, 11, 'EXAMEN');
         expect(result.current.successMessage).toBe('Documento enviado a ana correctamente.');
         expect(result.current.selectedFile).toBeNull();
-        expect(mockRefreshNotifications).toHaveBeenCalledTimes(1);
+        expect(mockRefreshNotifications).not.toHaveBeenCalled();
         expect(result.current.isUploadingDocument).toBe(false);
     });
 

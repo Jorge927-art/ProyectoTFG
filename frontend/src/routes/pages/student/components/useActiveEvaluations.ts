@@ -48,15 +48,18 @@ export const useActiveEvaluations = () => {
 
   useEffect(() => { fetchPending(); }, [fetchPending]);
 
-  const submitEvaluation = async (data: EvaluationInput) => {
+  const submitEvaluation = async (data: EvaluationInput): Promise<boolean> => {
     setIsSubmitting(true);
     setEvaluationError('');
     try {
       await submitAcademicEvaluation(data);
-      // Tras el éxito, eliminamos el curso de la lista local para feedback inmediato [ADR-35]
+      await fetchPending();
+      // Mantiene el feedback inmediato aunque la respuesta de lectura llegue con retraso [ADR-35]
       setPendingList(prev => (Array.isArray(prev) ? prev : []).filter(item => item.course.course_id !== data.course_id));
+      return true;
     } catch  {
       setEvaluationError('No se pudo procesar la evaluación. Inténtalo de nuevo.');
+      return false;
     } finally {
       setIsSubmitting(false);
     }

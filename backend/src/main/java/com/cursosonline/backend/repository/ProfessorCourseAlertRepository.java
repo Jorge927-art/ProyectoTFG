@@ -16,7 +16,11 @@ public interface ProfessorCourseAlertRepository extends JpaRepository<ProfessorC
 
         List<ProfessorCourseAlert> findByProfessor_UsernameOrderByCreatedAtDesc(String username);
 
-        @Query("SELECT a FROM ProfessorCourseAlert a WHERE a.professor.username = :username AND a.bellDismissed = false ORDER BY a.createdAt ASC")
+        @Query("SELECT a FROM ProfessorCourseAlert a WHERE a.professor.username = :username "
+                        + "AND a.bellDismissed = false "
+                        + "AND a.status IN (com.cursosonline.backend.entities.ProfessorAlertStatus.PENDING, "
+                        + "com.cursosonline.backend.entities.ProfessorAlertStatus.VIEWED) "
+                        + "ORDER BY a.createdAt ASC")
         List<ProfessorCourseAlert> findBellPendingByProfessorUsername(@Param("username") String username);
 
         long countByProfessor_UsernameAndBellDismissedFalse(String username);
@@ -37,7 +41,8 @@ public interface ProfessorCourseAlertRepository extends JpaRepository<ProfessorC
 
         @Query("SELECT a FROM ProfessorCourseAlert a WHERE a.professor.username = :professorUsername "
                         + "AND a.student.user_id = :studentId AND a.course.course_id = :courseId "
-                        + "AND a.status = com.cursosonline.backend.entities.ProfessorAlertStatus.VIEWED "
+                        + "AND a.status IN (com.cursosonline.backend.entities.ProfessorAlertStatus.PENDING, "
+                        + "com.cursosonline.backend.entities.ProfessorAlertStatus.VIEWED) "
                         + "AND a.alertType IN :alertTypes ORDER BY a.createdAt ASC, a.alertId ASC")
         List<ProfessorCourseAlert> findOldestViewedByProfessorStudentCourseAndTypes(
                         @Param("professorUsername") String professorUsername,
@@ -49,4 +54,11 @@ public interface ProfessorCourseAlertRepository extends JpaRepository<ProfessorC
         @Query("UPDATE ProfessorCourseAlert a SET a.bellDismissed = true WHERE a.alertId = :alertId AND a.professor.username = :username")
         int dismissBellByAlertIdAndProfessorUsername(@Param("alertId") Long alertId,
                         @Param("username") String username);
+
+        @Modifying
+        @Query("UPDATE ProfessorCourseAlert a SET a.bellDismissed = true "
+                        + "WHERE a.professor.username = :username AND a.bellDismissed = false "
+                        + "AND a.status IN (com.cursosonline.backend.entities.ProfessorAlertStatus.PENDING, "
+                        + "com.cursosonline.backend.entities.ProfessorAlertStatus.VIEWED)")
+        int dismissAllBellAlertsByProfessorUsername(@Param("username") String username);
 }

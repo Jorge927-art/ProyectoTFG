@@ -28,9 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 
 /**
  * Test de Integración del Flujo Académico del Profesor [ADR-055]
@@ -140,5 +142,10 @@ public class TeacherEvaluationFlowIntegrationTest {
                 assertEquals("alumno_test", receivedDoc.getReceiver().getUsername(),
                                 "El receptor debe coincidir con el alumno elegido");
                 assertFalse(receivedDoc.isRead(), "Debe marcarse como no leído para activar sus notificaciones");
+
+                mockMvc.perform(get("/api/auth/notifications")
+                                .with(user("alumno_test").roles("STUDENT")))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].type").value("DOCUMENT_INBOX"));
         }
 }

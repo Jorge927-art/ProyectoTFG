@@ -806,6 +806,17 @@ public class UserServiceTest {
         }
 
         @Test
+        void dismissSingleNotification_DebeMarcarDocumentosComoLeidosParaDocumentInbox() {
+                when(documentMetadataRepository.markAllReceivedAsRead("Laura")).thenReturn(2);
+
+                userService.dismissSingleNotification("Laura", null, "DOCUMENT_INBOX");
+
+                verify(documentMetadataRepository).markAllReceivedAsRead("Laura");
+                verifyNoInteractions(professorCourseAlertService);
+                verifyNoInteractions(userSystemNotificationRepository);
+        }
+
+        @Test
         void getUserNotifications_DebeOmitirAlertasDeProgresoCuandoElEsquemaNoEstaDisponible() {
                 Users student = new Users(41L, "student_schema", "pwd", Role.STUDENT, "schema@example.com", true,
                                 new java.util.ArrayList<>());
@@ -821,6 +832,100 @@ public class UserServiceTest {
                                 .getUserNotifications("student_schema");
 
                 assertTrue(alerts.isEmpty());
+        }
+
+        @Test
+        void getUserNotifications_DebeIndicarLaBandejaDeCadaTipoDeDocumentoPendiente() {
+                Users student = new Users(45L, "student_trays", "pwd", Role.STUDENT, "trays@example.com", true,
+                                new java.util.ArrayList<>());
+                DocumentMetadata exam = new DocumentMetadata();
+                exam.setDocumentid(901L);
+                exam.setEvaluation_type("EXAMEN");
+                DocumentMetadata work = new DocumentMetadata();
+                work.setDocumentid(902L);
+                work.setEvaluation_type("TRABAJO");
+
+                when(userRepository.findByUsername("student_trays")).thenReturn(Optional.of(student));
+                when(documentMetadataRepository.findUnreadReceivedDocumentsByUsername("student_trays"))
+                                .thenReturn(List.of(exam, work));
+                when(userSystemNotificationRepository.findUnreadByUsername("student_trays")).thenReturn(List.of());
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class)))
+                                .thenThrow(new RuntimeException("schema-down"));
+
+                List<com.cursosonline.backend.dto.NotificationDTO> alerts = userService
+                                .getUserNotifications("student_trays");
+
+                String message = alerts.stream()
+                                .filter(alert -> "DOCUMENT_INBOX".equals(alert.type()))
+                                .findFirst()
+                                .orElseThrow()
+                                .message();
+                assertTrue(message.contains("Bandeja de envío y recepción de exámenes: 1 documento(s)"));
+                assertTrue(message.contains("Bandeja de documentos y trabajos: 1 documento(s)"));
+        }
+
+        @Test
+        void getUserNotifications_DebeClasificarDocumentoLegacyDelProfesorYMostrarRemitente() {
+                Users professor = new Users(46L, "laura", "pwd", Role.PROFESSOR, "laura@example.com", true,
+                                new java.util.ArrayList<>());
+                Users student = new Users(47L, "Luis", "pwd", Role.STUDENT, "luis@example.com", true,
+                                new java.util.ArrayList<>());
+                Courses course = new Courses();
+                course.setCourse_id(903L);
+                course.setTitle("Curso de examen");
+
+                DocumentMetadata legacyExam = new DocumentMetadata();
+                legacyExam.setDocumentid(904L);
+                legacyExam.setSender(student);
+                legacyExam.setReceiver(professor);
+                legacyExam.setCourse(course);
+                legacyExam.setEvaluation_type(null);
+
+                when(userRepository.findByUsername("laura")).thenReturn(Optional.of(professor));
+                when(documentMetadataRepository.findUnreadReceivedDocumentsByUsername("laura"))
+                                .thenReturn(List.of(legacyExam));
+                when(userSystemNotificationRepository.findUnreadByUsername("laura")).thenReturn(List.of());
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class)))
+                                .thenThrow(new RuntimeException("schema-down"));
+
+                String message = userService.getUserNotifications("laura").stream()
+                                .filter(alert -> "DOCUMENT_INBOX".equals(alert.type()))
+                                .findFirst()
+                                .orElseThrow()
+                                .message();
+
+                assertTrue(message.contains("Bandeja de envío y recepción de exámenes: 1 documento(s)"));
+                assertTrue(message.contains("Remitente: Luis"));
+        }
+
+        @Test
+        void getUserNotifications_DebeUsarRecepcionDeDocumentosParaAdminYMostrarRemitente() {
+                Users admin = new Users(48L, "Jorge", "pwd", Role.ADMIN, "jorge@example.com", true,
+                                new java.util.ArrayList<>());
+                Users student = new Users(49L, "Luis", "pwd", Role.STUDENT, "luis@example.com", true,
+                                new java.util.ArrayList<>());
+                DocumentMetadata document = new DocumentMetadata();
+                document.setDocumentid(905L);
+                document.setSender(student);
+                document.setReceiver(admin);
+                document.setEvaluation_type("EXAMEN");
+
+                when(userRepository.findByUsername("Jorge")).thenReturn(Optional.of(admin));
+                when(documentMetadataRepository.findUnreadReceivedDocumentsByUsername("Jorge"))
+                                .thenReturn(List.of(document));
+                when(userSystemNotificationRepository.findUnreadByUsername("Jorge")).thenReturn(List.of());
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class)))
+                                .thenThrow(new RuntimeException("schema-down"));
+
+                String message = userService.getUserNotifications("Jorge").stream()
+                                .filter(alert -> "DOCUMENT_INBOX".equals(alert.type()))
+                                .findFirst()
+                                .orElseThrow()
+                                .message();
+
+                assertTrue(message.contains("Recepción de Documentos: 1 documento(s)"));
+                assertTrue(message.contains("Remitente: Luis"));
+                assertFalse(message.contains("Bandeja de envío y recepción de exámenes"));
         }
 
         @Test
@@ -853,6 +958,7 @@ public class UserServiceTest {
 
                 assertTrue(enrollment.isProgressAlertProfessorAck());
                 verify(enrollmentRepository).save(enrollment);
+                verify(professorCourseAlertService).dismissAllBellAlerts("prof_ack");
         }
 
         /**

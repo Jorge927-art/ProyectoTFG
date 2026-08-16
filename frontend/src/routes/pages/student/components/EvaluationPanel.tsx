@@ -40,13 +40,21 @@ export const EvaluationPanel = ({ hasEnrolledCourses = true }: EvaluationPanelPr
         // Cortocircuito de seguridad: Evita el envío si el estado no existe o si ambos campos están vacíos
         if (!state || (!state.course_score && !state.instructor_score)) return;
 
-        await submitEvaluation({
+        const submitted = await submitEvaluation({
             course_id: courseId,
             course_score: state.course_score || 0, // Envía 0 si el alumno decide ignorar el curso
             course_comment: state.course_comment || '',
             instructor_score: state.instructor_score || 0, // Envía 0 si el alumno decide ignorar al profesor
             instructor_comment: state.instructor_comment || ''
         });
+
+        if (submitted) {
+            setFormStates(prev => {
+                const next = { ...prev };
+                delete next[enrollmentId];
+                return next;
+            });
+        }
     };
 
     return (

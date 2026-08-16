@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Inbox, Download, Loader2, AlertCircle, FileText, Send, Users, FolderOpen } from 'lucide-react';
+import { Inbox, Download, Loader2, AlertCircle, FileText, Send, Users, FolderOpen, CheckCircle } from 'lucide-react';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import {
     downloadDocumentSecure,
@@ -334,6 +334,15 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                         onChange={(e) => setSelectedRecipientFile(e.target.files?.[0] ?? null)}
                         className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-100 file:px-3 file:py-2 file:text-xs file:font-bold file:text-blue-700 hover:file:bg-blue-200"
                     />
+                    {selectedRecipientFile && (
+                        <div className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+                            <CheckCircle className="text-emerald-500 shrink-0" size={18} />
+                            <div className="min-w-0">
+                                <p className="text-[11px] font-bold text-slate-700 truncate">{selectedRecipientFile.name}</p>
+                                <p className="text-[10px] font-semibold text-slate-500">Archivo seleccionado para enviar</p>
+                            </div>
+                        </div>
+                    )}
 
                     <GenericButton
                         type="button"
@@ -384,6 +393,15 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                         onChange={(e) => setSelectedCourseFile(e.target.files?.[0] ?? null)}
                         className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-100 file:px-3 file:py-2 file:text-xs file:font-bold file:text-indigo-700 hover:file:bg-indigo-200"
                     />
+                    {selectedCourseFile && (
+                        <div className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+                            <CheckCircle className="text-emerald-500 shrink-0" size={18} />
+                            <div className="min-w-0">
+                                <p className="text-[11px] font-bold text-slate-700 truncate">{selectedCourseFile.name}</p>
+                                <p className="text-[10px] font-semibold text-slate-500">Archivo seleccionado para enviar</p>
+                            </div>
+                        </div>
+                    )}
 
                     <GenericButton
                         type="button"
@@ -477,9 +495,6 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                                     className="p-2! text-blue-600! hover:bg-blue-50! rounded-lg!"
                                 />
 
-                                {!doc.isRead && (
-                                    <span className="w-2 h-2 rounded-full bg-red-500" title="No leído" />
-                                )}
                             </div>
                         ))
                     )}

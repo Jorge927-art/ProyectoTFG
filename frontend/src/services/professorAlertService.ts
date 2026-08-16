@@ -3,6 +3,12 @@ import { apiClient } from './apiClient';
 export type ProfessorAlertType = 'INITIAL_CONTACT' | 'MATERIAL_DISPATCH' | 'FINAL_EXAM';
 export type ProfessorAlertStatus = 'PENDING' | 'VIEWED' | 'RESOLVED';
 
+export const PROFESSOR_ALERTS_REFRESH_EVENT = 'professor-alerts:refresh';
+
+export const emitProfessorAlertsRefresh = (): void => {
+    window.dispatchEvent(new Event(PROFESSOR_ALERTS_REFRESH_EVENT));
+};
+
 export interface ProfessorCourseAlert {
     alertId: number;
     alertType: ProfessorAlertType;

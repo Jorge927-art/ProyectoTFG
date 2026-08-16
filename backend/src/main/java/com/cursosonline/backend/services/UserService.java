@@ -671,7 +671,7 @@ public class UserService {
             alerts.add(new com.cursosonline.backend.dto.NotificationDTO(
                     "DOCUMENT_INBOX",
                     "Bandeja de Entrada",
-                    "Tienes " + unreadDocs.size() + " documento(s) pendiente(s) en tu bandeja.",
+                    buildDocumentInboxMessage(user, unreadDocs),
                     buildDocumentInboxRedirect(user, firstUnread)));
         }
 
@@ -709,6 +709,59 @@ public class UserService {
         // ADMIN: no entra en los bloques 2 ni 3, solo puede recibir el bloque 1.
 
         return alerts;
+    }
+
+    private String buildDocumentInboxMessage(Users receiver,
+            List<com.cursosonline.backend.entities.DocumentMetadata> unreadDocuments) {
+        long examCount = unreadDocuments.stream()
+                .filter(document -> isExamTrayDocument(receiver, document))
+                .count();
+        long documentOrWorkCount = unreadDocuments.size() - examCount;
+
+        List<String> trayMessages = new ArrayList<>();
+        if (receiver != null && receiver.getRole() == Role.ADMIN) {
+            return buildTrayMessage("Recepción de Documentos", unreadDocuments, receiver, false,
+                    unreadDocuments.size());
+        }
+        if (examCount > 0) {
+            trayMessages.add(buildTrayMessage("Bandeja de envío y recepción de exámenes",
+                    unreadDocuments, receiver, true, examCount));
+        }
+        if (documentOrWorkCount > 0) {
+            trayMessages.add(buildTrayMessage("Bandeja de documentos y trabajos",
+                    unreadDocuments, receiver, false, documentOrWorkCount));
+        }
+
+        return "Tienes avisos pendientes. " + String.join(". ", trayMessages) + ".";
+    }
+
+    private String buildTrayMessage(String trayName,
+            List<com.cursosonline.backend.entities.DocumentMetadata> documents,
+            Users receiver,
+            boolean examTray,
+            long count) {
+        List<String> senders = documents.stream()
+                .filter(document -> isExamTrayDocument(receiver, document) == examTray)
+                .map(document -> document.getSender() != null && document.getSender().getUsername() != null
+                        ? document.getSender().getUsername()
+                        : "remitente no disponible")
+                .distinct()
+                .toList();
+        String senderLabel = senders.size() == 1 ? "Remitente: " : "Remitentes: ";
+        return trayName + ": " + count + " documento(s). " + senderLabel + String.join(", ", senders);
+    }
+
+    private boolean isExamTrayDocument(Users receiver,
+            com.cursosonline.backend.entities.DocumentMetadata document) {
+        if (receiver != null && receiver.getRole() == Role.ADMIN) {
+            return false;
+        }
+        if ("EXAMEN".equalsIgnoreCase(document.getEvaluation_type())) {
+            return true;
+        }
+        return receiver != null
+                && receiver.getRole() == Role.PROFESSOR
+                && document.getCourse() != null;
     }
 
     private String buildDocumentInboxRedirect(Users user, DocumentMetadata document) {
@@ -761,6 +814,10 @@ public class UserService {
             return;
         }
 
+        if (user.getRole() == Role.PROFESSOR && professorCourseAlertService != null) {
+            professorCourseAlertService.dismissAllBellAlerts(username);
+        }
+
         if (hasProgressAlertColumns()) {
             acknowledgeProgressNotificationsSafely(user, username);
         } else {
@@ -772,6 +829,11 @@ public class UserService {
 
     @Transactional
     public void dismissSingleNotification(String username, Long notificationId, String type) {
+        if (type != null && "DOCUMENT_INBOX".equalsIgnoreCase(type)) {
+            markAllReceivedAsReadSafely(username);
+            return;
+        }
+
         if (type != null && "PROFESSOR_TASK_ALERT".equalsIgnoreCase(type)) {
             if (notificationId != null && notificationId > 0) {
                 if (professorCourseAlertService != null) {

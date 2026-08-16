@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 // Usamos 'import type' para satisfacer las reglas estrictas de TypeScript de tu proyecto
 import type { 
     StudentPerformanceDTO,
@@ -13,10 +13,15 @@ import {
     submitStudentGrade 
 } from '../../../../services/evaluationService';
 import { getDocumentsByEnrollment, uploadProfessorDocument } from '../../../../services/documentService';
-import { useNotifications } from '../../../../components/ui/globalNotificationBell/useNotifications';
+import { emitProfessorAlertsRefresh } from '../../../../services/professorAlertService';
+import {
+    NOTIFICATIONS_REFRESH_EVENT,
+    useNotifications,
+} from '../../../../components/ui/globalNotificationBell/useNotifications';
 
 const ERROR_MESSAGE_AUTO_DISMISS_MS = 6000;
 const GRADE_SUBMIT_FEEDBACK_AUTO_DISMISS_MS = 3500;
+const RECEIVED_DOCUMENTS_AUTO_REFRESH_MS = 15000;
 export const PROFESSOR_FEEDBACK_MAX_LENGTH = 300;
 const GRADING_CENTER_DELIVERY_TYPE = 'EXAMEN';
 
@@ -164,7 +169,7 @@ export const useGradingCenter = (courseId: number | null) => {
         fetchCourseData();
     }, [courseId]);
 
-    const fetchStudentDocuments = async (student: StudentPerformanceDTO) => {
+    const fetchStudentDocuments = useCallback(async (student: StudentPerformanceDTO) => {
         setStudentDocuments([]);
         setErrorMessage('');
 
@@ -185,7 +190,25 @@ export const useGradingCenter = (courseId: number | null) => {
         } finally {
             setLoadingDocs(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        if (!selectedStudent || typeof selectedStudent.enrollmentId !== 'number') {
+            return;
+        }
+
+        const refreshReceivedDocuments = () => {
+            void fetchStudentDocuments(selectedStudent);
+        };
+
+        window.addEventListener(NOTIFICATIONS_REFRESH_EVENT, refreshReceivedDocuments);
+        const intervalId = window.setInterval(refreshReceivedDocuments, RECEIVED_DOCUMENTS_AUTO_REFRESH_MS);
+
+        return () => {
+            window.removeEventListener(NOTIFICATIONS_REFRESH_EVENT, refreshReceivedDocuments);
+            window.clearInterval(intervalId);
+        };
+    }, [fetchStudentDocuments, selectedStudent]);
 
     const fetchStudentGrades = async (student: StudentPerformanceDTO) => {
         if (typeof student.enrollmentId !== 'number') {
@@ -266,9 +289,9 @@ export const useGradingCenter = (courseId: number | null) => {
                 GRADING_CENTER_DELIVERY_TYPE
             );
 
+            emitProfessorAlertsRefresh();
             setSelectedFile(null);
             setSuccessMessage(`Documento enviado a ${selectedStudent.username} correctamente.`);
-            refreshNotifications();
         } catch {
             setErrorMessage('No se pudo enviar el documento con la configuración seleccionada.');
         } finally {
