@@ -6,6 +6,7 @@ import { ROLES } from './authTypes';
 import * as authStorage from './authStorage';
 import { fireEvent } from '@testing-library/dom';
 import type { AuthTokenResponse } from './authTypes';
+import { refreshAccessToken } from '../services/apiClient';
 
 vi.mock('../services/apiClient', () => ({
     apiClient: { post: vi.fn().mockResolvedValue({ status: 200 }) },
@@ -13,10 +14,11 @@ vi.mock('../services/apiClient', () => ({
 }));
 
 const TestComponent = () => {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, isLoading } = useAuth();
     return (
         <div>
             <div data-testid="auth-status">{isAuthenticated ? 'AUTENTICADO' : 'NO_AUTENTICADO'}</div>
+            <div data-testid="loading-status">{isLoading ? 'CARGANDO' : 'LISTO'}</div>
         </div>
     );
 };
@@ -32,6 +34,7 @@ const AuthActionsHarness = ({ tokenData }: { tokenData: AuthTokenResponse }) => 
             <div data-testid="categories">{user?.interests?.categories.join(',') ?? 'sin_intereses'}</div>
             <div data-testid="durations">{user?.interests?.durations.join(',') ?? 'sin_duraciones'}</div>
             <div data-testid="course-count">{String(user?.enrolledCourseIds?.length ?? 0)}</div>
+            <div data-testid="expires-at">{String((user as (typeof user & { expiresAt?: number }) | null)?.expiresAt ?? '')}</div>
             <button type="button" onClick={() => login(tokenData)}>login</button>
             <button type="button" onClick={() => updateUser({ email: 'actualizado@tfg.com' })}>update</button>
             <button type="button" onClick={logout}>logout</button>
@@ -219,6 +222,163 @@ describe('Auditoría de Calidad Frontend: Blindaje de Sesión y Activity Tracker
         });
 
         expect(screen.getByTestId('auth-status').textContent).toBe('NO_AUTENTICADO');
+    });
+
+    it('finaliza el bootstrap sin refresh cuando no existe una sesión almacenada', async () => {
+        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(null);
+
+        render(
+            <AuthProvider>
+                <TestComponent />
+            </AuthProvider>
+        );
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(screen.getByTestId('auth-status').textContent).toBe('NO_AUTENTICADO');
+        expect(screen.getByTestId('loading-status').textContent).toBe('LISTO');
+        expect(refreshAccessToken).not.toHaveBeenCalled();
+    });
+
+    it('cierra la sesión durante el bootstrap si el refresh no devuelve access token', async () => {
+        const sessionUser = {
+            userId: 88,
+            username: 'bootstrap_expirado',
+            role: ROLES.STUDENT,
+            email: 'bootstrap@tfg.com',
+            token: 'jwt_bootstrap',
+            expiresAt: Date.now() + 900000,
+        };
+        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(sessionUser);
+        vi.mocked(refreshAccessToken).mockResolvedValue(null);
+
+        render(
+            <AuthProvider>
+                <TestComponent />
+            </AuthProvider>
+        );
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(screen.getByTestId('auth-status').textContent).toBe('NO_AUTENTICADO');
+        expect(screen.getByTestId('loading-status').textContent).toBe('LISTO');
+        expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+    });
+
+    it('renueva silenciosamente un token expirado y conserva la sesión activa', async () => {
+        const sessionUser = {
+            userId: 92,
+            username: 'renovacion_silenciosa',
+            role: ROLES.STUDENT,
+            email: 'renovacion@tfg.com',
+            token: 'jwt_renovacion',
+            expiresAt: Date.now() - 1000,
+        };
+        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(sessionUser);
+        vi.mocked(refreshAccessToken).mockResolvedValue({ accessToken: 'access-renovado', expiresIn: 120 });
+        const writeUserSpy = vi.spyOn(authStorage, 'writeStoredAuthUser');
+
+        render(
+            <AuthProvider>
+                <TestComponent />
+            </AuthProvider>
+        );
+
+        await act(async () => {
+            await Promise.resolve();
+            vi.advanceTimersByTime(5000);
+            await Promise.resolve();
+        });
+
+        expect(screen.getByTestId('auth-status').textContent).toBe('AUTENTICADO');
+        expect(refreshAccessToken).toHaveBeenCalled();
+        expect(writeUserSpy).toHaveBeenCalledWith(expect.objectContaining({ expiresAt: expect.any(Number) }));
+    });
+
+    it('refresca la sesión almacenada durante el bootstrap y actualiza su expiración', async () => {
+        const sessionUser = {
+            userId: 93,
+            username: 'bootstrap_valido',
+            role: ROLES.STUDENT,
+            email: 'bootstrap-valido@tfg.com',
+            token: 'jwt_bootstrap_valido',
+            expiresAt: Date.now() + 900000,
+        };
+        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(sessionUser);
+        vi.mocked(refreshAccessToken).mockResolvedValue({ accessToken: 'access-bootstrap', expiresIn: 300 });
+        const writeUserSpy = vi.spyOn(authStorage, 'writeStoredAuthUser');
+
+        render(
+            <AuthProvider>
+                <TestComponent />
+            </AuthProvider>
+        );
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(screen.getByTestId('auth-status').textContent).toBe('AUTENTICADO');
+        expect(screen.getByTestId('loading-status').textContent).toBe('LISTO');
+        expect(writeUserSpy).toHaveBeenCalledWith(expect.objectContaining({ expiresAt: expect.any(Number) }));
+    });
+
+    it('actualiza expiresAt al recibir auth-session-refreshed con duración válida', () => {
+        const sessionUser = {
+            userId: 89,
+            username: 'evento_refresh',
+            role: ROLES.STUDENT,
+            email: 'evento@tfg.com',
+            token: 'jwt_evento',
+            expiresAt: Date.now() + 900000,
+        };
+        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(sessionUser);
+        const writeUserSpy = vi.spyOn(authStorage, 'writeStoredAuthUser');
+
+        render(
+            <AuthProvider>
+                <AuthActionsHarness tokenData={{} as AuthTokenResponse} />
+            </AuthProvider>
+        );
+
+        const beforeRefresh = Date.now();
+        act(() => {
+            window.dispatchEvent(new CustomEvent('auth-session-refreshed', { detail: { expiresIn: 120 } }));
+        });
+
+        const expiresAt = Number(screen.getByTestId('expires-at').textContent);
+        expect(expiresAt).toBeGreaterThanOrEqual(beforeRefresh + 120000);
+        expect(writeUserSpy).toHaveBeenCalledWith(expect.objectContaining({ expiresAt }));
+    });
+
+    it('usa la duración por defecto al recibir auth-session-refreshed sin expiresIn válido', () => {
+        const sessionUser = {
+            userId: 90,
+            username: 'evento_default',
+            role: ROLES.STUDENT,
+            email: 'default@tfg.com',
+            token: 'jwt_default',
+            expiresAt: Date.now() + 900000,
+        };
+        vi.spyOn(authStorage, 'readStoredAuthUser').mockReturnValue(sessionUser);
+
+        render(
+            <AuthProvider>
+                <AuthActionsHarness tokenData={{} as AuthTokenResponse} />
+            </AuthProvider>
+        );
+
+        const beforeRefresh = Date.now();
+        act(() => {
+            window.dispatchEvent(new CustomEvent('auth-session-refreshed', { detail: { expiresIn: 0 } }));
+        });
+
+        const expiresAt = Number(screen.getByTestId('expires-at').textContent);
+        expect(expiresAt).toBeGreaterThanOrEqual(beforeRefresh + 15 * 60 * 1000);
     });
 
     it('debe procesar login con expiresIn inválido, normalizar intereses y omitir refresh token vacío', () => {

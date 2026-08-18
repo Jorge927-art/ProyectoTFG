@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { EvaluationPanel } from './EvaluationPanel';
 import { useActiveEvaluations } from './useActiveEvaluations';
 
@@ -186,5 +186,74 @@ describe('EvaluationPanel Component [TFG Test Suite]', () => {
         expect(screen.getByText('Ya has evaluado esta asignatura.')).toBeInTheDocument();
         const submitButton = screen.getByRole('button', { name: /ENVIAR EVALUACIÓN/i });
         expect(submitButton).toBeDisabled();
+    });
+
+    it('debe construir y enviar la evaluación con puntuaciones y comentario', async () => {
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: mockPending,
+            loadingPending: false,
+            isSubmitting: false,
+            evaluationError: '',
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation.mockResolvedValue(true)
+        });
+
+        render(<EvaluationPanel />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Calificar curso con 4 estrellas' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Calificar profesor con 5 estrellas' }));
+        fireEvent.change(screen.getByPlaceholderText('Escribe un comentario opcional...'), {
+            target: { value: 'Curso muy claro y profesor atento.' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: /ENVIAR EVALUACIÓN/i }));
+
+        await waitFor(() => {
+            expect(mockSubmitEvaluation).toHaveBeenCalledWith({
+                course_id: 101,
+                course_score: 4,
+                course_comment: 'Curso muy claro y profesor atento.',
+                instructor_score: 5,
+                instructor_comment: '',
+            });
+        });
+        expect(screen.getByRole('button', { name: /ENVIAR EVALUACIÓN/i })).toBeDisabled();
+    });
+
+    it('mantiene los datos del formulario cuando el hook rechaza el envío', async () => {
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: mockPending,
+            loadingPending: false,
+            isSubmitting: false,
+            evaluationError: '',
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation.mockResolvedValue(false)
+        });
+
+        render(<EvaluationPanel />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Calificar curso con 3 estrellas' }));
+        fireEvent.click(screen.getByRole('button', { name: /ENVIAR EVALUACIÓN/i }));
+
+        await waitFor(() => expect(mockSubmitEvaluation).toHaveBeenCalledTimes(1));
+        expect(screen.getByRole('button', { name: /ENVIAR EVALUACIÓN/i })).toBeEnabled();
+    });
+
+    it('ignora el envío si no existe puntuación seleccionada', () => {
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: mockPending,
+            loadingPending: false,
+            isSubmitting: false,
+            evaluationError: '',
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
+        });
+
+        render(<EvaluationPanel />);
+
+        const submitButton = screen.getByRole('button', { name: /ENVIAR EVALUACIÓN/i });
+        fireEvent.click(submitButton);
+
+        expect(submitButton).toBeDisabled();
+        expect(mockSubmitEvaluation).not.toHaveBeenCalled();
     });
 });

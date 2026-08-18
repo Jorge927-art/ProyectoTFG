@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCourseInsight } from './useCourseInsight';
 import {
@@ -6,6 +6,7 @@ import {
     getCourseDetail,
     getCourseUserStats,
     getCourseCollectiveStats,
+    finalizePreviousYearCourseStats,
     resolveCourseInsightErrorMessage
 } from '../../../../services/adminCourseInsightService';
 
@@ -58,6 +59,10 @@ const sampleCollectiveStats = {
 describe('useCourseInsight', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it('no busca si el keyword está vacío', async () => {
@@ -229,5 +234,204 @@ describe('useCourseInsight', () => {
         expect(result.current.error).toBe('Error de red al cargar el detalle del curso.');
         expect(result.current.loadingDetail).toBe(false);
         expect(result.current.loadingCollectiveStats).toBe(false);
+    });
+
+    it('ejecuta la búsqueda predictiva tras el debounce y permite navegar por resultados con teclado', async () => {
+        vi.useFakeTimers();
+        vi.mocked(searchCourses).mockResolvedValue([
+            { courseId: 301, title: 'Arquitectura', category: 'Ingenieria' },
+            { courseId: 302, title: 'Algoritmos', category: 'Ingenieria' },
+        ]);
+
+        const { result } = renderHook(() => useCourseInsight());
+
+        act(() => {
+            result.current.setKeyword('A');
+        });
+        await act(async () => {
+            vi.advanceTimersByTime(250);
+            await Promise.resolve();
+        });
+
+        expect(result.current.results).toHaveLength(2);
+        expect(result.current.highlightedResultIndex).toBe(0);
+
+        const preventDefault = vi.fn();
+        act(() => {
+            result.current.handleSearchInputKeyDown({ key: 'ArrowDown', preventDefault } as unknown as React.KeyboardEvent<HTMLInputElement>);
+        });
+        expect(result.current.highlightedResultIndex).toBe(1);
+
+        act(() => {
+            result.current.handleSearchInputKeyDown({ key: 'ArrowUp', preventDefault } as unknown as React.KeyboardEvent<HTMLInputElement>);
+        });
+        expect(result.current.highlightedResultIndex).toBe(0);
+        expect(preventDefault).toHaveBeenCalledTimes(2);
+
+        act(() => {
+            result.current.handleSearchInputKeyDown({ key: 'Escape', preventDefault } as unknown as React.KeyboardEvent<HTMLInputElement>);
+        });
+        expect(result.current.results).toEqual([]);
+        expect(result.current.highlightedResultIndex).toBe(-1);
+    });
+
+    it('selecciona el resultado resaltado al pulsar Enter', async () => {
+        vi.useFakeTimers();
+        vi.mocked(searchCourses).mockResolvedValue([sampleCourse]);
+        vi.mocked(getCourseDetail).mockResolvedValue(sampleDetail);
+        vi.mocked(getCourseCollectiveStats).mockResolvedValue(sampleCollectiveStats);
+
+        const { result } = renderHook(() => useCourseInsight());
+
+        act(() => {
+            result.current.setKeyword('Ar');
+        });
+        await act(async () => {
+            vi.advanceTimersByTime(250);
+            await Promise.resolve();
+        });
+
+        const preventDefault = vi.fn();
+        act(() => {
+            result.current.handleSearchInputKeyDown({ key: 'Enter', preventDefault } as unknown as React.KeyboardEvent<HTMLInputElement>);
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(preventDefault).toHaveBeenCalledOnce();
+        expect(getCourseDetail).toHaveBeenCalledWith(300);
+        expect(result.current.selectedCourse).toEqual(sampleDetail);
+    });
+
+    it('ignora las teclas de navegación cuando no hay resultados', () => {
+        const preventDefault = vi.fn();
+        const { result } = renderHook(() => useCourseInsight());
+
+        act(() => {
+            result.current.handleSearchInputKeyDown({ key: 'ArrowDown', preventDefault } as unknown as React.KeyboardEvent<HTMLInputElement>);
+        });
+
+        expect(preventDefault).not.toHaveBeenCalled();
+        expect(result.current.highlightedResultIndex).toBe(-1);
+    });
+
+    it('descarta la respuesta de una búsqueda que quedó obsoleta', async () => {
+        vi.useFakeTimers();
+        type SearchResponse = Array<{ courseId: number; title: string; category: string }>;
+        const resolvers: Array<(value: SearchResponse) => void> = [];
+        vi.mocked(searchCourses).mockImplementation(
+            () => new Promise<SearchResponse>((resolve) => {
+                resolvers.push(resolve);
+            })
+        );
+
+        const { result } = renderHook(() => useCourseInsight());
+
+        act(() => {
+            result.current.setKeyword('A');
+        });
+        act(() => {
+            vi.advanceTimersByTime(250);
+        });
+
+        act(() => {
+            result.current.setKeyword('Ar');
+        });
+        act(() => {
+            vi.advanceTimersByTime(250);
+        });
+
+        expect(resolvers).toHaveLength(2);
+        await act(async () => {
+            resolvers[0]([sampleCourse]);
+            await Promise.resolve();
+        });
+        expect(result.current.results).toEqual([]);
+
+        await act(async () => {
+            resolvers[1]([sampleCourse]);
+            await Promise.resolve();
+        });
+        expect(result.current.results).toEqual([sampleCourse]);
+    });
+
+    it('limpia resultados y selecciones al vaciar la búsqueda', async () => {
+        vi.mocked(searchCourses).mockResolvedValue([sampleCourse]);
+        vi.mocked(getCourseDetail).mockResolvedValue(sampleDetail);
+        vi.mocked(getCourseCollectiveStats).mockResolvedValue(sampleCollectiveStats);
+
+        const { result } = renderHook(() => useCourseInsight());
+
+        await act(async () => {
+            await result.current.handleSelectCourse(300);
+        });
+        act(() => {
+            result.current.setKeyword('Arquitectura');
+        });
+        act(() => {
+            result.current.setKeyword('');
+        });
+
+        expect(result.current.results).toEqual([]);
+        expect(result.current.selectedCourse).toBeNull();
+        expect(result.current.selectedUser).toBeNull();
+        expect(result.current.stats).toBeNull();
+        expect(result.current.collectiveStats).toBeNull();
+        expect(result.current.error).toBe('');
+    });
+
+    it('no consolida si todavía no hay curso seleccionado', async () => {
+        const { result } = renderHook(() => useCourseInsight());
+
+        await act(async () => {
+            await result.current.handleFinalizePreviousYear();
+        });
+
+        expect(finalizePreviousYearCourseStats).not.toHaveBeenCalled();
+        expect(result.current.consolidating).toBe(false);
+    });
+
+    it('consolida el año anterior, muestra éxito y refresca el curso', async () => {
+        vi.mocked(getCourseDetail).mockResolvedValue(sampleDetail);
+        vi.mocked(getCourseCollectiveStats).mockResolvedValue(sampleCollectiveStats);
+        vi.mocked(finalizePreviousYearCourseStats).mockResolvedValue({
+            message: 'Histórico consolidado correctamente',
+            finalizedYear: 2025,
+        });
+
+        const { result } = renderHook(() => useCourseInsight());
+
+        await act(async () => {
+            await result.current.handleSelectCourse(300);
+        });
+        await act(async () => {
+            await result.current.handleFinalizePreviousYear();
+        });
+
+        expect(finalizePreviousYearCourseStats).toHaveBeenCalledWith(300);
+        expect(getCourseDetail).toHaveBeenCalledTimes(2);
+        expect(result.current.successMessage).toBe('Histórico consolidado correctamente Año consolidado: 2025.');
+        expect(result.current.consolidating).toBe(false);
+    });
+
+    it('muestra error cuando falla la consolidación del año anterior', async () => {
+        vi.mocked(getCourseDetail).mockResolvedValue(sampleDetail);
+        vi.mocked(getCourseCollectiveStats).mockResolvedValue(sampleCollectiveStats);
+        vi.mocked(finalizePreviousYearCourseStats).mockRejectedValue(new Error('consolidation-error'));
+        vi.mocked(resolveCourseInsightErrorMessage).mockReturnValue('No se pudo consolidar el histórico.');
+
+        const { result } = renderHook(() => useCourseInsight());
+
+        await act(async () => {
+            await result.current.handleSelectCourse(300);
+        });
+        await act(async () => {
+            await result.current.handleFinalizePreviousYear();
+        });
+
+        expect(result.current.error).toBe('No se pudo consolidar el histórico.');
+        expect(result.current.consolidating).toBe(false);
+        expect(result.current.successMessage).toBe('');
     });
 });
