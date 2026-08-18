@@ -419,6 +419,40 @@ public class DocumentController {
     }
 
     /**
+     * Recupera los exámenes/documentos enviados por el profesor al alumno de
+     * una matrícula concreta.
+     */
+    @GetMapping("/course/enrollment/{enrollmentId}/sent")
+    @PreAuthorize("hasAuthority('PROFESSOR')")
+    public ResponseEntity<?> getSentDocumentsByEnrollmentId(
+            Authentication authentication,
+            @PathVariable("enrollmentId") Long enrollmentId) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            boolean isAuthorized = enrollmentRepository.isInstructorAuthorizedForEnrollment(
+                    enrollmentId,
+                    authentication.getName());
+
+            if (!isAuthorized) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Acceso denegado: no eres el instructor asignado a esta matrícula."));
+            }
+
+            List<DocumentMetadata> documents = documentMetadataRepository
+                    .findSentDocumentsByEnrollmentIdForInstructor(enrollmentId, authentication.getName());
+            return ResponseEntity.ok(documents.stream().map(this::toDocumentResponse).toList());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error al recuperar exámenes enviados al alumno",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
+    /**
      * Endpoint para subir un documento y enviarlo a otro usuario.
      * 
      * @param authentication Objeto Authentication que contiene la información del

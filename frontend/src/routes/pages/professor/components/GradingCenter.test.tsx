@@ -81,6 +81,7 @@ describe('GradingCenter', () => {
         selectedStudent: null,
         studentGrades: [],
         studentDocuments: [],
+        sentExamDocuments: [],
         loadingData: false,
         loadingDocs: false,
         isSubmitting: false,
@@ -191,6 +192,43 @@ describe('GradingCenter', () => {
 
         expect(screen.getByText('Selecciona un alumno para habilitar el envio de notas.')).toBeInTheDocument();
         expect(screen.getByText('Selecciona un alumno para habilitar la calculadora de nota final.')).toBeInTheDocument();
+    });
+
+    it('separa entregas de examen por pestañas Recibidos y Enviados', () => {
+        vi.mocked(useGradingCenter).mockReturnValue({
+            ...baseHookReturn,
+            selectedStudent: mockStudent,
+            studentDocuments: [
+                {
+                    ...mockStudentDocument,
+                    documentid: 1001,
+                    originalname: 'respuesta-examen.pdf',
+                    evaluation_type: 'EXAMEN',
+                    folder_type: 'RECEIVED',
+                    isRead: false,
+                },
+            ],
+            sentExamDocuments: [{
+                ...mockStudentDocument,
+                documentid: 1002,
+                originalname: 'examen-enviado.pdf',
+                evaluation_type: 'EXAMEN',
+                folder_type: 'SENT',
+                isRead: true,
+            }],
+        } as ReturnType<typeof useGradingCenter>);
+
+        render(<GradingCenter courseId={1} availableCourses={availableCourses} onCourseChange={mockOnCourseChange} />);
+
+        expect(screen.getByRole('button', { name: 'Recibidos' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Enviados' })).toBeInTheDocument();
+        expect(screen.getByText('respuesta-examen.pdf')).toBeInTheDocument();
+        expect(screen.queryByText('examen-enviado.pdf')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Enviados' }));
+
+        expect(screen.getByText('examen-enviado.pdf')).toBeInTheDocument();
+        expect(screen.queryByText('respuesta-examen.pdf')).not.toBeInTheDocument();
     });
 
     it('procesa seleccion de archivo PDF desde el input', () => {

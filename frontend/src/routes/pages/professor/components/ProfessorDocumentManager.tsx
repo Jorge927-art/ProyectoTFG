@@ -37,7 +37,13 @@ export const ProfessorDocumentManager = ({
     className = '',
 }: ProfessorDocumentManagerProps) => {
     const filterGeneralDocuments = (documents: DocumentMetadata[]) => (
-        documents.filter((document) => !document.course || typeof document.course.courseId !== 'number')
+        documents.filter((document) => {
+            if (document.evaluation_type === 'EXAMEN') {
+                return false;
+            }
+
+            return !document.course || typeof document.course.courseId !== 'number';
+        })
     );
 
     const [activeTab, setActiveTab] = useState<'RECEIVED' | 'SENT'>('RECEIVED');

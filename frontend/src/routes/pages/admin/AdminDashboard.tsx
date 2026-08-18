@@ -9,6 +9,7 @@ import { AdminDocumentInbox } from './components/AdminDocumentInbox';
 import { GlobalStatisticsPanel } from './components/GlobalStatisticsPanel';
 import { AdminCourseProfessorReassignmentPanel } from './components/AdminCourseProfessorReassignmentPanel';
 import { AdminCourseCatalogPanel } from './components/AdminCourseCatalogPanel';
+import { AdminStudentPreferencesPanel } from './components/AdminStudentPreferencesPanel';
 import { useLocation } from 'react-router-dom';
 
 const AdminDashboard = () => {
@@ -59,6 +60,12 @@ const AdminDashboard = () => {
                     <div className="h-full">
                         <UserScrollList />
                     </div>
+                </div>
+            )}
+
+            {!deferHeavySections && (
+                <div className="w-full mt-6">
+                    <AdminStudentPreferencesPanel />
                 </div>
             )}
 

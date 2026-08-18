@@ -8,6 +8,7 @@ import {
 } from '../../../../services/evaluationService';
 import {
     getDocumentsByEnrollment,
+    getSentDocumentsByEnrollment,
     uploadProfessorDocument
 } from '../../../../services/documentService';
 import type { DocumentMetadata } from '../../../../services/documentService';
@@ -22,6 +23,7 @@ vi.mock('../../../../services/evaluationService', () => ({
 
 vi.mock('../../../../services/documentService', () => ({
     getDocumentsByEnrollment: vi.fn(),
+    getSentDocumentsByEnrollment: vi.fn(),
     uploadProfessorDocument: vi.fn()
 }));
 
@@ -63,6 +65,18 @@ describe('useGradingCenter', () => {
             isRead: false
         }
     ];
+    const mockSentExamDocuments: DocumentMetadata[] = [
+        {
+            ...mockDocuments[0],
+            documentid: 1002,
+            originalname: 'examen-final.pdf',
+            evaluation_type: 'EXAMEN',
+            sender: { userId: 2, username: 'profesor', email: 'profe@uni.es', role: 'PROFESSOR' },
+            receiver: { userId: 11, username: 'ana', email: 'ana@uni.es', role: 'STUDENT' },
+            folder_type: 'SENT',
+            isRead: true,
+        }
+    ];
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -73,6 +87,7 @@ describe('useGradingCenter', () => {
             { gradeId: 3, title: 'Examen Final', score: '8.0' }
         ]);
         vi.mocked(getDocumentsByEnrollment).mockResolvedValue(mockDocuments);
+        vi.mocked(getSentDocumentsByEnrollment).mockResolvedValue(mockSentExamDocuments);
         vi.mocked(uploadProfessorDocument).mockResolvedValue({
             message: 'ok',
             filename: 'doc.pdf',
@@ -119,9 +134,26 @@ describe('useGradingCenter', () => {
 
         expect(result.current.selectedStudent?.userId).toBe(11);
         expect(getDocumentsByEnrollment).toHaveBeenCalledWith(301);
+        expect(getSentDocumentsByEnrollment).toHaveBeenCalledWith(301);
         expect(getTeacherEnrollmentGrades).toHaveBeenCalledWith(301);
         expect(result.current.studentDocuments).toEqual(mockDocuments);
+        expect(result.current.sentExamDocuments).toEqual(mockSentExamDocuments);
         expect(result.current.studentGrades).toHaveLength(3);
+    });
+
+    it('conserva las entregas recibidas si falla temporalmente la consulta de enviados', async () => {
+        vi.mocked(getSentDocumentsByEnrollment).mockRejectedValueOnce(new Error('sent endpoint unavailable'));
+        const { result } = renderHook(() => useGradingCenter(10));
+
+        await waitFor(() => expect(result.current.loadingData).toBe(false));
+
+        await act(async () => {
+            await result.current.handleSelectStudentById(11);
+        });
+
+        expect(result.current.studentDocuments).toEqual(mockDocuments);
+        expect(result.current.sentExamDocuments).toEqual([]);
+        expect(result.current.errorMessage).toBe('');
     });
 
     it('refresca las entregas recibidas al recibir el evento global de notificaciones', async () => {

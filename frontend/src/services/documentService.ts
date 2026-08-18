@@ -345,3 +345,14 @@ export const getDocumentsByEnrollment = async (enrollmentId: number): Promise<Do
     const response = await apiClient.get<RawDocumentMetadata[]>(`/api/v1/documents/course/enrollment/${enrollmentId}`);
     return normalizeDocumentList(response.data);
 };
+
+/**
+ * [EXCLUSIVO PROFESOR - CENTRO DE EXÁMENES]: Recupera los documentos enviados
+ * por el profesor al alumno de una matrícula concreta.
+ */
+export const getSentDocumentsByEnrollment = async (enrollmentId: number): Promise<DocumentMetadata[]> => {
+    const response = await apiClient.get<RawDocumentMetadata[]>(
+        `/api/v1/documents/course/enrollment/${enrollmentId}/sent`
+    );
+    return normalizeDocumentList(response.data);
+};

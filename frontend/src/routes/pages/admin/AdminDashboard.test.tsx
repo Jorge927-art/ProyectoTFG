@@ -46,6 +46,10 @@ vi.mock('./components/AdminCourseCatalogPanel', () => ({
     AdminCourseCatalogPanel: () => <div data-testid="mock-admin-course-catalog-panel" />
 }));
 
+vi.mock('./components/AdminStudentPreferencesPanel', () => ({
+    AdminStudentPreferencesPanel: () => <div data-testid="mock-admin-student-preferences-panel" />
+}));
+
 vi.mock('./components/CourseInsightPanel', () => ({
     CourseInsightPanel: () => <div data-testid="mock-course-insight-panel" />
 }));
@@ -68,6 +72,7 @@ describe('AdminDashboard - Orquestación de paneles', () => {
         expect(screen.getByTestId('mock-user-search-panel')).toBeInTheDocument();
         expect(screen.getByTestId('mock-user-scroll-list')).toBeInTheDocument();
         expect(screen.getByTestId('mock-admin-course-catalog-panel')).toBeInTheDocument();
+        expect(screen.getByTestId('mock-admin-student-preferences-panel')).toBeInTheDocument();
         expect(screen.getByTestId('mock-admin-course-reassignment-panel')).toBeInTheDocument();
         expect(screen.getByTestId('mock-admin-document-inbox')).toBeInTheDocument();
         expect(screen.getByTestId('mock-global-statistics-panel')).toBeInTheDocument();
@@ -87,6 +92,15 @@ describe('AdminDashboard - Orquestación de paneles', () => {
 
         const position = courseCatalog.compareDocumentPosition(inbox);
         expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('renderiza preferencias de alumnos entre usuarios y catálogo de cursos', () => {
+        render(<AdminDashboard />);
+
+        const preferences = screen.getByTestId('mock-admin-student-preferences-panel');
+        const catalog = screen.getByTestId('mock-admin-course-catalog-panel');
+
+        expect(preferences.compareDocumentPosition(catalog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it('renderiza el panel de reasignación antes que la bandeja de documentos', () => {

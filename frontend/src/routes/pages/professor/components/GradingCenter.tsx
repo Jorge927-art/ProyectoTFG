@@ -23,10 +23,13 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
     focusStudentUserId = null,
     focusDocumentId = null,
 }) => {
+    const [activeExamTab, setActiveExamTab] = React.useState<'RECEIVED' | 'SENT'>('RECEIVED');
+
     const {
         students,
         selectedStudent,
         studentDocuments,
+        sentExamDocuments,
         loadingData,
         loadingDocs,
         isSubmitting,
@@ -108,6 +111,21 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
 
     const selectedCourseValue = courseId ? String(courseId) : '';
     const selectedStudentValue = selectedStudent ? String(selectedStudent.userId) : '';
+    const examDocuments = React.useMemo(
+        () => studentDocuments.filter((document) => {
+            const evaluationType = document.evaluation_type?.trim().toUpperCase();
+            return evaluationType === 'EXAMEN' || evaluationType == null || evaluationType === '';
+        }),
+        [studentDocuments]
+    );
+    const sentExamDocumentsOnly = React.useMemo(
+        () => sentExamDocuments.filter((document) => document.evaluation_type === 'EXAMEN'),
+        [sentExamDocuments]
+    );
+    const visibleExamDocuments = React.useMemo(
+        () => activeExamTab === 'RECEIVED' ? examDocuments : sentExamDocumentsOnly,
+        [activeExamTab, examDocuments, sentExamDocumentsOnly]
+    );
     const gradeSubmitButtonFeedbackClass = gradeSubmitFeedbackStatus === 'success'
         ? '!bg-emerald-600 hover:!bg-emerald-700'
         : gradeSubmitFeedbackStatus === 'error'
@@ -240,18 +258,46 @@ export const GradingCenter: React.FC<GradingCenterProps> = ({
                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                 Recepcion de entregas del alumno seleccionado
                             </p>
+
+                            <div className="flex bg-slate-100 p-1 rounded-xl">
+                                <GenericButton
+                                    type="button"
+                                    onClick={() => setActiveExamTab('RECEIVED')}
+                                    variant="white"
+                                    icon={<Send size={14} />}
+                                    label="Recibidos"
+                                    className={`flex-1 justify-center gap-2 py-1.5! text-xs! font-bold! rounded-lg! transition-all! cursor-pointer ${activeExamTab === 'RECEIVED'
+                                        ? 'bg-white text-blue-600 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-800'
+                                        }`}
+                                />
+                                <GenericButton
+                                    type="button"
+                                    onClick={() => setActiveExamTab('SENT')}
+                                    variant="white"
+                                    icon={<Send size={14} />}
+                                    label="Enviados"
+                                    className={`flex-1 justify-center gap-2 py-1.5! text-xs! font-bold! rounded-lg! transition-all! cursor-pointer ${activeExamTab === 'SENT'
+                                        ? 'bg-white text-blue-600 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-800'
+                                        }`}
+                                />
+                            </div>
+
                             <div className="max-h-36 overflow-y-auto pr-1 bg-white border border-slate-200 rounded-lg p-1.5 space-y-1.5">
                                 {loadingDocs ? (
                                     <div className="flex items-center gap-1.5 justify-center py-2 text-slate-400">
                                         <Loader2 size={12} className="animate-spin text-blue-600" />
                                         <span className="text-[10px]">Cargando archivos...</span>
                                     </div>
-                                ) : studentDocuments.length === 0 ? (
+                                ) : visibleExamDocuments.length === 0 ? (
                                     <p className="text-[10px] text-slate-400 italic text-center py-2">
-                                        El alumno seleccionado no ha entregado archivos todavia.
+                                        {activeExamTab === 'RECEIVED'
+                                            ? 'El alumno seleccionado no ha entregado exámenes todavía.'
+                                            : 'Todavía no has enviado exámenes a este alumno.'}
                                     </p>
                                 ) : (
-                                    studentDocuments.map((doc) => (
+                                    visibleExamDocuments.map((doc) => (
                                         <div
                                             key={doc.documentid}
                                             ref={(node) => {

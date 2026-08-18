@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 import org.springframework.core.io.Resource;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
@@ -151,6 +152,22 @@ class FileStorageServiceTest {
         when(multipartFile.getContentType()).thenReturn("image/gif");
 
         assertThrows(IllegalArgumentException.class, () -> fileStorageService.storeFile(multipartFile, "avatars"));
+    }
+
+    @Test
+    @DisplayName("Debería rechazar un script ejecutable aunque se intente subir como imagen")
+    void storeFileMaliciousScriptException() {
+        MockMultipartFile maliciousScript = new MockMultipartFile(
+                "file",
+                "ataque_rce.sh",
+                "application/x-sh",
+                "#!/bin/bash\necho 'Servidor Comprometido'".getBytes());
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> fileStorageService.storeFile(maliciousScript, "avatars"));
+
+        assertTrue(exception.getMessage().contains("Extensión de imagen no permitida"));
     }
 
     @Test

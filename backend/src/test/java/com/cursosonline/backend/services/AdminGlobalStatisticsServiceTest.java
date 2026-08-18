@@ -184,6 +184,32 @@ class AdminGlobalStatisticsServiceTest {
     }
 
     @Test
+    @DisplayName("getGlobalStatistics debe escalar históricos ficticios y aplicar mínimos positivos")
+    void getGlobalStatistics_HistoricoFicticio_DebeEscalarYConservarTopCourses() {
+        when(userRepository.countByRoleAndEnabledTrue(Role.STUDENT)).thenReturn(1L);
+        when(userRepository.countByRoleAndEnabledTrue(Role.PROFESSOR)).thenReturn(1L);
+        when(enrollmentRepository.findTopCoursesByActiveStudentCount(any()))
+                .thenReturn(List.<Object[]>of(new Object[] { 10L, "Curso mínimo", 1L }));
+        when(historyRepository.findBySnapshotYear(2025)).thenReturn(Optional.empty());
+        when(historyRepository.findBySnapshotYear(2024)).thenReturn(Optional.empty());
+        when(historyRepository.findAllBySnapshotYearInWithTopCourses(List.of(2025, 2024)))
+                .thenReturn(List.of());
+
+        service.getGlobalStatistics();
+
+        ArgumentCaptor<AdminGlobalStatsHistory> captor = ArgumentCaptor.forClass(AdminGlobalStatsHistory.class);
+        verify(historyRepository, times(2)).save(captor.capture());
+        assertEquals(List.of(2025, 2024), captor.getAllValues().stream()
+                .map(history -> history.getSnapshotYear())
+                .toList());
+        assertTrue(captor.getAllValues().stream().allMatch(history -> !history.isRealData()));
+        assertTrue(captor.getAllValues().stream().allMatch(history -> history.getTotalStudents() == 1));
+        assertTrue(captor.getAllValues().stream().allMatch(history -> history.getTopCourseEnrollment() == 1));
+        assertEquals(1, captor.getAllValues().get(0).getTopCourses().get(0).getEnrolledStudents());
+        assertEquals(1, captor.getAllValues().get(0).getTopCourses().get(0).getRankPosition());
+    }
+
+    @Test
     @DisplayName("searchProfessorRatings debe filtrar usuarios inválidos y ordenar los resultados")
     void searchProfessorRatings_DatosInvalidos_DebeFiltrarYOrdenar() {
         Users disabled = new Users(1L, "disabled", "enc", Role.PROFESSOR, "disabled@test.com", false,
@@ -206,6 +232,47 @@ class AdminGlobalStatisticsServiceTest {
         assertEquals(2, results.size());
         assertEquals("alfa", results.get(0).username());
         assertEquals("Zeta", results.get(1).username());
+    }
+
+    @Test
+    @DisplayName("searchProfessorRatings debe normalizar el keyword y admitir rating sin valor")
+    void searchProfessorRatings_KeywordNormalizado_DebeFiltrarSinDescartarRatingNulo() {
+        Users matching = new Users(5L, "  LauraDocente  ", "enc", Role.PROFESSOR, "laura@test.com", true,
+                new ArrayList<>());
+        Users other = new Users(6L, "Miguel", "enc", Role.PROFESSOR, "miguel@test.com", true,
+                new ArrayList<>());
+        when(userRepository.findByRole(Role.PROFESSOR)).thenReturn(List.of(matching, other));
+        when(academicEvaluationRepository.getAverageInstructorScoreByProfessorId(5L)).thenReturn(null);
+
+        List<com.cursosonline.backend.dto.AdminProfessorRatingDTO> results = service.searchProfessorRatings("  LAURA ");
+
+        assertEquals(1, results.size());
+        assertEquals("  LauraDocente  ", results.get(0).username());
+        assertEquals(null, results.get(0).averageRating());
+    }
+
+    @Test
+    @DisplayName("getGlobalStatistics debe convertir históricos recuperados en comparativas reales")
+    void getGlobalStatistics_HistoricosReales_DebeMapearComparativas() {
+        when(userRepository.countByRoleAndEnabledTrue(Role.STUDENT)).thenReturn(20L);
+        when(userRepository.countByRoleAndEnabledTrue(Role.PROFESSOR)).thenReturn(4L);
+        when(enrollmentRepository.findTopCoursesByActiveStudentCount(any())).thenReturn(List.of());
+        AdminGlobalStatsHistory previous = history(2025, 18, 3, 12, true);
+        AdminGlobalStatsHistory older = history(2024, 15, 2, 9, false);
+        when(historyRepository.findBySnapshotYear(2025)).thenReturn(Optional.of(previous));
+        when(historyRepository.findBySnapshotYear(2024)).thenReturn(Optional.of(older));
+        when(historyRepository.findAllBySnapshotYearInWithTopCourses(List.of(2025, 2024)))
+                .thenReturn(List.of(previous, older));
+
+        AdminGlobalStatisticsDTO dto = service.getGlobalStatistics();
+
+        assertEquals(18, dto.yearlyComparisons().get(1).totalStudents());
+        assertEquals(3, dto.yearlyComparisons().get(1).totalProfessors());
+        assertEquals(12, dto.yearlyComparisons().get(1).topCourseEnrollment());
+        assertTrue(dto.yearlyComparisons().get(1).realData());
+        assertEquals(15, dto.yearlyComparisons().get(2).totalStudents());
+        assertFalse(dto.yearlyComparisons().get(2).realData());
+        verify(historyRepository, never()).save(any(AdminGlobalStatsHistory.class));
     }
 
     @Test

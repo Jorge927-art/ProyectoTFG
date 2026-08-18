@@ -2631,3 +2631,82 @@ La configuración por curso también aporta flexibilidad, ya que permite ajustar
 | Resolución automática de avisos intermedios | `DocumentController.java`, `ProfessorCourseAlertService.java` y `ProfessorCourseAlertServiceTest.java` | Un envío correcto de documentación, vídeo o trabajo resuelve solo el aviso `VIEWED` más antiguo compatible |
 | Resolución exclusiva del aviso final por el canal de examen | `DocumentController.java` distingue `EXAMEN` y `ProfessorCourseAlertServiceTest.java` cubre la separación de tipos | Un envío desde el panel de documentación no resuelve `FINAL_EXAM`; solo lo hace el canal de exámenes |
 | Fallo durante el envío | Transacción de `DocumentController.java` y resolución posterior a la persistencia | Si el envío no termina correctamente, el aviso permanece en estado `VIEWED` |
+
+---
+
+# ADR-066: Panel Administrativo `/admin` como Módulo de Supervisión y Gestión Centralizada
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Agosto 2026
+
+## Contexto
+
+La plataforma había ido creciendo en funcionalidades de gestión, pero el rol administrativo seguía disperso entre varias vistas, controladores y flujos de negocio. La lógica de supervisión del sistema no estaba centralizada en un módulo explícito: altas, bajas, reactivaciones, estadísticas, control de usuarios y gestión de incidencias se repartían entre rutas y servicios especializados sin un punto único de orquestación.
+
+Ese diseño provocaba dos riesgos arquitectónicos. En primer lugar, la administración dependía de varios componentes visuales poco cohesivos, lo que hacía más difícil mantener una experiencia consistente para el rol `ADMIN`. En segundo lugar, la seguridad y el acceso estaban más fragmentados de lo que debería, ya que no existía un punto claro de entrada para las operaciones de supervisión global, aumentando el riesgo de fugas de privilegios por semántica o navegación.
+
+## Decisión
+
+Crear un módulo administrativo explícito en la ruta `/admin` con un layout propio, acceso restringido por rol y servicios dedicados a la supervisión de usuarios, cursos, perfiles y alertas globales.
+
+La decisión se materializa en cinco principios:
+
+1. **Ruta centralizada:** toda la gestión operativa del administrador pasa por `/admin` como punto único de entrada.
+2. **Control de acceso por rol:** el módulo solo es accesible para usuarios con rol `ADMIN`, validado desde el contexto de seguridad y los claims del JWT.
+3. **Cohesión funcional:** se agrupan operaciones como activo/inactivo, reactivación, estadísticas globales y administración de usuarios en un único bloque de navegación y servicios.
+4. **Desacoplamiento de vistas:** la capa de presentación y la capa de negocio quedan separadas, evitando que la UI admin contenga lógica de dominio o permisos.
+5. **Compatibilidad con el modelo existente:** la reactivación del usuario y el bloqueo automático por intentos fallidos reutilizan los mecanismos ya presentes de baja lógica (`enabled = false`) para mantener consistencia con la base de datos y con la consola administrativa.
+
+## Justificación
+
+El panel administrativo responde a una necesidad real de arquitectura y mantenimiento. Un rol de supervisión global necesita un espacio con responsabilidad clara, experiencia coherente y límites de acceso definidos. La decisión también mejora la trazabilidad operativa: un administrador puede identificar rápidamente qué está ocurriendo en la plataforma sin depender de rutas diseminadas por la aplicación.
+
+La implementación del módulo en `/admin` refuerza además la separación de responsabilidades ya definida en la arquitectura del proyecto: la capa de presentación gestiona la interactividad visual, mientras que el backend concentra la lógica de seguridad, estadísticas y validación de datos del dominio administrativo.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* Centralización de la gestión operativa del administrador.
+* Mejor cumplimiento de RBAC y menor riesgo de acceso no autorizado a funciones administrativas.
+* Experiencia de usuario más coherente para el rol `ADMIN`.
+* Trazabilidad y mantenimiento mejorados en tareas de supervisión global.
+* Reutilización del flujo de inactivación/reactivación ya existente, reduciendo deuda técnica y complejidad adicional.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Mayor complejidad del frontend administrativo:** el módulo exige vistas, rutas y componentes diferenciados.
+  * *Mitigación:* mantener un layout específico y una capa de navegación separada, evitando mezclarlo con dashboards de estudiante o profesor.
+
+* **Riesgo de acoplamiento funcional entre paneles:** si el administrador llega a depender de vistas de otros roles, la lógica se vuelve difícil de auditar.
+  * *Mitigación:* exigir que cada operación administrativa se resuelva en servicios específicos del backend y no desde componentes de otras áreas.
+
+* **Riesgo de sobreexposición de datos sensibles:** las estadísticas y métricas globales pueden revelar información operativa sensible.
+  * *Mitigación:* limitar acceso a usuarios autenticados con rol `ADMIN` y mantener validación perimetral con claims del JWT y reglas de autorización explícitas.
+
+## Trazabilidad de Implementación
+
+| Decisión arquitectónica | Materialización en backend | Materialización en frontend |
+| --- | --- | --- |
+| Ruta centralizada `/admin` | `controller/AdminGlobalStatisticsController.java`, `services/AdminStudentPreferencesService.java`, `services/AdminGlobalStatisticsService.java` | `routes/pages/admin` y componentes del dashboard administrativo |
+| Control de acceso por rol | `SecurityConfig.java`, validación de `Authentication` y claims de JWT | protección de rutas y redirección de acceso no autorizado |
+| Consolidación de gestión de usuarios | `UserService.java` y flujo de baja/reactivación | panel de administración para usuarios activos/inactivos |
+| Supervisión global | servicios analíticos y DTOs de agregación | panel de estadísticas con datos consolidados |
+| Coherencia de diseño para el rol `ADMIN` | endpoints REST con contrato claro y DTOs especializados | layout administrativo y navegación dedicada |
+
+## Evidencias de Validación
+
+| Escenario de validación | Evidencia reconocida | Resultado esperado |
+| --- | --- | --- |
+| Acceso a `/admin` con rol `ADMIN` | validación por seguridad y claims JWT | acceso permitido |
+| Acceso a `/admin` con rol no administrativo | filtro de autorización | acceso denegado |
+| Desactivación y reactivación de usuario | `enabled = false` + proceso de reactivación | coherencia con la consola admin |
+| Estadísticas globales del alumnado | `AdminGlobalStatisticsService`, `AdminStudentPreferencesService` | datos agregados correctos y visibles solo para admin |
+| Integridad del flujo de administración | tests de controller/service y protección de rutas | operación consistente y no propagada a otros roles |
+
+---

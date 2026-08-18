@@ -4,6 +4,8 @@ import com.cursosonline.backend.dto.AdminGlobalStatisticsDTO;
 import com.cursosonline.backend.dto.AdminGlobalTopCourseDTO;
 import com.cursosonline.backend.dto.AdminGlobalYearComparisonDTO;
 import com.cursosonline.backend.services.AdminGlobalStatisticsService;
+import com.cursosonline.backend.services.AdminStudentPreferencesService;
+import com.cursosonline.backend.dto.AdminStudentPreferencesDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,6 +48,9 @@ class AdminGlobalStatisticsControllerTest {
         @MockitoBean
         private AdminGlobalStatisticsService adminGlobalStatisticsService;
 
+        @MockitoBean
+        private AdminStudentPreferencesService adminStudentPreferencesService;
+
         @Test
         @WithMockUser(authorities = "ADMIN")
         @DisplayName("GET /api/admin/statistics/global debe devolver el panel global")
@@ -68,6 +73,28 @@ class AdminGlobalStatisticsControllerTest {
                                 .andExpect(jsonPath("$.totalStudents").value(120))
                                 .andExpect(jsonPath("$.topCourses[0].courseTitle").value("Algebra"))
                                 .andExpect(jsonPath("$.yearlyComparisons[1].realData").value(false));
+        }
+
+        @Test
+        @WithMockUser(authorities = "ADMIN")
+        @DisplayName("GET /api/admin/statistics/student-preferences debe devolver el análisis agregado")
+        void getStudentPreferences_DebeDevolverDatos() throws Exception {
+                AdminStudentPreferencesDTO dto = new AdminStudentPreferencesDTO(
+                                4,
+                                12,
+                                List.of(new AdminStudentPreferencesDTO.PreferenceSummary(
+                                                "Categorías", List.of("Programación"), 4, 4)),
+                                List.of(new AdminStudentPreferencesDTO.CourseDemand(
+                                                10L, "Java avanzado", 85, 30, 20, 20, 15, 0, 0, 8,
+                                                true, "laura")));
+
+                when(adminStudentPreferencesService.getAggregatedPreferences()).thenReturn(dto);
+
+                mockMvc.perform(get("/api/admin/statistics/student-preferences"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.studentsWithPreferences").value(4))
+                                .andExpect(jsonPath("$.courses[0].totalScore").value(85))
+                                .andExpect(jsonPath("$.courses[0].professorAssigned").value(true));
         }
 
         @Test

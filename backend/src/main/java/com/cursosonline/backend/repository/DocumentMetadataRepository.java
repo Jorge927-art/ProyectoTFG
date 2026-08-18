@@ -96,6 +96,20 @@ public interface DocumentMetadataRepository extends JpaRepository<DocumentMetada
                         @Param("instructorUsername") String instructorUsername);
 
         /**
+         * Recupera los documentos enviados por el profesor al alumno de una
+         * matrícula concreta.
+         */
+        @Query("SELECT d FROM DocumentMetadata d JOIN Enrollment e ON e.user = d.receiver " +
+                        "WHERE e.enrollmentid = :enrollmentId " +
+                        "AND d.sender.username = :instructorUsername " +
+                        "AND d.folder_type = com.cursosonline.backend.entities.FolderType.SENT " +
+                        "AND e.course = d.course " +
+                        "ORDER BY d.documentid DESC")
+        List<DocumentMetadata> findSentDocumentsByEnrollmentIdForInstructor(
+                        @Param("enrollmentId") Long enrollmentId,
+                        @Param("instructorUsername") String instructorUsername);
+
+        /**
          * Recupera los documentos RECIBIDOS no leídos por el usuario (alumno),
          * filtrando estrictamente por FolderType.RECEIVED.
          * 

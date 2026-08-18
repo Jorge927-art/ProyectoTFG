@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestParam;
 import com.cursosonline.backend.dto.AdminProfessorRatingDTO;
+import com.cursosonline.backend.dto.AdminStudentPreferencesDTO;
+import com.cursosonline.backend.services.AdminStudentPreferencesService;
 
 import java.util.Map;
 import java.util.List;
@@ -25,6 +27,7 @@ import java.util.List;
 public class AdminGlobalStatisticsController {
 
     private final AdminGlobalStatisticsService adminGlobalStatisticsService;
+    private final AdminStudentPreferencesService adminStudentPreferencesService;
 
     /**
      * Obtiene las estadísticas globales de la plataforma.
@@ -34,6 +37,11 @@ public class AdminGlobalStatisticsController {
     @GetMapping("/global")
     public ResponseEntity<AdminGlobalStatisticsDTO> getGlobalStatistics() {
         return ResponseEntity.ok(adminGlobalStatisticsService.getGlobalStatistics());
+    }
+
+    @GetMapping("/student-preferences")
+    public ResponseEntity<AdminStudentPreferencesDTO> getStudentPreferences() {
+        return ResponseEntity.ok(adminStudentPreferencesService.getAggregatedPreferences());
     }
 
     @GetMapping("/professors/search")

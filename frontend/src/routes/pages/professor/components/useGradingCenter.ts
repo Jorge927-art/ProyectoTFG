@@ -12,7 +12,11 @@ import {
     getTeacherEnrollmentGrades,
     submitStudentGrade 
 } from '../../../../services/evaluationService';
-import { getDocumentsByEnrollment, uploadProfessorDocument } from '../../../../services/documentService';
+import {
+    getDocumentsByEnrollment,
+    getSentDocumentsByEnrollment,
+    uploadProfessorDocument,
+} from '../../../../services/documentService';
 import { emitProfessorAlertsRefresh } from '../../../../services/professorAlertService';
 import {
     NOTIFICATIONS_REFRESH_EVENT,
@@ -82,6 +86,7 @@ export const useGradingCenter = (courseId: number | null) => {
     const [selectedStudent, setSelectedStudent] = useState<StudentPerformanceDTO | null>(null);
     const [studentGrades, setStudentGrades] = useState<CourseGradeDTO[]>([]);
     const [studentDocuments, setStudentDocuments] = useState<DocumentMetadata[]>([]);
+    const [sentExamDocuments, setSentExamDocuments] = useState<DocumentMetadata[]>([]);
     
     // Estados de carga de la API
     const [loadingData, setLoadingData] = useState<boolean>(false);
@@ -137,6 +142,7 @@ export const useGradingCenter = (courseId: number | null) => {
             setSelectedStudent(null);
             setStudentGrades([]);
             setStudentDocuments([]);
+            setSentExamDocuments([]);
             setGradeSubmitFeedbackStatus(null);
             setFinalExamWeight('60');
             setCalculatorMessage('');
@@ -160,6 +166,7 @@ export const useGradingCenter = (courseId: number | null) => {
             setSelectedStudent(null); // Resetear selección al cambiar de asignatura
             setStudentGrades([]);
             setStudentDocuments([]);
+            setSentExamDocuments([]);
             setSelectedFile(null);
             setFinalExamWeight('60');
             setCalculatorMessage('');
@@ -171,6 +178,7 @@ export const useGradingCenter = (courseId: number | null) => {
 
     const fetchStudentDocuments = useCallback(async (student: StudentPerformanceDTO) => {
         setStudentDocuments([]);
+        setSentExamDocuments([]);
         setErrorMessage('');
 
         try {
@@ -183,8 +191,24 @@ export const useGradingCenter = (courseId: number | null) => {
                 return;
             }
 
-            const docsByEnrollment = await getDocumentsByEnrollment(student.enrollmentId);
-            setStudentDocuments(docsByEnrollment);
+            const [receivedResult, sentResult] = await Promise.allSettled([
+                getDocumentsByEnrollment(student.enrollmentId),
+                getSentDocumentsByEnrollment(student.enrollmentId),
+            ]);
+
+            if (receivedResult.status === 'fulfilled') {
+                setStudentDocuments(receivedResult.value);
+            } else {
+                setStudentDocuments([]);
+                setErrorMessage('No se pudieron recuperar las entregas físicas de este estudiante.');
+            }
+
+            if (sentResult.status === 'fulfilled') {
+                setSentExamDocuments(sentResult.value);
+            } else {
+                console.error('No se pudieron recuperar los exámenes enviados del profesor:', sentResult.reason);
+                setSentExamDocuments([]);
+            }
         } catch {
             setErrorMessage('No se pudieron recuperar las entregas físicas de este estudiante.');
         } finally {
@@ -244,6 +268,7 @@ export const useGradingCenter = (courseId: number | null) => {
         if (!student) {
             setSelectedStudent(null);
             setStudentDocuments([]);
+            setSentExamDocuments([]);
             return;
         }
         await handleSelectStudent(student);
@@ -429,6 +454,7 @@ export const useGradingCenter = (courseId: number | null) => {
         selectedStudent,
         studentGrades,
         studentDocuments,
+        sentExamDocuments,
         loadingData,
         loadingDocs,
         isSubmitting,

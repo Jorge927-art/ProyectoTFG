@@ -129,6 +129,30 @@ describe('ProfessorDocumentManager', () => {
         expect(screen.queryByText('entrega-t1.pdf')).not.toBeInTheDocument();
     });
 
+    it('no muestra documentos de examen en la bandeja de documentación académica', async () => {
+        const examDoc: DocumentMetadata = {
+            documentid: 99,
+            filename: 'examen-final.pdf',
+            originalname: 'examen-final.pdf',
+            upload_date: '2026-08-06T10:00:00.000Z',
+            evaluation_type: 'EXAMEN',
+            sender: { userId: 2, username: 'profesor_juan', email: 'juan@tfg.com', role: 'PROFESSOR' },
+            receiver: { userId: 3, username: 'laura_student', email: 'laura@tfg.com', role: 'STUDENT' },
+            folder_type: 'RECEIVED',
+            isRead: false,
+        };
+
+        vi.mocked(documentService.getUserDocuments).mockResolvedValueOnce([receivedUnreadDoc, examDoc]);
+
+        render(<ProfessorDocumentManager availableCourses={courses} />);
+
+        await waitFor(() => {
+            expect(screen.getByText('feedback-algebra.pdf')).toBeInTheDocument();
+        });
+
+        expect(screen.queryByText('examen-final.pdf')).not.toBeInTheDocument();
+    });
+
     it('al cambiar a Enviados consulta documentos enviados y renderiza el destinatario', async () => {
         render(<ProfessorDocumentManager availableCourses={courses} />);
 
