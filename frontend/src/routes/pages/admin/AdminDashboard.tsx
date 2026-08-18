@@ -52,7 +52,7 @@ const AdminDashboard = () => {
             />
 
             {!deferHeavySections && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch w-full">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 xl:gap-8 2xl:gap-10 items-stretch w-full">
                     <div className="h-full">
                         <UserSearchPanel currentAdminUsername={user?.username ?? ''} />
                     </div>
@@ -80,12 +80,14 @@ const AdminDashboard = () => {
 
             {!deferHeavySections && (
                 <>
-                    <div className="w-full mt-6">
-                        <CourseInsightPanel />
-                    </div>
+                    <div data-testid="admin-analytics-grid" className="grid grid-cols-1 2xl:grid-cols-2 gap-6 items-stretch w-full mt-6">
+                        <div className="h-full">
+                            <CourseInsightPanel />
+                        </div>
 
-                    <div className="w-full mt-6">
-                        <GlobalStatisticsPanel />
+                        <div className="h-full">
+                            <GlobalStatisticsPanel />
+                        </div>
                     </div>
                 </>
             )}

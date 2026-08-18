@@ -1,5 +1,5 @@
 // frontend/src/routes/pages/admin/AdminDashboard.test.tsx
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import AdminDashboard from './AdminDashboard';
 
@@ -55,6 +55,10 @@ vi.mock('./components/GlobalStatisticsPanel', () => ({
 }));
 
 describe('AdminDashboard - Orquestación de paneles', () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
     it('renderiza la cabecera institucional y ambos paneles', () => {
         render(<AdminDashboard />);
 
@@ -113,5 +117,24 @@ describe('AdminDashboard - Orquestación de paneles', () => {
 
         const position = courseInsight.compareDocumentPosition(globalStats);
         expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it.each([
+        [390, 'móvil'],
+        [768, 'tablet'],
+        [1366, 'portátil'],
+        [1920, 'monitor grande'],
+        [2560, 'monitor amplio'],
+    ])('mantiene el contrato responsive en %s px (%s)', (viewportWidth) => {
+        vi.stubGlobal('innerWidth', viewportWidth);
+        render(<AdminDashboard />);
+
+        const analyticsGrid = screen.getByTestId('admin-analytics-grid');
+        const userGrid = screen.getByTestId('mock-user-search-panel').parentElement?.parentElement;
+
+        expect(analyticsGrid).toHaveClass('grid-cols-1', '2xl:grid-cols-2');
+        expect(userGrid).toHaveClass('grid-cols-1', 'md:grid-cols-2');
+        expect(analyticsGrid).not.toHaveClass('w-screen', 'min-w-max');
+        expect(userGrid).not.toHaveClass('w-screen', 'min-w-max');
     });
 });

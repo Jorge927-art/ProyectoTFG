@@ -45,6 +45,9 @@ describe('Auditoría de Calidad: Composición Paramétrica de DashboardLayout', 
 
         // Verificaciones de Maquetación Paramétrica (Assertions)
         expect(layoutContainer).toBeInTheDocument();
+        expect(layoutContainer?.className).toContain('max-w-6xl');
+        expect(layoutContainer?.className).toContain('xl:max-w-7xl');
+        expect(layoutContainer?.className).toContain('2xl:max-w-[1600px]');
         expect(layoutContainer?.className).toContain('px-4');
         expect(layoutContainer?.className).not.toContain('px-6');
     });
