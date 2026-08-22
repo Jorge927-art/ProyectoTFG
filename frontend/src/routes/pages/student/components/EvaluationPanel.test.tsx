@@ -188,6 +188,27 @@ describe('EvaluationPanel Component [TFG Test Suite]', () => {
         expect(submitButton).toBeDisabled();
     });
 
+    it('debe avisar que ambas valoraciones son obligatorias y no enviar una evaluación parcial', () => {
+        vi.mocked(useActiveEvaluations).mockReturnValue({
+            pendingList: mockPending,
+            loadingPending: false,
+            isSubmitting: false,
+            evaluationError: '',
+            refreshPending: mockRefreshPending,
+            submitEvaluation: mockSubmitEvaluation
+        });
+
+        render(<EvaluationPanel />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Calificar curso con 4 estrellas' }));
+        fireEvent.click(screen.getByRole('button', { name: /ENVIAR EVALUACIÓN/i }));
+
+        expect(screen.getByRole('alert')).toHaveTextContent(
+            'Debes evaluar la calidad del curso y el desempeño docente antes de enviar la evaluación.'
+        );
+        expect(mockSubmitEvaluation).not.toHaveBeenCalled();
+    });
+
     it('debe construir y enviar la evaluación con puntuaciones y comentario', async () => {
         vi.mocked(useActiveEvaluations).mockReturnValue({
             pendingList: mockPending,
@@ -219,7 +240,7 @@ describe('EvaluationPanel Component [TFG Test Suite]', () => {
         expect(screen.getByRole('button', { name: /ENVIAR EVALUACIÓN/i })).toBeDisabled();
     });
 
-    it('mantiene los datos del formulario cuando el hook rechaza el envío', async () => {
+    it('mantiene los datos y bloquea el envío cuando falta una valoración', () => {
         vi.mocked(useActiveEvaluations).mockReturnValue({
             pendingList: mockPending,
             loadingPending: false,
@@ -234,7 +255,8 @@ describe('EvaluationPanel Component [TFG Test Suite]', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Calificar curso con 3 estrellas' }));
         fireEvent.click(screen.getByRole('button', { name: /ENVIAR EVALUACIÓN/i }));
 
-        await waitFor(() => expect(mockSubmitEvaluation).toHaveBeenCalledTimes(1));
+        expect(mockSubmitEvaluation).not.toHaveBeenCalled();
+        expect(screen.getByRole('alert')).toHaveTextContent('Debes evaluar la calidad del curso y el desempeño docente');
         expect(screen.getByRole('button', { name: /ENVIAR EVALUACIÓN/i })).toBeEnabled();
     });
 

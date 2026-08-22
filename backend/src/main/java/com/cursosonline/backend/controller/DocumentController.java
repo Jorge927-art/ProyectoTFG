@@ -586,7 +586,7 @@ public class DocumentController {
             for (Enrollment enrollment : classEnrollments) {
                 if (enrollment.getUser() != null) {
                     persistDirectedDocumentPair(relativePath, cleanOriginalName, currentUser, enrollment.getUser(),
-                            course);
+                            course, null);
                 }
             }
 
@@ -1057,14 +1057,13 @@ public class DocumentController {
 
     /**
      * Endpoint para que un profesor suba un documento y lo envíe a un alumno o a
-     * toda la clase.
+     * un alumno concreto.
      * 
      * @param authentication Objeto Authentication que contiene la información del
      *                       usuario autenticado.
      * @param file           El archivo que se desea subir.
      * @param courseId       El ID del curso al cual se desea enviar el documento.
-     * @param receiverId     El ID del alumno destinatario. Si es 0, se envía a toda
-     *                       la clase.
+     * @param receiverId     El ID positivo del alumno destinatario.
      * @return ResponseEntity con el resultado de la operación o un mensaje de error
      *         en caso de fallo.
      */
@@ -1080,6 +1079,11 @@ public class DocumentController {
             if (authentication == null || !authentication.isAuthenticated()) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            if (receiverId == null || receiverId <= 0) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Debes seleccionar un alumno destinatario concreto."));
             }
 
             if (file == null || file.isEmpty()) {
@@ -1106,57 +1110,7 @@ public class DocumentController {
                     FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS);
             String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
 
-            // CASO A: ENVÍO MASIVO A TODA LA CLASE (receiverId == 0)
-            if (receiverId == 0) {
-                // Buscamos únicamente matrículas activas de estudiantes para la asignatura.
-                List<Enrollment> classEnrollments = enrollmentRepository
-                        .findActiveStudentEnrollmentsByCourseId(courseId);
-
-                if (classEnrollments.isEmpty()) {
-                    return ResponseEntity.badRequest()
-                            .body(Map.of("error",
-                                    "No se puede realizar un envío masivo porque no hay alumnos matriculados."));
-                }
-
-                // Generamos metadatos por alumno para respetar receiver_id NOT NULL.
-                for (Enrollment enrollment : classEnrollments) {
-                    if (enrollment.getUser() != null) {
-                        Users classStudent = enrollment.getUser();
-
-                        DocumentMetadata bulkSentPerStudent = new DocumentMetadata();
-                        bulkSentPerStudent.setFilename(relativePath);
-                        bulkSentPerStudent.setOriginalname(cleanOriginalName);
-                        bulkSentPerStudent.setSender(currentUser);
-                        bulkSentPerStudent.setReceiver(classStudent);
-                        bulkSentPerStudent.setCourse(selectedCourse);
-                        bulkSentPerStudent.setEvaluation_type(normalizedDeliveryType);
-                        bulkSentPerStudent.setFolder_type(FolderType.SENT);
-                        documentMetadataRepository.save(bulkSentPerStudent);
-
-                        // Registro de carpeta RECEIVED para que le salte la notificación en la campana
-                        DocumentMetadata bulkReceived = new DocumentMetadata();
-                        bulkReceived.setFilename(relativePath);
-                        bulkReceived.setOriginalname(cleanOriginalName);
-                        bulkReceived.setSender(currentUser);
-                        bulkReceived.setReceiver(classStudent);
-                        bulkReceived
-                                .setCourse(resolveReceivedCourseByDeliveryType(selectedCourse, normalizedDeliveryType));
-                        bulkReceived.setEvaluation_type(normalizedDeliveryType);
-                        bulkReceived.setFolder_type(FolderType.RECEIVED);
-                        bulkReceived.setRead(false);
-                        documentMetadataRepository.save(bulkReceived);
-                        professorCourseAlertService.resolveOldestViewedAlertAfterSuccessfulDelivery(
-                                currentUser.getUsername(), classStudent.getUser_id(), courseId,
-                                "EXAMEN".equals(normalizedDeliveryType));
-                    }
-                }
-
-                return ResponseEntity.ok(Map.of(
-                        "message", "Documento transmitido con éxito de forma masiva a toda la clase",
-                        "totalStudents", classEnrollments.size()));
-            }
-
-            // CASO B: ENVÍO SEGMENTADO INDIVIDUAL (receiverId > 0)
+            // ENVÍO INDIVIDUAL A UN ÚNICO ALUMNO
             Users receiverUser = userRepository.findById(receiverId)
                     .orElseThrow(() -> new RuntimeException("El alumno destinatario seleccionado no existe."));
 

@@ -183,11 +183,12 @@ describe('AdminDocumentInbox', () => {
         });
 
         fireEvent.click(screen.getByRole('button', { name: 'Limpiar bandeja de entrada' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Aceptar' }));
 
         await waitFor(() => {
             expect(documentService.hideAllReceivedGeneralDocuments).toHaveBeenCalledTimes(1);
             expect(mockEmitNotificationsRefresh).toHaveBeenCalledTimes(1);
-            expect(screen.getByText(/Bandeja de entrada limpiada/i)).toBeInTheDocument();
+            expect(screen.getByText(/Todos tus documentos se han borrado correctamente/i)).toBeInTheDocument();
         });
     });
 
@@ -215,10 +216,11 @@ describe('AdminDocumentInbox', () => {
         });
 
         fireEvent.click(screen.getByRole('button', { name: 'Limpiar bandeja de salida' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Aceptar' }));
 
         await waitFor(() => {
             expect(documentService.hideAllSentGeneralDocuments).toHaveBeenCalledTimes(1);
-            expect(screen.getByText(/Bandeja de salida limpiada/i)).toBeInTheDocument();
+            expect(screen.getByText(/Todos tus documentos se han borrado correctamente/i)).toBeInTheDocument();
         });
     });
 
@@ -308,13 +310,16 @@ describe('AdminDocumentInbox', () => {
         render(<AdminDocumentInbox />);
 
         await waitFor(() => {
-            expect(screen.getByLabelText('Seleccionar curso destinatario')).toBeInTheDocument();
-            expect(screen.getByRole('option', { name: 'Álgebra (Matemáticas)' })).toBeInTheDocument();
+            expect(screen.getByLabelText('Buscar curso destinatario')).toBeInTheDocument();
         });
 
-        fireEvent.change(screen.getByLabelText('Seleccionar curso destinatario'), {
-            target: { value: '101' },
+        fireEvent.change(screen.getByLabelText('Buscar curso destinatario'), {
+            target: { value: 'Álgebra' },
         });
+        await waitFor(() => {
+            expect(screen.getAllByText('Álgebra', { exact: true }).length).toBeGreaterThan(0);
+        });
+        fireEvent.click(screen.getAllByText('Álgebra', { exact: true })[0]);
         fireEvent.change(screen.getByLabelText('Archivo para envío colectivo'), {
             target: { files: [sentFile] },
         });

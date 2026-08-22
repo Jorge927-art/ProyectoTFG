@@ -38,12 +38,22 @@ export interface CourseUserStats {
     averageInstructorRating: number | null;
 }
 
+export interface CourseComment {
+    evaluationId: number;
+    studentUsername: string;
+    courseScore: number;
+    instructorScore: number;
+    comment: string;
+    evaluationDate: string;
+}
+
 export interface CourseCollectiveStats {
     activeStudentsInCourse: number;
     courseAverageProgressPercentage: number;
     completionRatePercentage: number;
     averageCourseRating: number | null;
     averageInstructorRating: number | null;
+    courseComments: CourseComment[];
     averageGrade: number | null;
     averageWorkGrade: number | null;
     averageFinalExamGrade: number | null;

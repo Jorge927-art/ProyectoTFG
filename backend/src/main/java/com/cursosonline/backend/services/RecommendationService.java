@@ -157,14 +157,14 @@ public class RecommendationService {
                 .map(e -> e.getCourse().getCourse_id())
                 .collect(Collectors.toSet());
 
-        Set<String> userCategoryTokens = interests != null ? normalizeCollection(interests.getCategory())
+        Set<String> userCategoryTokens = interests != null ? normalizeCategoryCollection(interests.getCategory())
                 : Collections.emptySet();
         Set<String> userLevelTokens = interests != null ? normalizeLevelCollection(interests.getCourse_type())
                 : Collections.emptySet();
-        Set<String> userLanguageTokens = interests != null ? normalizeCollection(interests.getLanguage())
+        Set<String> userLanguageTokens = interests != null ? normalizeLanguageCollection(interests.getLanguage())
                 : Collections.emptySet();
         Set<String> userSubtitleTokens = interests != null
-                ? normalizeCollection(interests.getSubtitle_languages())
+                ? normalizeSubtitleCollection(interests.getSubtitle_languages())
                 : Collections.emptySet();
         List<String> rawDurations = interests != null ? interests.getDuration() : Collections.emptyList();
 
@@ -173,7 +173,17 @@ public class RecommendationService {
                 .filter(course -> !excludedIds.contains(course.getCourse_id()))
                 .map(course -> calculateAffinityWithTokens(course, userCategoryTokens, userLevelTokens,
                         userLanguageTokens, userSubtitleTokens, rawDurations, safeEnrollments))
-                .sorted((dto1, dto2) -> Integer.compare(dto2.score(), dto1.score()))
+                .filter(recommendation -> recommendation != null && recommendation.score() > 0)
+                .sorted(Comparator.comparingInt(
+                        (RecommendationDTO recommendation) -> recommendation == null ? Integer.MIN_VALUE
+                                : recommendation.score())
+                        .reversed()
+                        .thenComparing(
+                                recommendation -> recommendation == null ? null : recommendation.rating(),
+                                Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(
+                                recommendation -> recommendation == null ? null : recommendation.id(),
+                                Comparator.nullsLast(Comparator.naturalOrder())))
                 .limit(6)
                 .collect(Collectors.toList());
     }
@@ -205,31 +215,40 @@ public class RecommendationService {
         StringBuilder reason = new StringBuilder();
 
         // Evaluación de Precondiciones emparejando a nivel de Token Semántico local
-        String courseCategoryToken = normalizeSingle(course.getCategory());
+        String courseCategoryToken = normalizeCategoryToken(course.getCategory());
         boolean isCategoryMatch = userCategoryTokens.contains(courseCategoryToken);
 
         String courseLevelToken = normalizeLevelToken(course.getCourseType());
         boolean isLevelMatch = userLevelTokens.contains(ALL_LEVELS_TOKEN) || userLevelTokens.contains(courseLevelToken);
 
-        String courseLanguageToken = normalizeSingle(course.getLanguage());
+        String courseLanguageToken = normalizeLanguageToken(course.getLanguage());
         boolean isLanguageMatch = userLanguageTokens.contains(courseLanguageToken);
 
         // Subtítulos: Comprobamos inclusión lingüística nativa mediante tokens
         // normalizados
         boolean isSubtitleMatch = false;
-        if (course.getSubtitleLanguages() != null && !userSubtitleTokens.isEmpty()) {
-            String cleanSubs = course.getSubtitleLanguages().toLowerCase();
+        if (!userSubtitleTokens.isEmpty()) {
+            String cleanSubs = course.getSubtitleLanguages() == null ? ""
+                    : course.getSubtitleLanguages().toLowerCase();
             isSubtitleMatch = userSubtitleTokens.stream()
                     .anyMatch(token -> {
-                        if (token.equals("spanish") && (cleanSubs.contains("esp") || cleanSubs.contains("spa")))
+                        if (token.equals("con_subtitulos"))
+                            return !cleanSubs.isBlank();
+                        if (token.equals("sin_subtitulos"))
+                            return cleanSubs.isBlank();
+                        if (token.equals("subtitulos_en_ingles"))
+                            token = "ingles";
+                        if (token.equals("subtitulos_en_espanol"))
+                            token = "espanol";
+                        if (token.equals("espanol") && (cleanSubs.contains("esp") || cleanSubs.contains("spa")))
                             return true;
-                        if (token.equals("english") && (cleanSubs.contains("ing") || cleanSubs.contains("eng")))
+                        if (token.equals("ingles") && (cleanSubs.contains("ing") || cleanSubs.contains("eng")))
                             return true;
-                        if (token.equals("portuguese") && (cleanSubs.contains("por") || cleanSubs.contains("pt")))
+                        if (token.equals("portugues") && (cleanSubs.contains("por") || cleanSubs.contains("pt")))
                             return true;
                         if (token.equals("japanese") && (cleanSubs.contains("jap") || cleanSubs.contains("jp")))
                             return true;
-                        if (token.equals("french") && (cleanSubs.contains("fra") || cleanSubs.contains("fre")))
+                        if (token.equals("frances") && (cleanSubs.contains("fra") || cleanSubs.contains("fre")))
                             return true;
                         return cleanSubs.contains(token.toLowerCase());
                     });
@@ -243,7 +262,7 @@ public class RecommendationService {
         if (myEnrollments != null && !myEnrollments.isEmpty() && course.getCategory() != null) {
             for (Enrollment enrollment : myEnrollments) {
                 if (enrollment.getCourse() != null && enrollment.getCourse().getCategory() != null) {
-                    String enrollmentCatToken = normalizeSingle(enrollment.getCourse().getCategory());
+                    String enrollmentCatToken = normalizeCategoryToken(enrollment.getCourse().getCategory());
                     if (courseCategoryToken.equals(enrollmentCatToken)) {
                         int currentProgress = enrollment.getProgress_percentage();
                         if (currentProgress > maxProgressInTemplate) {
@@ -355,7 +374,8 @@ public class RecommendationService {
                 .replace("ó", "o")
                 .replace("ú", "u")
                 .replaceAll("[^a-z0-8_\\s-]", "")
-                .replaceAll("\\s+", "_");
+                .replaceAll("\\s+", "_")
+                .replaceAll("_+", "_");
     }
 
     private String safeCourseTitle(Courses course) {
@@ -367,36 +387,13 @@ public class RecommendationService {
 
         return switch (normalized) {
             case "todos_los_niveles", ALL_LEVELS_TOKEN -> ALL_LEVELS_TOKEN;
-            case "principiante", "basico", "principiante_basico" -> BASIC_LEVEL_TOKEN;
-            case "medio", "intermedio", "medio_intermedio" -> INTERMEDIATE_LEVEL_TOKEN;
-            case "avanzado", "experto", "avanzado_experto" -> ADVANCED_LEVEL_TOKEN;
+            case "principiante", "basico", "principiante_basico", "beginner", "basic" -> BASIC_LEVEL_TOKEN;
+            case "medio", "intermedio", "medio_intermedio", "intermediate" -> INTERMEDIATE_LEVEL_TOKEN;
+            case "avanzado", "experto", "avanzado_experto", "advanced", "expert",
+                    "professional_certificate" ->
+                ADVANCED_LEVEL_TOKEN;
             default -> normalized;
         };
-    }
-
-    /**
-     * Normaliza una colección de entradas a un conjunto de tokens semánticos
-     * únicos.
-     * La normalización incluye:
-     * - Conversión a minúsculas.
-     * - Eliminación de acentos.
-     * - Reemplazo de espacios por guiones bajos.
-     * - Eliminación de caracteres no alfanuméricos.
-     *
-     * @param input La colección de entradas a normalizar.
-     * @return El conjunto de tokens semánticos normalizados.
-     */
-    private static Set<String> normalizeCollection(Object input) {
-        List<String> rawElements = extractStringElements(input);
-        if (rawElements.isEmpty()) {
-            return Collections.emptySet();
-        }
-
-        return rawElements.stream()
-                .map(value -> value == null ? "" : value.trim())
-                .filter(s -> !s.isEmpty())
-                .map(RecommendationService::normalizeSingle)
-                .collect(Collectors.toSet());
     }
 
     private static Set<String> normalizeLevelCollection(Object input) {
@@ -410,6 +407,69 @@ public class RecommendationService {
                 .filter(s -> !s.isEmpty())
                 .map(RecommendationService::normalizeLevelToken)
                 .collect(Collectors.toSet());
+    }
+
+    private static Set<String> normalizeCategoryCollection(Object input) {
+        return normalizeWith(input, RecommendationService::normalizeCategoryToken);
+    }
+
+    private static Set<String> normalizeLanguageCollection(Object input) {
+        return normalizeWith(input, RecommendationService::normalizeLanguageToken);
+    }
+
+    private static Set<String> normalizeSubtitleCollection(Object input) {
+        return normalizeWith(input, RecommendationService::normalizeSubtitleToken);
+    }
+
+    private static Set<String> normalizeWith(Object input, java.util.function.Function<String, String> normalizer) {
+        return extractStringElements(input).stream()
+                .map(value -> value == null ? "" : value.trim())
+                .filter(value -> !value.isEmpty())
+                .map(normalizer)
+                .filter(value -> !value.isEmpty())
+                .collect(Collectors.toSet());
+    }
+
+    private static String normalizeCategoryToken(String input) {
+        String normalized = normalizeSingle(input);
+        return switch (normalized) {
+            case "language_learning", "language_and_linguistics" -> "aprendizaje_de_idiomas";
+            case "business", "business_management", "business_essentials" -> "negocios";
+            case "data_science" -> "ciencia_de_datos";
+            case "information_technology", "it" -> "tecnologia_de_la_informacion";
+            case "computer_science" -> "ciencias_de_la_computacion";
+            case "arts_and_humanities" -> "artes_y_humanidades";
+            case "personal_development" -> "desarrollo_personal";
+            case "health" -> "salud";
+            case "social_sciences" -> "ciencias_sociales";
+            case "physical_science_and_engineering", "physical_sciences_and_engineering" ->
+                "ciencias_fisicas_e_ingenieria";
+            case "mathematics_and_logic" -> "matematicas_y_logica";
+            default -> normalized;
+        };
+    }
+
+    private static String normalizeLanguageToken(String input) {
+        String normalized = normalizeSingle(input);
+        return switch (normalized) {
+            case "espanol", "spanish", "es" -> "espanol";
+            case "ingles", "english", "en" -> "ingles";
+            case "portugues", "portuguese", "portuguese_brazilian", "portuguese_european", "pt" -> "portugues";
+            case "aleman", "german", "de" -> "aleman";
+            case "frances", "french", "fr" -> "frances";
+            default -> normalized;
+        };
+    }
+
+    private static String normalizeSubtitleToken(String input) {
+        String normalized = normalizeSingle(input);
+        return switch (normalized) {
+            case "con_subtitulos", "with_subtitles" -> "con_subtitulos";
+            case "sin_subtitulos", "without_subtitles" -> "sin_subtitulos";
+            case "subtitulos_en_ingles", "english_subtitles" -> "subtitulos_en_ingles";
+            case "subtitulos_en_espanol", "spanish_subtitles" -> "subtitulos_en_espanol";
+            default -> normalizeLanguageToken(input);
+        };
     }
 
     private static List<String> extractStringElements(Object input) {

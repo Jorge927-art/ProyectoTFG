@@ -27,18 +27,32 @@ export const EvaluationPanel = ({ hasEnrolledCourses = true }: EvaluationPanelPr
 
     // Estado local para gestionar el formulario activo de cada tarjeta
     const [formStates, setFormStates] = useState<Record<number, Partial<EvaluationInput>>>({});
+    const [validationErrors, setValidationErrors] = useState<Record<number, string>>({});
 
     const handleRatingChange = (enrollmentId: number, field: keyof EvaluationInput, value: number | string) => {
         setFormStates(prev => ({
             ...prev,
             [enrollmentId]: { ...prev[enrollmentId], [field]: value }
         }));
+        setValidationErrors(prev => {
+            if (!prev[enrollmentId]) return prev;
+            const next = { ...prev };
+            delete next[enrollmentId];
+            return next;
+        });
     };
 
     const handleSend = async (enrollmentId: number, courseId: number) => {
         const state = formStates[enrollmentId];
         // Cortocircuito de seguridad: Evita el envío si el estado no existe o si ambos campos están vacíos
         if (!state || (!state.course_score && !state.instructor_score)) return;
+        if (!state.course_score || !state.instructor_score) {
+            setValidationErrors(prev => ({
+                ...prev,
+                [enrollmentId]: 'Debes evaluar la calidad del curso y el desempeño docente antes de enviar la evaluación.'
+            }));
+            return;
+        }
 
         const submitted = await submitEvaluation({
             course_id: courseId,
@@ -176,6 +190,12 @@ export const EvaluationPanel = ({ hasEnrolledCourses = true }: EvaluationPanelPr
                                     label={isSubmitting ? "Enviando..." : "ENVIAR EVALUACIÓN"}
                                     icon={isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                                 />
+
+                                {validationErrors[item.enrollmentid] && (
+                                    <p className="text-[10px] font-bold text-red-600" role="alert">
+                                        {validationErrors[item.enrollmentid]}
+                                    </p>
+                                )}
 
                             </div>
                         );

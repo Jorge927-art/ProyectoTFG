@@ -176,7 +176,10 @@ public class ProfessorCourseAlertService {
 
     @Transactional(readOnly = true)
     public Optional<ProfessorBellAlertSummaryDTO> getOldestBellAlertSummary(String professorUsername) {
-        List<ProfessorCourseAlert> pending = alertRepository.findBellPendingByProfessorUsername(professorUsername);
+        List<ProfessorCourseAlert> pending = alertRepository.findBellPendingByProfessorUsername(professorUsername)
+                .stream()
+                .filter(alert -> alert.getAlertType() != ProfessorAlertType.MATERIAL_DISPATCH)
+                .toList();
         if (pending.isEmpty()) {
             return Optional.empty();
         }
@@ -279,6 +282,9 @@ public class ProfessorCourseAlertService {
         }
 
         ProfessorCourseAlert oldest = viewedAlerts.get(0);
+        if (oldest.getStatus() != ProfessorAlertStatus.VIEWED) {
+            return;
+        }
         oldest.setStatus(ProfessorAlertStatus.RESOLVED);
         alertRepository.save(oldest);
     }

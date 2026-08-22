@@ -41,8 +41,7 @@ public interface ProfessorCourseAlertRepository extends JpaRepository<ProfessorC
 
         @Query("SELECT a FROM ProfessorCourseAlert a WHERE a.professor.username = :professorUsername "
                         + "AND a.student.user_id = :studentId AND a.course.course_id = :courseId "
-                        + "AND a.status IN (com.cursosonline.backend.entities.ProfessorAlertStatus.PENDING, "
-                        + "com.cursosonline.backend.entities.ProfessorAlertStatus.VIEWED) "
+                        + "AND a.status = com.cursosonline.backend.entities.ProfessorAlertStatus.VIEWED "
                         + "AND a.alertType IN :alertTypes ORDER BY a.createdAt ASC, a.alertId ASC")
         List<ProfessorCourseAlert> findOldestViewedByProfessorStudentCourseAndTypes(
                         @Param("professorUsername") String professorUsername,

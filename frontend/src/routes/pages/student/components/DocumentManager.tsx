@@ -59,6 +59,7 @@ export const DocumentManager = ({
     const [selectedCourseId, setSelectedCourseId] = useState<number | ''>('');
     const [highlightedDocumentId, setHighlightedDocumentId] = useState<number | null>(null);
     const [clearingTray, setClearingTray] = useState(false);
+    const [showClearConfirmation, setShowClearConfirmation] = useState(false);
     const highlightTimeoutRef = useRef<number | null>(null);
     const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
     const autoFocusAppliedRef = useRef(false);
@@ -226,15 +227,13 @@ export const DocumentManager = ({
         }
     };
 
-    const handleClearCurrentTray = async () => {
-        const trayLabel = activeTab === 'RECEIVED' ? 'entrada' : 'salida';
-        const confirmed = window.confirm(
-            `¿Deseas limpiar tu bandeja de ${trayLabel}?\n\nEsta acción oculta los documentos para tu usuario y no borra datos en la base de datos.`
-        );
+    const handleClearCurrentTray = () => {
+        setShowClearConfirmation(true);
+    };
 
-        if (!confirmed) {
-            return;
-        }
+    const confirmClearCurrentTray = async () => {
+        const trayLabel = activeTab === 'RECEIVED' ? 'entrada' : 'salida';
+        setShowClearConfirmation(false);
 
         try {
             setClearingTray(true);
@@ -442,6 +441,11 @@ export const DocumentManager = ({
                         icon={clearingTray ? <Loader2 size={14} className="animate-spin" /> : <FileUp size={14} />}
                         className="text-xs! font-bold! text-slate-600!"
                     />
+                    {activeTab === 'RECEIVED' && (
+                        <span className="ml-2 text-[10px] font-medium text-slate-400">
+                            Se borrarán todos tus documentos. Este borrado es definitivo.
+                        </span>
+                    )}
                 </div>
                 {/* ZONA DE LISTADO CON SCROLL GEOMÉTRICO CONTROLADO [ADR-19] */}
                 <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2 min-h-30">
@@ -525,6 +529,17 @@ export const DocumentManager = ({
                     )}
                 </div>
             </div>
+            {showClearConfirmation && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4" role="presentation">
+                    <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="student-clear-documents-title">
+                        <h2 id="student-clear-documents-title" className="text-base font-bold text-slate-800">Se borrarán todos tus documentos. Este borrado es definitivo.</h2>
+                        <div className="mt-5 flex justify-end gap-2">
+                            <GenericButton type="button" variant="white" label="Cancelar" onClick={() => setShowClearConfirmation(false)} />
+                            <GenericButton type="button" variant="primary" label="Aceptar" onClick={() => void confirmClearCurrentTray()} />
+                        </div>
+                    </div>
+                </div>
+            )}
         </GenericCard>
     );
 };

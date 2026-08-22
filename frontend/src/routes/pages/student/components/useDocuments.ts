@@ -24,12 +24,6 @@ const mergeDirectoryEntries = (groups: UserDirectoryDTO[][]): UserDirectoryDTO[]
     return Array.from(uniqueUsers.values());
 };
 
-// La bandeja "Gestión de Documentos Académicos" solo debe mostrar intercambios generales.
-// Los documentos asociados a asignaturas se consumen en el panel "ASIGNATURAS".
-const filterGeneralDocuments = (documents: DocumentMetadata[]): DocumentMetadata[] => (
-    documents.filter((document) => !document.course || typeof document.course.courseId !== 'number')
-);
-
 export const useDocuments = (successTrigger?: string) => {
     // Listas independientes para evitar el "efecto fantasma" visual [ADR-19]
     const [receivedList, setReceivedList] = useState<DocumentMetadata[]>([]);
@@ -55,7 +49,7 @@ export const useDocuments = (successTrigger?: string) => {
         try {
             if (activeTab === 'RECEIVED') {
                 const data = await getUserDocuments();
-                setReceivedList(filterGeneralDocuments(data));
+                setReceivedList(data);
             } else {
                 const data = await getSentDocuments();
                 setSentList(data);

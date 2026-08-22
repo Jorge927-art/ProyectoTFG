@@ -860,8 +860,46 @@ public class UserServiceTest {
                                 .findFirst()
                                 .orElseThrow()
                                 .message();
-                assertTrue(message.contains("Bandeja de envío y recepción de exámenes: 1 documento(s)"));
-                assertTrue(message.contains("Bandeja de documentos y trabajos: 1 documento(s)"));
+                assertTrue(message.contains("Bandeja de recepción de exámenes: 1 documento(s)"));
+                assertTrue(message.contains("Bandeja de recepción de documentos y trabajos: 1 documento(s)"));
+        }
+
+        @Test
+        void getUserNotifications_DocumentInboxNoDebeMencionarEnvio() {
+                Users student = new Users(451L, "student_contract", "pwd", Role.STUDENT, "contract@example.com",
+                                true,
+                                new java.util.ArrayList<>());
+                Users sender = new Users(452L, "profesor_uno", "pwd", Role.PROFESSOR, "prof@example.com", true,
+                                new java.util.ArrayList<>());
+
+                DocumentMetadata exam = new DocumentMetadata();
+                exam.setDocumentid(1901L);
+                exam.setSender(sender);
+                exam.setReceiver(student);
+                exam.setEvaluation_type("EXAMEN");
+
+                DocumentMetadata work = new DocumentMetadata();
+                work.setDocumentid(1902L);
+                work.setSender(sender);
+                work.setReceiver(student);
+                work.setEvaluation_type("TRABAJO");
+
+                when(userRepository.findByUsername("student_contract")).thenReturn(Optional.of(student));
+                when(documentMetadataRepository.findUnreadReceivedDocumentsByUsername("student_contract"))
+                                .thenReturn(List.of(exam, work));
+                when(userSystemNotificationRepository.findUnreadByUsername("student_contract")).thenReturn(List.of());
+                when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class)))
+                                .thenThrow(new RuntimeException("schema-down"));
+
+                String message = userService.getUserNotifications("student_contract").stream()
+                                .filter(alert -> "DOCUMENT_INBOX".equals(alert.type()))
+                                .findFirst()
+                                .orElseThrow()
+                                .message();
+
+                assertFalse(message.toLowerCase(java.util.Locale.ROOT).contains("envio"));
+                assertFalse(message.toLowerCase(java.util.Locale.ROOT).contains("envío"));
+                assertTrue(message.contains("recepción"));
         }
 
         @Test
@@ -894,7 +932,7 @@ public class UserServiceTest {
                                 .orElseThrow()
                                 .message();
 
-                assertTrue(message.contains("Bandeja de envío y recepción de exámenes: 1 documento(s)"));
+                assertTrue(message.contains("Bandeja de recepción de exámenes: 1 documento(s)"));
                 assertTrue(message.contains("Remitente: Luis"));
         }
 

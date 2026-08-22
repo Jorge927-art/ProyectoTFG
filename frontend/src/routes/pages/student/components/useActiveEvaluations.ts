@@ -57,8 +57,13 @@ export const useActiveEvaluations = () => {
       // Mantiene el feedback inmediato aunque la respuesta de lectura llegue con retraso [ADR-35]
       setPendingList(prev => (Array.isArray(prev) ? prev : []).filter(item => item.course.course_id !== data.course_id));
       return true;
-    } catch  {
-      setEvaluationError('No se pudo procesar la evaluación. Inténtalo de nuevo.');
+    } catch (error: unknown) {
+      const responseError = (error as {
+        response?: { data?: { error?: unknown } };
+      }).response?.data?.error;
+      setEvaluationError(typeof responseError === 'string'
+        ? responseError
+        : 'No se pudo procesar la evaluación. Inténtalo de nuevo.');
       return false;
     } finally {
       setIsSubmitting(false);

@@ -220,6 +220,7 @@ describe('ProfessorDocumentManager', () => {
         });
 
         fireEvent.click(screen.getByRole('button', { name: 'Limpiar bandeja de entrada' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Aceptar' }));
 
         await waitFor(() => {
             expect(documentService.hideAllReceivedGeneralDocuments).toHaveBeenCalledTimes(1);

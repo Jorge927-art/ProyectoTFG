@@ -36,16 +36,6 @@ export const ProfessorDocumentManager = ({
     focusDocumentId = null,
     className = '',
 }: ProfessorDocumentManagerProps) => {
-    const filterGeneralDocuments = (documents: DocumentMetadata[]) => (
-        documents.filter((document) => {
-            if (document.evaluation_type === 'EXAMEN') {
-                return false;
-            }
-
-            return !document.course || typeof document.course.courseId !== 'number';
-        })
-    );
-
     const [activeTab, setActiveTab] = useState<'RECEIVED' | 'SENT'>('RECEIVED');
     const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
     const [selectedReceiverId, setSelectedReceiverId] = useState<number | ''>('');
@@ -60,6 +50,7 @@ export const ProfessorDocumentManager = ({
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
     const [highlightedDocumentId, setHighlightedDocumentId] = useState<number | null>(null);
     const [clearingReceivedTray, setClearingReceivedTray] = useState(false);
+    const [showClearConfirmation, setShowClearConfirmation] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -128,7 +119,7 @@ export const ProfessorDocumentManager = ({
             setDocumentError('');
             try {
                 const docs = activeTab === 'RECEIVED'
-                    ? filterGeneralDocuments(await getUserDocuments())
+                    ? await getUserDocuments()
                     : await getSentDocumentsByCourse(selectedCourseId as number);
 
                 if (!cancelled) {
@@ -288,21 +279,19 @@ export const ProfessorDocumentManager = ({
         }
     };
 
-    const handleClearReceivedTray = async () => {
-        const confirmed = window.confirm(
-            '¿Deseas limpiar la bandeja de entrada?\n\nEsta acción oculta los documentos para tu usuario y no elimina datos en base de datos.'
-        );
+    const handleClearReceivedTray = () => {
+        setShowClearConfirmation(true);
+    };
 
-        if (!confirmed) {
-            return;
-        }
+    const confirmClearReceivedTray = async () => {
+        setShowClearConfirmation(false);
 
         try {
             setClearingReceivedTray(true);
             setDocumentError('');
             await hideAllReceivedGeneralDocuments();
             emitNotificationsRefresh();
-            const docs = filterGeneralDocuments(await getUserDocuments());
+            const docs = await getUserDocuments();
             setDocumentList(docs);
             setHighlightedDocumentId(null);
         } catch {
@@ -387,6 +376,9 @@ export const ProfessorDocumentManager = ({
                         label={clearingReceivedTray ? 'Limpiando...' : 'Limpiar bandeja de entrada'}
                         className="text-xs! font-bold! text-slate-600!"
                     />
+                    <span className="ml-2 text-[10px] font-medium text-slate-400">
+                        Se borrarán todos tus documentos. Este borrado es definitivo.
+                    </span>
                 </div>
             )}
 
@@ -547,6 +539,17 @@ export const ProfessorDocumentManager = ({
                     )}
                 </div>
             </div>
+            {showClearConfirmation && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4" role="presentation">
+                    <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="professor-clear-documents-title">
+                        <h2 id="professor-clear-documents-title" className="text-base font-bold text-slate-800">Se borrarán todos tus documentos. Este borrado es definitivo.</h2>
+                        <div className="mt-5 flex justify-end gap-2">
+                            <GenericButton type="button" variant="white" label="Cancelar" onClick={() => setShowClearConfirmation(false)} />
+                            <GenericButton type="button" variant="primary" label="Aceptar" onClick={() => void confirmClearReceivedTray()} />
+                        </div>
+                    </div>
+                </div>
+            )}
         </GenericCard>
     );
 };

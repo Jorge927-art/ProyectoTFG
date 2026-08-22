@@ -307,6 +307,46 @@ class AdminCourseInsightServiceTest {
     }
 
     @Test
+    @DisplayName("getCourseCollectiveStats debe devolver comentarios del curso del más reciente al más antiguo")
+    void getCourseCollectiveStats_DebeIncluirComentariosOrdenados() {
+        when(coursesRepository.existsById(300L)).thenReturn(true);
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(300L)).thenReturn(List.of());
+        when(enrollmentRepository.findAllByCourseId(300L)).thenReturn(List.of());
+        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(300L)).thenReturn(List.of());
+        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(List.of(300L))).thenReturn(4.5);
+        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(List.of(300L))).thenReturn(4.5);
+
+        AcademicEvaluation newest = evaluation(2L, "Andres", 5, "Comentario reciente",
+                java.time.LocalDateTime.of(2026, 8, 22, 10, 0));
+        AcademicEvaluation oldest = evaluation(1L, "Maria", 4, "Comentario antiguo",
+                java.time.LocalDateTime.of(2026, 8, 20, 10, 0));
+        AcademicEvaluation blank = evaluation(3L, "Pedro", 3, "   ", java.time.LocalDateTime.of(2026, 8, 23, 10, 0));
+        when(academicEvaluationRepository.findCourseCommentsOrderByEvaluationDateDesc(300L))
+                .thenReturn(List.of(newest, blank, oldest));
+
+        AdminCourseCollectiveStatsDTO stats = adminCourseInsightService.getCourseCollectiveStats(300L);
+
+        assertEquals(2, stats.courseComments().size());
+        assertEquals("Comentario reciente", stats.courseComments().get(0).comment());
+        assertEquals("Comentario antiguo", stats.courseComments().get(1).comment());
+        assertEquals("Andres", stats.courseComments().get(0).studentUsername());
+    }
+
+    private AcademicEvaluation evaluation(Long id, String username, int score, String comment,
+            java.time.LocalDateTime date) {
+        Users user = new Users();
+        user.setUsername(username);
+        AcademicEvaluation evaluation = new AcademicEvaluation();
+        evaluation.setEvaluationid(id);
+        evaluation.setUser(user);
+        evaluation.setCourse_score(score);
+        evaluation.setInstructor_score(4);
+        evaluation.setCourseComment(comment);
+        evaluation.setEvaluation_date(date);
+        return evaluation;
+    }
+
+    @Test
     @DisplayName("getCourseCollectiveStats debe incluir el alumno activo en sus estadísticas individuales")
     void getCourseCollectiveStats_DebeIncluirEstadisticasPorAlumno() {
         when(coursesRepository.existsById(300L)).thenReturn(true);

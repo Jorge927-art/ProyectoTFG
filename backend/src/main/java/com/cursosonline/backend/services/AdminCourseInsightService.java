@@ -183,6 +183,21 @@ public class AdminCourseInsightService {
 
         CourseCollectiveMetrics metrics = resolveCourseCollectiveMetrics(courseId);
         List<AdminCourseStudentStatsDTO> studentStatistics = resolveStudentStatistics(courseId);
+        List<AdminCourseCollectiveStatsDTO.CourseCommentDTO> courseComments = academicEvaluationRepository
+                .findCourseCommentsOrderByEvaluationDateDesc(courseId)
+                .stream()
+                .filter(evaluation -> evaluation.getCourseComment() != null
+                        && !evaluation.getCourseComment().isBlank())
+                .map(evaluation -> new AdminCourseCollectiveStatsDTO.CourseCommentDTO(
+                        evaluation.getEvaluationid(),
+                        evaluation.getUser() != null && evaluation.getUser().getUsername() != null
+                                ? evaluation.getUser().getUsername()
+                                : "Alumno anonimizado",
+                        evaluation.getCourse_score(),
+                        evaluation.getInstructor_score(),
+                        evaluation.getCourseComment().trim(),
+                        evaluation.getEvaluation_date()))
+                .toList();
         int currentYear = Year.now().getValue();
         List<Integer> historicalYears = List.of(currentYear - 1, currentYear - 2);
         Map<Integer, AdminCourseStatsHistory> historyByYear = new HashMap<>();
@@ -217,6 +232,7 @@ public class AdminCourseInsightService {
                 metrics.completionRatePercentage(),
                 metrics.averageCourseRating(),
                 metrics.averageInstructorRating(),
+                courseComments,
                 metrics.averageGrade(),
                 metrics.averageWorkGrade(),
                 metrics.averageFinalExamGrade(), comparisons, studentStatistics);

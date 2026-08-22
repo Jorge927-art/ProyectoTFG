@@ -46,6 +46,9 @@ describe('CourseInsightPanel', () => {
         completionRatePercentage: 100,
         averageCourseRating: 4.2,
         averageInstructorRating: 4.5,
+        courseComments: [
+            { evaluationId: 1, studentUsername: 'student1', courseScore: 5, instructorScore: 4, comment: 'Curso muy claro.', evaluationDate: '2026-08-22T10:00:00' },
+        ],
         averageGrade: 8.5,
         averageWorkGrade: 7.8,
         averageFinalExamGrade: 9.0,

@@ -128,6 +128,18 @@ public class AcademicEvaluationController {
                                         ? payload.get("instructor_comment").toString()
                                         : null;
 
+                        if (courseScore > 5 || instructorScore > 5) {
+                                return ResponseEntity.badRequest()
+                                                .body(Map.of("error",
+                                                                "Las puntuaciones deben estar confinadas entre 1 y 5 estrellas."));
+                        }
+
+                        if (courseScore < 1 || instructorScore < 1) {
+                                return ResponseEntity.badRequest()
+                                                .body(Map.of("error",
+                                                                "Debes evaluar la calidad del curso y el desempeño docente antes de enviar la evaluación."));
+                        }
+
                         // Rango de estrellas aceptado (1 a 5)
                         if (courseScore < 1 || courseScore > 5 || instructorScore < 1 || instructorScore > 5) {
                                 return ResponseEntity.badRequest()

@@ -272,6 +272,21 @@ class ProfessorCourseAlertServiceTest {
 
                 when(alertRepository.findBellPendingByProfessorUsername("profesor")).thenReturn(List.of());
                 assertTrue(service.getOldestBellAlertSummary("profesor").isEmpty());
+
+                ProfessorCourseAlert dispatchOnly = new ProfessorCourseAlert();
+                dispatchOnly.setAlertId(61L);
+                dispatchOnly.setStudent(student);
+                dispatchOnly.setCourse(course);
+                dispatchOnly.setAlertType(ProfessorAlertType.MATERIAL_DISPATCH);
+                when(alertRepository.findBellPendingByProfessorUsername("profesor")).thenReturn(List.of(dispatchOnly));
+                assertTrue(service.getOldestBellAlertSummary("profesor").isEmpty());
+
+                when(alertRepository.findBellPendingByProfessorUsername("profesor"))
+                                .thenReturn(List.of(dispatchOnly, alert));
+                var filteredSummary = service.getOldestBellAlertSummary("profesor");
+                assertTrue(filteredSummary.isPresent());
+                assertEquals("Aviso docente: examen final", filteredSummary.get().title());
+                assertEquals(0L, filteredSummary.get().remainingCountAfterThis());
         }
 
         @Test
@@ -308,7 +323,7 @@ class ProfessorCourseAlertServiceTest {
         }
 
         @Test
-        void resolvesPendingAlertWhenProfessorDeliversWithoutOpeningBellFirst() {
+        void doesNotResolvePendingAlertWhenProfessorDeliversWithoutOpeningBellFirst() {
                 ProfessorCourseAlert pending = new ProfessorCourseAlert();
                 pending.setStatus(ProfessorAlertStatus.PENDING);
                 when(alertRepository.findOldestViewedByProfessorStudentCourseAndTypes(
@@ -317,7 +332,7 @@ class ProfessorCourseAlertServiceTest {
 
                 service.resolveOldestViewedAlertAfterSuccessfulDelivery("profesor", 20L, 30L, false);
 
-                assertEquals(ProfessorAlertStatus.RESOLVED, pending.getStatus());
-                verify(alertRepository).save(pending);
+                assertEquals(ProfessorAlertStatus.PENDING, pending.getStatus());
+                verify(alertRepository, never()).save(any());
         }
 }

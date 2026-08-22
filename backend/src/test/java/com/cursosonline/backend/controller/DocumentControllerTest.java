@@ -729,8 +729,8 @@ public class DocumentControllerTest {
         }
 
         @Test
-        @DisplayName("Debe procesar envío masivo del profesor sin violar receiver_id al enviar a toda la clase")
-        void debeProcesarEnvioMasivoProfesorConReceiverIdCero() {
+        @DisplayName("Debe rechazar el envío masivo del profesor")
+        void debeRechazarEnvioMasivoProfesorConReceiverIdCero() {
                 MockMultipartFile validFile = new MockMultipartFile(
                                 "file",
                                 "guia_general.pdf",
@@ -773,14 +773,11 @@ public class DocumentControllerTest {
                                 0L,
                                 "DOCUMENTO");
 
-                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
                 Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
                 assertNotNull(bodyMap);
-                assertEquals("Documento transmitido con éxito de forma masiva a toda la clase", bodyMap.get("message"));
-                assertEquals(2, bodyMap.get("totalStudents"));
-
-                // 2 alumnos => 4 registros (SENT + RECEIVED por alumno)
-                Mockito.verify(documentMetadataRepository, Mockito.times(4)).save(any(DocumentMetadata.class));
+                assertEquals("Debes seleccionar un alumno destinatario concreto.", bodyMap.get("error"));
+                Mockito.verify(documentMetadataRepository, Mockito.never()).save(any(DocumentMetadata.class));
         }
 
         @Test
@@ -878,8 +875,8 @@ public class DocumentControllerTest {
         }
 
         @Test
-        @DisplayName("Debe enrutar DOCUMENTO masivo a Gestion de Documentos Academicos (RECEIVED con course nulo)")
-        void debeEnrutarDocumentoMasivoABandejaGeneralAlumno() {
+        @DisplayName("Debe rechazar DOCUMENTO masivo del profesor")
+        void debeRechazarDocumentoMasivoDelProfesor() {
                 MockMultipartFile validFile = new MockMultipartFile(
                                 "file",
                                 "guia_general.pdf",
@@ -930,29 +927,10 @@ public class DocumentControllerTest {
                                 0L,
                                 "DOCUMENTO");
 
-                assertEquals(HttpStatus.OK, response.getStatusCode());
-
-                ArgumentCaptor<DocumentMetadata> metadataCaptor = ArgumentCaptor.forClass(DocumentMetadata.class);
-                Mockito.verify(documentMetadataRepository, Mockito.times(4)).save(metadataCaptor.capture());
-
-                List<DocumentMetadata> saved = metadataCaptor.getAllValues();
-                List<DocumentMetadata> sentDocs = saved.stream()
-                                .filter(d -> d.getFolder_type() == FolderType.SENT)
-                                .toList();
-                List<DocumentMetadata> receivedDocs = saved.stream()
-                                .filter(d -> d.getFolder_type() == FolderType.RECEIVED)
-                                .toList();
-
-                assertEquals(2, sentDocs.size());
-                assertEquals(2, receivedDocs.size());
-
-                assertTrue(sentDocs.stream()
-                                .allMatch(d -> d.getCourse() != null && d.getCourse().getCourse_id() == 2958L),
-                                "Los registros SENT deben conservar el curso para trazabilidad del emisor.");
-
-                assertTrue(receivedDocs.stream().allMatch(d -> d.getCourse() == null),
-                                "Los registros RECEIVED de tipo DOCUMENTO deben caer en la bandeja general (sin curso).");
-                assertTrue(receivedDocs.stream().allMatch(d -> "DOCUMENTO".equals(d.getEvaluation_type())));
+                assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+                assertEquals("Debes seleccionar un alumno destinatario concreto.",
+                                ((Map<?, ?>) response.getBody()).get("error"));
+                Mockito.verify(documentMetadataRepository, never()).save(any(DocumentMetadata.class));
         }
 
         @Test
@@ -1183,6 +1161,9 @@ public class DocumentControllerTest {
                                 bodyMap.get("message"));
                 assertEquals(2, bodyMap.get("totalStudents"));
                 Mockito.verify(documentMetadataRepository, Mockito.times(4)).save(any(DocumentMetadata.class));
+                Mockito.verify(documentMetadataRepository, Mockito.atLeastOnce())
+                                .save(Mockito.argThat(document -> document.getFolder_type() == FolderType.RECEIVED
+                                                && document.getCourse() == null));
         }
 
         @Test
@@ -1221,12 +1202,11 @@ public class DocumentControllerTest {
                                 eq(FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS)))
                                 .thenReturn("documents/uuid_case.pdf");
                 Mockito.when(coursesRepository.findById(2958L)).thenReturn(Optional.of(course));
-                Mockito.when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(2958L))
-                                .thenReturn(List.of(enrollment));
+                Mockito.when(userRepository.findById(31L)).thenReturn(Optional.of(studentA));
 
                 ResponseEntity<?> response = documentController.professorUploadDocument(authentication, validFile,
                                 2958L,
-                                0L,
+                                31L,
                                 "DOCUMENTO");
 
                 assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -1604,8 +1584,8 @@ public class DocumentControllerTest {
         }
 
         @Test
-        @DisplayName("Debe bloquear envío masivo del profesor cuando no hay alumnos matriculados")
-        void debeBloquearEnvioMasivoProfesorSinAlumnos() {
+        @DisplayName("Debe rechazar el envío del profesor sin destinatario individual")
+        void debeRechazarEnvioProfesorSinDestinatarioIndividual() {
                 MockMultipartFile validFile = new MockMultipartFile(
                                 "file",
                                 "guia.pdf",
@@ -1623,18 +1603,13 @@ public class DocumentControllerTest {
                 Courses course = new Courses();
                 course.setCourse_id(77L);
                 Mockito.when(coursesRepository.findById(77L)).thenReturn(Optional.of(course));
-                Mockito.when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(77L)).thenReturn(List.of());
-                Mockito.when(fileStorageService.storeDocumentFile(any(),
-                                eq(FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS)))
-                                .thenReturn("documents/uuid_guide.pdf");
-
                 ResponseEntity<?> response = documentController.professorUploadDocument(authentication, validFile, 77L,
                                 0L,
                                 "DOCUMENTO");
 
                 assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
                 Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
-                assertTrue(bodyMap.get("error").toString().contains("no hay alumnos matriculados"));
+                assertEquals("Debes seleccionar un alumno destinatario concreto.", bodyMap.get("error"));
                 Mockito.verify(documentMetadataRepository, never()).save(any(DocumentMetadata.class));
         }
 

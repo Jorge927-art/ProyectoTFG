@@ -176,6 +176,7 @@ export const CourseInsightPanel = () => {
                     />
 
                     <HistoricalMetric label="Valoración media del curso" icon={<Star size={14} className="text-amber-500 fill-amber-400" />} current={collectiveStats.averageCourseRating} rows={collectiveStats.yearlyComparisons} selector={(row) => row.averageCourseRating} formatRating />
+                    <CourseComments comments={collectiveStats.courseComments} />
                     <HistoricalMetric label="Valoración media del profesor" icon={<Star size={14} className="text-amber-500 fill-amber-400" />} current={collectiveStats.averageInstructorRating} rows={collectiveStats.yearlyComparisons} selector={(row) => row.averageInstructorRating} formatRating />
                     <HistoricalMetric label="Índice de aprobados" icon={<CheckCircle2 size={14} className="text-emerald-600" />} current={collectiveStats.completionRatePercentage} rows={collectiveStats.yearlyComparisons} selector={(row) => row.approvalIndexPercentage} suffix="%" />
                     <HistoricalMetric label="Nota media trabajos" current={collectiveStats.averageWorkGrade} rows={collectiveStats.yearlyComparisons} selector={(row) => row.averageWorkGrade} />
@@ -337,3 +338,30 @@ const HistoricalMetric = ({ label, icon, current, rows, selector, suffix = '', f
 };
 
 const formatStudentGrade = (grade: number | null) => grade === null ? 'Sin datos' : `${grade.toFixed(1)} / 10`;
+
+const CourseComments = ({ comments }: { comments: CourseCollectiveStats['courseComments'] }) => (
+    <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5">
+        <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-slate-700">Comentarios de los alumnos</p>
+            <span className="text-[10px] font-bold text-slate-400">{comments.length}</span>
+        </div>
+        {comments.length === 0 ? (
+            <p className="mt-1.5 text-[10px] text-slate-400 italic">Todavía no hay comentarios.</p>
+        ) : (
+            <div className="mt-1.5 max-h-24 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+                {comments.map((comment) => (
+                    <article key={comment.evaluationId} className="rounded border border-slate-100 bg-white p-2 text-[10px]">
+                        <div className="flex items-center justify-between gap-2 text-slate-400">
+                            <span className="font-bold text-slate-600 truncate">{comment.studentUsername}</span>
+                            <span className="shrink-0">{new Date(comment.evaluationDate).toLocaleDateString('es-ES')}</span>
+                        </div>
+                        <p className="mt-1 text-slate-600 whitespace-pre-wrap wrap-break-word">{comment.comment}</p>
+                        <p className="mt-1 font-semibold text-amber-600">
+                            Valoración curso: {comment.courseScore} / 5 · Valoración docente: {comment.instructorScore} / 5
+                        </p>
+                    </article>
+                ))}
+            </div>
+        )}
+    </div>
+);

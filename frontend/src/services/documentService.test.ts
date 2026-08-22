@@ -195,18 +195,18 @@ describe('documentService - Suite de Pruebas Unitarias de Alta Fidelidad', () =>
         expect(config).toBeUndefined();
     });
 
-    it('debe procesar correctamente la subida polimórfica del rol docente', async () => {
+    it('debe procesar correctamente la subida individual del rol docente', async () => {
         const mockResponse: UploadDocumentResponse = { message: 'Ok', filename: 'p.pdf', originalname: 'p.pdf' };
         mockedApi.post.mockResolvedValueOnce({ data: mockResponse });
         const dummyFile = new File([new Uint8Array()], 'guia.pdf', { type: 'application/pdf' });
 
-        await uploadProfessorDocument(dummyFile, 202, 0);
+        await uploadProfessorDocument(dummyFile, 202, 42);
 
         // CORRECCIÓN QUIRÚRGICA: Solución al fallo de la línea 160 de tu captura de pantalla utilizando el índice [0]
         const [url, formData] = mockedApi.post.mock.calls[0] as [string, FormData];
         expect(url).toBe('/api/v1/documents/professor-upload');
         expect(formData.get('courseId')).toBe('202');
-        expect(formData.get('receiverId')).toBe('0');
+        expect(formData.get('receiverId')).toBe('42');
         expect(formData.get('deliveryType')).toBe('DOCUMENTO');
     });
 

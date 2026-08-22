@@ -133,6 +133,27 @@ describe('useActiveEvaluations - Suite de Pruebas Unitarias del Hook de Evaluaci
         expect(result.current.pendingList).toHaveLength(2);
     });
 
+    it('Debe propagar el mensaje funcional del backend cuando falta una de las dos valoraciones', async () => {
+        vi.mocked(getPendingEvaluations).mockResolvedValue(mockPendingData);
+        vi.mocked(submitAcademicEvaluation).mockRejectedValue({
+            response: {
+                data: {
+                    error: 'Debes evaluar la calidad del curso y el desempeño docente antes de enviar la evaluación.'
+                }
+            }
+        });
+
+        const { result } = renderHook(() => useActiveEvaluations());
+        await waitFor(() => expect(result.current.loadingPending).toBe(false));
+
+        await act(async () => {
+            await result.current.submitEvaluation(sampleInput);
+        });
+
+        expect(result.current.evaluationError)
+            .toBe('Debes evaluar la calidad del curso y el desempeño docente antes de enviar la evaluación.');
+    });
+
     /* =========================================================================
        5. CONTROL DEL DISPARADOR DE REFRESCO OPERATIVO (REFRESH)
        ========================================================================= */

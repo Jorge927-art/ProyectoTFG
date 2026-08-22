@@ -1,6 +1,7 @@
 package com.cursosonline.backend.dto;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 /**
  * DTO con métricas colectivas del curso para el panel estadístico de admin.
@@ -27,6 +28,7 @@ public record AdminCourseCollectiveStatsDTO(
                 int completionRatePercentage,
                 Double averageCourseRating,
                 Double averageInstructorRating,
+                List<CourseCommentDTO> courseComments,
                 Double averageGrade,
                 Double averageWorkGrade,
                 Double averageFinalExamGrade,
@@ -44,8 +46,17 @@ public record AdminCourseCollectiveStatsDTO(
                         Double averageFinalExamGrade,
                         List<AdminCourseYearComparisonDTO> yearlyComparisons) {
                 this(activeStudentsInCourse, courseAverageProgressPercentage, completionRatePercentage,
-                                averageCourseRating, averageInstructorRating, averageGrade, averageWorkGrade,
+                                averageCourseRating, averageInstructorRating, List.of(), averageGrade, averageWorkGrade,
                                 averageFinalExamGrade, yearlyComparisons, List.of());
+        }
+
+        public record CourseCommentDTO(
+                        Long evaluationId,
+                        String studentUsername,
+                        Integer courseScore,
+                        Integer instructorScore,
+                        String comment,
+                        LocalDateTime evaluationDate) {
         }
 
         public record AdminCourseYearComparisonDTO(

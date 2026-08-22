@@ -99,6 +99,7 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
         render(<DocumentManager />);
 
         fireEvent.click(screen.getByRole('button', { name: 'Limpiar bandeja de entrada' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Aceptar' }));
 
         await waitFor(() => {
             expect(mockHideAllReceivedGeneralDocuments).toHaveBeenCalledTimes(1);
@@ -143,6 +144,7 @@ describe('DocumentManager Component [TFG Test Suite]', () => {
         render(<DocumentManager />);
 
         fireEvent.click(screen.getByRole('button', { name: 'Limpiar bandeja de salida' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Aceptar' }));
 
         await waitFor(() => {
             expect(mockHideAllSentGeneralDocuments).toHaveBeenCalledTimes(1);

@@ -375,7 +375,6 @@ public class UserService {
         Interest interest = interestRepository.findById(user.getUser_id())
                 .orElseGet(() -> {
                     Interest newInterest = new Interest();
-                    newInterest.setId(user.getUser_id()); // Sincronización manual requerida por @MapsId
                     newInterest.setUser(user);
                     return interestRepository.save(newInterest);
                 });
@@ -724,11 +723,11 @@ public class UserService {
                     unreadDocuments.size());
         }
         if (examCount > 0) {
-            trayMessages.add(buildTrayMessage("Bandeja de envío y recepción de exámenes",
+            trayMessages.add(buildTrayMessage("Bandeja de recepción de exámenes",
                     unreadDocuments, receiver, true, examCount));
         }
         if (documentOrWorkCount > 0) {
-            trayMessages.add(buildTrayMessage("Bandeja de documentos y trabajos",
+            trayMessages.add(buildTrayMessage("Bandeja de recepción de documentos y trabajos",
                     unreadDocuments, receiver, false, documentOrWorkCount));
         }
 

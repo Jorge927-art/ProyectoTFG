@@ -34,6 +34,7 @@ const StudentDashboard = () => {
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
     const [successMessage, setSuccessMessage] = useState<string>('');
+    const [recommendationsRefreshKey, setRecommendationsRefreshKey] = useState(0);
     const documentsPanelRef = useRef<HTMLDivElement | null>(null);
     const focusParams = new URLSearchParams(location.search);
     const shouldFocusDocuments = focusParams.get('focus') === 'documents';
@@ -102,7 +103,8 @@ const StudentDashboard = () => {
      * HOOK DE RECOMENDACIONES ALGORÍTMICAS:
      * Consume dinámicamente el motor de filtrado basado en contenido de Spring Boot [ADR-30].
      */
-    const { recommendations, loadingRecommendations, recommendationsError } = useSmartRecommendations(successMessage);
+    const recommendationsRefreshTrigger = `${recommendationsRefreshKey}:${successMessage}`;
+    const { recommendations, loadingRecommendations, recommendationsError } = useSmartRecommendations(recommendationsRefreshTrigger);
 
     /**
      * MANEJADOR DE ÉXITO EN MATRÍCULA:
@@ -128,6 +130,7 @@ const StudentDashboard = () => {
     }) => {
         console.log("Preferencias del estudiante capturadas para el TFG:", preferences);
         setIsModalOpen(false);
+        setRecommendationsRefreshKey((currentKey) => currentKey + 1);
         setSuccessMessage("¡Intereses guardados y actualizados correctamente!");
         setTimeout(() => setSuccessMessage(''), 5000);
     };

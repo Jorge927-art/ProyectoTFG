@@ -111,6 +111,97 @@ class RecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("Debe priorizar un curso de idiomas en inglés cuando el alumno elige sus etiquetas en español")
+    void getRecommendations_ShouldMatchLocalizedCategoryAndLanguageAliases() {
+        Courses languageLearningCourse = new Courses();
+        languageLearningCourse.setCourse_id(105L);
+        languageLearningCourse.setTitle("English Communication Skills");
+        languageLearningCourse.setCategory("Language Learning");
+        languageLearningCourse.setLanguage("English");
+        languageLearningCourse.setCourseType("Principiante");
+
+        Courses businessCourse = new Courses();
+        businessCourse.setCourse_id(106L);
+        businessCourse.setTitle("Administración de empresas");
+        businessCourse.setCategory("Business");
+        businessCourse.setLanguage("Spanish");
+        businessCourse.setCourseType("Principiante");
+
+        userInterests.setCategory(new ArrayList<>(List.of("Aprendizaje de Idiomas")));
+        userInterests.setLanguage(new ArrayList<>(List.of("Inglés")));
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(businessCourse, languageLearningCourse));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertEquals(105L, results.get(0).id());
+        assertEquals(45, results.get(0).score());
+    }
+
+    @Test
+    @DisplayName("Debe valorar el certificado portugués como avanzado y priorizarlo frente a un curso sin datos")
+    void getRecommendations_ShouldPrioritizePortugueseProfessionalCertificate() {
+        Courses portugueseCertificate = new Courses();
+        portugueseCertificate.setCourse_id(108L);
+        portugueseCertificate.setTitle("Google Data Analytics (PT) Professional Certificate");
+        portugueseCertificate.setCourseType("Professional Certificate");
+        portugueseCertificate.setLanguage("Portuguese (Brazilian)");
+
+        Courses incompleteCourse = new Courses();
+        incompleteCourse.setCourse_id(109L);
+        incompleteCourse.setTitle("Data Analysis Using NumPy & Pandas");
+
+        userInterests.setCategory(new ArrayList<>());
+        userInterests.setCourse_type(new ArrayList<>(List.of("Avanzado / Experto")));
+        userInterests.setLanguage(new ArrayList<>(List.of("Portugués")));
+        userInterests.setSubtitle_languages(new ArrayList<>());
+        userInterests.setDuration(new ArrayList<>());
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(incompleteCourse, portugueseCertificate));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertEquals(1, results.size());
+        assertEquals(108L, results.get(0).id());
+        assertEquals(35, results.get(0).score());
+    }
+
+    @Test
+    @DisplayName("Debe aplicar las cinco preferencias emitidas por el modal sobre datos legacy del catálogo")
+    void getRecommendations_ShouldApplyAllModalPreferenceDimensions() {
+        Courses matchingCourse = new Courses();
+        matchingCourse.setCourse_id(107L);
+        matchingCourse.setTitle("English Intermediate Course");
+        matchingCourse.setCategory("Language Learning");
+        matchingCourse.setCourseType("Intermediate");
+        matchingCourse.setLanguage("English");
+        matchingCourse.setSubtitleLanguages("Subtitles: English");
+        matchingCourse.setDuration(25.0f);
+
+        userInterests.setCategory(new ArrayList<>(List.of("Aprendizaje de Idiomas")));
+        userInterests.setCourse_type(new ArrayList<>(List.of("Medio / Intermedio")));
+        userInterests.setDuration(new ArrayList<>(List.of("Medio (1 - 6 semanas)")));
+        userInterests.setLanguage(new ArrayList<>(List.of("Inglés")));
+        userInterests.setSubtitle_languages(new ArrayList<>(List.of("Subtítulos en Inglés")));
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(List.of(matchingCourse));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertEquals(107L, results.get(0).id());
+        assertEquals(80, results.get(0).score());
+    }
+
+    @Test
     @DisplayName("Debe excluir estrictamente cursos donde el alumno ya está matriculado [ADR-32]")
     void getRecommendations_ExcludesEnrolled() {
         // Arrange
@@ -199,10 +290,8 @@ class RecommendationServiceTest {
                 "FALLO ALGORÍTMICO: El motor no priorizó el curso con el peso de coincidencia más alto.");
         assertEquals("Master en Machine Learning e IA", results.get(0).title());
 
-        // El curso de Marketing (0 pts) queda relegado al final de la cola
-        int ultimoIndice = results.size() - 1;
-        assertEquals(102L, results.get(ultimoIndice).id(),
-                "El curso sin ninguna coincidencia temática debe quedar al final.");
+        // El curso de Marketing (0 pts) no se publica como recomendación
+        assertTrue(results.stream().noneMatch(result -> result.id().equals(102L)));
 
         verify(coursesRepository, times(1)).findAll();
     }
@@ -236,8 +325,7 @@ class RecommendationServiceTest {
 
         List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
 
-        assertFalse(results.isEmpty());
-        assertEquals(101L, results.get(0).id());
+        assertTrue(results.isEmpty());
     }
 
     @Test
@@ -395,7 +483,7 @@ class RecommendationServiceTest {
     }
 
     @Test
-    @DisplayName("Debe devolver puntuación mínima cuando no hay coincidencias semánticas relevantes")
+    @DisplayName("Debe excluir cursos sin coincidencias semánticas relevantes")
     void getRecommendations_ShouldReturnBaseScoreWhenNoPreferencesMatch() {
         userInterests.setCategory(new ArrayList<>(Arrays.asList("Arte")));
         userInterests.setCourse_type(new ArrayList<>(Arrays.asList("Avanzado")));
@@ -416,9 +504,7 @@ class RecommendationServiceTest {
 
         List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
 
-        assertFalse(results.isEmpty());
-        assertEquals(0, results.get(0).score());
-        assertTrue(results.get(0).reason().contains("Sugerencia personalizada"));
+        assertTrue(results.isEmpty());
     }
 
     @Test

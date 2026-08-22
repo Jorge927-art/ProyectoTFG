@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Inbox, Download, Loader2, AlertCircle, FileText, Send, Users, FolderOpen, CheckCircle } from 'lucide-react';
+import { Inbox, Download, Loader2, AlertCircle, FileText, Send, Users, FolderOpen, CheckCircle, Search } from 'lucide-react';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import {
     downloadDocumentSecure,
@@ -53,12 +53,15 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
     const [courses, setCourses] = useState<AdminDocumentCourseOption[]>([]);
     const [selectedRecipientId, setSelectedRecipientId] = useState('');
     const [selectedCourseId, setSelectedCourseId] = useState('');
+    const [courseSearchKeyword, setCourseSearchKeyword] = useState('');
+    const [showCourseResults, setShowCourseResults] = useState(false);
     const [sentRecipientFilter, setSentRecipientFilter] = useState('');
     const [sentCourseFilter, setSentCourseFilter] = useState('');
     const [selectedRecipientFile, setSelectedRecipientFile] = useState<File | null>(null);
     const [selectedCourseFile, setSelectedCourseFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [clearingTray, setClearingTray] = useState<'received' | 'sent' | null>(null);
+    const [trayPendingConfirmation, setTrayPendingConfirmation] = useState<'received' | 'sent' | null>(null);
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
@@ -69,6 +72,28 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
     const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
     const recipientFileInputRef = useRef<HTMLInputElement | null>(null);
     const courseFileInputRef = useRef<HTMLInputElement | null>(null);
+
+    const visibleCourseResults = courseSearchKeyword.trim().length === 0
+        ? []
+        : courses
+            .filter((course) => {
+                const keyword = courseSearchKeyword.trim().toLocaleLowerCase();
+                return course.title.toLocaleLowerCase().includes(keyword)
+                    || course.category.toLocaleLowerCase().includes(keyword);
+            })
+            .sort((left, right) => {
+                const keyword = courseSearchKeyword.trim().toLocaleLowerCase();
+                const rank = (course: AdminDocumentCourseOption) => {
+                    const title = course.title.toLocaleLowerCase();
+                    const category = course.category.toLocaleLowerCase();
+                    if (title === keyword) return 0;
+                    if (title.startsWith(keyword)) return 1;
+                    if (category.startsWith(keyword)) return 2;
+                    return 3;
+                };
+                return rank(left) - rank(right) || left.title.localeCompare(right.title, 'es');
+            })
+            .slice(0, 15);
 
     const loadDocuments = async () => {
         setLoading(true);
@@ -174,6 +199,8 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
 
     const resetCourseForm = () => {
         setSelectedCourseId('');
+        setCourseSearchKeyword('');
+        setShowCourseResults(false);
         setSelectedCourseFile(null);
         if (courseFileInputRef.current) {
             courseFileInputRef.current.value = '';
@@ -226,22 +253,20 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
         }
     };
 
-    const handleClearReceivedTray = async () => {
-        const confirmed = window.confirm(
-            '¿Deseas limpiar la bandeja de entrada?\n\nEsta acción oculta los documentos para tu usuario y no elimina datos en base de datos.'
-        );
-        if (!confirmed) {
-            return;
-        }
+    const handleClearReceivedTray = () => {
+        setTrayPendingConfirmation('received');
+    };
 
+    const confirmClearReceivedTray = async () => {
+        setTrayPendingConfirmation(null);
         try {
             setClearingTray('received');
             setError('');
             setSuccessMessage('');
-            const result = await hideAllReceivedGeneralDocuments();
+            await hideAllReceivedGeneralDocuments();
             await loadDocuments();
             emitNotificationsRefresh();
-            setSuccessMessage(`Bandeja de entrada limpiada (${result.hiddenCount} documentos ocultados).`);
+            setSuccessMessage('Todos tus documentos se han borrado correctamente.');
         } catch {
             setError('No se pudo limpiar la bandeja de entrada.');
         } finally {
@@ -249,21 +274,19 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
         }
     };
 
-    const handleClearSentTray = async () => {
-        const confirmed = window.confirm(
-            '¿Deseas limpiar la bandeja de salida?\n\nEsta acción oculta los documentos para tu usuario y no elimina datos en base de datos.'
-        );
-        if (!confirmed) {
-            return;
-        }
+    const handleClearSentTray = () => {
+        setTrayPendingConfirmation('sent');
+    };
 
+    const confirmClearSentTray = async () => {
+        setTrayPendingConfirmation(null);
         try {
             setClearingTray('sent');
             setError('');
             setSuccessMessage('');
-            const result = await hideAllSentGeneralDocuments();
+            await hideAllSentGeneralDocuments();
             await loadDocuments();
-            setSuccessMessage(`Bandeja de salida limpiada (${result.hiddenCount} documentos ocultados).`);
+            setSuccessMessage('Todos tus documentos se han borrado correctamente.');
         } catch {
             setError('No se pudo limpiar la bandeja de salida.');
         } finally {
@@ -369,20 +392,52 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                         </span>
                     </div>
 
-                    <select
-                        aria-label="Seleccionar curso destinatario"
-                        value={selectedCourseId}
-                        onChange={(e) => setSelectedCourseId(e.target.value)}
+                    <input
+                        aria-label="Buscar curso destinatario"
+                        type="text"
+                        value={courseSearchKeyword}
+                        onChange={(e) => {
+                            setCourseSearchKeyword(e.target.value);
+                            setSelectedCourseId('');
+                            setShowCourseResults(true);
+                        }}
+                        onFocus={() => setShowCourseResults(true)}
+                        placeholder="Escribe el nombre o categoría del curso..."
                         disabled={sendingTarget !== null}
                         className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                        <option value="">Selecciona curso destinatario</option>
-                        {courses.map((course) => (
-                            <option key={course.courseId} value={course.courseId}>
-                                {course.title} ({course.category})
-                            </option>
-                        ))}
-                    </select>
+                    />
+                    {showCourseResults && courseSearchKeyword.trim() && (
+                        <div className="relative z-10">
+                            <div className="absolute left-0 right-0 mt-1 max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                                {visibleCourseResults.length === 0 ? (
+                                    <p className="px-2.5 py-2 text-[11px] font-medium text-slate-400">
+                                        No se encontraron cursos.
+                                    </p>
+                                ) : (
+                                    visibleCourseResults.map((course) => (
+                                        <button
+                                            key={course.courseId}
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedCourseId(String(course.courseId));
+                                                setCourseSearchKeyword(course.title);
+                                                setShowCourseResults(false);
+                                            }}
+                                            className="w-full rounded-md px-2.5 py-2 text-left hover:bg-indigo-50"
+                                        >
+                                            <span className="block text-xs font-bold text-slate-700">{course.title}</span>
+                                            <span className="block text-[10px] font-medium text-slate-400">{course.category}</span>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {selectedCourseId && (
+                        <p className="flex items-center gap-1.5 text-[10px] font-semibold text-indigo-600">
+                            <Search size={12} /> Curso seleccionado para el envío colectivo.
+                        </p>
+                    )}
 
                     <input
                         ref={courseFileInputRef}
@@ -456,6 +511,9 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                         label={clearingTray === 'received' ? 'Limpiando...' : 'Limpiar bandeja de entrada'}
                         className="text-xs! font-bold! text-slate-600!"
                     />
+                    <span className="ml-2 text-[10px] font-medium text-slate-400">
+                        Se eliminarán TODOS tus documentos.
+                    </span>
                 </div>
 
                 <div className="max-h-80 overflow-y-auto custom-scrollbar space-y-2 pr-1">
@@ -605,6 +663,17 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                     Los documentos enviados permanecen disponibles para consulta y descarga del administrador.
                 </div>
             </div>
+            {trayPendingConfirmation && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4" role="presentation">
+                    <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="admin-clear-documents-title">
+                        <h2 id="admin-clear-documents-title" className="text-base font-bold text-slate-800">Se borrarán todos tus documentos. Este borrado es definitivo.</h2>
+                        <div className="mt-5 flex justify-end gap-2">
+                            <GenericButton type="button" variant="white" label="Cancelar" onClick={() => setTrayPendingConfirmation(null)} />
+                            <GenericButton type="button" variant="primary" label="Aceptar" onClick={() => void (trayPendingConfirmation === 'received' ? confirmClearReceivedTray() : confirmClearSentTray())} />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

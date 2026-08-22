@@ -301,7 +301,7 @@ export const hideAllSentGeneralDocuments = async (): Promise<HideDocumentsRespon
 
 /**
  * [EXCLUSIVO PROFESOR]: Transmite guías, temarios o exámenes asociando el ID de la asignatura
- * y, de manera opcional, el ID del alumno concreto o toda la clase (receiverId = 0).
+ * y el ID positivo del alumno concreto.
  */
 export const uploadProfessorDocument = async (
     file: File, 

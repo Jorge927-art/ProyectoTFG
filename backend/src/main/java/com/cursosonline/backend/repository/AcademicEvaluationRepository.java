@@ -107,4 +107,10 @@ public interface AcademicEvaluationRepository extends JpaRepository<AcademicEval
          */
         @Query("SELECT ae FROM AcademicEvaluation ae WHERE ae.user.user_id = :userId")
         List<AcademicEvaluation> findByUserId(@Param("userId") Long userId);
+
+        @Query("SELECT ae FROM AcademicEvaluation ae "
+                        + "WHERE ae.course.course_id = :courseId "
+                        + "AND ae.courseComment IS NOT NULL "
+                        + "ORDER BY ae.evaluation_date DESC")
+        List<AcademicEvaluation> findCourseCommentsOrderByEvaluationDateDesc(@Param("courseId") Long courseId);
 }

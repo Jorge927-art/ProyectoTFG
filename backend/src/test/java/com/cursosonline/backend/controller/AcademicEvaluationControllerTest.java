@@ -121,6 +121,25 @@ public class AcademicEvaluationControllerTest {
     }
 
     @Test
+    @DisplayName("Debe indicar que ambas valoraciones son obligatorias cuando falta una")
+    void debeRechazarEvaluacionParcialConMensajeExplicito() {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("course_id", 101L);
+        payload.put("course_score", 5);
+        payload.put("course_comment", "Buen curso.");
+        payload.put("instructor_score", 0);
+
+        ResponseEntity<?> response = academicEvaluationController.submitEvaluation(authentication, payload);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        Map<?, ?> bodyMap = (Map<?, ?>) response.getBody();
+        assertNotNull(bodyMap);
+        assertEquals("Debes evaluar la calidad del curso y el desempeño docente antes de enviar la evaluación.",
+                bodyMap.get("error"));
+        Mockito.verify(academicEvaluationRepository, Mockito.never()).save(any(AcademicEvaluation.class));
+    }
+
+    @Test
     @DisplayName("Debe denegar el acceso (HTTP 403 Forbidden) si el alumno intenta evaluar una asignatura sin matrícula legítima")
     void debeDenegarEvaluacionSiNoEstaMatriculado() {
         Map<String, Object> payload = new HashMap<>();
