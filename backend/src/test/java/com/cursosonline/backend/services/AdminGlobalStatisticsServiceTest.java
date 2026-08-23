@@ -171,6 +171,20 @@ class AdminGlobalStatisticsServiceTest {
         assertTrue(captor.getValue().isRealData());
     }
 
+    @Test
+    @DisplayName("el cálculo global debe ignorar cursos nulos al buscar el máximo")
+    void maximoGlobal_DebeIgnorarCursosNulos() throws Exception {
+        var method = AdminGlobalStatisticsService.class
+                .getDeclaredMethod("resolveMaxEnrolledStudents", List.class);
+        method.setAccessible(true);
+
+        int maximum = (int) method.invoke(service, java.util.Arrays.asList(
+                null,
+                new com.cursosonline.backend.dto.AdminGlobalTopCourseDTO(10L, "Algebra", 7)));
+
+        assertEquals(7, maximum);
+    }
+
     private static final class MutableClock extends Clock {
         private Instant instant;
         private final ZoneId zone;

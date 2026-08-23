@@ -246,6 +246,34 @@ class AdminCourseInsightServiceTest {
     }
 
     @Test
+    @DisplayName("getUserStatsInCourse debe tolerar una calificación sin tipo reconocible")
+    void getUserStatsInCourse_CalificacionSinTipo_DebeDevolverNotaSinClasificar() {
+        when(coursesRepository.existsById(300L)).thenReturn(true);
+        when(userRepository.findById(10L)).thenReturn(Optional.of(studentUser));
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(300L)).thenReturn(List.of());
+        when(enrollmentRepository.findAllByCourseId(300L)).thenReturn(List.of());
+        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(List.of(300L))).thenReturn(null);
+        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(List.of(300L))).thenReturn(null);
+
+        Enrollment enrollment = new Enrollment();
+        enrollment.setUser(studentUser);
+        enrollment.setCourse(course);
+        CourseGrade unclassified = new CourseGrade();
+        unclassified.setTitle("Evaluación extraordinaria");
+        unclassified.setScore(new BigDecimal("7.0"));
+        enrollment.setGrades(List.of(unclassified));
+        when(enrollmentRepository.findByUserIdAndCourseId(10L, 300L)).thenReturn(Optional.of(enrollment));
+        when(userService.calculateCurrentProgress(enrollment)).thenReturn(0);
+
+        AdminCourseUserStatsDTO stats = adminCourseInsightService.getUserStatsInCourse(300L, 10L);
+
+        assertEquals(1, stats.studentGrades().size());
+        assertEquals(new BigDecimal("7.0"), stats.studentGrades().get(0).score());
+        assertNull(stats.workGrade());
+        assertNull(stats.finalExamGrade());
+    }
+
+    @Test
     @DisplayName("getUserStatsInCourse debe lanzar ResourceNotFoundException si el alumno no está matriculado en ese curso")
     void getUserStatsInCourse_AlumnoNoMatriculado_DebeLanzarExcepcion() {
         when(coursesRepository.existsById(300L)).thenReturn(true);
@@ -301,7 +329,10 @@ class AdminCourseInsightServiceTest {
         CourseGrade extra = new CourseGrade();
         extra.setTitle("Actividad práctica");
         extra.setScore(new BigDecimal("7.0"));
-        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(300L)).thenReturn(List.of(work, exam, extra));
+        CourseGrade withoutTitle = new CourseGrade();
+        withoutTitle.setScore(null);
+        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(300L))
+                .thenReturn(List.of(work, exam, extra, withoutTitle));
 
         AdminCourseCollectiveStatsDTO stats = adminCourseInsightService.getCourseCollectiveStats(300L);
 
@@ -502,7 +533,7 @@ class AdminCourseInsightServiceTest {
         org.mockito.Mockito.verify(courseHistoryRepository, org.mockito.Mockito.times(2))
                 .save(captor.capture());
         assertTrue(captor.getAllValues().stream().allMatch(history -> history.getSnapshotYear() == 2026));
-        assertTrue(captor.getAllValues().stream().allMatch(AdminCourseStatsHistory::isRealData));
+        assertTrue(captor.getAllValues().stream().allMatch(history -> history.isRealData()));
     }
 
     @Test
@@ -526,6 +557,20 @@ class AdminCourseInsightServiceTest {
         adminCourseInsightService.finalizePreviousYearCourseStats();
 
         org.mockito.Mockito.verify(courseHistoryRepository).save(any(AdminCourseStatsHistory.class));
+    }
+
+    @Test
+    @DisplayName("el cierre anual debe ignorar un curso inexistente y continuar")
+    void cierreAnual_CursoInexistente_DebeContinuar() {
+        when(coursesRepository.findAll()).thenReturn(List.of(course));
+        when(coursesRepository.existsById(300L)).thenReturn(false);
+        when(courseHistoryRepository.findByCourseAndYear(300L, 2026)).thenReturn(Optional.empty());
+
+        clock.setInstant(Instant.parse("2027-01-01T00:20:00Z"));
+        adminCourseInsightService.finalizePreviousYearCourseStats();
+
+        org.mockito.Mockito.verify(courseHistoryRepository, org.mockito.Mockito.never())
+                .save(any(AdminCourseStatsHistory.class));
     }
 
     private static final class MutableClock extends Clock {
