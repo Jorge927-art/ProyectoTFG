@@ -117,8 +117,3 @@ export const resolveCourseInsightErrorMessage = (err: unknown): string => {
     return 'Error al consultar la información estadística del curso.';
 };
 
-export const finalizePreviousYearCourseStats = async (courseId: number): Promise<{ message: string; finalizedYear: number }> => {
-    const response = await apiClient.post<{ message: string; finalizedYear: number }>(
-        `/api/admin/courses/${courseId}/collective-stats/finalize-previous-year`);
-    return response.data;
-};

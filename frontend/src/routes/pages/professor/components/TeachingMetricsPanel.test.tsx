@@ -51,7 +51,10 @@ describe('TeachingMetricsPanel', () => {
                 courseId: 10,
                 courseTitle: 'Arquitectura',
                 progressPercentage: 90,
-                averageGrade: 8.5
+                averageGrade: 8.5,
+                workAverage: 8.5,
+                finalExamGrade: 9,
+                finalGrade: 8.8
             }
         ],
         loading: false,

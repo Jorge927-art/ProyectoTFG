@@ -28,11 +28,6 @@ export interface AdminGlobalStatistics {
     yearlyComparisons: AdminGlobalYearComparison[];
 }
 
-export interface AdminGlobalFinalizeResponse {
-    message: string;
-    finalizedYear: number;
-}
-
 export interface AdminProfessorRating {
     professorId: number;
     username: string;
@@ -41,11 +36,6 @@ export interface AdminProfessorRating {
 
 export const getAdminGlobalStatistics = async (): Promise<AdminGlobalStatistics> => {
     const response = await apiClient.get<AdminGlobalStatistics>('/api/admin/statistics/global');
-    return response.data;
-};
-
-export const finalizeAdminGlobalPreviousYear = async (): Promise<AdminGlobalFinalizeResponse> => {
-    const response = await apiClient.post<AdminGlobalFinalizeResponse>('/api/admin/statistics/global/finalize-previous-year');
     return response.data;
 };
 

@@ -19,7 +19,10 @@ class StudentMetricBreakdownDTOTest {
                 7L,
                 "Programacion Avanzada",
                 90,
-                8.7);
+                8.7,
+                8.5,
+                9.0,
+                8.8);
         StudentMetricBreakdownDTO sameDto = new StudentMetricBreakdownDTO(
                 15L,
                 "alumno1",
@@ -27,7 +30,10 @@ class StudentMetricBreakdownDTOTest {
                 7L,
                 "Programacion Avanzada",
                 90,
-                8.7);
+                8.7,
+                8.5,
+                9.0,
+                8.8);
 
         assertEquals(15L, dto.userId());
         assertEquals("alumno1", dto.username());

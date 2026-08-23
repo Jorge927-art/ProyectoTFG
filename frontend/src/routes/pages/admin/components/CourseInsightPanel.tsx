@@ -24,9 +24,6 @@ export const CourseInsightPanel = () => {
         handleSearchInputKeyDown,
         handleSelectCourse,
         handleSelectUser
-        , consolidating
-        , successMessage
-        , handleFinalizePreviousYear
     } = useCourseInsight();
 
     const trabajoScore = stats?.workGrade ?? getGradeByTitleKeyword(stats?.studentGrades, 'trabajo')?.score ?? null;
@@ -60,7 +57,6 @@ export const CourseInsightPanel = () => {
             </form>
 
             {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
-            {successMessage && <p className="text-xs text-emerald-700 font-semibold">{successMessage}</p>}
 
             {/* RESULTADOS DE BÚSQUEDA */}
             {results.length > 0 && !selectedCourse && (
@@ -156,17 +152,6 @@ export const CourseInsightPanel = () => {
                             Alumnos activos en el curso:{' '}
                             <span className="font-black text-emerald-700">{collectiveStats.activeStudentsInCourse}</span>
                         </p>
-                    </div>
-
-                    <div className="flex justify-end">
-                        <GenericButton
-                            type="button"
-                            onClick={() => void handleFinalizePreviousYear()}
-                            disabled={consolidating || loadingCollectiveStats}
-                            variant="primary"
-                            label={consolidating ? 'Consolidando...' : 'Consolidar año cerrado'}
-                            className="px-3! py-1.5! text-[11px]! font-bold! rounded-lg!"
-                        />
                     </div>
 
                     <ProgressBar

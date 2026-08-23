@@ -24,7 +24,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -99,37 +98,12 @@ class AdminGlobalStatisticsControllerTest {
 
         @Test
         @WithMockUser(authorities = "ADMIN")
-        @DisplayName("POST /api/admin/statistics/global/finalize-previous-year debe consolidar el año cerrado")
-        void finalizePreviousYearSnapshot_DebeDevolverOk() throws Exception {
-                when(adminGlobalStatisticsService.finalizePreviousYearSnapshotNow()).thenReturn(2025);
-
-                mockMvc.perform(post("/api/admin/statistics/global/finalize-previous-year"))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.message").value("Histórico anual consolidado correctamente."))
-                                .andExpect(jsonPath("$.finalizedYear").value(2025));
-        }
-
-        @Test
-        @WithMockUser(authorities = "ADMIN")
         @DisplayName("GET /api/admin/statistics/global debe devolver 500 si el servicio falla")
         void getGlobalStatistics_ServicioFalla_DebeDevolver500() throws Exception {
                 when(adminGlobalStatisticsService.getGlobalStatistics())
                                 .thenThrow(new RuntimeException("fallo inesperado"));
 
                 mockMvc.perform(get("/api/admin/statistics/global"))
-                                .andExpect(status().isInternalServerError())
-                                .andExpect(jsonPath("$.status").value(500))
-                                .andExpect(jsonPath("$.message").value("Error interno en el servidor."));
-        }
-
-        @Test
-        @WithMockUser(authorities = "ADMIN")
-        @DisplayName("POST /api/admin/statistics/global/finalize-previous-year debe devolver 500 si el servicio falla")
-        void finalizePreviousYearSnapshot_ServicioFalla_DebeDevolver500() throws Exception {
-                when(adminGlobalStatisticsService.finalizePreviousYearSnapshotNow())
-                                .thenThrow(new RuntimeException("fallo inesperado"));
-
-                mockMvc.perform(post("/api/admin/statistics/global/finalize-previous-year"))
                                 .andExpect(status().isInternalServerError())
                                 .andExpect(jsonPath("$.status").value(500))
                                 .andExpect(jsonPath("$.message").value("Error interno en el servidor."));

@@ -7,11 +7,14 @@ package com.cursosonline.backend.dto;
  * a qué asignatura pertenece cada fila del alumno en la lista agregada.
  */
 public record StudentMetricBreakdownDTO(
-        Long userId,
-        String username,
-        String email,
-        Long courseId,
-        String courseTitle,
-        Integer progressPercentage,
-        Double averageGrade) {
+                Long userId,
+                String username,
+                String email,
+                Long courseId,
+                String courseTitle,
+                Integer progressPercentage,
+                Double averageGrade,
+                Double workAverage,
+                Double finalExamGrade,
+                Double finalGrade) {
 }

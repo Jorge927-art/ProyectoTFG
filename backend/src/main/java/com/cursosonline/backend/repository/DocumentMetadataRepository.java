@@ -29,7 +29,7 @@ public interface DocumentMetadataRepository extends JpaRepository<DocumentMetada
          * @param username El nombre de usuario del receptor.
          * @return Lista de documentos recibidos sin curso asociado.
          */
-        @Query("SELECT d FROM DocumentMetadata d WHERE d.receiver.username = :username AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED AND d.hiddenForReceiver = false ORDER BY d.documentid DESC")
+        @Query("SELECT d FROM DocumentMetadata d WHERE d.receiver.username = :username AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED AND d.course IS NULL AND UPPER(COALESCE(d.evaluation_type, '')) <> 'EXAMEN' AND d.hiddenForReceiver = false ORDER BY d.documentid DESC")
         List<DocumentMetadata> findReceivedGeneralDocumentsByUsername(@Param("username") String username);
 
         /**
@@ -142,6 +142,8 @@ public interface DocumentMetadataRepository extends JpaRepository<DocumentMetada
         @Query("UPDATE DocumentMetadata d SET d.hiddenForReceiver = true " +
                         "WHERE d.receiver.username = :username " +
                         "AND d.folder_type = com.cursosonline.backend.entities.FolderType.RECEIVED " +
+                        "AND d.course IS NULL " +
+                        "AND UPPER(COALESCE(d.evaluation_type, '')) <> 'EXAMEN' " +
                         "AND d.hiddenForReceiver = false")
         int hideAllReceivedGeneralDocumentsByUsername(@Param("username") String username);
 

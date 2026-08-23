@@ -15,7 +15,10 @@ const students: StudentMetricBreakdown[] = [
         courseId: 10,
         courseTitle: 'Arquitectura',
         progressPercentage: 90,
-        averageGrade: 8.5
+        averageGrade: 8.5,
+        workAverage: 8.5,
+        finalExamGrade: 9,
+        finalGrade: 8.8
     },
     {
         userId: 2,
@@ -24,7 +27,10 @@ const students: StudentMetricBreakdown[] = [
         courseId: 20,
         courseTitle: 'Bases',
         progressPercentage: 70,
-        averageGrade: 0
+        averageGrade: 0,
+        workAverage: null,
+        finalExamGrade: null,
+        finalGrade: null
     }
 ];
 
@@ -37,7 +43,10 @@ const manyStudents: StudentMetricBreakdown[] = [
         courseId: 30,
         courseTitle: 'Sistemas',
         progressPercentage: 65,
-        averageGrade: 7.2
+        averageGrade: 7.2,
+        workAverage: 7.2,
+        finalExamGrade: null,
+        finalGrade: null
     },
     {
         userId: 4,
@@ -46,7 +55,10 @@ const manyStudents: StudentMetricBreakdown[] = [
         courseId: 40,
         courseTitle: 'Compiladores',
         progressPercentage: 88,
-        averageGrade: 8.8
+        averageGrade: 8.8,
+        workAverage: 8.8,
+        finalExamGrade: null,
+        finalGrade: null
     }
 ];
 
@@ -62,8 +74,11 @@ describe('StudentGradeBreakdown', () => {
 
         expect(screen.getByText('alumno1')).toBeInTheDocument();
         expect(screen.getByText('Arquitectura')).toBeInTheDocument();
-        expect(screen.getByText('8.5 / 10')).toBeInTheDocument();
-        expect(screen.getByText('---')).toBeInTheDocument();
+        expect(screen.getByText('8.5')).toBeInTheDocument();
+        expect(screen.getByText('9.0')).toBeInTheDocument();
+        expect(screen.getByText('8.8')).toBeInTheDocument();
+        expect(screen.queryByText(/\/ 10/)).not.toBeInTheDocument();
+        expect(screen.getAllByText('--')).toHaveLength(3);
     });
 
     it('no debe mostrar la columna de curso al filtrar una sola asignatura', () => {

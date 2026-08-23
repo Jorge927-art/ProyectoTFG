@@ -6,7 +6,6 @@ import {
     getCourseDetail,
     getCourseUserStats,
     getCourseCollectiveStats,
-    finalizePreviousYearCourseStats,
     resolveCourseInsightErrorMessage
 } from '../../../../services/adminCourseInsightService';
 
@@ -15,7 +14,6 @@ vi.mock('../../../../services/adminCourseInsightService', () => ({
     getCourseDetail: vi.fn(),
     getCourseUserStats: vi.fn(),
     getCourseCollectiveStats: vi.fn(),
-    finalizePreviousYearCourseStats: vi.fn(),
     resolveCourseInsightErrorMessage: vi.fn()
 }));
 
@@ -382,57 +380,4 @@ describe('useCourseInsight', () => {
         expect(result.current.error).toBe('');
     });
 
-    it('no consolida si todavía no hay curso seleccionado', async () => {
-        const { result } = renderHook(() => useCourseInsight());
-
-        await act(async () => {
-            await result.current.handleFinalizePreviousYear();
-        });
-
-        expect(finalizePreviousYearCourseStats).not.toHaveBeenCalled();
-        expect(result.current.consolidating).toBe(false);
-    });
-
-    it('consolida el año anterior, muestra éxito y refresca el curso', async () => {
-        vi.mocked(getCourseDetail).mockResolvedValue(sampleDetail);
-        vi.mocked(getCourseCollectiveStats).mockResolvedValue(sampleCollectiveStats);
-        vi.mocked(finalizePreviousYearCourseStats).mockResolvedValue({
-            message: 'Histórico consolidado correctamente',
-            finalizedYear: 2025,
-        });
-
-        const { result } = renderHook(() => useCourseInsight());
-
-        await act(async () => {
-            await result.current.handleSelectCourse(300);
-        });
-        await act(async () => {
-            await result.current.handleFinalizePreviousYear();
-        });
-
-        expect(finalizePreviousYearCourseStats).toHaveBeenCalledWith(300);
-        expect(getCourseDetail).toHaveBeenCalledTimes(2);
-        expect(result.current.successMessage).toBe('Histórico consolidado correctamente Año consolidado: 2025.');
-        expect(result.current.consolidating).toBe(false);
-    });
-
-    it('muestra error cuando falla la consolidación del año anterior', async () => {
-        vi.mocked(getCourseDetail).mockResolvedValue(sampleDetail);
-        vi.mocked(getCourseCollectiveStats).mockResolvedValue(sampleCollectiveStats);
-        vi.mocked(finalizePreviousYearCourseStats).mockRejectedValue(new Error('consolidation-error'));
-        vi.mocked(resolveCourseInsightErrorMessage).mockReturnValue('No se pudo consolidar el histórico.');
-
-        const { result } = renderHook(() => useCourseInsight());
-
-        await act(async () => {
-            await result.current.handleSelectCourse(300);
-        });
-        await act(async () => {
-            await result.current.handleFinalizePreviousYear();
-        });
-
-        expect(result.current.error).toBe('No se pudo consolidar el histórico.');
-        expect(result.current.consolidating).toBe(false);
-        expect(result.current.successMessage).toBe('');
-    });
 });

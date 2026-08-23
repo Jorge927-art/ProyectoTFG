@@ -42,7 +42,7 @@ public class AdminGlobalStatisticsService {
     private final AdminGlobalStatsHistoryRepository historyRepository;
     private final com.cursosonline.backend.repository.AcademicEvaluationRepository academicEvaluationRepository;
 
-    private Clock clock = Clock.systemDefaultZone();
+    private final Clock clock;
 
     /**
      * Obtiene las estadísticas globales actuales y de años anteriores.
@@ -118,18 +118,6 @@ public class AdminGlobalStatisticsService {
     @Transactional
     public void finalizePreviousYearSnapshot() {
         finalizePreviousYearSnapshotInternal();
-    }
-
-    /**
-     * Finaliza el snapshot del año anterior y lo guarda en la base de datos.
-     * Este método se puede invocar manualmente para forzar la finalización del
-     * snapshot.
-     * 
-     * @return El año del snapshot finalizado.
-     */
-    @Transactional
-    public int finalizePreviousYearSnapshotNow() {
-        return finalizePreviousYearSnapshotInternal();
     }
 
     /**

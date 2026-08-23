@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     getAdminGlobalStatistics,
-    finalizeAdminGlobalPreviousYear,
     resolveAdminGlobalStatisticsErrorMessage
 } from './adminGlobalStatisticsService';
 import { apiClient } from './apiClient';
@@ -38,19 +37,6 @@ describe('adminGlobalStatisticsService', () => {
         const result = await getAdminGlobalStatistics();
 
         expect(apiClient.get).toHaveBeenCalledWith('/api/admin/statistics/global');
-        expect(result).toEqual(payload);
-    });
-
-    it('dispara la consolidación manual del año previo', async () => {
-        const payload = {
-            message: 'Histórico anual consolidado correctamente.',
-            finalizedYear: 2025
-        };
-        vi.mocked(apiClient.post).mockResolvedValue({ data: payload });
-
-        const result = await finalizeAdminGlobalPreviousYear();
-
-        expect(apiClient.post).toHaveBeenCalledWith('/api/admin/statistics/global/finalize-previous-year');
         expect(result).toEqual(payload);
     });
 

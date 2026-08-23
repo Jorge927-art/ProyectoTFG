@@ -18,11 +18,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.time.Year;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.math.BigDecimal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Servicio para gestionar las operaciones relacionadas con el "Panel
@@ -35,6 +39,8 @@ import java.math.BigDecimal;
 @RequiredArgsConstructor
 public class AdminCourseInsightService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(AdminCourseInsightService.class);
+
     private static final String[] WORK_GRADE_KEYWORDS = { "trabajo", "proyecto", "practica", "práctica", "actividad",
             "tarea" };
     private static final String[] FINAL_EXAM_KEYWORDS = { "examen final", "final", "examen" };
@@ -46,6 +52,7 @@ public class AdminCourseInsightService {
     private final com.cursosonline.backend.repository.CourseGradeRepository courseGradeRepository;
     private final com.cursosonline.backend.repository.AcademicEvaluationRepository academicEvaluationRepository;
     private final AdminCourseStatsHistoryRepository courseHistoryRepository;
+    private final Clock clock;
 
     /**
      * Realiza una búsqueda de cursos en el panel de administración utilizando un
@@ -198,7 +205,7 @@ public class AdminCourseInsightService {
                         evaluation.getCourseComment().trim(),
                         evaluation.getEvaluation_date()))
                 .toList();
-        int currentYear = Year.now().getValue();
+        int currentYear = Year.now(clock).getValue();
         List<Integer> historicalYears = List.of(currentYear - 1, currentYear - 2);
         Map<Integer, AdminCourseStatsHistory> historyByYear = new HashMap<>();
         for (AdminCourseStatsHistory row : courseHistoryRepository
@@ -238,12 +245,10 @@ public class AdminCourseInsightService {
                 metrics.averageFinalExamGrade(), comparisons, studentStatistics);
     }
 
-    @Transactional
-    public int finalizePreviousYearCourseStatsNow(Long courseId) {
+    private void finalizePreviousYearCourseStatsForCourse(Long courseId, int year) {
         if (!coursesRepository.existsById(courseId)) {
             throw new ResourceNotFoundException("Curso no encontrado con id: " + courseId);
         }
-        int year = Year.now().getValue() - 1;
         CourseCollectiveMetrics metrics = resolveCourseCollectiveMetrics(courseId);
         AdminCourseStatsHistory row = courseHistoryRepository
                 .findByCourseAndYear(courseId, year)
@@ -260,18 +265,39 @@ public class AdminCourseInsightService {
         row.setAverageWorkGrade(metrics.averageWorkGrade());
         row.setAverageFinalExamGrade(metrics.averageFinalExamGrade());
         row.setRealData(true);
-        row.setGeneratedAt(java.time.LocalDateTime.now());
+        row.setGeneratedAt(LocalDateTime.now(clock));
         courseHistoryRepository.save(row);
-        return year;
     }
 
     @Scheduled(cron = "${app.admin.course-stats.finalize-cron:0 20 0 1 1 *}", zone = "${app.admin.global-stats.time-zone:Europe/Madrid}")
     @Transactional
     public void finalizePreviousYearCourseStats() {
-        for (Courses course : coursesRepository.findAll()) {
+        int previousYear = Year.now(clock).getValue() - 1;
+        List<Courses> courses = coursesRepository.findAll();
+        for (Courses course : courses) {
             if (course != null && course.getCourse_id() != null) {
-                finalizePreviousYearCourseStatsNow(course.getCourse_id());
+                try {
+                    finalizePreviousYearCourseStatsForCourse(course.getCourse_id(), previousYear);
+                } catch (RuntimeException exception) {
+                    LOGGER.error("No se pudo consolidar el curso {} para el año {}",
+                            course.getCourse_id(), previousYear, exception);
+                }
             }
+        }
+        verifyAllCoursesHaveRealHistory(courses, previousYear);
+    }
+
+    private void verifyAllCoursesHaveRealHistory(List<Courses> courses, int year) {
+        List<Long> missingCourseIds = courses.stream()
+                .filter(course -> course != null && course.getCourse_id() != null)
+                .map(course -> course.getCourse_id())
+                .filter(courseId -> courseHistoryRepository.findByCourseAndYear(courseId, year)
+                        .map(history -> !history.isRealData())
+                        .orElse(true))
+                .toList();
+        if (!missingCourseIds.isEmpty()) {
+            LOGGER.error("Cierre anual incompleto para el año {}. Cursos sin histórico real: {}",
+                    year, missingCourseIds);
         }
     }
 

@@ -25,6 +25,9 @@ export interface StudentMetricBreakdown {
     courseTitle: string;
     progressPercentage: number;
     averageGrade: number;
+    workAverage: number | null;
+    finalExamGrade: number | null;
+    finalGrade: number | null;
 }
 
 /**

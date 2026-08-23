@@ -16,8 +16,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.lang.reflect.Field;
 import java.time.Clock;
+import org.mockito.Spy;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -51,14 +51,14 @@ class AdminGlobalStatisticsServiceTest {
     @Mock
     private com.cursosonline.backend.repository.AcademicEvaluationRepository academicEvaluationRepository;
 
+    @Spy
+    private MutableClock clock = new MutableClock(Instant.parse("2026-08-03T10:00:00Z"), ZoneId.of("UTC"));
+
     @InjectMocks
     private AdminGlobalStatisticsService service;
 
     @BeforeEach
-    void setUp() throws Exception {
-        Field clockField = AdminGlobalStatisticsService.class.getDeclaredField("clock");
-        clockField.setAccessible(true);
-        clockField.set(service, Clock.fixed(Instant.parse("2026-08-03T10:00:00Z"), ZoneId.of("UTC")));
+    void setUp() {
     }
 
     @Test
@@ -116,12 +116,10 @@ class AdminGlobalStatisticsServiceTest {
         existing.setRealData(false);
         when(historyRepository.findBySnapshotYear(2025)).thenReturn(Optional.of(existing));
 
-        int finalizedYear = service.finalizePreviousYearSnapshotNow();
+        service.finalizePreviousYearSnapshot();
 
         ArgumentCaptor<AdminGlobalStatsHistory> captor = ArgumentCaptor.forClass(AdminGlobalStatsHistory.class);
         verify(historyRepository).save(captor.capture());
-
-        assertEquals(2025, finalizedYear);
 
         AdminGlobalStatsHistory saved = captor.getValue();
         assertEquals(2025, saved.getSnapshotYear());
@@ -144,15 +142,62 @@ class AdminGlobalStatisticsServiceTest {
     }
 
     @Test
-    @DisplayName("finalizePreviousYearSnapshotNow debe propagar excepción y no persistir si falla ranking")
-    void finalizePreviousYearSnapshotNow_FalloRanking_DebePropagarExcepcion() {
+    @DisplayName("el cierre automático debe propagar excepción y no persistir si falla ranking")
+    void finalizePreviousYearSnapshot_FalloRanking_DebePropagarExcepcion() {
         when(userRepository.countByRoleAndEnabledTrue(Role.STUDENT)).thenReturn(100L);
         when(userRepository.countByRoleAndEnabledTrue(Role.PROFESSOR)).thenReturn(7L);
         when(enrollmentRepository.findTopCoursesByActiveStudentCount(any()))
                 .thenThrow(new RuntimeException("db error"));
 
-        assertThrows(RuntimeException.class, () -> service.finalizePreviousYearSnapshotNow());
+        assertThrows(RuntimeException.class, () -> service.finalizePreviousYearSnapshot());
         verify(historyRepository, never()).save(any(AdminGlobalStatsHistory.class));
+    }
+
+    @Test
+    @DisplayName("el cambio de año debe convertir el histórico ficticio global en real")
+    void cambioDeAno_DebeReemplazarHistoricoFicticioGlobal() {
+        when(userRepository.countByRoleAndEnabledTrue(Role.STUDENT)).thenReturn(12L);
+        when(userRepository.countByRoleAndEnabledTrue(Role.PROFESSOR)).thenReturn(2L);
+        when(enrollmentRepository.findTopCoursesByActiveStudentCount(any())).thenReturn(List.of());
+
+        when(historyRepository.findBySnapshotYear(2026)).thenReturn(Optional.empty());
+
+        clock.setInstant(Instant.parse("2027-01-01T00:10:00Z"));
+        service.finalizePreviousYearSnapshot();
+
+        ArgumentCaptor<AdminGlobalStatsHistory> captor = ArgumentCaptor.forClass(AdminGlobalStatsHistory.class);
+        verify(historyRepository).save(captor.capture());
+        assertEquals(2026, captor.getValue().getSnapshotYear());
+        assertTrue(captor.getValue().isRealData());
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant instant;
+        private final ZoneId zone;
+
+        private MutableClock(Instant instant, ZoneId zone) {
+            this.instant = instant;
+            this.zone = zone;
+        }
+
+        private void setInstant(Instant instant) {
+            this.instant = instant;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return zone;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return new MutableClock(instant, zone);
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
+        }
     }
 
     @Test
@@ -273,25 +318,6 @@ class AdminGlobalStatisticsServiceTest {
         assertEquals(15, dto.yearlyComparisons().get(2).totalStudents());
         assertFalse(dto.yearlyComparisons().get(2).realData());
         verify(historyRepository, never()).save(any(AdminGlobalStatsHistory.class));
-    }
-
-    @Test
-    @DisplayName("finalizePreviousYearSnapshotNow debe crear el histórico cuando aún no existe")
-    void finalizePreviousYearSnapshotNow_SinHistorico_DebeCrearRegistro() {
-        when(userRepository.countByRoleAndEnabledTrue(Role.STUDENT)).thenReturn(12L);
-        when(userRepository.countByRoleAndEnabledTrue(Role.PROFESSOR)).thenReturn(2L);
-        when(enrollmentRepository.findTopCoursesByActiveStudentCount(any())).thenReturn(List.of());
-        when(historyRepository.findBySnapshotYear(2025)).thenReturn(Optional.empty());
-
-        assertEquals(2025, service.finalizePreviousYearSnapshotNow());
-
-        ArgumentCaptor<AdminGlobalStatsHistory> captor = ArgumentCaptor.forClass(AdminGlobalStatsHistory.class);
-        verify(historyRepository).save(captor.capture());
-        assertEquals(2025, captor.getValue().getSnapshotYear());
-        assertTrue(captor.getValue().isRealData());
-        assertEquals(0, captor.getValue().getTopCourseEnrollment());
-        assertNotNull(captor.getValue().getTopCourses());
-        assertTrue(captor.getValue().getTopCourses().isEmpty());
     }
 
     private AdminGlobalStatsHistory history(int year, int students, int professors, int topEnrollment, boolean real) {

@@ -4,7 +4,6 @@ import {
     getCourseDetail,
     getCourseUserStats,
     getCourseCollectiveStats,
-    finalizePreviousYearCourseStats,
     resolveCourseInsightErrorMessage
 } from '../../../../services/adminCourseInsightService';
 import type {
@@ -28,8 +27,6 @@ export const useCourseInsight = () => {
     const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
     const [loadingStats, setLoadingStats] = useState<boolean>(false);
     const [loadingCollectiveStats, setLoadingCollectiveStats] = useState<boolean>(false);
-    const [consolidating, setConsolidating] = useState(false);
-    const [successMessage, setSuccessMessage] = useState('');
     const [error, setError] = useState<string>('');
     const [highlightedResultIndex, setHighlightedResultIndex] = useState<number>(-1);
     const searchRequestIdRef = useRef(0);
@@ -190,21 +187,6 @@ export const useCourseInsight = () => {
         }
     };
 
-    const handleFinalizePreviousYear = async () => {
-        if (!selectedCourse) return;
-        setConsolidating(true);
-        setSuccessMessage('');
-        try {
-            const response = await finalizePreviousYearCourseStats(selectedCourse.courseId);
-            setSuccessMessage(`${response.message} Año consolidado: ${response.finalizedYear}.`);
-            await handleSelectCourse(selectedCourse.courseId);
-        } catch (err) {
-            setError(resolveCourseInsightErrorMessage(err));
-        } finally {
-            setConsolidating(false);
-        }
-    };
-
     return {
         keyword,
         setKeyword,
@@ -219,12 +201,9 @@ export const useCourseInsight = () => {
         loadingCollectiveStats,
         highlightedResultIndex,
         error,
-        consolidating,
-        successMessage,
         handleSearch,
         handleSearchInputKeyDown,
         handleSelectCourse,
         handleSelectUser
-        ,handleFinalizePreviousYear
     };
 };

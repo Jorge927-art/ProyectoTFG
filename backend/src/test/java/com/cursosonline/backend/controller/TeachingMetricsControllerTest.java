@@ -79,7 +79,10 @@ class TeachingMetricsControllerTest {
                                                 7L,
                                                 "Programacion Avanzada",
                                                 90,
-                                                8.7)));
+                                                8.7,
+                                                8.5,
+                                                9.0,
+                                                8.8)));
 
                 mockMvc.perform(get("/api/v1/teacher/metrics/students")
                                 .param("courseId", "7")

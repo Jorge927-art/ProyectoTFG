@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BarChart3, Loader2, GraduationCap, UserCheck, TrendingUp, Star } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
-import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import {
     getAdminGlobalStatistics,
-    finalizeAdminGlobalPreviousYear,
     resolveAdminGlobalStatisticsErrorMessage,
     type AdminGlobalStatistics,
     type AdminGlobalYearComparison,
@@ -15,9 +13,7 @@ import {
 export const GlobalStatisticsPanel = () => {
     const [data, setData] = useState<AdminGlobalStatistics | null>(null);
     const [loading, setLoading] = useState(false);
-    const [consolidating, setConsolidating] = useState(false);
     const [error, setError] = useState('');
-    const [successMessage, setSuccessMessage] = useState('');
     const [professorResults, setProfessorResults] = useState<AdminProfessorRating[]>([]);
     const [professorLoading, setProfessorLoading] = useState(false);
     const [selectedProfessorId, setSelectedProfessorId] = useState<number | null>(null);
@@ -51,22 +47,6 @@ export const GlobalStatisticsPanel = () => {
         }
     };
 
-    const handleFinalizePreviousYear = async () => {
-        setConsolidating(true);
-        setError('');
-        setSuccessMessage('');
-
-        try {
-            const response = await finalizeAdminGlobalPreviousYear();
-            setSuccessMessage(`${response.message} Año consolidado: ${response.finalizedYear}.`);
-            await loadStatistics();
-        } catch (err) {
-            setError(resolveAdminGlobalStatisticsErrorMessage(err));
-        } finally {
-            setConsolidating(false);
-        }
-    };
-
     const topEnrollmentMax = useMemo(() => {
         if (!data?.topCourses?.length) {
             return 0;
@@ -81,18 +61,6 @@ export const GlobalStatisticsPanel = () => {
                 Panel Estadístico Global
             </h2>
 
-            <div className="flex justify-end">
-                <GenericButton
-                    type="button"
-                    onClick={handleFinalizePreviousYear}
-                    disabled={loading || consolidating}
-                    variant="primary"
-                    label={consolidating ? 'Consolidando...' : 'Consolidar año cerrado'}
-                    icon={consolidating ? <Loader2 size={14} className="animate-spin" /> : undefined}
-                    className="px-3! py-1.5! text-[11px]! font-bold! rounded-lg!"
-                />
-            </div>
-
             {loading && (
                 <div className="flex justify-center py-4">
                     <Loader2 size={20} className="animate-spin text-cyan-500" />
@@ -100,7 +68,6 @@ export const GlobalStatisticsPanel = () => {
             )}
 
             {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
-            {successMessage && <p className="text-xs text-emerald-700 font-medium">{successMessage}</p>}
 
             {!loading && !error && data && (
                 <>
