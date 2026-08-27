@@ -479,6 +479,10 @@ public class UserService {
             throw new ServicesException("Acción inválida: Ya te encuentras matriculado en este curso.");
         }
 
+        if (!course.hasEvaluationResponsible()) {
+            throw new ServicesException("El curso no tiene profesor ni modalidad de evaluación disponible.");
+        }
+
         // 4. Instanciar y configurar el objeto de matrícula explícito
         Enrollment enrollment = new Enrollment();
         enrollment.setUser(user);

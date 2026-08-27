@@ -14,6 +14,7 @@ export interface DBModelCourse {
     subtitleLanguages?: string;
     skills?: string;
     instructors?: string;
+    hasEvaluationResponsible?: boolean;
     rating?: number;
     numOfViewers?: number;
     duration?: number;

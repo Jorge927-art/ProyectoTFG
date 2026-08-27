@@ -482,6 +482,7 @@ public class UserServiceTest {
                                 new java.util.ArrayList<>());
                 Courses course = new Courses();
                 course.setCourse_id(200L);
+                course.setInstructors("instructor_legacy");
 
                 when(userRepository.findByUsername("student_start")).thenReturn(Optional.of(student));
                 when(coursesRepository.findById(200L)).thenReturn(Optional.of(course));
@@ -495,6 +496,25 @@ public class UserServiceTest {
                 verify(adminCourseCatalogService).markCourseAsEverUsed(200L);
                 verify(professorCourseAlertService, never())
                                 .createInitialEnrollmentAlertIfApplicable(any(Enrollment.class));
+        }
+
+        @Test
+        void enrollStudentInCourse_DebeRechazarCursoSinResponsableDeEvaluacion() {
+                Users student = new Users(22L, "student_no_teacher", "enc", Role.STUDENT,
+                                "no.teacher@example.com", true, new java.util.ArrayList<>());
+                Courses course = new Courses();
+                course.setCourse_id(201L);
+
+                when(userRepository.findByUsername("student_no_teacher")).thenReturn(Optional.of(student));
+                when(coursesRepository.findById(201L)).thenReturn(Optional.of(course));
+                when(enrollmentRepository.findByUserIdAndCourseId(22L, 201L)).thenReturn(Optional.empty());
+
+                ServicesException ex = assertThrows(ServicesException.class,
+                                () -> userService.enrollStudentInCourse("student_no_teacher", 201L));
+
+                assertTrue(ex.getMessage().contains("modalidad de evaluación"));
+                verify(enrollmentRepository, never()).saveAndFlush(any(Enrollment.class));
+                verify(adminCourseCatalogService, never()).markCourseAsEverUsed(anyLong());
         }
 
         @Test

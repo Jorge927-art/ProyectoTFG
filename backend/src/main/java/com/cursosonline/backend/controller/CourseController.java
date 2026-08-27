@@ -79,7 +79,7 @@ public class CourseController {
     /**
      * Endpoint transaccional seguro para procesar la matrícula de un estudiante.
      * POST /api/courses/enroll/{courseId}
-     *
+     * 
      * @param courseId  El ID del curso en el cual se desea matricular al
      *                  estudiante.
      * @param principal Objeto Principal que contiene la información del usuario

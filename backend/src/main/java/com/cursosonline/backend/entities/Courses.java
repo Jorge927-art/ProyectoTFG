@@ -102,4 +102,10 @@ public class Courses {
     // filtrar cursos por uso
     @Column(name = "ever_used", nullable = false)
     private boolean everUsed = false;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("hasEvaluationResponsible")
+    public boolean hasEvaluationResponsible() {
+        return assignedUser != null || (instructors != null && !instructors.trim().isEmpty()
+                && !instructors.trim().equalsIgnoreCase("por asignar"));
+    }
 }
