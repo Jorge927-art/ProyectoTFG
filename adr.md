@@ -437,11 +437,10 @@ Deprecar y eliminar del sistema los tres archivos redundantes de diseño por rol
 
 * **Riesgo de Pérdida de Especialización:** Agrupar la lógica de visualización de tres paneles de control en un único archivo puede dificultar la adición de componentes exclusivos de un rol específico (como un menú de administración avanzado).
 * *Mitigación:* Se diseñó `DashboardLayout.tsx` para delegar de forma modular las interfaces específicas en subcomponentes independientes (como `<NavbarUser />`), los cuales gestionan internamente sus insignias y botones mediante composición limpia de React, manteniendo el layout base genérico y protegido.
-.
 
-  ---
+---
 
-  # [ADR-13] Mitigación de Desincronización Temporal mediante Margen de Tolerancia (Clock Skew) en JWT
+# ADR-13: Mitigación de Desincronización Temporal mediante Margen de Tolerancia (Clock Skew) en JWT
 
 ## Estatus
 
@@ -507,32 +506,34 @@ Implementar una suite robusta de pruebas automatizadas utilizando **JUnit 5 y Mo
 
 ---
 
-## [ADR-15] Purificación Arquitectónica de la Capa de Presentación mediante Composición Pura e Inyección del Contenedor de Scroll Controlado
+# ADR-15: Purificación Arquitectónica de la Capa de Presentación mediante Composición Pura e Inyección del Contenedor de Scroll Controlado
 
-### Estado
+## Estatus
 
 Aceptado.
 
-### Contexto
+## Contexto
 
 El componente transversal `GenericCard.tsx` presentaba un sobrediseño inicial que acoplaba rígidamente su estructura a propiedades de texto estáticas (como `title`, `tag`, `footerChildren`), obligando al sistema a realizar mapeos artificiales y limitando su polimorfismo. Además, la necesidad de incorporar un listado masivo de usuarios PostgreSQL en la consola del Administrador exigía un mecanismo de visualización que no degradase el DOM ni alterase de forma descontrolada el layout vertical de la aplicación ante el crecimiento de la base de datos.
 
-### Decisión
+## Decisión
 
 1. **Purificación UI**: Rediseñar por completo `GenericCard.tsx` eliminando todas las propiedades rígidas del contrato de TypeScript y reduciéndola a un contenedor minimalista gobernado única y exclusivamente por la propiedad nativa de composición pura `children`.
 2. **Encapsulamiento del Scroll**: Crear la utilidad atómica `UserScrollList.tsx` dentro de `components/admin/` e inyectarla por composición dentro de la nueva tarjeta genérica.
 3. **Contención Estricta de Altura**: Fijar una altura estricta inamovible de `h-[116px]` en el scroll y compensar simétricamente el Buscador en `AdminDashboard.tsx` mediante un acolchado geométrico equilibrado (`py-15`), garantizando un plano horizontal perfectamente alineado (50% - 50%).
 
-### Justificación para el TFG
+## Justificación para el TFG
 
 Cumplimiento estricto del principio Abierto/Cerrado (OCP) de SOLID. La tarjeta actúa como un lienzo abstracto inmutable capaz de asimilar cualquier contenido futuro sin alterar su código fuente. La contención vertical garantiza la ergonomía visual y un consumo constante de memoria en el navegador sin importar el volumen de datos en PostgreSQL.
 
-### Consecuencias
+## Consecuencias
 
 * Erradicación total de abstracciones falsas y código muerto en el Frontend.
 
 * Logro de simetría geométrica bidireccional perfecta en la interfaz del Administrador.
 * Escalabilidad visual y de rendimiento garantizada frente a cientos de registros concurrentes.
+
+---
 
 # ADR-16: Soporte Multirrol Dinámico y Corrección de Ámbito en Bloques Asíncronos (AuthModal & NavbarUser)
 
@@ -751,7 +752,7 @@ El buscador global de cursos integrado en el panel del estudiante (`StudentDashb
 
 Implementar una reestructuración arquitectónica integral en tres capas para optimizar el flujo de datos y la eficiencia de cómputo:
 
-1. **Capa de Persistencia (PostgreSQL):** Activar la extensión nativa `pg_trgm` y estructurar tres índices invertidos generalizados (**GIN**) basados en operaciones de trigramas (`gin_trgm_ops`) sobre las columnas críticas de búsqueda (`title`, `category`, `skills`) de la tabla `courses` para habilitar búsquedas parciales indexadas de coste O(log N) u O(1).
+1. **Capa de Persistencia (PostgreSQL):** Activar la extensión nativa `pg_trgm` y estructurar tres índices invertidos generalizados (**GIN**) basados en operaciones de trigramas (`gin_trgm_ops`) sobre las columnas críticas de búsqueda (`title`, `category`, `skills`) de la tabla `courses`, sustituyendo el escaneo secuencial completo (*Full Table Scan*, O(N)) del `LIKE` original por una búsqueda indexada por trigramas.
 2. **Capa de Negocio y Repositorio (Spring Boot):** Modificar la firma del método en `CoursesRepository.java` trasladando de forma nativa el formateo de los patrones de coincidencia aproximada (`%keyword%`) a la memoria de Java en `UserService.java`. La consulta se restringe a un lote simétrico estricto de **12 resultados** mediante `PageRequest.of(0, 12)` e incorpora una cláusula algorítmica `ORDER BY CASE` en JPQL que prioriza semánticamente las coincidencias por títulos que comienzan exactamente con el término buscado.
 3. **Capa de Presentación (React & Tailwind):** Consolidar un control de tasa de peticiones (*rate limiting*) en el cliente mediante un temporizador *debounce* de 400ms acoplado al hook de efecto (`useEffect`) para evitar la saturación de peticiones HTTP en vuelo. A nivel de maquetación, se implementa una cuadrícula de tres columnas (`lg:grid-cols-3`) y se acota el contenedor exterior mediante un límite dimensional estricto de altura fija (`max-h-[290px] overflow-y-auto`) para inducir el fenómeno de diseño *Cut-off effect* (efecto de recorte) e incentivar el scroll natural.
 
@@ -795,7 +796,7 @@ Implementar una reestructuración de alcance y una purga de infraestructura en t
 1. **Refactorización del Backend (`CoursesRepository.java`):** Eliminar de forma estricta la cláusula `OR LOWER(c.skills) LIKE LOWER(:formattedKeyword)` tanto del filtro de selección como de la estructura de ponderación algorítmica `ORDER BY CASE`. La búsqueda predictiva instantánea queda restringida exclusivamente a los campos de alta densidad semántica: `title` y `category`.
 2. **Optimización del Almacenamiento (PostgreSQL):** Ejecutar una purga del índice invertido trunco mediante el comando `DROP INDEX IF EXISTS idx_courses_skills_trgm;`, liberando espacio físico en disco y mitigando la sobrecarga computacional de reindexación en las operaciones de inserción (`INSERT`) y actualización (`UPDATE`).
 3. **Sincronización de Interfaz (`StudentDashboard.tsx`):** Modificar los descriptores semánticos de la barra de búsqueda para transparentar el alcance real de la consulta al usuario, limitando el texto informativo a *"por título o categoría temática"*.
-4. **Aislamiento de Responsabilidad Funcional:** Reservar de forma exclusiva el atributo `skills` para el motor del **Algoritmo de Recomendación Inteligente [ADR-20]**, donde su procesamiento se ejecutará de manera asíncrona mediante un cruce de matrices frente a la tabla de intereses del estudiante, evitando penalizar el hilo de la consulta síncrona en tiempo real del catálogo.
+4. **Campo sin uso funcional activo:** El atributo `skills` queda excluido de la búsqueda predictiva síncrona. A fecha de esta enmienda no se ha implementado ningún consumidor de este campo en el motor de recomendaciones (`RecommendationService`) ni en ningún otro módulo; su reutilización queda como línea de trabajo futuro pendiente de valorar.
 
 ## Consecuencias
 
@@ -1202,28 +1203,27 @@ Junio 2026
 
 ## Contexto
 
-Se requería un motor de sugerencias personalizado dentro del panel del estudiante que priorizara de manera dinámica la afinidad temática, las competencias académicas y el historial de navegación previo del alumno, en lugar de mostrar un catálogo plano y estático de asignaturas. El reto consistía en procesar y cruzar eficientemente estos vectores de datos sin degradar el tiempo de respuesta del servidor durante la carga inicial del panel.
+Se requería un motor de sugerencias personalizado dentro del panel del estudiante que priorizara de manera dinámica la afinidad temática, las competencias académicas y el historial de matriculación del alumno, en lugar de mostrar un catálogo plano y estático de asignaturas.
 
 ## Decisión
 
-Desarrollar un servicio analítico especializado (`RecommendationService`) que cruce los metadatos estructurales del catálogo de asignaturas (`Courses`) con el perfil normalizado de preferencias guardado del alumno (`Interest` [ADR-20]) y su historial de matrículas previas (`Enrollment` [ADR-31]), aplicando una ponderación matemática estricta de pesos (30% Categoría Temática, 25% Historial de Matriculación, 20% Nivel Técnico, 15% Idioma y 10% Compatibilidad de Subtítulos).
+Desarrollar un servicio analítico especializado (`RecommendationService`) que cruce los metadatos estructurales del catálogo de asignaturas (`Courses`) con el perfil normalizado de preferencias del alumno (`Interest` [ADR-20]) y su historial de matrículas previas (`Enrollment` [ADR-31]), aplicando una matriz de pesos sobre seis criterios: 30 puntos por coincidencia de categoría, hasta 25 puntos en función del progreso del alumno en cursos previos de la misma categoría, 20 puntos por coincidencia de nivel, 15 por idioma, 10 por disponibilidad de subtítulos en un idioma de interés y 5 por duración compatible (máximo teórico: 105 puntos).
 
 ## Justificación para el TFG
 
-* **Capa de Inteligencia de Negocio:** Eleva sustancialmente el valor académico y la complejidad metodológica del proyecto al introducir una capa legítima de lógica algorítmica predictiva y minería de datos básica.
-* **Capitalización del Modelo Relacional:** Justifica técnicamente la inversión en el diseño estructurado de la base de datos y la fragmentación de colecciones multivalor [ADR-20]. Demuestra ante el tribunal cómo un esquema en 1FN habilita operaciones de cruce matricial eficientes en el servidor en lugar de delegar el filtrado a código imperativo pesado en el cliente.
+* **Capa de Inteligencia de Negocio:** Introduce una capa de lógica algorítmica predictiva explicable, priorizando la transparencia del criterio (cada recomendación incluye el motivo textual de por qué se sugiere) sobre la sofisticación del modelo.
+* **Capitalización del Modelo Relacional:** Se apoya en el diseño normalizado de `Interest` [ADR-20] para realizar el cruce de preferencias sin necesidad de procesar cadenas de texto sin normalizar.
 
 ## Consecuencias
 
 ### Impacto Positivo
 
-* **Sugerencias Predictivas Dinámicas:** El frontend pinta en tiempo real sugerencias altamente personalizadas y justificadas con un "porqué" semántico explícito para el estudiante (ej. *"Recomendado por tu interés en Ingeniería del Software"*).
-* **Consumo de Memoria Eficiente:** Al operar directamente sobre colecciones indexadas e hidratadas en el mismo ciclo transaccional, el algoritmo procesa la ordenación y el descarte de elementos duplicados en memoria RAM a través de Streams de Java de forma ultrarrápida.
+* **Sugerencias Predictivas Dinámicas:** El frontend muestra en tiempo real sugerencias personalizadas junto con una justificación textual explícita para el estudiante.
 
 ### Impacto Negativo / Riesgos Mitigados
 
-* **Escalabilidad Computacional Limitada (O(N*M)):** El algoritmo de filtrado basado en contenido evalúa en memoria cada curso disponible frente a la matriz de intereses del alumno. Con un crecimiento masivo del catálogo de cursos (N) y de usuarios concurrentes (M), este cálculo secuencial puede saturar la CPU del backend.
-* *Mitigación:* Se acotó la ventana operativa del servicio mediante un cortocircuito algorítmico defensivo: el repositorio filtra inicialmente y excluye de la consulta JPQL todos los IDs de cursos en los que el alumno ya se encuentra matriculado activamente. Además, el servicio limita el payload final a un lote estricto de los **3 resultados con mayor puntuación de afinidad**, aliviando drásticamente el coste de serialización y renderizado en la SPA.
+* **Escalabilidad Computacional Limitada:** El algoritmo evalúa en memoria cada curso disponible frente al perfil de intereses del alumno; con un crecimiento significativo del catálogo, este cálculo secuencial podría penalizar el tiempo de respuesta.
+* *Mitigación:* El repositorio excluye de antemano los cursos en los que el alumno ya está matriculado, y el servicio limita el resultado final a los **6 cursos** con mayor puntuación de afinidad (`.limit(6)`), acotando el coste de serialización y renderizado.
 
 ---
 
@@ -1275,41 +1275,7 @@ Esto obliga al ORM a poblar las colecciones satélite de forma síncrona mientra
 
 ---
 
-# ADR-34: Algoritmo de Filtrado Basado en Contenido para el Motor de Recomendaciones
-
-## Estatus
-
-Aceptado
-
-## Fecha
-
-Junio 2026
-
-## Contexto
-
-Se requería un motor de sugerencias personalizado dentro del panel del estudiante que priorizara la afinidad temática, las competencias académicas y la disponibilidad de tiempo del alumno. El backend original carecía de lógica predictiva y el frontend dependía de datos estáticos (*mocks*), lo que reducía el valor tecnológico de la plataforma de cara a la defensa del proyecto y la justificación de la complejidad de la arquitectura.
-
-## Decisión
-
-Diseñar y desarrollar un servicio especializado (`RecommendationService.java`) que implementa un algoritmo de Filtrado Basado en Contenido (*Content-Based Filtering*). El motor opera de forma determinista bajo una matriz de pesos en memoria (30% Categoría, 20% Historial, 20% Nivel, 15% Idioma, 10%  Subtitulos, 5% Duración). El enrutamiento se expone en `/api/courses/recommendations` resolviendo la identidad mediante el *Claim* del token JWT [ADR-29], y el cliente en React se conecta de forma reactiva a través del gancho personalizado `useSmartRecommendations.ts`.
-
-## Justificación para el TFG
-
-* **Estrategia Computacional Stateless:** Resuelve el acoplamiento y la eficiencia del grafo de persistencia. En lugar de delegar el cálculo matemático de ponderación a PostgreSQL mediante costosos procedimientos almacenados o subconsultas cíclicas, los datos se recuperan atómicamente mediante proyecciones nativas e indexadas de clave primaria (`findEnrolledCourseIdsByUserId`) y se procesan a alta velocidad en memoria utilizando *Java Streams*, liberando por completo de carga computacional al servidor de la base de datos.
-* **Inteligencia de Negocio Aplicada:** Eleva el rigor del proyecto demostrando la capacidad de estructurar algoritmos analíticos personalizados en la capa de negocio, sincronizándolos de forma nativa con el tipado estricto de TypeScript en el cliente.
-
-## Consecuencias
-
-### Impacto Positivo
-
-* **Sugerencias Predictivas Dinámicas:** El frontend renderiza en tiempo real recomendaciones justificadas con un porqué explícito (`reason`) de forma transparente para el estudiante en su dashboard principal.
-* **Aislamiento e Inmunidad ante Regresiones:** El algoritmo queda blindado metodológicamente mediante una suite de pruebas de comportamiento automatizadas en JUnit 5 y Mockito (`RecommendationServiceTest`), certificando con un 100% de éxito en consola (`BUILD SUCCESS`) que el sistema descarta cursos irrelevantes y excluye estrictamente las asignaturas en las que el alumno ya está matriculado.
-* **Arquitectura Altamente Reactiva:** La UI del frontend se sincroniza automáticamente e invalida el feed en milisegundos en cuanto el estudiante efectúa una nueva matrícula, disparando una recarga limpia de red sin necesidad de refrescar el navegador.
-
-### Impacto Negativo / Riesgos Mitigados
-
-* **Acoplamiento de Lógica en Memoria de Aplicación:** Al calcular las ponderaciones utilizando Streams de Java, el recolector de basura (*Garbage Collector*) del backend puede experimentar picos de trabajo puntuales para limpiar los objetos temporales generados si miles de alumnos acceden al dashboard simultáneamente.
-* *Mitigación:* Se implementó un límite estricto de corte anticipado en el flujo: el motor aborta la evaluación individual en cuanto detecta que el curso evaluado ya está completado o matriculado, procesando únicamente el remanente activo del catálogo y reduciendo la creación de instancias volátiles a niveles marginales y seguros para la memoria del servidor.
+# ADR-34: (Retirado)
 
 ---
 
@@ -1325,7 +1291,7 @@ Junio 2026
 
 ## Contexto
 
-Durante la integración del Motor de Recomendaciones Algorítmicas [ADR-34], se detectó un fallo de regresión en el guardado del modal de preferencias del estudiante. La tabla principal `interests` y sus cinco tablas satélite multivalor (ej. `interest_categories`) rechazaban las actualizaciones en la base de datos debido a dos fenómenos críticos del ciclo de vida de Hibernate:
+Durante la integración del Motor de Recomendaciones Algorítmicas [ADR-32], se detectó un fallo de regresión en el guardado del modal de preferencias del estudiante. La tabla principal `interests` y sus cinco tablas satélite multivalor (ej. `interest_categories`) rechazaban las actualizaciones en la base de datos debido a dos fenómenos críticos del ciclo de vida de Hibernate:
 
 1. **Identidad Huérfana:** Al utilizar `@MapsId` sin estrategias de generación automática (`@GeneratedValue`), el motor de persistencia requería la asignación explícita y manual del ID del usuario en memoria antes de poder invocar al repositorio.
 2. **Violación de la Colección Persistente (*PersistentBag*):** El uso de métodos *setter* convencionales reemplazaba los envoltorios nativos de las colecciones de Spring Data JPA por instancias estándar de `ArrayList`, inhabilitando el rastreo de cambios (*dirty checking*) y bloqueando la generación automática de sentencias SQL `DELETE` e `INSERT`.
@@ -1352,7 +1318,7 @@ Rediseñar de forma quirúrgica la capa de servicios e infraestructura de persis
 
 ---
 
-# ADR-36: Implementación del Motor de Recomendaciones mediante Algoritmo de Ponderación
+# ADR-36: Corrección de Identidad Inestable en Matrículas y Falsos Positivos de Expiración de Sesión
 
 ## Estatus
 
@@ -1363,7 +1329,7 @@ Aceptado
 Durante la fase de integración del *Activity Tracker*, el cálculo de progreso académico "al vuelo" (*on the fly*) de las asignaturas en curso introdujo una doble anomalía crítica en el flujo de trabajo del alumno:
 
 1. **Desfase de Indexación Visual ("Efecto Dominó"):** Al accionar el evento del DOM "Iniciar curso" en la tarjeta superior de la lista vertical, la interfaz sufría un parpadeo visual y trasladaba erróneamente el estado activo ("✓ Estudiando asignatura") a la tarjeta inferior, dejando el nodo pulsado intacto.
-2. **Falso Positivo de Expiración de Sesión:** Tras pulsaciones consecutivas sobre el componente reactivo, el sistema sufría una expulsión abrupta del usuario hacia la pantalla de login debido a la activación involuntaria del circuito de expiración de sesión definido en el `AuthProvider.tsx` [ADR-34].
+2. **Falso Positivo de Expiración de Sesión:** Tras pulsaciones consecutivas sobre el componente reactivo, el sistema sufría una expulsión abrupta del usuario hacia la pantalla de login debido a la activación involuntaria del circuito de expiración de sesión definido en el `AuthProvider.tsx` [ADR-37].
 
 La auditoría técnica reveló un quiebre de la integridad de identidad bidireccional entre la base de datos y el cliente asíncrono. En el backend, la consulta HQL de `EnrollmentRepository.java` carecía de una cláusula `ORDER BY` explícita, provocando que Hibernate alterara la disposición física de la fila en el cursor de PostgreSQL tras ejecutar el `UPDATE` de la estampa de tiempo `started_at`.
 
@@ -1546,8 +1512,8 @@ Específicamente, se debían mitigar dos vectores de riesgo críticos:
 
 ## Decisión
 
-1. **Modelado Físico Normalizado y Bidireccional:** Crear la entidad `CourseGrade.java` vinculada mediante una relación de muchos a uno (`@ManyToOne`) con la matrícula (`Enrollment`). La entidad principal `Enrollment.java` incorpora la contraparte inversa (`@OneToMany`) con estrategias de cascada completa (`CascadeType.ALL`) y remoción de huérfanos para garantizar la integridad referencial en cascada ante limpiezas de historial.
-2. **Aislamiento de Deserialización Perimetral:** Sustituir la anotación restrictiva `@JsonIgnore` por `@JsonProperty(access = JsonProperty.Access.READ_ONLY)` sobre la propiedad `grades`. Esto instruye al serializador Jackson a ignorar de forma proactiva cualquier entrada de datos hacia el servidor a través de esta propiedad, utilizándola exclusivamente como flujo de salida seguro e inmutable hacia el Frontend.
+1. **Modelado Físico Normalizado y Bidireccional:** Crear la entidad `CourseGrade.java` vinculada mediante una relación de muchos a uno (`@ManyToOne`) con la matrícula (`Enrollment`). La entidad principal `Enrollment.java` incorpora la contraparte inversa (`@OneToMany`) con cascada acotada a `PERSIST` y `MERGE` (sin `orphanRemoval`), para evitar que una operación de limpieza sobre la matrícula elimine accidentalmente calificaciones ya emitidas.
+2. **Aislamiento de Deserialización Perimetral:** Mantener `@JsonIgnore` sobre el campo `grades` para bloquear cualquier intento de asignación masiva (*mass assignment*) desde el cliente, y exponer la colección al frontend exclusivamente mediante un getter explícito de solo lectura (`getGradesForFrontend()`, anotado con `@JsonProperty("grades")`), que nunca participa en la deserialización de peticiones entrantes.
 3. **Optimización por Carga Diferida (Lazy Loading) e Hidratación Explícita:** Configurar la relación con `FetchType.LAZY` para salvaguardar el rendimiento del motor de base de datos. En el método transaccional de lectura `getStudentActiveCoursesWithCalculatedProgress` dentro de `UserService.java`, se fuerza la hidratación controlada de la colección invocando un método de acceso estructural (`.size()`) antes del retorno de la lista, poblando el payload únicamente en este flujo de negocio específico.
 4. **Restauración de Firma de Constructores:** Declarar un constructor explícito de 7 argumentos en `Enrollment.java` que actúe como puente de compatibilidad hacia atrás. Esto inmuniza a la suite preexistente de pruebas unitarias (`UserServiceTest.java`, etc.) contra los cambios en las anotaciones automáticas de Lombok.
 
@@ -1563,7 +1529,7 @@ Específicamente, se debían mitigar dos vectores de riesgo críticos:
 
 ## Estatus
 
-Pospuesto
+Superado — implementado posteriormente con un enfoque distinto al aquí planificado (ver nota de actualización)
 
 ## Contexto
 
@@ -1591,6 +1557,10 @@ Se determina **posponer e inactivar temporalmente la integración del componente
 * **Preservación de la Estabilidad:** La inactivación de este módulo analítico reduce la complejidad transaccional del proyecto actual, garantizando que el catálogo predictivo y el registro de intereses funcionen con total fluidez y con cero errores de red en la UI.
 * **Garantía de Documentación Metodológica:** Mantener el ADR bajo el estado de *Pospuesto* justifica de manera académica ante el tribunal que el problema de agregación analítica de datos mixtos (String a Double en PostgreSQL) fue analizado, modelado y resuelto teóricamente, aportando valor al diseño de arquitectura del TFG.
 * **Consistencia del Repositorio Actualizado:** Al retirar los disparadores reactivos del frontend y las consultas complejas del backend, la suite de pruebas y la compilación (`BUILD SUCCESS`) regresan a un terreno de consistencia absoluta, libre de regresiones colaterales en el ecosistema transaccional.
+
+## Nota de actualización
+
+El campo `CourseGrade.score` se implementó finalmente como `BigDecimal` (no `String`), eliminando la necesidad del casteo condicional `CAST(cg.score AS double)` descrito en este ADR como planificación teórica. El componente analítico aquí pospuesto fue implementado en `UserService.getCourseStats`, documentado en el apartado de servicios de la memoria.
 
 ---
 
@@ -1889,80 +1859,46 @@ Julio 2026
 
 ## Contexto
 
-Con la creciente complejidad funcional y de seguridad de la plataforma (intercambio bidireccional de archivos [ADR-48], motor de recomendaciones algorítmicas [ADR-34] y seguridad stateless JWT [ADR-03]), se hacía imperativo establecer un marco estricto de aseguramiento de la calidad (QA) que garantizara que las refactorizaciones profundas (como la unificación de la campana global [ADR-52] o la limpieza de código muerto) no introdujeran regresiones operacionales. Una arquitectura desacoplada y robusta exige que tanto el contrato de datos del backend como la reactividad de la UI en el frontend estén blindados de manera simétrica ante cualquier alteración del entorno de desarrollo.
+Con la creciente complejidad funcional y de seguridad de la plataforma (intercambio bidireccional de archivos [ADR-48], motor de recomendaciones algorítmicas [ADR-32] y seguridad stateless JWT [ADR-03]), se hacía imperativo establecer un marco estricto de aseguramiento de la calidad (QA) que garantizara que las refactorizaciones profundas (como la unificación de la campana global [ADR-52] o la limpieza de código muerto) no introdujeran regresiones operacionales.
 
 ## Decisión
 
 Adoptar de manera formal una **Estrategia de Testing en Pirámide**, estructurada en tres niveles operativos de validación y ejecutada a través de un ecosistema tecnológico híbrido y complementario [ADR-28]:
 
 1. **Capa Unitaria (Alta Densidad y Aislamiento):**
-   * *Frontend:* Uso de Vitest y React Testing Library para validar el comportamiento de componentes atómicos (`GenericButton`) y aislar la lógica de componentes complejos como `GlobalNotificationBell.test.tsx`.
+   * *Frontend:* Uso de Vitest y React Testing Library para validar componentes atómicos (`GenericButton`), aislar la lógica de componentes complejos como `GlobalNotificationBell.test.tsx` (forzando degradación amigable y simulación asíncrona de dropdowns mediante `await waitFor`).
    * *Backend:* Pruebas unitarias sobre servicios aislados, destacando `RecommendationServiceTest.java`, que valida la matriz de pesos del algoritmo predictivo de forma independiente del motor de persistencia.
 2. **Capa de Integración Técnica e Infraestructura:**
-   * Validación de la capa criptográfica mediante `JwtServiceTest.java` y comprobación perimetral de red a través de `CorsIntegrationTest.java` para asegurar que el modelo stateless sea infranqueable.
-   * Pruebas reales de persistencia y consistencia relacional en repositorios (`EnrollmentRepositoryTest.java`) para garantizar la integridad de las cláusulas JPQL y el cursor de PostgreSQL tras los procesos transaccionales.
+   * Validación de la capa criptográfica mediante `JwtServiceTest.java` y comprobación perimetral de red a través de `CorsIntegrationTest.java`.
+   * Pruebas de persistencia y consistencia relacional en repositorios (`EnrollmentRepositoryTest.java`) para garantizar la integridad de las cláusulas JPQL, junto con auditorías de desmontado de nodos (`unmount`) en elementos de alta carga visual como la consola de administración (`UserScrollList.test.tsx`).
 3. **Capa de Flujo de Negocio (Integración Funcional de Extremo a Extremo):**
-   * Implementación de la suite `NotificationDocumentFlowIntegrationTest.java` en el backend y su equivalente homólogo en el frontend. Estos tests validan el "camino feliz" (*happy path*) completo del sistema: desde que un documento se persiste con metadatos hasta que el sistema de persistencia genera reactivamente la alerta correspondiente indexada por el `receiver_id` del destinatario.
-
-## Consecuencias
-
-### Impacto Positivo
-
-* **Confianza Absoluta en la Refactorización:** Permite realizar cambios estructurales profundos y tareas de purificación de código inerte con la certeza matemática de que los flujos críticos de la plataforma siguen 100% operativos.
-* **Documentación Técnica Viva:** Las suites de pruebas actúan como una especificación funcional ejecutable que describe de forma exacta cómo deben interactuar los componentes, servicios y contratos entre ambas capas del software.
-* **Automatización del Gobierno de Calidad:** La suite completa está integrada en el pipeline de Integración Continua (CI) mediante GitHub Actions (`ci.yml`), garantizando que ninguna rama de código pueda fusionarse con la rama principal si no supera satisfactoriamente todas las validaciones de la pirámide.
-
-### Impacto Negativo / Riesgos Mitigados
-
-* **Sobrecarga de Mantenimiento por Alta Cobertura:** El incremento exponencial de la cobertura exige un esfuerzo de ingeniería adicional para actualizar, sincronizar y adaptar las aserciones de los tests cada vez que se modifique una regla de negocio o la estructura de los DTOs compartidos.
-* *Mitigación:* Se implementó un diseño de pruebas estrictamente acotado y guiado por comportamiento, evitando verificar detalles de implementación volátiles o estilos estéticos mutables. Los tests se centran de forma exclusiva en la invariabilidad de las firmas de los contratos y la lógica perimetral de seguridad, minimizando drásticamente la tasa de mantenimiento y falsos positivos en el pipeline.
-
----
-
-# ADR-055: Estrategia de Testing en Pirámide y Validación de Flujos de Integración
-
-## Estatus
-
-Aceptado
-
-## Fecha
-
-Julio 2026
-
-## Contexto
-
-Con la creciente complejidad funcional y de seguridad de la plataforma (intercambio bidireccional de archivos [ADR-48], motor de recomendaciones algorítmicas [ADR-34] y seguridad stateless JWT [ADR-03]), se hacía imperativo establecer un marco estricto de aseguramiento de la calidad (QA) que garantizara que las refactorizaciones profundas (como la unificación de la campana global [ADR-52] o la limpieza de código muerto) no introdujeran regresiones operacionales. Una arquitectura desacoplada y robusta exige que tanto el contrato de datos del backend como la reactividad de la UI en el frontend estén blindados de manera simétrica ante cualquier alteración del entorno de desarrollo.
-
-## Decisión
-
-Adoptar de manera formal una **Estrategia de Testing en Pirámide**, estructurada en tres niveles operativos de validación y ejecutada a través de un ecosistema tecnológico híbrido y complementario [ADR-28]:
-
-1. **Capa Unitaria (Alta Densidad y Aislamiento):**
-   * *Frontend:* Uso de Vitest y React Testing Library para validar componentes atómicos (`GenericButton`) y aislar la lógica de componentes complejos como `GlobalNotificationBell.test.tsx`, forzando la degradación amigable (*Graceful Degradation*) de la interfaz y la simulación asíncrona de dropdowns mediante bloques `await waitFor`.
-   * *Backend:* Pruebas unitarias sobre servicios aislados, destacando `RecommendationServiceTest.java`, que valida la matriz de pesos del algoritmo predictivo de forma independiente del motor de persistencia.
-2. **Capa de Integración Técnica e Infraestructura:**
-   * Validación de la capa criptográfica mediante `JwtServiceTest.java` y comprobación perimetral de red a través de `CorsIntegrationTest.java` para asegurar que el modelo stateless sea infranqueable.
-   * Pruebas de persistencia y consistencia relacional en repositorios (`EnrollmentRepositoryTest.java`) para garantizar la integridad de las cláusulas JPQL, junto con auditorías programáticas de desmontado de nodos (`unmount`) en elementos de alta carga visual como la consola de administración (`UserScrollList.test.tsx`) para certificar la ausencia de fugas de memoria concurrentes.
-3. **Capa de Flujo de Negocio (Integración Funcional de Extremo a Extremo):**
-   * Implementación de la suite `NotificationDocumentFlow.integration.test.tsx` en el frontend. Este test valida el flujo de negocio completo: desde que un documento se persiste con metadatos hasta que el sistema genera reactivamente la alerta correspondiente indexada por el `receiver_id`, forzando la mutación estética de la campana mediante el consumo de eventos nativos del sistema de ventanas (`window.dispatchEvent`).
+   * Implementación de la suite `NotificationDocumentFlow.integration.test.tsx`, validando el flujo completo desde que un documento se persiste con metadatos hasta que el sistema genera reactivamente la alerta correspondiente indexada por `receiver_id`.
 
 ## Justificación para el TFG
 
-* **Rigor Metodológico Avanzado (QA):** Aporta el máximo nivel de rigor metodológico y madurez de ingeniería de software exigido en la rúbrica de evaluación de un TFG, validando la integración real entre las capas de negocio, seguridad, red y persistencia de datos.
-* **Escudo Inmune a Regresiones:** El uso de contexto web simulado en Spring Boot y mocks controlados en React aísla las responsabilidades de los componentes. Esto garantiza que las pruebas actúen como un escudo perimetral inmune a futuras alteraciones en la base de datos o modificaciones estéticas en la interfaz de usuario, proveyendo documentación viva y ejecutable.
+* **Rigor Metodológico:** Aporta un nivel de validación que cubre la integración real entre las capas de negocio, seguridad, red y persistencia de datos.
+* **Aislamiento de Responsabilidades:** El uso de contexto web simulado en Spring Boot y mocks controlados en React permite que las pruebas actúen como red de seguridad frente a futuras alteraciones sin acoplarse a detalles estéticos de la interfaz.
 
 ## Consecuencias
 
 ### Impacto Positivo
 
-* **Confianza Absoluta en la Refactorización:** Permite realizar cambios estructurales profundos y tareas de purificación de código inerte con la certeza matemática de que los flujos críticos de la plataforma siguen 100% operativos.
-* **Documentación Técnica Viva:** Las suites de pruebas actúan como una especificación funcional ejecutable que describe de forma exacta cómo deben interactuar los componentes, servicios y contratos entre ambas capas del software.
-* **Automatización del Gobierno de Calidad:** La suite completa está integrada en el pipeline de Integración Continua (CI) mediante GitHub Actions (`ci.yml`), garantizando que ninguna rama de código pueda fusionarse con la rama principal si no supera satisfactoriamente todas las validaciones de la pirámiade (83 tests en verde).
+* **Confianza en la Refactorización:** Permite realizar cambios estructurales y tareas de limpieza de código con evidencia automatizada de que los flujos críticos siguen operativos.
+* **Documentación Técnica Viva:** Las suites de pruebas describen de forma ejecutable cómo deben interactuar los componentes, servicios y contratos entre ambas capas.
+* **Automatización del Gobierno de Calidad:** La suite está integrada en el pipeline de CI (`ci.yml`), impidiendo que una rama se fusione sin pasar todas las validaciones.
 
 ### Impacto Negativo / Riesgos Mitigados
 
-* **Sobrecarga de Mantenimiento por Alta Cobertura:** El incremento exponencial de la cobertura exige un esfuerzo de ingeniería adicional para actualizar, sincronizar y adaptar las aserciones de los tests cada vez que se modifique una regla de negocio o la estructura de los DTOs compartidos [ADR-23].
-* *Mitigación:* Se implementó un diseño de pruebas estrictamente acotado y guiado por comportamiento, utilizando expresiones regulares con la bandera `i` para ignorar variaciones de capitalización. Los tests se centran exclusivamente en la invariabilidad de las firmas de los contratos y la lógica perimetral de seguridad, minimizando la tasa de refactorización de los tests ante cambios cosméticos.
+* **Sobrecarga de Mantenimiento:** El incremento de cobertura exige actualizar las aserciones cada vez que cambia una regla de negocio o la estructura de los DTOs compartidos [ADR-23].
+* *Mitigación:* Diseño de pruebas guiado por comportamiento (incluyendo expresiones regulares con la bandera `i` para ignorar variaciones de capitalización), centrado en la invariabilidad de las firmas de los contratos y no en detalles de implementación volátiles.
+
+---
+
+# ADR-055: (Retirado)
+
+## Estatus
+
+Retirado — duplicado de ADR-054, fusionado en dicha entrada.
 
 ---
 

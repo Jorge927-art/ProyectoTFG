@@ -40,7 +40,7 @@ class JwtServiceTest {
         when(jwtProperties.getSecret()).thenReturn(testSecret);
         when(jwtProperties.getIssuer()).thenReturn("cursosonline-backend");
         when(jwtProperties.getAccessTokenExpirationMinutes()).thenReturn(15L);
-        when(jwtProperties.getRefreshTokenExpirationDays()).thenReturn(30L);
+        when(jwtProperties.getRefreshTokenExpirationDays()).thenReturn(7L);
         when(jwtProperties.getClockSkewSeconds()).thenReturn(60L);
 
         jwtService = new JwtService(jwtProperties);

@@ -46,7 +46,7 @@ public class JwtProperties {
 
     /** Tiempo de vida del refresh token en días. */
     @Positive
-    private long refreshTokenExpirationDays = 30;
+    private long refreshTokenExpirationDays = 7;
 
     /** Margen de tolerancia para diferencias de reloj, en segundos. */
     @PositiveOrZero

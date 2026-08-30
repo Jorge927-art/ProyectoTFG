@@ -33,8 +33,8 @@ class JwtPropertiesTest {
                 "El emisor canónico debe ser cursosonline-backend");
         assertEquals(15, jwtProperties.getAccessTokenExpirationMinutes(),
                 "El Access Token por defecto debe durar 15 minutos");
-        assertEquals(30, jwtProperties.getRefreshTokenExpirationDays(),
-                "El Refresh Token por defecto debe durar 30 días");
+        assertEquals(7, jwtProperties.getRefreshTokenExpirationDays(),
+                "El Refresh Token por defecto debe durar 7 días");
         assertEquals(60, jwtProperties.getClockSkewSeconds(), "La tolerancia de reloj inicial debe ser de 60 segundos");
     }
 
