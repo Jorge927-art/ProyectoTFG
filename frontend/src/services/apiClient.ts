@@ -45,7 +45,54 @@ function shouldBypassRefresh(url?: string): boolean {
     return AUTH_PATHS_WITHOUT_RETRY.some((path) => url.includes(path));
 }
 
+// Mutex entre pestañas: el refresh token es de un solo uso en backend, así que dos
+// pestañas no pueden llamar a /api/auth/refresh en paralelo con la misma cookie.
+const CROSS_TAB_REFRESH_LOCK_KEY = 'auth_refresh_lock';
+const REFRESH_LOCK_TTL_MS = 6000; // Margen sobre el timeout de red (5000ms) por si la pestaña que tiene el lock muere.
+const REFRESH_LOCK_POLL_MS = 150;
+const REFRESH_LOCK_MAX_WAIT_MS = 6000;
+
+function hasBrowserStorage(): boolean {
+    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+}
+
+function isRefreshLockFree(): boolean {
+    const lockedAt = Number(window.localStorage.getItem(CROSS_TAB_REFRESH_LOCK_KEY));
+    return !lockedAt || Number.isNaN(lockedAt) || (Date.now() - lockedAt) > REFRESH_LOCK_TTL_MS;
+}
+
+function acquireCrossTabRefreshLock(): boolean {
+    if (!hasBrowserStorage()) {
+        return true;
+    }
+    if (!isRefreshLockFree()) {
+        return false;
+    }
+    window.localStorage.setItem(CROSS_TAB_REFRESH_LOCK_KEY, String(Date.now()));
+    return true;
+}
+
+function releaseCrossTabRefreshLock() {
+    if (hasBrowserStorage()) {
+        window.localStorage.removeItem(CROSS_TAB_REFRESH_LOCK_KEY);
+    }
+}
+
+// Espera a que la pestaña que ya está refrescando termine (o su lock caduque) antes de
+// intentar nuestro propio refresh, evitando que dos pestañas roten el mismo token a la vez.
+async function waitForCrossTabRefreshLock(): Promise<void> {
+    const start = Date.now();
+    while (!isRefreshLockFree() && (Date.now() - start) < REFRESH_LOCK_MAX_WAIT_MS) {
+        await new Promise((resolve) => setTimeout(resolve, REFRESH_LOCK_POLL_MS));
+    }
+}
+
 async function performRefreshAccessToken(): Promise<AccessTokenRefreshResult | null> {
+    if (!acquireCrossTabRefreshLock()) {
+        await waitForCrossTabRefreshLock();
+        acquireCrossTabRefreshLock();
+    }
+
     try {
         const response = await axios.post<RefreshResponse>(
             `${API_URL}/api/auth/refresh`,
@@ -68,6 +115,8 @@ async function performRefreshAccessToken(): Promise<AccessTokenRefreshResult | n
         return response.data;
     } catch {
         return null;
+    } finally {
+        releaseCrossTabRefreshLock();
     }
 }
 

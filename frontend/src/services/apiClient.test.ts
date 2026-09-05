@@ -19,6 +19,7 @@ describe('apiClient - Suite de Pruebas Unitarias de Interceptores de Red', () =>
     
     beforeEach(() => {
         vi.clearAllMocks();
+        window.localStorage.clear();
     });
 
     /* =========================================================================

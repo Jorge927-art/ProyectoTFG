@@ -2646,3 +2646,79 @@ La implementación del módulo en `/admin` refuerza además la separación de re
 | Integridad del flujo de administración | tests de controller/service y protección de rutas | operación consistente y no propagada a otros roles |
 
 ---
+
+# ADR-67: Aplazamiento Deliberado de Sincronización en Tiempo Real para el Canal de Notificaciones
+
+## Estatus
+
+Aceptado (como deuda técnica documentada, no como defecto)
+
+## Fecha
+
+Agosto 2026
+
+## Contexto
+
+`GlobalNotificationBell` obtiene las notificaciones pendientes (documentos no leídos, avisos docentes, alertas de progreso) mediante una consulta bajo demanda (`fetchAlerts`), ejecutada únicamente al montar el componente o en respuesta a un evento disparado por acciones de la propia sesión del usuario. No existe sondeo periódico (`setInterval`), WebSocket ni Server-Sent Events. Como consecuencia, un usuario con la sesión abierta no ve reflejada en la campana una notificación generada por la acción de otro usuario (por ejemplo, un profesor enviando un documento a un alumno) hasta que recarga la página o navega de forma que el componente se remonte.
+
+## Decisión
+
+No introducir ningún mecanismo de sincronización en tiempo real en esta fase del proyecto. Se documenta la limitación como deuda técnica consciente en lugar de corregirla, dado que los datos subyacentes son en todo momento correctos y consultables — el retraso es exclusivamente de propagación hacia el cliente, no de integridad de datos.
+
+## Justificación para el TFG
+
+Introducir sondeo continuo o un canal push (WebSocket/SSE) en la fase final del proyecto constituye un cambio estructural de sincronización, no un ajuste puntual: afecta a la gestión de conexiones, al ciclo de vida de los componentes que consumen notificaciones, y requeriría una batería de pruebas dedicada para descartar regresiones en login/logout y en el flujo de descarte de notificaciones (`dismissUserNotifications`), ambos ya cubiertos por una suite de tests estable. El riesgo de introducir una regresión en un sistema ya validado supera el beneficio de una campana que se actualiza con antelación de minutos en lugar de al recargar la página.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* Cero riesgo de regresión sobre el sistema de autenticación y el flujo de notificaciones ya probado.
+* Alcance del cambio acotado a documentación, sin tocar código de producción.
+
+### Impacto Negativo / Riesgos Aceptados
+
+* El usuario final no recibe avisos inmediatos de eventos generados por terceros mientras su sesión permanece abierta sin recargar.
+* *Mitigación futura propuesta:* evaluar en una segunda fase, con diseño y pruebas dedicadas, un mecanismo de sondeo ligero (`setInterval` de baja frecuencia) como paso intermedio antes de considerar WebSocket/SSE.
+
+---
+
+# ADR-68: Serialización entre Pestañas de la Rotación de Refresh Token
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Septiembre 2026
+
+## Contexto
+
+El modelo de sesión JWT (ADR-60) emite el `accessToken` únicamente en memoria de cliente y persiste el `refreshToken` en una cookie `HttpOnly` compartida por todas las pestañas del mismo origen. El backend (`RefreshTokenService.rotate`) trata cada refresh token como de un solo uso: al consumirse, se revoca de inmediato y se emite uno nuevo.
+
+Este diseño es correcto para una única pestaña, pero entra en conflicto con el hecho de que el `accessToken` en memoria no se comparte entre pestañas: cada pestaña, al cargarse o al detectar expiración de su propio token, dispara su propia llamada a `POST /api/auth/refresh`. Si dos pestañas lo hacen de forma concurrente (por ejemplo, al abrir la aplicación en una segunda pestaña, o al recuperar el foco tras dejarla en segundo plano), ambas presentan la misma cookie de refresh token vigente en ese instante. La primera en llegar al servidor rota el token con éxito; la segunda recibe `"Refresh token inválido o revocado"`, lo que dispara `logout()` en esa pestaña. Como `clearStoredAuth()` limpia `localStorage` (compartido entre pestañas) y además invoca `POST /api/auth/logout` (que revoca el refresh token vigente en ese momento), el fallo de una sola pestaña expulsaba también a la pestaña que sí había refrescado correctamente. El síntoma percibido por el usuario era una expulsión de sesión tras un período sin interactuar con la página, pese a que el refresh token de 7 días seguía siendo válido.
+
+## Decisión
+
+Se introduce en el cliente un mutex entre pestañas basado en `localStorage`, sin modificar el contrato de rotación del backend ni el modelo de almacenamiento del `accessToken`.
+
+* Antes de invocar `POST /api/auth/refresh`, la pestaña intenta reservar una clave `auth_refresh_lock` con marca de tiempo en `localStorage`.
+* Si el lock está en uso por otra pestaña (marca de tiempo reciente), la pestaña actual espera en sondeo corto a que se libere, o a que caduque por TTL (6s, margen sobre el timeout de red de 5s) si la pestaña que lo tomó quedó inconsistente.
+* Una vez libre el lock, la pestaña realiza su propia llamada de refresh, que ya usa la cookie actualizada por la rotación previa, evitando presentar un refresh token ya revocado.
+* El lock se libera siempre en un bloque `finally`, tanto en éxito como en fallo de la petición.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* Elimina la expulsión en cascada de sesión por condición de carrera multi-pestaña sin tocar `RefreshTokenService` ni la política de rotación de un solo uso.
+* Cambio acotado a `apiClient.ts`; no varía el modelo de seguridad (el `accessToken` sigue sin persistirse fuera de memoria).
+* Compatible con el mecanismo de single-flight ya existente para 401 concurrentes dentro de una misma pestaña (ADR-60).
+
+### Impacto Negativo / Riesgos Mitigados
+
+* Introduce una dependencia adicional en `localStorage` para coordinación, con TTL como salvaguarda ante pestañas que queden bloqueadas o se cierren abruptamente mientras sostienen el lock.
+* No resuelve el caso de despliegue con frontend y backend en dominios distintos y cookie `SameSite=Strict`, que queda como riesgo pendiente de revisión en la configuración de producción.
+
+---
