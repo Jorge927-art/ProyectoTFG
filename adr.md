@@ -1243,7 +1243,7 @@ La entidad `Interest` mapea las colecciones de preferencias dinámicas del estud
 
 ## Decisión
 
-Implementar una **Estrategia de Hidratación Explícita Controlada** dentro del método de lectura transaccional `getUserInterests` de `UserService.java`. En lugar de forzar un acoplamiento estructural rígido mediante `@ElementCollection(fetch = FetchType.EAGER)` —el cual sobrecargaría el rendimiento con productos cartesianos inválidos en PostgreSQL—, se mantiene el esquema diferido eficiente (`LAZY`) y se ejecuta programáticamente el método de resolución de proxies invocando el tamaño de cada colección (`.size()`) antes de salir del ámbito del servicio:
+Configurar las cinco colecciones de preferencias de `Interest` mediante `@ElementCollection(fetch = FetchType.EAGER)`. Las preferencias se recuperan siempre de forma conjunta al cargar el perfil de intereses, evitando excepciones de tipo `LazyInitializationException` durante la conversión a `InterestDTO` fuera de la sesión de persistencia.
 
 ```java
 if (interest.getCategory() != null) interest.getCategory().size();
@@ -1253,25 +1253,25 @@ if (interest.getLanguage() != null) interest.getLanguage().size();
 if (interest.getSubtitle_languages() != null) interest.getSubtitle_languages().size();
 ```
 
-Esto obliga al ORM a poblar las colecciones satélite de forma síncrona mientras la transacción `@Transactional(readOnly = true)` permanece abierta.
+El método transaccional `getUserInterests` de `UserService.java` conserva además las llamadas a `.size()` como comprobación defensiva de hidratación antes de devolver el DTO.
 
 ## Justificación para el TFG
 
-* **Evaluación de Compromisos (*Trade-offs*):** Refleja la capacidad del ingeniero para evaluar de forma crítica los compromisos de diseño en la persistencia avanzada de datos.
-* **Control Preciso del Grafo de Datos:** Ante el tribunal, se defiende como una decisión táctica, defensiva y limpia: se evita delegar la carga en intermediarios o inicializaciones globales pesadas del proveedor, controlando a nivel de servicio cuándo y cómo se resuelve el grafo de datos. Esto blinda la API contra fallos de proxy en entornos multihilo o filtros desacoplados, manteniendo la consistencia de tipos primitivos.
+* **Evaluación de Compromisos (*Trade-offs*):** Refleja la decisión de priorizar la disponibilidad inmediata de las preferencias frente al coste de recuperar cinco colecciones pequeñas en cada lectura del perfil.
+* **Robustez del DTO:** La carga ansiosa evita que la transformación a `InterestDTO` dependa de que una sesión de Hibernate siga abierta fuera del servicio.
 
 ## Consecuencias
 
 ### Impacto Positivo
 
-* **Estabilidad Absoluta de la API:** Se eliminan de raíz las excepciones de inicialización diferida al transformar los intereses del alumno a `InterestDTO`, garantizando el retorno seguro de los datos en un estado HTTP 200 OK.
-* **Optimización de Recursos en PostgreSQL:** Al resolver los datos de forma dirigida en el *Read Path* del servicio, se previene el desperdicio de memoria y concurrencia en operaciones de escritura u otras consultas secundarias donde no se requiera el desglose multidimensional de intereses.
+* **Estabilidad de la API:** Se evitan excepciones de inicialización diferida al transformar los intereses del alumno a `InterestDTO`, garantizando el retorno de colecciones disponibles para el cliente.
+* **Implementación simple:** El comportamiento de lectura resulta predecible para los flujos que necesitan todas las dimensiones de preferencias, como autenticación y recomendaciones.
 * **Sincronización Coherente:** Este registro interactúa y se hermana directamente con las directrices de persistencia del [ADR-20], cerrando de forma definitiva la coherencia técnica entre el código fuente transaccional de Spring Boot y la documentación del monorrepo.
 
 ### Impacto Negativo / Riesgos Mitigados
 
-* **Aumento en el Número de Sentencias SQL (Problema de las N Consultas):** Invocar el método `.size()` de cinco colecciones independientes provoca que Hibernate dispare de forma secuencial cinco consultas `SELECT` independientes a PostgreSQL para contar los elementos de cada tabla satélite.
-* *Mitigación:* Al estar el perfil de intereses acotado y guardado de forma atómica en filas de tipos primitivos muy ligeros (máximo 10 filas por tabla de colección satélite por alumno), el tiempo de ejecución sumado de estas cinco consultas síncronas indexadas por clave primaria es inferior a 2 milisegundos, un coste computacionalmente insignificante que neutraliza por completo el riesgo de un desborde por producto cartesiano en el servidor.
+* **Coste de lectura adicional:** La carga ansiosa recupera las cinco colecciones de preferencias aunque un consumidor no necesite todas sus dimensiones.
+* *Mitigación:* El perfil está acotado a colecciones pequeñas de valores primitivos y los flujos principales de uso necesitan el conjunto completo de preferencias.
 
 ---
 
@@ -1444,24 +1444,27 @@ Aceptado
 
 ## Contexto
 
-Para consolidar las directrices de privacidad y control de acceso en el módulo de intercambio bidireccional y dirigido de archivos, se requería una solución técnica que garantizara que los documentos académicos almacenados en el servidor solo pudieran ser descargados por sus destinatarios legítimos o sus emisores originales. El diseño arquitectónico inicial presentaba tres vulnerabilidades críticas:
+Para reforzar el control de acceso en el módulo de intercambio bidireccional y dirigido de archivos, se requería un endpoint protegido que comprobara la relación del usuario con los metadatos del documento antes de servir su contenido. La aplicación mantiene también una ruta estática pública `/uploads/**` para servir recursos almacenados, por lo que el control anti-IDOR se aplica específicamente al flujo de descarga gestionado por la API.
 
-1. La ruta estática `/uploads/**` estaba configurada como pública en la seguridad perimetral, permitiendo que cualquier usuario malintencionado que conociera el nombre físico del archivo pudiera saltarse los filtros de autenticación y descargarlo de forma directa.
-2. El uso de `window.open(fileUrl)` en el frontend exponía metadatos e identificadores sensibles en la barra de direcciones del navegador, facilitando vectores de ataque basados en la enumeración predecible de recursos.
-3. El sistema carecía de un mecanismo de validación de identidad en tiempo de ejecución, lo que exponía la plataforma a vulnerabilidades de Referencia Directa Insegura a Objetos (IDOR), donde un alumno autenticado válidamente con su token JWT podía consultar recursos privados pertenecientes a otros alumnos modificando los parámetros de la solicitud.
+1. El cliente necesitaba un mecanismo de descarga que no dependiera de rutas físicas ni de identificadores de archivos conocidos por el usuario.
+2. El sistema requería validación de identidad en tiempo de ejecución para impedir que un usuario autenticado obtuviera documentos ajenos modificando el identificador del endpoint de descarga.
 
 ## Decisión
 
-1. **Aislamiento Perimetral y Blindaje de Archivos:** Eliminar por completo la regla estática `.requestMatchers("/uploads/**").permitAll()` en `SecurityConfig.java`. El directorio de almacenamiento físico queda completamente aislado del tráfico de red externo, obligando a que cualquier solicitud de lectura sea interceptada y evaluada por el contexto de Spring Security.
-2. **Cortocircuito Defensivo Anti-IDOR (Backend):** Implementar el endpoint protegido `GET /api/v1/documents/download/{documentId}` en `DocumentController.java`. El método recupera el token JWT a través del objeto `Principal`, intercepta la entidad en la base de datos de PostgreSQL y evalúa mediante una condición excluyente si el `username` del usuario autenticado coincide obligatoriamente con el emisor (`sender_id`) o el receptor (`receiver_id`) del documento. Si la validación falla, el flujo se interrumpe de forma reactiva respondiendo con un estado HTTP 403 Forbidden.
+1. **Recursos estáticos públicos:** Mantener la regla `GET /uploads/**` y el mapeo estático de `WebConfig` para servir los recursos almacenados mediante URL directa.
+2. **Cortocircuito Defensivo Anti-IDOR (Backend):** Implementar el endpoint protegido `GET /api/v1/documents/download/{documentId}` en `DocumentController.java`. El método recupera el token JWT a través del objeto `Principal`, consulta la entidad en PostgreSQL y verifica que el `username` autenticado coincida con el emisor (`sender_id`) o el receptor (`receiver_id`) del documento. Si la validación falla, responde con HTTP 403 Forbidden.
 3. **Consumo por Flujo de Datos Binarios (Frontend):** Sustituir el uso de `window.open` en el cliente por un consumo asíncrono basado en `Blob`. La función `downloadDocumentSecure` inyecta de forma transparente el token JWT en las cabeceras de autorización mediante el cliente HTTP de Axios (`apiClient`) y procesa el flujo de bytes directamente en la memoria del navegador, forzando la descarga local con el nombre real del archivo (`originalname`).
 4. **Control de Concurrencia y Estado Visual en la UI:** Refactorizar el componente `DocumentManager.tsx` inyectando un estado de bloqueo local denominado `downloadingId`. Al activar el evento `onClick`, el componente inhabilita el botón correspondiente (`disabled`) para evitar solicitudes HTTP simultáneas o dobles clics accidentales del usuario. Simultáneamente, se muta el icono estático por un spinner animado (`Loader2`) preservando las dimensiones geométricas y las clases de Tailwind CSS sin alterar la maquetación.
 
 ## Consecuencias
 
-* **Mitigación Completa de Vulnerabilidades IDOR:** Se erradica la posibilidad de fugas de información por manipulación de identificadores en la URL. El servidor valida la matriz de permisos de forma interna, garantizando la confidencialidad estricta del material académico.
+* **Mitigación de IDOR en la API de descarga:** El endpoint protegido valida la matriz de permisos antes de servir documentos solicitados mediante su identificador lógico.
 * **Flujos de Datos Transparentes:** Las credenciales de autorización y los tokens JWT viajan encapsulados de forma oculta en las cabeceras HTTP, evitando la exposición de firmas digitales en el historial del navegador o en los logs del servidor proxy.
 * **Integridad de la Suite de Pruebas:** Los tests de integración con `MockMvc` en `DocumentControllerTest.java` validan con éxito que los intentos de intrusión devuelvan un error 403. En el cliente, la refactorización mantiene en verde un consolidado absoluto de 46 tests en Vitest, garantizando que el comportamiento asíncrono y los bloqueos de interfaz se ejecutan de manera predecible y libre de regresiones.
+
+### Riesgo aceptado
+
+* La ruta estática pública `/uploads/**` no aplica el control anti-IDOR del endpoint de descarga. Si el proyecto necesitara confidencialidad estricta para todos los documentos almacenados, esta ruta debería restringirse o separarse entre recursos públicos y privados.
 
 ---
 
