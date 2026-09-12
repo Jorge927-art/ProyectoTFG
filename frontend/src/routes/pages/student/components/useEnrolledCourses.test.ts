@@ -250,8 +250,8 @@ describe('useEnrolledCourses - Suite de Pruebas Unitarias de Hooks Avanzados', (
         expect(firstEnrollment.progress_percentage).toBe(45);
         expect(firstEnrollment.course.title).toBe('Testing Avanzado con Vitest');
         expect(firstEnrollment.grades).toEqual([
-            { title: 'Trabajo 1', score: '8.75' },
-            { title: 'Examen final', score: '9.5' }
+            { gradeId: undefined, title: 'Trabajo 1', score: '8.75', comments: '' },
+            { gradeId: undefined, title: 'Examen final', score: '9.5', comments: '' }
         ]);
     });
 

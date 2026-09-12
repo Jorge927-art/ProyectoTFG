@@ -70,7 +70,6 @@ const NoAuthWrapper = ({ children }: { children: React.ReactNode }) => {
 describe('useNotifications', () => {
     let currentAlerts: NotificationDTO[];
     let currentDocuments: DocumentMetadata[];
-    let currentRecommendations: Array<{ id: number; title: string; instructor: string; category: string; rating: number; reason: string }>;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -85,13 +84,7 @@ describe('useNotifications', () => {
             },
         ];
         currentDocuments = [buildDoc(false)];
-        currentRecommendations = [];
-
-        vi.spyOn(apiClient, 'get').mockImplementation(async (url: string) => {
-            if (url === '/api/courses/recommendations') {
-                return { data: currentRecommendations } as never;
-            }
-
+        vi.spyOn(apiClient, 'get').mockImplementation(async () => {
             return { data: currentAlerts } as never;
         });
         vi.spyOn(documentService, 'getUserDocuments').mockImplementation(async () => currentDocuments);
@@ -236,6 +229,25 @@ describe('useNotifications', () => {
         expect(hook.result.current.alerts[0].redirectUrl).toContain('documentId=1');
     });
 
+    it('respeta redirectUrl contextual cuando backend ya incluye courseId y documentId', async () => {
+        currentAlerts = [
+            {
+                type: 'DOCUMENT_INBOX',
+                title: 'Bandeja',
+                message: 'Tienes un documento pendiente',
+                redirectUrl: '/student?focus=documents&documentId=55&courseId=101'
+            }
+        ];
+
+        const hook = renderHook(() => useNotifications(), { wrapper: AuthWrapper });
+
+        await waitFor(() => {
+            expect(hook.result.current.loading).toBe(false);
+        });
+
+        expect(hook.result.current.alerts[0].redirectUrl).toBe('/student?focus=documents&documentId=55&courseId=101');
+    });
+
     it('activa DOCUMENT_INBOX con MP4 no leído en alumno igual que con PDF', async () => {
         currentAlerts = [];
         currentDocuments = [
@@ -288,19 +300,45 @@ describe('useNotifications', () => {
         expect(hook.result.current.alerts[0].redirectUrl).toContain('senderId=42');
     });
 
-    it('activa aviso de campana cuando aparece un nuevo curso recomendado para el estudiante', async () => {
+    it('distingue la bandeja de exámenes de la bandeja de documentos y trabajos', async () => {
+        currentAlerts = [];
+        currentDocuments = [
+            { ...buildDoc(false), documentid: 101, evaluation_type: 'EXAMEN' },
+            { ...buildDoc(false), documentid: 102, evaluation_type: 'TRABAJO' },
+        ];
+
+        const hook = renderHook(() => useNotifications(), { wrapper: ProfessorAuthWrapper });
+
+        await waitFor(() => {
+            expect(hook.result.current.loading).toBe(false);
+        });
+
+        expect(hook.result.current.alerts[0].message).toContain('Bandeja de envío y recepción de exámenes: 1 documento(s)');
+        expect(hook.result.current.alerts[0].message).toContain('Bandeja de documentos y trabajos: 1 documento(s)');
+    });
+
+    it('usa Recepción de Documentos para la alarma del administrador e incluye remitente', async () => {
+        currentAlerts = [];
+        currentDocuments = [{
+            ...buildDoc(false),
+            documentid: 103,
+            evaluation_type: 'EXAMEN',
+            sender: { userId: 42, username: 'Luis', email: 'luis@tfg.com', role: 'STUDENT' },
+        }];
+
+        const hook = renderHook(() => useNotifications(), { wrapper: AdminAuthWrapper });
+
+        await waitFor(() => {
+            expect(hook.result.current.loading).toBe(false);
+        });
+
+        expect(hook.result.current.alerts[0].message).toContain('Recepción de Documentos: 1 documento(s)');
+        expect(hook.result.current.alerts[0].message).toContain('Remitente: Luis');
+    });
+
+    it('muestra una alarma de recomendación persistida por el backend y no la calcula desde el catálogo', async () => {
         currentAlerts = [];
         currentDocuments = [buildDoc(true)];
-        currentRecommendations = [
-            {
-                id: 101,
-                title: 'Curso base recomendado',
-                instructor: 'Profesor A',
-                category: 'Datos',
-                rating: 4.8,
-                reason: 'Coincide con tus intereses',
-            },
-        ];
 
         const patchSpy = vi.spyOn(apiClient, 'patch').mockResolvedValue({} as never);
         const hook = renderHook(() => useNotifications(), { wrapper: AuthWrapper });
@@ -312,17 +350,13 @@ describe('useNotifications', () => {
         // Primera carga: se crea baseline y no debe aparecer aviso por histórico.
         expect(hook.result.current.alerts.some((alert) => alert.type === 'COURSE_RECOMMENDATION')).toBe(false);
 
-        currentRecommendations = [
-            ...currentRecommendations,
-            {
-                id: 202,
-                title: 'Nuevo curso recomendado',
-                instructor: 'Profesora B',
-                category: 'IA',
-                rating: 4.9,
-                reason: 'Nuevo match por tus preferencias',
-            },
-        ];
+        currentAlerts = [{
+            notificationId: 202,
+            type: 'COURSE_RECOMMENDATION',
+            title: 'Nuevas recomendaciones para ti',
+            message: 'La asignatura "Nuevo curso recomendado" coincide con tus intereses.',
+            redirectUrl: '/student',
+        }];
 
         await act(async () => {
             await hook.result.current.refreshNotifications();
@@ -331,7 +365,7 @@ describe('useNotifications', () => {
         await waitFor(() => {
             const recommendationAlert = hook.result.current.alerts.find((alert) => alert.type === 'COURSE_RECOMMENDATION');
             expect(recommendationAlert).toBeDefined();
-            expect(recommendationAlert?.title).toContain('recomendación');
+            expect(recommendationAlert?.title).toMatch(/recomendaciones/i);
             expect(recommendationAlert?.redirectUrl).toBe('/student');
         });
 
@@ -341,6 +375,7 @@ describe('useNotifications', () => {
 
         expect(patchSpy).toHaveBeenCalledWith('/api/auth/notifications/dismiss');
 
+        currentAlerts = [];
         await act(async () => {
             await hook.result.current.refreshNotifications();
         });

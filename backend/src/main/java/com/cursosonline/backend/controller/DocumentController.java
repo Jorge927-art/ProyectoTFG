@@ -12,6 +12,7 @@ import com.cursosonline.backend.repository.DocumentMetadataRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
 import com.cursosonline.backend.services.FileStorageService;
+import com.cursosonline.backend.services.ProfessorCourseAlertService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Objects;
+import java.util.Locale;
 
 /**
  * Controlador REST para gestionar las operaciones relacionadas con la
@@ -43,6 +45,7 @@ public class DocumentController {
     private final CoursesRepository coursesRepository;
     private final UserRepository userRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final ProfessorCourseAlertService professorCourseAlertService;
 
     /**
      * Constructor de la clase DocumentController.
@@ -58,12 +61,14 @@ public class DocumentController {
             DocumentMetadataRepository documentMetadataRepository,
             CoursesRepository coursesRepository,
             UserRepository userRepository,
-            EnrollmentRepository enrollmentRepository) {
+            EnrollmentRepository enrollmentRepository,
+            ProfessorCourseAlertService professorCourseAlertService) {
         this.fileStorageService = fileStorageService;
         this.documentMetadataRepository = documentMetadataRepository;
         this.coursesRepository = coursesRepository;
         this.userRepository = userRepository;
         this.enrollmentRepository = enrollmentRepository;
+        this.professorCourseAlertService = professorCourseAlertService;
     }
 
     /**
@@ -137,6 +142,33 @@ public class DocumentController {
      * asignatura: alumnado activo del curso, profesorado asociado al curso y
      * administradores globales.
      */
+    @GetMapping("/directory/course/{courseId}")
+    @PreAuthorize("hasAuthority('STUDENT')")
+    public ResponseEntity<?> getStudentCourseDirectory(
+            Authentication authentication,
+            @PathVariable("courseId") Long courseId) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            Users currentUser = resolveAuthenticatedUser(authentication.getName(),
+                    "Usuario autenticado no encontrado.");
+            if (!enrollmentRepository.existsByUsernameAndCourseId(currentUser.getUsername(), courseId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error",
+                                "Solo puedes consultar usuarios de asignaturas en las que estás matriculado."));
+            }
+
+            return getProfessorRecipientsByCourse(authentication, courseId);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error al recuperar usuarios de la asignatura",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
     @GetMapping("/professor/courses/{courseId}/recipients")
     @PreAuthorize("hasAnyAuthority('PROFESSOR','ADMIN')")
     public ResponseEntity<?> getProfessorRecipientsByCourse(
@@ -241,8 +273,8 @@ public class DocumentController {
             }
 
             String username = authentication.getName();
-            // Reemplaza la línea vieja por esta nueva versión limpia:
-            List<DocumentMetadata> documents = documentMetadataRepository.findReceivedDocumentsByUsername(username);
+            List<DocumentMetadata> documents = documentMetadataRepository
+                    .findReceivedGeneralDocumentsByUsername(username);
 
             return ResponseEntity.ok(documents.stream().map(this::toDocumentResponse).toList());
 
@@ -270,7 +302,8 @@ public class DocumentController {
             }
 
             String username = authentication.getName();
-            List<DocumentMetadata> documents = documentMetadataRepository.findSentDocumentsByUsername(username);
+            List<DocumentMetadata> documents = documentMetadataRepository
+                    .findSentGeneralDocumentsByUsername(username);
 
             return ResponseEntity.ok(documents.stream().map(this::toDocumentResponse).toList());
         } catch (Exception e) {
@@ -386,6 +419,40 @@ public class DocumentController {
     }
 
     /**
+     * Recupera los exámenes/documentos enviados por el profesor al alumno de
+     * una matrícula concreta.
+     */
+    @GetMapping("/course/enrollment/{enrollmentId}/sent")
+    @PreAuthorize("hasAuthority('PROFESSOR')")
+    public ResponseEntity<?> getSentDocumentsByEnrollmentId(
+            Authentication authentication,
+            @PathVariable("enrollmentId") Long enrollmentId) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            boolean isAuthorized = enrollmentRepository.isInstructorAuthorizedForEnrollment(
+                    enrollmentId,
+                    authentication.getName());
+
+            if (!isAuthorized) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Acceso denegado: no eres el instructor asignado a esta matrícula."));
+            }
+
+            List<DocumentMetadata> documents = documentMetadataRepository
+                    .findSentDocumentsByEnrollmentIdForInstructor(enrollmentId, authentication.getName());
+            return ResponseEntity.ok(documents.stream().map(this::toDocumentResponse).toList());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error al recuperar exámenes enviados al alumno",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
+    /**
      * Endpoint para subir un documento y enviarlo a otro usuario.
      * 
      * @param authentication Objeto Authentication que contiene la información del
@@ -399,7 +466,8 @@ public class DocumentController {
     public ResponseEntity<?> uploadDocument(
             Authentication authentication,
             @RequestParam("file") MultipartFile file,
-            @RequestParam("receiverId") Long receiverId) {
+            @RequestParam("receiverId") Long receiverId,
+            @RequestParam(name = "courseId", required = false) Long courseId) {
 
         try {
             if (authentication == null || !authentication.isAuthenticated()) {
@@ -425,12 +493,26 @@ public class DocumentController {
             Users receiverUser = userRepository.findById(receiverId)
                     .orElseThrow(() -> new RuntimeException("El usuario destinatario no existe."));
 
+            Courses selectedCourse = null;
+            if (courseId != null) {
+                if (!enrollmentRepository.existsByUsernameAndCourseId(authentication.getName(), courseId)) {
+                    throw new IllegalArgumentException(
+                            "No puedes enviar documentos en una asignatura en la que no estás matriculado.");
+                }
+                selectedCourse = coursesRepository.findById(courseId)
+                        .orElseThrow(() -> new IllegalArgumentException("La asignatura seleccionada no existe."));
+            }
+
             String relativePath = fileStorageService.storeDocumentFile(
                     file,
                     FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS);
             String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
 
-            persistDirectedDocumentPair(relativePath, cleanOriginalName, currentUser, receiverUser, null);
+            Courses receivedCourse = currentUser.getRole() == Role.STUDENT
+                    ? null
+                    : selectedCourse;
+            persistDirectedDocumentPair(relativePath, cleanOriginalName, currentUser, receiverUser, selectedCourse,
+                    receivedCourse);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Documento enviado con éxito al destinatario",
@@ -444,6 +526,13 @@ public class DocumentController {
                     "error", "Error crítico al procesar el intercambio del documento",
                     "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
         }
+    }
+
+    public ResponseEntity<?> uploadDocument(
+            Authentication authentication,
+            MultipartFile file,
+            Long receiverId) {
+        return uploadDocument(authentication, file, receiverId, null);
     }
 
     /**
@@ -497,7 +586,7 @@ public class DocumentController {
             for (Enrollment enrollment : classEnrollments) {
                 if (enrollment.getUser() != null) {
                     persistDirectedDocumentPair(relativePath, cleanOriginalName, currentUser, enrollment.getUser(),
-                            course);
+                            course, null);
                 }
             }
 
@@ -550,6 +639,8 @@ public class DocumentController {
             validateFileSize(file, STANDARD_DOCUMENT_MAX_BYTES,
                     "El archivo excede el límite de 5MB configurado para entregas académicas.");
 
+            validateExamFile(file, evaluationType);
+
             Users currentUser = resolveAuthenticatedUser(authentication.getName(), "Usuario emisor no encontrado.");
 
             // Selección determinista y acotada al alumno autenticado para evitar
@@ -597,6 +688,9 @@ public class DocumentController {
                     file,
                     FileStorageService.DocumentValidationProfile.BASIC_DOCUMENTS);
             String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
+            String normalizedEvaluationType = evaluationType == null
+                    ? ""
+                    : evaluationType.trim().toUpperCase(Locale.ROOT);
 
             DocumentMetadata sentMetadata = new DocumentMetadata();
             sentMetadata.setFilename(relativePath);
@@ -604,6 +698,7 @@ public class DocumentController {
             sentMetadata.setSender(currentUser);
             sentMetadata.setReceiver(receiverUser);
             sentMetadata.setCourse(enrollment.getCourse());
+            sentMetadata.setEvaluation_type(normalizedEvaluationType);
             sentMetadata.setFolder_type(FolderType.SENT);
             documentMetadataRepository.save(sentMetadata);
 
@@ -613,6 +708,7 @@ public class DocumentController {
             receivedMetadata.setSender(currentUser);
             receivedMetadata.setReceiver(receiverUser);
             receivedMetadata.setCourse(enrollment.getCourse());
+            receivedMetadata.setEvaluation_type(normalizedEvaluationType);
             receivedMetadata.setFolder_type(FolderType.RECEIVED);
             documentMetadataRepository.save(receivedMetadata);
 
@@ -660,17 +756,27 @@ public class DocumentController {
             List<Users> allProfessors = userRepository.findByRole(Role.PROFESSOR);
 
             // 3. Filtrar los profesores cuyos nombres aparezcan en la cadena "instructors"
-            // de los cursos matriculados
+            // de los cursos matriculados, tolerando matriculas sin curso o sin instructores
             List<UserDirectoryDTO> myTeachers = allProfessors.stream()
-                    .filter(prof -> enrollments.stream().anyMatch(e -> e.getCourse().getInstructors() != null &&
-                            e.getCourse().getInstructors().contains(prof.getUsername())))
-                    .map(p -> new UserDirectoryDTO(p.getUser_id(), p.getUsername(), p.getEmail(), p.getRole().name()))
+                    .filter(prof -> enrollments.stream()
+                            .anyMatch(e -> matchesInstructorInCourse(e, prof.getUsername())))
+                    .map(p -> new UserDirectoryDTO(p.getUser_id(), p.getUsername(), p.getEmail(),
+                            p.getRole() != null ? p.getRole().name() : "UNKNOWN"))
                     .toList();
 
             return ResponseEntity.ok(myTeachers);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
+    }
+
+    private boolean matchesInstructorInCourse(Enrollment enrollment, String username) {
+        if (enrollment == null || enrollment.getCourse() == null || username == null || username.isBlank()) {
+            return false;
+        }
+
+        String instructors = enrollment.getCourse().getInstructors();
+        return instructors != null && instructors.contains(username);
     }
 
     /**
@@ -844,6 +950,56 @@ public class DocumentController {
     }
 
     /**
+     * Oculta de forma lógica todos los documentos de mensajería general de la
+     * bandeja de entrada del usuario autenticado. No elimina registros físicos.
+     */
+    @PatchMapping("/received/hide-all")
+    public ResponseEntity<?> hideAllReceivedGeneralDocuments(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            String username = authentication.getName();
+            int hiddenCount = documentMetadataRepository.hideAllReceivedGeneralDocumentsByUsername(username);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Bandeja de entrada limpiada correctamente.",
+                    "hiddenCount", hiddenCount));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error al limpiar la bandeja de entrada.",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
+    /**
+     * Oculta de forma lógica todos los documentos de mensajería general de la
+     * bandeja de salida del usuario autenticado. No elimina registros físicos.
+     */
+    @PatchMapping("/sent/hide-all")
+    public ResponseEntity<?> hideAllSentGeneralDocuments(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            String username = authentication.getName();
+            int hiddenCount = documentMetadataRepository.hideAllSentGeneralDocumentsByUsername(username);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Bandeja de salida limpiada correctamente.",
+                    "hiddenCount", hiddenCount));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "Error al limpiar la bandeja de salida.",
+                    "detalles", e.getMessage() != null ? e.getMessage() : "Desconocido"));
+        }
+    }
+
+    /**
      * Convierte un objeto DocumentMetadata en un mapa de respuesta para la API.
      * 
      * @param document El objeto DocumentMetadata que se desea convertir.
@@ -901,14 +1057,13 @@ public class DocumentController {
 
     /**
      * Endpoint para que un profesor suba un documento y lo envíe a un alumno o a
-     * toda la clase.
+     * un alumno concreto.
      * 
      * @param authentication Objeto Authentication que contiene la información del
      *                       usuario autenticado.
      * @param file           El archivo que se desea subir.
      * @param courseId       El ID del curso al cual se desea enviar el documento.
-     * @param receiverId     El ID del alumno destinatario. Si es 0, se envía a toda
-     *                       la clase.
+     * @param receiverId     El ID positivo del alumno destinatario.
      * @return ResponseEntity con el resultado de la operación o un mensaje de error
      *         en caso de fallo.
      */
@@ -917,12 +1072,18 @@ public class DocumentController {
             Authentication authentication,
             @RequestParam("file") MultipartFile file,
             @RequestParam("courseId") Long courseId,
-            @RequestParam("receiverId") Long receiverId) {
+            @RequestParam("receiverId") Long receiverId,
+            @RequestParam(name = "deliveryType", required = false, defaultValue = "DOCUMENTO") String deliveryType) {
 
         try {
             if (authentication == null || !authentication.isAuthenticated()) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body(Map.of("error", "No autenticado o token JWT inválido."));
+            }
+
+            if (receiverId == null || receiverId <= 0) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Debes seleccionar un alumno destinatario concreto."));
             }
 
             if (file == null || file.isEmpty()) {
@@ -936,7 +1097,12 @@ public class DocumentController {
             Users currentUser = resolveAuthenticatedUser(authentication.getName(),
                     "Usuario profesor emisor no encontrado.");
 
-            Courses selectedCourse = coursesRepository.findById(courseId).orElse(null);
+            Courses selectedCourse = coursesRepository.findById(courseId)
+                    .orElseThrow(() -> new IllegalArgumentException("La asignatura seleccionada no existe."));
+
+            String normalizedDeliveryType = normalizeProfessorDeliveryType(deliveryType);
+
+            validateExamFile(file, normalizedDeliveryType);
 
             // Almacenamos el archivo una sola vez físicamente en el disco
             String relativePath = fileStorageService.storeDocumentFile(
@@ -944,51 +1110,7 @@ public class DocumentController {
                     FileStorageService.DocumentValidationProfile.ACADEMIC_MEDIA_DOCUMENTS);
             String cleanOriginalName = org.springframework.util.StringUtils.cleanPath(file.getOriginalFilename());
 
-            // CASO A: ENVÍO MASIVO A TODA LA CLASE (receiverId == 0)
-            if (receiverId == 0) {
-                // Buscamos únicamente matrículas activas de estudiantes para la asignatura.
-                List<Enrollment> classEnrollments = enrollmentRepository
-                        .findActiveStudentEnrollmentsByCourseId(courseId);
-
-                if (classEnrollments.isEmpty()) {
-                    return ResponseEntity.badRequest()
-                            .body(Map.of("error",
-                                    "No se puede realizar un envío masivo porque no hay alumnos matriculados."));
-                }
-
-                // Generamos metadatos por alumno para respetar receiver_id NOT NULL.
-                for (Enrollment enrollment : classEnrollments) {
-                    if (enrollment.getUser() != null) {
-                        Users classStudent = enrollment.getUser();
-
-                        DocumentMetadata bulkSentPerStudent = new DocumentMetadata();
-                        bulkSentPerStudent.setFilename(relativePath);
-                        bulkSentPerStudent.setOriginalname(cleanOriginalName);
-                        bulkSentPerStudent.setSender(currentUser);
-                        bulkSentPerStudent.setReceiver(classStudent);
-                        bulkSentPerStudent.setCourse(selectedCourse);
-                        bulkSentPerStudent.setFolder_type(FolderType.SENT);
-                        documentMetadataRepository.save(bulkSentPerStudent);
-
-                        // Registro de carpeta RECEIVED para que le salte la notificación en la campana
-                        DocumentMetadata bulkReceived = new DocumentMetadata();
-                        bulkReceived.setFilename(relativePath);
-                        bulkReceived.setOriginalname(cleanOriginalName);
-                        bulkReceived.setSender(currentUser);
-                        bulkReceived.setReceiver(classStudent);
-                        bulkReceived.setCourse(selectedCourse);
-                        bulkReceived.setFolder_type(FolderType.RECEIVED);
-                        bulkReceived.setRead(false);
-                        documentMetadataRepository.save(bulkReceived);
-                    }
-                }
-
-                return ResponseEntity.ok(Map.of(
-                        "message", "Documento transmitido con éxito de forma masiva a toda la clase",
-                        "totalStudents", classEnrollments.size()));
-            }
-
-            // CASO B: ENVÍO SEGMENTADO INDIVIDUAL (receiverId > 0)
+            // ENVÍO INDIVIDUAL A UN ÚNICO ALUMNO
             Users receiverUser = userRepository.findById(receiverId)
                     .orElseThrow(() -> new RuntimeException("El alumno destinatario seleccionado no existe."));
 
@@ -998,6 +1120,7 @@ public class DocumentController {
             singleSent.setSender(currentUser);
             singleSent.setReceiver(receiverUser);
             singleSent.setCourse(selectedCourse);
+            singleSent.setEvaluation_type(normalizedDeliveryType);
             singleSent.setFolder_type(FolderType.SENT);
             documentMetadataRepository.save(singleSent);
 
@@ -1006,13 +1129,18 @@ public class DocumentController {
             singleReceived.setOriginalname(cleanOriginalName);
             singleReceived.setSender(currentUser);
             singleReceived.setReceiver(receiverUser);
-            singleReceived.setCourse(selectedCourse);
+            singleReceived.setCourse(resolveReceivedCourseByDeliveryType(selectedCourse, normalizedDeliveryType));
+            singleReceived.setEvaluation_type(normalizedDeliveryType);
             singleReceived.setFolder_type(FolderType.RECEIVED);
             singleReceived.setRead(false);
             documentMetadataRepository.save(singleReceived);
+            professorCourseAlertService.resolveOldestViewedAlertAfterSuccessfulDelivery(
+                    currentUser.getUsername(), receiverUser.getUser_id(), courseId,
+                    "EXAMEN".equals(normalizedDeliveryType));
 
             return ResponseEntity.ok(Map.of(
                     "message", "Documento enviado con éxito de forma individual al alumno",
+                    "deliveryType", normalizedDeliveryType,
                     "receiver", receiverUser.getUsername()));
 
         } catch (IllegalArgumentException e) {
@@ -1059,6 +1187,36 @@ public class DocumentController {
         }
     }
 
+    private String normalizeProfessorDeliveryType(String deliveryType) {
+        if (deliveryType == null) {
+            return "DOCUMENTO";
+        }
+
+        String normalized = deliveryType.trim().toUpperCase(Locale.ROOT);
+        if (!normalized.equals("DOCUMENTO") && !normalized.equals("TRABAJO") && !normalized.equals("EXAMEN")) {
+            throw new IllegalArgumentException("Tipo de envío no válido. Usa DOCUMENTO, TRABAJO o EXAMEN.");
+        }
+
+        return normalized;
+    }
+
+    private void validateExamFile(MultipartFile file, String deliveryType) {
+        if (!"EXAMEN".equalsIgnoreCase(deliveryType)) {
+            return;
+        }
+
+        String filename = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase(Locale.ROOT) : "";
+        String contentType = file.getContentType() != null ? file.getContentType().toLowerCase(Locale.ROOT) : "";
+        if (!filename.endsWith(".pdf") || !"application/pdf".equals(contentType)) {
+            throw new IllegalArgumentException(
+                    "Los exámenes solo admiten archivos PDF; los vídeos no están permitidos.");
+        }
+    }
+
+    private Courses resolveReceivedCourseByDeliveryType(Courses selectedCourse, String deliveryType) {
+        return "DOCUMENTO".equals(deliveryType) ? null : selectedCourse;
+    }
+
     /**
      * Persiste un par de metadatos de documento dirigido (emisor y receptor) en la
      * base de datos.
@@ -1072,12 +1230,17 @@ public class DocumentController {
     private void persistDirectedDocumentPair(String relativePath, String cleanOriginalName, Users sender,
             Users receiver,
             Courses course) {
+        persistDirectedDocumentPair(relativePath, cleanOriginalName, sender, receiver, course, course);
+    }
+
+    private void persistDirectedDocumentPair(String relativePath, String cleanOriginalName, Users sender,
+            Users receiver, Courses sentCourse, Courses receivedCourse) {
         DocumentMetadata sentMetadata = new DocumentMetadata();
         sentMetadata.setFilename(relativePath);
         sentMetadata.setOriginalname(cleanOriginalName);
         sentMetadata.setSender(sender);
         sentMetadata.setReceiver(receiver);
-        sentMetadata.setCourse(course);
+        sentMetadata.setCourse(sentCourse);
         sentMetadata.setFolder_type(FolderType.SENT);
         sentMetadata.setRead(true);
         documentMetadataRepository.save(sentMetadata);
@@ -1087,7 +1250,7 @@ public class DocumentController {
         receivedMetadata.setOriginalname(cleanOriginalName);
         receivedMetadata.setSender(sender);
         receivedMetadata.setReceiver(receiver);
-        receivedMetadata.setCourse(course);
+        receivedMetadata.setCourse(receivedCourse);
         receivedMetadata.setFolder_type(FolderType.RECEIVED);
         receivedMetadata.setRead(false);
         documentMetadataRepository.save(receivedMetadata);

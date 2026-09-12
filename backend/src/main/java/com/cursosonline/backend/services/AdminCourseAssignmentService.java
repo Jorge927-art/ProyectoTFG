@@ -10,6 +10,7 @@ import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.exception.ResourceNotFoundException;
 import com.cursosonline.backend.exception.ServicesException;
 import com.cursosonline.backend.repository.CoursesRepository;
+import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.UserRepository;
 import com.cursosonline.backend.repository.UserSystemNotificationRepository;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class AdminCourseAssignmentService {
 
     private final UserRepository userRepository;
     private final CoursesRepository coursesRepository;
+    private final EnrollmentRepository enrollmentRepository;
     private final UserSystemNotificationRepository userSystemNotificationRepository;
     private final AdminCourseCatalogService adminCourseCatalogService;
 
@@ -108,6 +110,16 @@ public class AdminCourseAssignmentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Curso no encontrado con id: " + courseId));
 
         Users currentProfessor = course.getAssignedUser();
+
+        if (currentProfessor == null && hasLegacyInstructorOnly(course)) {
+            throw new ServicesException(
+                    "Acción inválida: este curso pertenece al dataset y no admite reasignación administrativa.");
+        }
+
+        if (hasCourseStarted(course)) {
+            throw new ServicesException(
+                    "Acción inválida: solo se puede reasignar un curso que no se haya iniciado nunca.");
+        }
 
         Users newProfessor = userRepository.findById(newProfessorId)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -215,5 +227,19 @@ public class AdminCourseAssignmentService {
             return "Curso sin título";
         }
         return title.trim().toLowerCase(Locale.ROOT).equals("null") ? "Curso sin título" : title.trim();
+    }
+
+    private boolean hasLegacyInstructorOnly(Courses course) {
+        String instructors = course.getInstructors();
+        return instructors != null && !instructors.trim().isEmpty();
+    }
+
+    private boolean hasCourseStarted(Courses course) {
+        Long courseId = course.getCourse_id();
+        if (courseId == null) {
+            return course.isEverUsed();
+        }
+
+        return course.isEverUsed() || enrollmentRepository.existsEnrollmentByCourseId(courseId);
     }
 }

@@ -32,6 +32,9 @@ public class UserSystemNotification {
     @JoinColumn(name = "receiver_user_id", nullable = false)
     private Users receiver;
 
+    @Column(name = "related_course_id")
+    private Long relatedCourseId;
+
     // Tipo de notificación, que puede ser "INFO", "WARNING" o "ERROR"
     @Column(nullable = false, length = 64)
     private String type;

@@ -38,15 +38,50 @@ export interface CourseUserStats {
     averageInstructorRating: number | null;
 }
 
+export interface CourseComment {
+    evaluationId: number;
+    studentUsername: string;
+    courseScore: number;
+    instructorScore: number;
+    comment: string;
+    evaluationDate: string;
+}
+
 export interface CourseCollectiveStats {
     activeStudentsInCourse: number;
     courseAverageProgressPercentage: number;
     completionRatePercentage: number;
     averageCourseRating: number | null;
     averageInstructorRating: number | null;
+    courseComments: CourseComment[];
     averageGrade: number | null;
     averageWorkGrade: number | null;
     averageFinalExamGrade: number | null;
+    yearlyComparisons: CourseYearComparison[];
+    studentStatistics: CourseStudentStats[];
+}
+
+export interface CourseStudentStats {
+    userId: number;
+    username: string;
+    progressPercentage: number;
+    averageGrade: number | null;
+    averageWorkGrade: number | null;
+    averageFinalExamGrade: number | null;
+    passed: boolean;
+}
+
+export interface CourseYearComparison {
+    year: number;
+    activeStudentsInCourse: number;
+    courseAverageProgressPercentage: number;
+    approvalIndexPercentage: number;
+    averageCourseRating: number | null;
+    averageInstructorRating: number | null;
+    averageGrade: number | null;
+    averageWorkGrade: number | null;
+    averageFinalExamGrade: number | null;
+    realData: boolean;
 }
 
 export const searchCourses = async (keyword: string): Promise<CourseSearchResult[]> => {
@@ -81,3 +116,4 @@ export const resolveCourseInsightErrorMessage = (err: unknown): string => {
     }
     return 'Error al consultar la información estadística del curso.';
 };
+

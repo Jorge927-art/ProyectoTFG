@@ -9,7 +9,8 @@ import { emitNotificationsRefresh } from '../../../../components/ui/globalNotifi
 vi.mock('../../../../services/documentService', () => ({
     downloadDocumentSecure: vi.fn(),
     getProfessorRecipientsByCourse: vi.fn(),
-    getReceivedDocumentsByCourse: vi.fn(),
+    hideAllReceivedGeneralDocuments: vi.fn(),
+    getUserDocuments: vi.fn(),
     getSentDocumentsByCourse: vi.fn(),
     markDocumentAsRead: vi.fn(),
     uploadProfessorDocument: vi.fn(),
@@ -72,12 +73,13 @@ const receivedUnreadVideoDoc: DocumentMetadata = {
 describe('ProfessorDocumentManager', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.spyOn(window, 'confirm').mockReturnValue(true);
 
         vi.mocked(documentService.getProfessorRecipientsByCourse).mockResolvedValue([
             { userId: 3, username: 'laura_student', email: 'laura@tfg.com', role: 'STUDENT' },
             { userId: 9, username: 'root_admin', email: 'admin@tfg.com', role: 'ADMIN' },
         ]);
-        vi.mocked(documentService.getReceivedDocumentsByCourse).mockResolvedValue([receivedUnreadDoc]);
+        vi.mocked(documentService.getUserDocuments).mockResolvedValue([receivedUnreadDoc]);
         vi.mocked(documentService.getSentDocumentsByCourse).mockResolvedValue([sentDoc]);
         vi.mocked(documentService.uploadProfessorDocument).mockResolvedValue({
             message: 'ok',
@@ -97,10 +99,58 @@ describe('ProfessorDocumentManager', () => {
 
         await waitFor(() => {
             expect(documentService.getProfessorRecipientsByCourse).toHaveBeenCalledWith(101);
-            expect(documentService.getReceivedDocumentsByCourse).toHaveBeenCalledWith(101);
+            expect(documentService.getUserDocuments).toHaveBeenCalled();
             expect(screen.getByText('feedback-algebra.pdf')).toBeInTheDocument();
             expect(screen.getByText('De: alumno_marta')).toBeInTheDocument();
         });
+    });
+
+    it('filtra en Recibidos los trabajos/exámenes asociados a asignatura para no mezclar bandejas', async () => {
+        const assignmentDoc: DocumentMetadata = {
+            documentid: 44,
+            filename: 'entrega-t1.pdf',
+            originalname: 'entrega-t1.pdf',
+            upload_date: '2026-08-06T10:00:00.000Z',
+            sender: { userId: 3, username: 'laura_student', email: 'laura@tfg.com', role: 'STUDENT' },
+            receiver: { userId: 2, username: 'profesor_juan', email: 'juan@tfg.com', role: 'PROFESSOR' },
+            folder_type: 'RECEIVED',
+            isRead: false,
+            course: { courseId: 101, title: 'Álgebra', category: 'Matemáticas' },
+        };
+
+        vi.mocked(documentService.getUserDocuments).mockResolvedValueOnce([receivedUnreadDoc, assignmentDoc]);
+
+        render(<ProfessorDocumentManager availableCourses={courses} />);
+
+        await waitFor(() => {
+            expect(screen.getByText('feedback-algebra.pdf')).toBeInTheDocument();
+        });
+
+        expect(screen.queryByText('entrega-t1.pdf')).not.toBeInTheDocument();
+    });
+
+    it('no muestra documentos de examen en la bandeja de documentación académica', async () => {
+        const examDoc: DocumentMetadata = {
+            documentid: 99,
+            filename: 'examen-final.pdf',
+            originalname: 'examen-final.pdf',
+            upload_date: '2026-08-06T10:00:00.000Z',
+            evaluation_type: 'EXAMEN',
+            sender: { userId: 2, username: 'profesor_juan', email: 'juan@tfg.com', role: 'PROFESSOR' },
+            receiver: { userId: 3, username: 'laura_student', email: 'laura@tfg.com', role: 'STUDENT' },
+            folder_type: 'RECEIVED',
+            isRead: false,
+        };
+
+        vi.mocked(documentService.getUserDocuments).mockResolvedValueOnce([receivedUnreadDoc, examDoc]);
+
+        render(<ProfessorDocumentManager availableCourses={courses} />);
+
+        await waitFor(() => {
+            expect(screen.getByText('feedback-algebra.pdf')).toBeInTheDocument();
+        });
+
+        expect(screen.queryByText('examen-final.pdf')).not.toBeInTheDocument();
     });
 
     it('al cambiar a Enviados consulta documentos enviados y renderiza el destinatario', async () => {
@@ -132,11 +182,12 @@ describe('ProfessorDocumentManager', () => {
         const file = new File(['contenido-video'], 'rubrica.mp4', { type: 'video/mp4' });
         fireEvent.change(fileInput, { target: { files: [file] } });
 
-        fireEvent.click(screen.getByRole('button', { name: 'Enviar documento' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Enviar documentación o trabajo' }));
 
         await waitFor(() => {
-            expect(documentService.uploadProfessorDocument).toHaveBeenCalledWith(file, 101, 3);
+            expect(documentService.uploadProfessorDocument).toHaveBeenCalledWith(file, 101, 3, 'DOCUMENTO');
             expect(documentService.getSentDocumentsByCourse).toHaveBeenCalledWith(101);
+            expect(screen.getByText('Documento enviado correctamente: rubrica.mp4.')).toBeInTheDocument();
         });
     });
 
@@ -153,6 +204,28 @@ describe('ProfessorDocumentManager', () => {
             expect(documentService.downloadDocumentSecure).toHaveBeenCalledWith(11, 'feedback-algebra.pdf');
             expect(documentService.markDocumentAsRead).toHaveBeenCalledWith(11);
             expect(emitNotificationsRefresh).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    it('limpia lógicamente la bandeja recibida general del profesor', async () => {
+        vi.mocked(documentService.hideAllReceivedGeneralDocuments).mockResolvedValue({
+            message: 'ok',
+            hiddenCount: 1,
+        });
+
+        render(<ProfessorDocumentManager availableCourses={courses} />);
+
+        await waitFor(() => {
+            expect(screen.getByText('feedback-algebra.pdf')).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Limpiar bandeja de entrada' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Aceptar' }));
+
+        await waitFor(() => {
+            expect(documentService.hideAllReceivedGeneralDocuments).toHaveBeenCalledTimes(1);
+            expect(emitNotificationsRefresh).toHaveBeenCalledTimes(1);
+            expect(vi.mocked(documentService.getUserDocuments).mock.calls.length).toBeGreaterThanOrEqual(2);
         });
     });
 
@@ -181,7 +254,7 @@ describe('ProfessorDocumentManager', () => {
     });
 
     it('debe activar campana al descargar un MP4 recibido no leído (mismo flujo que documentos)', async () => {
-        vi.mocked(documentService.getReceivedDocumentsByCourse).mockResolvedValueOnce([receivedUnreadVideoDoc]);
+        vi.mocked(documentService.getUserDocuments).mockResolvedValue([receivedUnreadVideoDoc]);
         vi.mocked(documentService.markDocumentAsRead).mockResolvedValueOnce({
             message: 'ok',
             documentId: 33,

@@ -30,6 +30,9 @@
 	<properties>
 		<java.version>21</java.version>
 		<lombok.version>1.18.32</lombok.version>
+		<testcontainers.version>1.20.1</testcontainers.version>
+		<jacoco.minimum.instruction.ratio>0.09</jacoco.minimum.instruction.ratio>
+		<jacoco.minimum.line.ratio>0.08</jacoco.minimum.line.ratio>
 		<!-- CVE Fixes for Security Vulnerabilities -->
 		<json-smart.version>2.6.0</json-smart.version>
 		<assertj.version>3.27.7</assertj.version>
@@ -110,6 +113,20 @@
 		</dependency>
 
 		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<version>${testcontainers.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>postgresql</artifactId>
+			<version>${testcontainers.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter</artifactId>
 			<scope>test</scope>
@@ -180,6 +197,32 @@
 						<goals>
 							<goal>report</goal>
 						</goals>
+					</execution>
+					<execution>
+						<id>check</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<rule>
+									<element>BUNDLE</element>
+									<limits>
+										<limit>
+											<counter>INSTRUCTION</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>${jacoco.minimum.instruction.ratio}</minimum>
+										</limit>
+										<limit>
+											<counter>LINE</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>${jacoco.minimum.line.ratio}</minimum>
+										</limit>
+									</limits>
+								</rule>
+							</rules>
+						</configuration>
 					</execution>
 				</executions>
 			</plugin>

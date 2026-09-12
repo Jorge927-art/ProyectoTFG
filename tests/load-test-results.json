@@ -1,0 +1,46 @@
+{
+  "base_url": "http://localhost:8081",
+  "users": 89,
+  "concurrency": 10,
+  "elapsed_seconds": 3.973,
+  "total_requests": 356,
+  "failed_requests": 0,
+  "endpoints": {
+    "/api/auth/login": {
+      "requests": 89,
+      "status_counts": {
+        "200": 89
+      },
+      "average_ms": 169.65,
+      "max_ms": 650.58,
+      "p95_ms": 643.02
+    },
+    "/api/courses/search?query=python": {
+      "requests": 89,
+      "status_counts": {
+        "200": 89
+      },
+      "average_ms": 19.3,
+      "max_ms": 81.29,
+      "p95_ms": 78.64
+    },
+    "/api/courses/recommendations": {
+      "requests": 89,
+      "status_counts": {
+        "200": 89
+      },
+      "average_ms": 226.66,
+      "max_ms": 337.26,
+      "p95_ms": 321.08
+    },
+    "/api/auth/my-active-courses": {
+      "requests": 89,
+      "status_counts": {
+        "200": 89
+      },
+      "average_ms": 15.78,
+      "max_ms": 34.74,
+      "p95_ms": 31.66
+    }
+  }
+}

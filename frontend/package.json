@@ -9,6 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "coverage:ratchet": "node scripts/check-coverage-ratchet.mjs coverage/coverage-summary.json coverage-baseline.json",
     "test:run": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",

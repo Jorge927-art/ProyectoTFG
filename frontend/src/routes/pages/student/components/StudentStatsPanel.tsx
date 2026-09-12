@@ -1,10 +1,11 @@
 // frontend/src/routes/pages/student/components/StudentStatsPanel.tsx
 
-import { Trophy, Globe, Tags, Loader2, AlertCircle, FileText } from 'lucide-react';
+import { Trophy, Globe, Tags, Loader2, AlertCircle, FileText, MessageSquare, X } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import { useMemo, useState } from 'react';
 import type { EnrollmentInfo } from '../../../../services/courseTypes';
 import { useCourseStats } from './useCourseStats';
+import { dismissGradeNotifications } from '../../../../services/evaluationService';
 
 interface StudentStatsPanelProps {
     activeCourseId: number | undefined | null;
@@ -18,6 +19,7 @@ interface StudentStatsPanelProps {
 export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStatsPanelProps) => {
     // Estado interno para almacenar de forma reactiva la asignatura seleccionada [ADR-41]
     const [localSelectedId, setLocalSelectedId] = useState<number | null>(null);
+    const [selectedGradeDetail, setSelectedGradeDetail] = useState<{ title: string; score: string; comments: string } | null>(null);
     const selectedCourseId = localSelectedId ?? activeCourseId ?? null;
     const selectedEnrollments = useMemo(
         () => enrolledList.filter((enrollment) => enrollment.course?.course_id === selectedCourseId),
@@ -64,6 +66,21 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
         (grade) => !isExamGrade(grade.title) && !isFinalCourseGrade(grade.title)
     );
     const shouldShowScrollHint = workGrades.length > 3;
+    const hasClarification = (comments: string | undefined): boolean => Boolean(comments && comments.trim().length > 0);
+
+    const openGradeDetailModal = async (grade: { title: string; score: string; comments?: string }) => {
+        setSelectedGradeDetail({
+            title: grade.title,
+            score: String(grade.score),
+            comments: grade.comments?.trim() ?? '',
+        });
+
+        try {
+            await dismissGradeNotifications();
+        } catch {
+            // Silencioso: no bloqueamos la visualización del detalle por un fallo de red.
+        }
+    };
 
     return (
         <GenericCard className="h-full flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -106,7 +123,7 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
             </div>
 
             {/* CONTENEDOR OPERACIONAL CENTRAL */}
-            <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar pr-1">
 
                 {/* 1. Estado de Carga Unificado */}
                 {loadingStats && (
@@ -144,15 +161,34 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
 
                             <div className="pr-1 space-y-3 min-h-0">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <div className="p-3 bg-white border border-slate-100 rounded-xl flex items-center gap-2.5 min-w-0 shadow-xs">
-                                        <Trophy size={16} className="text-green-500 shrink-0" />
-                                        <div className="min-w-0">
-                                            <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight truncate">Nota del examen</p>
-                                            <p className="text-xs font-black text-slate-700 mt-0.5 truncate">
-                                                {examGrade ? `${formatDecimal(Number(examGrade.score))} / 10` : 'Pendiente de calificar'}
-                                            </p>
+                                    {examGrade ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => void openGradeDetailModal(examGrade)}
+                                            className="p-3 bg-white border border-slate-100 rounded-xl flex items-center gap-2.5 min-w-0 shadow-xs text-left hover:border-blue-200 transition-colors"
+                                        >
+                                            <Trophy size={16} className="text-green-500 shrink-0" />
+                                            <div className="min-w-0">
+                                                <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight truncate">Nota del examen</p>
+                                                <p className="text-xs font-black text-slate-700 mt-0.5 truncate">
+                                                    {formatDecimal(Number(examGrade.score))} / 10
+                                                </p>
+                                                {hasClarification(examGrade.comments) && (
+                                                    <p className="text-[10px] text-blue-700 font-semibold mt-1 flex items-center gap-1">
+                                                        <MessageSquare size={11} /> Incluye aclaracion
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </button>
+                                    ) : (
+                                        <div className="p-3 bg-white border border-slate-100 rounded-xl flex items-center gap-2.5 min-w-0 shadow-xs">
+                                            <Trophy size={16} className="text-green-500 shrink-0" />
+                                            <div className="min-w-0">
+                                                <p className="text-[9px] font-black text-slate-900 uppercase tracking-tight truncate">Nota del examen</p>
+                                                <p className="text-xs font-black text-slate-700 mt-0.5 truncate">Pendiente de calificar</p>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     <div className="p-3 bg-white border border-slate-100 rounded-xl flex items-center gap-2.5 min-w-0 shadow-xs">
                                         <FileText size={16} className="text-blue-500 shrink-0" />
@@ -193,18 +229,25 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
                                             </p>
                                         ) : (
                                             workGrades.map((grade, index) => (
-                                                <div
+                                                <button
+                                                    type="button"
                                                     key={`${grade.title}-${index}`}
-                                                    className="flex items-center justify-between gap-3 p-2 rounded-lg border border-slate-100 bg-slate-50"
+                                                    onClick={() => void openGradeDetailModal(grade)}
+                                                    className="w-full text-left flex items-center justify-between gap-3 p-2 rounded-lg border border-slate-100 bg-slate-50 hover:border-blue-200 transition-colors"
                                                 >
                                                     <div className="min-w-0">
                                                         <p className="text-xs font-bold text-slate-700 truncate">{grade.title}</p>
                                                         <p className="text-[10px] text-slate-400 uppercase tracking-wide">Trabajo</p>
+                                                        {hasClarification(grade.comments) && (
+                                                            <p className="text-[10px] text-blue-700 font-semibold mt-0.5 flex items-center gap-1 normal-case tracking-normal">
+                                                                <MessageSquare size={11} /> Incluye aclaracion
+                                                            </p>
+                                                        )}
                                                     </div>
                                                     <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md font-black text-[10px] shrink-0">
                                                         {formatDecimal(Number(grade.score))} / 10
                                                     </span>
-                                                </div>
+                                                </button>
                                             ))
                                         )}
                                     </div>
@@ -224,14 +267,23 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
                                     </div>
 
                                     {finalCourseGrade ? (
-                                        <div className="flex items-center justify-between gap-3 p-2 rounded-lg border border-emerald-100 bg-emerald-50">
+                                        <button
+                                            type="button"
+                                            onClick={() => void openGradeDetailModal(finalCourseGrade)}
+                                            className="w-full text-left flex items-center justify-between gap-3 p-2 rounded-lg border border-emerald-100 bg-emerald-50 hover:border-emerald-300 transition-colors"
+                                        >
                                             <span className="text-xs font-bold text-slate-700">
                                                 Ponderación de trabajos y examen final
+                                                {hasClarification(finalCourseGrade.comments) && (
+                                                    <span className="mt-1 block text-[10px] text-emerald-700 font-semibold">
+                                                        Incluye aclaracion
+                                                    </span>
+                                                )}
                                             </span>
                                             <span className="px-2 py-0.5 bg-emerald-600 text-white rounded-md font-black text-[10px] shrink-0">
                                                 {formatDecimal(Number(finalCourseGrade.score))} / 10
                                             </span>
-                                        </div>
+                                        </button>
                                     ) : (
                                         <p className="text-xs text-slate-400 italic">
                                             Aún no se ha publicado la nota final de esta asignatura.
@@ -272,6 +324,47 @@ export const StudentStatsPanel = ({ activeCourseId, enrolledList }: StudentStats
                     </div>
                 )}
             </div>
+
+            {selectedGradeDetail && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <button
+                        type="button"
+                        aria-label="Cerrar detalle de nota"
+                        className="absolute inset-0 bg-slate-900/40"
+                        onClick={() => setSelectedGradeDetail(null)}
+                    />
+                    <div className="relative w-full max-w-md rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                            <div>
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Detalle de nota</p>
+                                <h3 className="text-sm font-bold text-slate-800">{selectedGradeDetail.title}</h3>
+                            </div>
+                            <button
+                                type="button"
+                                aria-label="Cerrar modal"
+                                onClick={() => setSelectedGradeDetail(null)}
+                                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 mb-3">
+                            <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Calificación</p>
+                            <p className="text-base font-black text-slate-800">{formatDecimal(Number(selectedGradeDetail.score))} / 10</p>
+                        </div>
+
+                        {selectedGradeDetail.comments ? (
+                            <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+                                <p className="text-[10px] uppercase tracking-wide text-blue-700 font-semibold mb-1">Aclaracion del profesor</p>
+                                <p className="text-xs text-slate-700 whitespace-pre-wrap wrap-break-words max-h-36 overflow-y-auto custom-scrollbar pr-1">
+                                    {selectedGradeDetail.comments}
+                                </p>
+                            </div>
+                        ) : null}
+                    </div>
+                </div>
+            )}
         </GenericCard>
     );
 };

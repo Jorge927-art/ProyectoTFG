@@ -7,7 +7,8 @@ import type { DBModelCourse } from '../../../services/courseTypes';
 vi.mock('lucide-react', () => ({
     Search: () => <div data-testid="search-icon" />,
     Loader2: () => <div data-testid="loader-icon" />,
-    Star: () => <div data-testid="star-icon" />
+    Star: () => <div data-testid="star-icon" />,
+    Clock: () => <div data-testid="clock-icon" />
 }));
 
 vi.mock('../genericCard/GenericCard', () => ({

@@ -1,21 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BarChart3, Loader2, GraduationCap, UserCheck, TrendingUp } from 'lucide-react';
+import { BarChart3, Loader2, GraduationCap, UserCheck, TrendingUp, Star } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
-import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import {
     getAdminGlobalStatistics,
-    finalizeAdminGlobalPreviousYear,
     resolveAdminGlobalStatisticsErrorMessage,
     type AdminGlobalStatistics,
     type AdminGlobalYearComparison,
+    searchAdminProfessorRatings,
+    type AdminProfessorRating,
 } from '../../../../services/adminGlobalStatisticsService';
 
 export const GlobalStatisticsPanel = () => {
     const [data, setData] = useState<AdminGlobalStatistics | null>(null);
     const [loading, setLoading] = useState(false);
-    const [consolidating, setConsolidating] = useState(false);
     const [error, setError] = useState('');
-    const [successMessage, setSuccessMessage] = useState('');
+    const [professorResults, setProfessorResults] = useState<AdminProfessorRating[]>([]);
+    const [professorLoading, setProfessorLoading] = useState(false);
+    const [selectedProfessorId, setSelectedProfessorId] = useState<number | null>(null);
 
     const loadStatistics = async () => {
         setLoading(true);
@@ -32,21 +33,17 @@ export const GlobalStatisticsPanel = () => {
 
     useEffect(() => {
         void loadStatistics();
+        void loadProfessorRatings();
     }, []);
 
-    const handleFinalizePreviousYear = async () => {
-        setConsolidating(true);
-        setError('');
-        setSuccessMessage('');
-
+    const loadProfessorRatings = async () => {
+        setProfessorLoading(true);
         try {
-            const response = await finalizeAdminGlobalPreviousYear();
-            setSuccessMessage(`${response.message} Año consolidado: ${response.finalizedYear}.`);
-            await loadStatistics();
+            setProfessorResults(await searchAdminProfessorRatings(''));
         } catch (err) {
             setError(resolveAdminGlobalStatisticsErrorMessage(err));
         } finally {
-            setConsolidating(false);
+            setProfessorLoading(false);
         }
     };
 
@@ -64,18 +61,6 @@ export const GlobalStatisticsPanel = () => {
                 Panel Estadístico Global
             </h2>
 
-            <div className="flex justify-end">
-                <GenericButton
-                    type="button"
-                    onClick={handleFinalizePreviousYear}
-                    disabled={loading || consolidating}
-                    variant="primary"
-                    label={consolidating ? 'Consolidando...' : 'Consolidar año cerrado'}
-                    icon={consolidating ? <Loader2 size={14} className="animate-spin" /> : undefined}
-                    className="px-3! py-1.5! text-[11px]! font-bold! rounded-lg!"
-                />
-            </div>
-
             {loading && (
                 <div className="flex justify-center py-4">
                     <Loader2 size={20} className="animate-spin text-cyan-500" />
@@ -83,7 +68,6 @@ export const GlobalStatisticsPanel = () => {
             )}
 
             {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
-            {successMessage && <p className="text-xs text-emerald-700 font-medium">{successMessage}</p>}
 
             {!loading && !error && data && (
                 <>
@@ -132,6 +116,29 @@ export const GlobalStatisticsPanel = () => {
                                 })
                             )}
                         </div>
+                    </div>
+
+                    <div className="space-y-2 pt-2 border-t border-slate-100">
+                        <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-wide">Valoración media de profesores</h3>
+                        <select
+                            size={3}
+                            value={selectedProfessorId ?? ''}
+                            onChange={(event) => setSelectedProfessorId(Number(event.target.value))}
+                            disabled={professorLoading || professorResults.length === 0}
+                            aria-label="Seleccionar profesor registrado"
+                            className="w-full max-h-24 overflow-y-auto border border-slate-200 rounded-lg bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 disabled:bg-slate-50"
+                        >
+                            {professorResults.length === 0 && <option value="">{professorLoading ? 'Cargando profesores...' : 'No hay profesores registrados'}</option>}
+                            {professorResults.map((professor) => <option key={professor.professorId} value={professor.professorId}>{professor.username}</option>)}
+                        </select>
+                        {selectedProfessorId !== null && (() => {
+                            const professor = professorResults.find((item) => item.professorId === selectedProfessorId);
+                            if (!professor) return null;
+                            return <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-2">
+                                <span className="text-xs font-bold text-slate-700">{professor.username}</span>
+                                {professor.averageRating === null ? <span className="text-[11px] text-slate-400">Sin valoraciones</span> : <span className="inline-flex items-center gap-1 text-xs font-black text-slate-700"><Star size={14} className="text-amber-500 fill-amber-400" />{professor.averageRating.toFixed(1)} / 5</span>}
+                            </div>;
+                        })()}
                     </div>
 
                     <div className="space-y-2 pt-2 border-t border-slate-100">

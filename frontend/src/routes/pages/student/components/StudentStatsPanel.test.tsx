@@ -1,6 +1,12 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { StudentStatsPanel } from './StudentStatsPanel';
+
+const mockDismissGradeNotifications = vi.fn(async () => undefined);
+
+vi.mock('../../../../services/evaluationService', () => ({
+    dismissGradeNotifications: () => mockDismissGradeNotifications(),
+}));
 
 // Simulamos de forma asíncrona el hook para controlar el payload analítico de PostgreSQL
 vi.mock('./useCourseStats', () => ({
@@ -202,5 +208,32 @@ describe('StudentStatsPanel - Pruebas de Control [ADR-41]', () => {
         );
 
         expect(screen.getByText('Aún no se ha publicado la nota final de esta asignatura.')).toBeInTheDocument();
+    });
+
+    it('muestra indicador de aclaración y abre modal compacto al pulsar una nota con comentario', () => {
+        render(
+            <StudentStatsPanel
+                activeCourseId={1}
+                enrolledList={[{
+                    enrollmentid: 10,
+                    enrolled_at: '2026-07-01T10:00:00Z',
+                    started_at: null,
+                    status: 'EN_PROGRESO',
+                    progress_percentage: 40,
+                    course: { course_id: 1, title: 'Migrating to Cloud SQL', category: 'Cloud', instructors: 'Profesor Demo', duration: 20 },
+                    grades: [
+                        { title: 'Examen final', score: '8.9', comments: 'Buena evolución general. Refuerza la parte práctica.' }
+                    ]
+                }]}
+            />
+        );
+
+        expect(screen.getByText('Incluye aclaracion')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: /Nota del examen/i }));
+
+        expect(screen.getByText('Detalle de nota')).toBeInTheDocument();
+        expect(screen.getByText('Aclaracion del profesor')).toBeInTheDocument();
+        expect(screen.getByText('Buena evolución general. Refuerza la parte práctica.')).toBeInTheDocument();
     });
 });

@@ -15,8 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 // Importaciones de Entidades y Repositorios necesarios
 import com.cursosonline.backend.entities.DocumentMetadata;
 import com.cursosonline.backend.entities.FolderType;
+import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.DocumentMetadataRepository;
 import com.cursosonline.backend.repository.UserRepository;
 
@@ -26,9 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 
 /**
  * Test de Integración del Flujo Académico del Profesor [ADR-055]
@@ -51,7 +55,11 @@ public class TeacherEvaluationFlowIntegrationTest {
         @Autowired
         private DocumentMetadataRepository documentMetadataRepository;
 
+        @Autowired
+        private CoursesRepository coursesRepository;
+
         private Users alumnoReceptor;
+        private Long testCourseId;
 
         @BeforeEach
         public void setUp() {
@@ -83,6 +91,14 @@ public class TeacherEvaluationFlowIntegrationTest {
                         u.setRole(Role.STUDENT);
                         return userRepository.save(u);
                 });
+
+                Courses testCourse = new Courses();
+                testCourse.setTitle("Curso Integración Profesor");
+                testCourse.setCategory("QA");
+                testCourse.setCourseType("Básico");
+                testCourse.setDuration(1.0f);
+                testCourse.setSite("COLE");
+                testCourseId = coursesRepository.save(testCourse).getCourse_id();
         }
 
         @Test
@@ -97,7 +113,7 @@ public class TeacherEvaluationFlowIntegrationTest {
                                 "application/pdf",
                                 "%PDF-1.4 ... datos ficticios binarios".getBytes());
 
-                Long courseId = 1L; // ID del curso gestionado actualmente por el profesor en la UI
+                Long courseId = testCourseId; // ID real del curso creado durante el setup
                 Long receiverId = alumnoReceptor.getUser_id(); // ID del alumno seleccionado en el desplegable de la
                                                                // clase
 
@@ -126,5 +142,10 @@ public class TeacherEvaluationFlowIntegrationTest {
                 assertEquals("alumno_test", receivedDoc.getReceiver().getUsername(),
                                 "El receptor debe coincidir con el alumno elegido");
                 assertFalse(receivedDoc.isRead(), "Debe marcarse como no leído para activar sus notificaciones");
+
+                mockMvc.perform(get("/api/auth/notifications")
+                                .with(user("alumno_test").roles("STUDENT")))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].type").value("DOCUMENT_INBOX"));
         }
 }

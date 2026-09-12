@@ -13,7 +13,8 @@ vi.mock('../../../services/apiClient', () => ({
             request: { use: vi.fn(), eject: vi.fn() },
             response: { use: vi.fn(), eject: vi.fn() }
         }
-    }
+    },
+    refreshAccessToken: vi.fn().mockResolvedValue({ accessToken: 'test-access', expiresIn: 900 })
 }));
 
 describe('InterestsModal Component - Suite de Pruebas Unitarias Estrictas', () => {

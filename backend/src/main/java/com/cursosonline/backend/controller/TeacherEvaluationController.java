@@ -6,9 +6,11 @@ import com.cursosonline.backend.dto.CourseMetricsDTO;
 import com.cursosonline.backend.dto.TeacherCourseGradeDTO;
 import com.cursosonline.backend.entities.CourseGrade;
 import com.cursosonline.backend.entities.Enrollment;
+import com.cursosonline.backend.entities.UserSystemNotification;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.CourseGradeRepository;
 import com.cursosonline.backend.repository.UserRepository;
+import com.cursosonline.backend.repository.UserSystemNotificationRepository;
 import com.cursosonline.backend.entities.Users;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -35,9 +37,14 @@ import java.util.stream.Collectors;
 @PreAuthorize("hasAuthority('PROFESSOR')")
 public class TeacherEvaluationController {
 
+    private static final int MAX_FEEDBACK_LENGTH = 300;
+    private static final String GRADE_PUBLISHED_TYPE = "GRADE_PUBLISHED";
+    private static final String GRADE_PUBLISHED_TITLE = "Nueva nota publicada";
+
     private final EnrollmentRepository enrollmentRepository;
     private final CourseGradeRepository courseGradeRepository;
     private final UserRepository userRepository;
+    private final UserSystemNotificationRepository userSystemNotificationRepository;
 
     /**
      * Endpoint POST para que un profesor califique a un estudiante en una matrícula
@@ -80,6 +87,13 @@ public class TeacherEvaluationController {
             return ResponseEntity.badRequest().body(Map.of("error", "El título de la calificación es obligatorio."));
         }
 
+        String normalizedFeedback = normalizeFeedback(request.feedback());
+        if (normalizedFeedback.length() > MAX_FEEDBACK_LENGTH) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error",
+                    "La aclaración del profesor no puede superar " + MAX_FEEDBACK_LENGTH + " caracteres."));
+        }
+
         // Nota Final de Asignatura: nota definitiva, ponderación de trabajos + examen
         // que el profesor introduce manualmente. Una vez enviada, es inmutable.
         if (isFinalCourseGradeTitle(requestedTitle)) {
@@ -95,9 +109,10 @@ public class TeacherEvaluationController {
             CourseGrade finalCourseGrade = new CourseGrade();
             finalCourseGrade.setTitle(requestedTitle);
             finalCourseGrade.setScore(request.score());
-            finalCourseGrade.setComments(request.feedback());
+            finalCourseGrade.setComments(normalizedFeedback);
             finalCourseGrade.setEnrollment(enrollment);
             courseGradeRepository.save(finalCourseGrade);
+            notifyStudentGradePublished(enrollment, requestedTitle, request.score());
 
             return ResponseEntity.ok(Map.of(
                     "success", true,
@@ -115,8 +130,9 @@ public class TeacherEvaluationController {
             if (existingExam != null) {
                 existingExam.setTitle(requestedTitle);
                 existingExam.setScore(request.score());
-                existingExam.setComments(request.feedback());
+                existingExam.setComments(normalizedFeedback);
                 courseGradeRepository.save(existingExam);
+                notifyStudentGradePublished(enrollment, requestedTitle, request.score());
 
                 return ResponseEntity.ok(Map.of(
                         "success", true,
@@ -136,10 +152,11 @@ public class TeacherEvaluationController {
         CourseGrade newGrade = new CourseGrade();
         newGrade.setTitle(resolvedTitle);
         newGrade.setScore(request.score());
-        newGrade.setComments(request.feedback());
+        newGrade.setComments(normalizedFeedback);
         newGrade.setEnrollment(enrollment);
 
         courseGradeRepository.save(newGrade);
+        notifyStudentGradePublished(enrollment, resolvedTitle, request.score());
 
         return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -174,7 +191,8 @@ public class TeacherEvaluationController {
                 .map(grade -> new TeacherCourseGradeDTO(
                         grade.getGradeId(),
                         grade.getTitle(),
-                        grade.getScore()))
+                        grade.getScore(),
+                        grade.getComments()))
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(grades);
@@ -213,6 +231,33 @@ public class TeacherEvaluationController {
      */
     private boolean isFinalCourseGradeTitle(String title) {
         return title.trim().equalsIgnoreCase("Nota Final Asignatura");
+    }
+
+    private String normalizeFeedback(String feedback) {
+        if (feedback == null) {
+            return "";
+        }
+        return feedback.trim();
+    }
+
+    private void notifyStudentGradePublished(Enrollment enrollment, String gradeTitle, java.math.BigDecimal score) {
+        if (enrollment == null || enrollment.getUser() == null) {
+            return;
+        }
+
+        String normalizedTitle = gradeTitle == null || gradeTitle.isBlank()
+                ? "Nueva calificación"
+                : gradeTitle.trim();
+        String normalizedScore = score != null ? score.toPlainString() : "N/A";
+
+        UserSystemNotification notification = new UserSystemNotification();
+        notification.setReceiver(enrollment.getUser());
+        notification.setType(GRADE_PUBLISHED_TYPE);
+        notification.setTitle(GRADE_PUBLISHED_TITLE);
+        notification.setMessage("Se publicó la nota de '" + normalizedTitle + "': " + normalizedScore + " / 10.");
+        notification.setRedirectUrl("/student");
+        notification.setRead(false);
+        userSystemNotificationRepository.save(notification);
     }
 
     /**

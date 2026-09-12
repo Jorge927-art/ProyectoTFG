@@ -175,6 +175,27 @@ describe('StudentCoursePicker - Suite Funcional del Lado del Estudiante', () => 
         expect(botonProcesando).toBeDisabled();
     });
 
+    it('Debe mostrar Sin profesor y bloquear la matrícula cuando el curso no es evaluable', () => {
+        const mockCatalogValue = {
+            ...defaultCatalogHookReturn,
+            catalogCourses: [{ ...mockCatalogCourses[0], hasEvaluationResponsible: false }]
+        } as unknown;
+        vi.mocked(useCourseCatalog).mockReturnValue(mockCatalogValue as ReturnType<typeof useCourseCatalog>);
+
+        render(
+            <StudentCoursePicker
+                enrolledList={[]}
+                onEnrollSuccess={mockOnEnrollSuccess}
+                onSetGlobalError={mockOnSetGlobalError}
+                onSetGlobalSuccess={mockOnSetGlobalSuccess}
+            />
+        );
+
+        const blockedButton = screen.getByRole('button', { name: 'Sin profesor' });
+        expect(blockedButton).toBeDisabled();
+        expect(mockExecuteCourseAction).not.toHaveBeenCalled();
+    });
+
     it('Debe disparar la burbuja de error global si el hook del catálogo reporta un fallo de red', () => {
         const mockCatalogValue = {
             ...defaultCatalogHookReturn,

@@ -2,6 +2,7 @@ package com.cursosonline.backend.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -110,6 +111,22 @@ public class GlobalExceptionHandler {
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.BAD_REQUEST.value(),
                 ex.getMessage(), // Envía "Rol inválido..." o "El campo role es requerido"
+                System.currentTimeMillis());
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * Maneja errores de deserialización JSON (payload mal formado o tipo inválido)
+     * y responde 400 en vez de 500.
+     *
+     * @param ex Excepción de lectura del cuerpo HTTP.
+     * @return ResponseEntity con error funcional y código 400.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadablePayload(HttpMessageNotReadableException ex) {
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "Formato de datos incorrecto en la solicitud. Revisa los tipos y el formato de los campos enviados.",
                 System.currentTimeMillis());
         return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
     }

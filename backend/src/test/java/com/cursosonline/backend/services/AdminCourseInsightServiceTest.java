@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -21,10 +22,16 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
+import java.util.HashMap;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Suite de Pruebas Unitarias para AdminCourseInsightService")
@@ -48,6 +55,12 @@ class AdminCourseInsightServiceTest {
     @Mock
     private AcademicEvaluationRepository academicEvaluationRepository;
 
+    @Mock
+    private AdminCourseStatsHistoryRepository courseHistoryRepository;
+
+    @Spy
+    private MutableClock clock = new MutableClock(Instant.parse("2026-08-03T10:00:00Z"), ZoneId.of("UTC"));
+
     @InjectMocks
     private AdminCourseInsightService adminCourseInsightService;
 
@@ -57,6 +70,10 @@ class AdminCourseInsightServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(courseHistoryRepository.findAllByCourseAndYears(anyLong(), anyList()))
+                .thenReturn(List.of());
+        lenient().when(courseGradeRepository.findAllByCourseIdWithStudentEnrollment(anyLong()))
+                .thenReturn(List.of());
         studentUser = new Users(10L, "laura_student", "enc", Role.STUDENT, "laura@a.com", true, new ArrayList<>());
         professorUser = new Users(20L, "laura_teacher", "enc", Role.PROFESSOR, "laura.t@a.com", true,
                 new ArrayList<>());
@@ -229,6 +246,34 @@ class AdminCourseInsightServiceTest {
     }
 
     @Test
+    @DisplayName("getUserStatsInCourse debe tolerar una calificación sin tipo reconocible")
+    void getUserStatsInCourse_CalificacionSinTipo_DebeDevolverNotaSinClasificar() {
+        when(coursesRepository.existsById(300L)).thenReturn(true);
+        when(userRepository.findById(10L)).thenReturn(Optional.of(studentUser));
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(300L)).thenReturn(List.of());
+        when(enrollmentRepository.findAllByCourseId(300L)).thenReturn(List.of());
+        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(List.of(300L))).thenReturn(null);
+        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(List.of(300L))).thenReturn(null);
+
+        Enrollment enrollment = new Enrollment();
+        enrollment.setUser(studentUser);
+        enrollment.setCourse(course);
+        CourseGrade unclassified = new CourseGrade();
+        unclassified.setTitle("Evaluación extraordinaria");
+        unclassified.setScore(new BigDecimal("7.0"));
+        enrollment.setGrades(List.of(unclassified));
+        when(enrollmentRepository.findByUserIdAndCourseId(10L, 300L)).thenReturn(Optional.of(enrollment));
+        when(userService.calculateCurrentProgress(enrollment)).thenReturn(0);
+
+        AdminCourseUserStatsDTO stats = adminCourseInsightService.getUserStatsInCourse(300L, 10L);
+
+        assertEquals(1, stats.studentGrades().size());
+        assertEquals(new BigDecimal("7.0"), stats.studentGrades().get(0).score());
+        assertNull(stats.workGrade());
+        assertNull(stats.finalExamGrade());
+    }
+
+    @Test
     @DisplayName("getUserStatsInCourse debe lanzar ResourceNotFoundException si el alumno no está matriculado en ese curso")
     void getUserStatsInCourse_AlumnoNoMatriculado_DebeLanzarExcepcion() {
         when(coursesRepository.existsById(300L)).thenReturn(true);
@@ -284,7 +329,10 @@ class AdminCourseInsightServiceTest {
         CourseGrade extra = new CourseGrade();
         extra.setTitle("Actividad práctica");
         extra.setScore(new BigDecimal("7.0"));
-        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(300L)).thenReturn(List.of(work, exam, extra));
+        CourseGrade withoutTitle = new CourseGrade();
+        withoutTitle.setScore(null);
+        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(300L))
+                .thenReturn(List.of(work, exam, extra, withoutTitle));
 
         AdminCourseCollectiveStatsDTO stats = adminCourseInsightService.getCourseCollectiveStats(300L);
 
@@ -296,5 +344,269 @@ class AdminCourseInsightServiceTest {
         assertEquals(7.0, stats.averageGrade());
         assertEquals(7.5, stats.averageWorkGrade());
         assertEquals(6.0, stats.averageFinalExamGrade());
+    }
+
+    @Test
+    @DisplayName("getCourseCollectiveStats debe devolver comentarios del curso del más reciente al más antiguo")
+    void getCourseCollectiveStats_DebeIncluirComentariosOrdenados() {
+        when(coursesRepository.existsById(300L)).thenReturn(true);
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(300L)).thenReturn(List.of());
+        when(enrollmentRepository.findAllByCourseId(300L)).thenReturn(List.of());
+        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(300L)).thenReturn(List.of());
+        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(List.of(300L))).thenReturn(4.5);
+        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(List.of(300L))).thenReturn(4.5);
+
+        AcademicEvaluation newest = evaluation(2L, "Andres", 5, "Comentario reciente",
+                java.time.LocalDateTime.of(2026, 8, 22, 10, 0));
+        AcademicEvaluation oldest = evaluation(1L, "Maria", 4, "Comentario antiguo",
+                java.time.LocalDateTime.of(2026, 8, 20, 10, 0));
+        AcademicEvaluation blank = evaluation(3L, "Pedro", 3, "   ", java.time.LocalDateTime.of(2026, 8, 23, 10, 0));
+        when(academicEvaluationRepository.findCourseCommentsOrderByEvaluationDateDesc(300L))
+                .thenReturn(List.of(newest, blank, oldest));
+
+        AdminCourseCollectiveStatsDTO stats = adminCourseInsightService.getCourseCollectiveStats(300L);
+
+        assertEquals(2, stats.courseComments().size());
+        assertEquals("Comentario reciente", stats.courseComments().get(0).comment());
+        assertEquals("Comentario antiguo", stats.courseComments().get(1).comment());
+        assertEquals("Andres", stats.courseComments().get(0).studentUsername());
+    }
+
+    private AcademicEvaluation evaluation(Long id, String username, int score, String comment,
+            java.time.LocalDateTime date) {
+        Users user = new Users();
+        user.setUsername(username);
+        AcademicEvaluation evaluation = new AcademicEvaluation();
+        evaluation.setEvaluationid(id);
+        evaluation.setUser(user);
+        evaluation.setCourse_score(score);
+        evaluation.setInstructor_score(4);
+        evaluation.setCourseComment(comment);
+        evaluation.setEvaluation_date(date);
+        return evaluation;
+    }
+
+    @Test
+    @DisplayName("getCourseCollectiveStats debe incluir el alumno activo en sus estadísticas individuales")
+    void getCourseCollectiveStats_DebeIncluirEstadisticasPorAlumno() {
+        when(coursesRepository.existsById(300L)).thenReturn(true);
+        Enrollment enrollment = new Enrollment();
+        enrollment.setEnrollmentid(301L);
+        enrollment.setUser(studentUser);
+        enrollment.setCourse(course);
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(300L)).thenReturn(List.of(enrollment));
+        when(enrollmentRepository.findAllByCourseId(300L)).thenReturn(List.of(enrollment));
+        when(userService.calculateCurrentProgress(enrollment)).thenReturn(70);
+        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(300L)).thenReturn(List.of());
+        when(courseGradeRepository.findAllByCourseIdWithStudentEnrollment(300L)).thenReturn(List.of(
+                gradeFor(enrollment, "Trabajo 1", "8.0"),
+                gradeFor(enrollment, "Examen final", "6.0")));
+        when(courseGradeRepository.countStudentsWithPassingGradeByCourseId(300L)).thenReturn(1L);
+        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(List.of(300L))).thenReturn(null);
+        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(List.of(300L))).thenReturn(null);
+
+        AdminCourseCollectiveStatsDTO stats = adminCourseInsightService.getCourseCollectiveStats(300L);
+
+        assertEquals(1, stats.activeStudentsInCourse());
+        assertEquals(1, stats.studentStatistics().size());
+        assertEquals("laura_student", stats.studentStatistics().get(0).username());
+        assertEquals(70, stats.studentStatistics().get(0).progressPercentage());
+        assertEquals(new BigDecimal("7.0"), stats.studentStatistics().get(0).averageGrade());
+        assertEquals(new BigDecimal("8.0"), stats.studentStatistics().get(0).averageWorkGrade());
+        assertEquals(new BigDecimal("6.0"), stats.studentStatistics().get(0).averageFinalExamGrade());
+        assertTrue(stats.studentStatistics().get(0).passed());
+    }
+
+    @Test
+    @DisplayName("getCourseCollectiveStats debe devolver ceros cuando faltan históricos y no hay alumnos activos")
+    void getCourseCollectiveStats_SinAlumnosNiHistoricos_DebeGenerarComparacionesVacias() {
+        when(coursesRepository.existsById(300L)).thenReturn(true);
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(300L)).thenReturn(List.of());
+        when(enrollmentRepository.findAllByCourseId(300L)).thenReturn(List.of());
+        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(300L)).thenReturn(List.of());
+        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(List.of(300L))).thenReturn(null);
+        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(List.of(300L))).thenReturn(null);
+
+        AdminCourseCollectiveStatsDTO stats = adminCourseInsightService.getCourseCollectiveStats(300L);
+
+        assertEquals(0, stats.activeStudentsInCourse());
+        assertEquals(0, stats.courseAverageProgressPercentage());
+        assertEquals(2, stats.yearlyComparisons().size());
+        assertEquals(0, stats.yearlyComparisons().get(0).activeStudentsInCourse());
+        assertEquals(0, stats.yearlyComparisons().get(0).courseAverageProgressPercentage());
+        assertNull(stats.yearlyComparisons().get(0).averageCourseRating());
+        assertFalse(stats.yearlyComparisons().get(0).realData());
+    }
+
+    @Test
+    @DisplayName("getCourseCollectiveStats debe conservar históricos reales existentes")
+    void getCourseCollectiveStats_ConHistoricoReal_DebeMapearComparaciones() {
+        when(coursesRepository.existsById(300L)).thenReturn(true);
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(300L)).thenReturn(List.of());
+        when(enrollmentRepository.findAllByCourseId(300L)).thenReturn(List.of());
+        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(300L)).thenReturn(List.of());
+        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(List.of(300L))).thenReturn(4.1);
+        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(List.of(300L))).thenReturn(4.6);
+
+        AdminCourseStatsHistory history = new AdminCourseStatsHistory();
+        history.setSnapshotYear(java.time.Year.now().getValue() - 1);
+        history.setActiveStudentsInCourse(9);
+        history.setCourseAverageProgressPercentage(82);
+        history.setApprovalIndexPercentage(77);
+        history.setAverageCourseRating(4.2);
+        history.setAverageInstructorRating(4.4);
+        history.setAverageGrade(7.9);
+        history.setAverageWorkGrade(8.1);
+        history.setAverageFinalExamGrade(7.7);
+        history.setRealData(true);
+        when(courseHistoryRepository.findAllByCourseAndYears(eq(300L), anyList())).thenReturn(List.of(history));
+
+        AdminCourseCollectiveStatsDTO stats = adminCourseInsightService.getCourseCollectiveStats(300L);
+
+        assertEquals(9, stats.yearlyComparisons().get(0).activeStudentsInCourse());
+        assertEquals(82, stats.yearlyComparisons().get(0).courseAverageProgressPercentage());
+        assertEquals(77, stats.yearlyComparisons().get(0).approvalIndexPercentage());
+        assertEquals(4.2, stats.yearlyComparisons().get(0).averageCourseRating());
+        assertTrue(stats.yearlyComparisons().get(0).realData());
+        assertEquals(0, stats.yearlyComparisons().get(1).activeStudentsInCourse());
+    }
+
+    @Test
+    @DisplayName("el cierre automático por curso debe ser idempotente y comprobar el histórico real")
+    void finalizePreviousYearCourseStats_DebeSerIdempotente() {
+        when(coursesRepository.findAll()).thenReturn(List.of(course));
+        when(coursesRepository.existsById(300L)).thenReturn(true);
+        when(coursesRepository.findById(300L)).thenReturn(Optional.of(course));
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(300L)).thenReturn(List.of());
+        when(enrollmentRepository.findAllByCourseId(300L)).thenReturn(List.of());
+        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(300L)).thenReturn(List.of());
+        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(List.of(300L))).thenReturn(null);
+        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(List.of(300L))).thenReturn(null);
+
+        AdminCourseStatsHistory history = new AdminCourseStatsHistory();
+        history.setCourse(course);
+        history.setSnapshotYear(2025);
+        history.setRealData(false);
+        when(courseHistoryRepository.findByCourseAndYear(300L, 2025)).thenReturn(Optional.of(history));
+
+        adminCourseInsightService.finalizePreviousYearCourseStats();
+        adminCourseInsightService.finalizePreviousYearCourseStats();
+
+        org.mockito.Mockito.verify(courseHistoryRepository, org.mockito.Mockito.times(2))
+                .save(history);
+        org.mockito.Mockito.verify(courseHistoryRepository, org.mockito.Mockito.times(4))
+                .findByCourseAndYear(300L, 2025);
+        assertTrue(history.isRealData());
+    }
+
+    @Test
+    @DisplayName("el cambio de año debe consolidar todos los cursos en el año anterior")
+    void cambioDeAno_DebeConsolidarTodosLosCursos() {
+        Courses secondCourse = new Courses();
+        secondCourse.setCourse_id(301L);
+        secondCourse.setTitle("Bases de Datos");
+        when(coursesRepository.findAll()).thenReturn(List.of(course, secondCourse));
+        when(coursesRepository.existsById(anyLong())).thenReturn(true);
+        when(coursesRepository.findById(anyLong())).thenAnswer(
+                invocation -> Optional.of(invocation.getArgument(0, Long.class).equals(300L) ? course : secondCourse));
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(anyLong())).thenReturn(List.of());
+        when(enrollmentRepository.findAllByCourseId(anyLong())).thenReturn(List.of());
+        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(anyLong())).thenReturn(List.of());
+        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(anyList())).thenReturn(null);
+        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(anyList())).thenReturn(null);
+        Map<Long, AdminCourseStatsHistory> persistedHistory = new HashMap<>();
+        when(courseHistoryRepository.findByCourseAndYear(anyLong(), eq(2026))).thenAnswer(
+                invocation -> Optional.ofNullable(persistedHistory.get(invocation.getArgument(0, Long.class))));
+        org.mockito.Mockito.doAnswer(invocation -> {
+            AdminCourseStatsHistory history = invocation.getArgument(0, AdminCourseStatsHistory.class);
+            persistedHistory.put(history.getCourse().getCourse_id(), history);
+            return history;
+        }).when(courseHistoryRepository).save(any(AdminCourseStatsHistory.class));
+
+        clock.setInstant(Instant.parse("2027-01-01T00:20:00Z"));
+        adminCourseInsightService.finalizePreviousYearCourseStats();
+
+        org.mockito.Mockito.verify(courseHistoryRepository, org.mockito.Mockito.times(2))
+                .save(any(AdminCourseStatsHistory.class));
+        org.mockito.ArgumentCaptor<AdminCourseStatsHistory> captor = org.mockito.ArgumentCaptor
+                .forClass(AdminCourseStatsHistory.class);
+        org.mockito.Mockito.verify(courseHistoryRepository, org.mockito.Mockito.times(2))
+                .save(captor.capture());
+        assertTrue(captor.getAllValues().stream().allMatch(history -> history.getSnapshotYear() == 2026));
+        assertTrue(captor.getAllValues().stream().allMatch(history -> history.isRealData()));
+    }
+
+    @Test
+    @DisplayName("el cierre anual debe continuar con otros cursos si uno falla y detectar el histórico ausente")
+    void cierreAnual_DebeContinuarTrasFalloDeUnCurso() {
+        Courses failingCourse = new Courses();
+        failingCourse.setCourse_id(301L);
+        failingCourse.setTitle("Curso con error");
+        when(coursesRepository.findAll()).thenReturn(List.of(course, failingCourse));
+        when(coursesRepository.existsById(anyLong())).thenReturn(true);
+        when(coursesRepository.findById(300L)).thenReturn(Optional.of(course));
+        when(coursesRepository.findById(301L)).thenReturn(Optional.empty());
+        when(enrollmentRepository.findActiveStudentEnrollmentsByCourseId(anyLong())).thenReturn(List.of());
+        when(enrollmentRepository.findAllByCourseId(anyLong())).thenReturn(List.of());
+        when(courseGradeRepository.findAllByCourseIdAndEnabledStudent(anyLong())).thenReturn(List.of());
+        when(academicEvaluationRepository.getAverageCourseScoreByCourseIds(anyList())).thenReturn(null);
+        when(academicEvaluationRepository.getAverageInstructorScoreByCourseIds(anyList())).thenReturn(null);
+        when(courseHistoryRepository.findByCourseAndYear(anyLong(), eq(2026))).thenReturn(Optional.empty());
+
+        clock.setInstant(Instant.parse("2027-01-01T00:20:00Z"));
+        adminCourseInsightService.finalizePreviousYearCourseStats();
+
+        org.mockito.Mockito.verify(courseHistoryRepository).save(any(AdminCourseStatsHistory.class));
+    }
+
+    @Test
+    @DisplayName("el cierre anual debe ignorar un curso inexistente y continuar")
+    void cierreAnual_CursoInexistente_DebeContinuar() {
+        when(coursesRepository.findAll()).thenReturn(List.of(course));
+        when(coursesRepository.existsById(300L)).thenReturn(false);
+        when(courseHistoryRepository.findByCourseAndYear(300L, 2026)).thenReturn(Optional.empty());
+
+        clock.setInstant(Instant.parse("2027-01-01T00:20:00Z"));
+        adminCourseInsightService.finalizePreviousYearCourseStats();
+
+        org.mockito.Mockito.verify(courseHistoryRepository, org.mockito.Mockito.never())
+                .save(any(AdminCourseStatsHistory.class));
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant instant;
+        private final ZoneId zone;
+
+        private MutableClock(Instant instant, ZoneId zone) {
+            this.instant = instant;
+            this.zone = zone;
+        }
+
+        private void setInstant(Instant instant) {
+            this.instant = instant;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return zone;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return new MutableClock(instant, zone);
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
+        }
+    }
+
+    private CourseGrade gradeFor(Enrollment enrollment, String title, String score) {
+        CourseGrade grade = new CourseGrade();
+        grade.setEnrollment(enrollment);
+        grade.setTitle(title);
+        grade.setScore(new BigDecimal(score));
+        return grade;
     }
 }

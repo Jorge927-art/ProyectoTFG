@@ -9,6 +9,7 @@ import { AdminDocumentInbox } from './components/AdminDocumentInbox';
 import { GlobalStatisticsPanel } from './components/GlobalStatisticsPanel';
 import { AdminCourseProfessorReassignmentPanel } from './components/AdminCourseProfessorReassignmentPanel';
 import { AdminCourseCatalogPanel } from './components/AdminCourseCatalogPanel';
+import { AdminStudentPreferencesPanel } from './components/AdminStudentPreferencesPanel';
 import { useLocation } from 'react-router-dom';
 
 const AdminDashboard = () => {
@@ -52,13 +53,19 @@ const AdminDashboard = () => {
             />
 
             {!deferHeavySections && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch w-full">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 xl:gap-8 2xl:gap-10 items-stretch w-full">
                     <div className="h-full">
                         <UserSearchPanel currentAdminUsername={user?.username ?? ''} />
                     </div>
                     <div className="h-full">
                         <UserScrollList />
                     </div>
+                </div>
+            )}
+
+            {!deferHeavySections && (
+                <div className="w-full mt-6">
+                    <AdminStudentPreferencesPanel />
                 </div>
             )}
 
@@ -80,12 +87,14 @@ const AdminDashboard = () => {
 
             {!deferHeavySections && (
                 <>
-                    <div className="w-full mt-6">
-                        <CourseInsightPanel />
-                    </div>
+                    <div data-testid="admin-analytics-grid" className="grid grid-cols-1 2xl:grid-cols-2 gap-6 items-stretch w-full mt-6">
+                        <div className="h-full">
+                            <CourseInsightPanel />
+                        </div>
 
-                    <div className="w-full mt-6">
-                        <GlobalStatisticsPanel />
+                        <div className="h-full">
+                            <GlobalStatisticsPanel />
+                        </div>
                     </div>
                 </>
             )}

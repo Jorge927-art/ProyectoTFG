@@ -14,6 +14,8 @@ import {
     getSentDocumentsByCourse, 
     uploadAssignmentDocument, 
     markDocumentAsRead, 
+    hideAllReceivedGeneralDocuments,
+    hideAllSentGeneralDocuments,
     uploadProfessorDocument,
     uploadAdminDocumentToCourse 
 } from './documentService';
@@ -167,6 +169,17 @@ describe('documentService - Suite de Pruebas Unitarias de Alta Fidelidad', () =>
         expect(config.headers['Content-Type']).toBe('multipart/form-data');
     });
 
+    it('debe incluir courseId opcional al enviar un documento académico del alumno', async () => {
+        mockedApi.post.mockResolvedValueOnce({ data: { message: 'Ok', filename: 'f.pdf', originalname: 'o.pdf' } });
+        const dummyFile = new File([new Uint8Array()], 'doc.pdf', { type: 'application/pdf' });
+
+        await uploadStudentDocument(dummyFile, 42, 77);
+
+        const [, formData] = mockedApi.post.mock.calls[0] as [string, FormData];
+        expect(formData.get('receiverId')).toBe('42');
+        expect(formData.get('courseId')).toBe('77');
+    });
+
     it('debe omitir cabeceras explícitas para delegar el boundary del navegador en uploadAssignmentDocument', async () => {
         const mockResponse: UploadDocumentResponse = { message: 'Ok', filename: 'a.pdf', originalname: 'o.pdf' };
         mockedApi.post.mockResolvedValueOnce({ data: mockResponse });
@@ -182,18 +195,19 @@ describe('documentService - Suite de Pruebas Unitarias de Alta Fidelidad', () =>
         expect(config).toBeUndefined();
     });
 
-    it('debe procesar correctamente la subida polimórfica del rol docente', async () => {
+    it('debe procesar correctamente la subida individual del rol docente', async () => {
         const mockResponse: UploadDocumentResponse = { message: 'Ok', filename: 'p.pdf', originalname: 'p.pdf' };
         mockedApi.post.mockResolvedValueOnce({ data: mockResponse });
         const dummyFile = new File([new Uint8Array()], 'guia.pdf', { type: 'application/pdf' });
 
-        await uploadProfessorDocument(dummyFile, 202, 0);
+        await uploadProfessorDocument(dummyFile, 202, 42);
 
         // CORRECCIÓN QUIRÚRGICA: Solución al fallo de la línea 160 de tu captura de pantalla utilizando el índice [0]
         const [url, formData] = mockedApi.post.mock.calls[0] as [string, FormData];
         expect(url).toBe('/api/v1/documents/professor-upload');
         expect(formData.get('courseId')).toBe('202');
-        expect(formData.get('receiverId')).toBe('0');
+        expect(formData.get('receiverId')).toBe('42');
+        expect(formData.get('deliveryType')).toBe('DOCUMENTO');
     });
 
     it('debe transmitir un documento administrativo al grupo de alumnos de un curso', async () => {
@@ -209,6 +223,21 @@ describe('documentService - Suite de Pruebas Unitarias de Alta Fidelidad', () =>
         expect(formData.get('courseId')).toBe('909');
         expect(config).toBeUndefined();
     });
+
+    it('debe invocar los endpoints de limpieza lógica de bandejas generales', async () => {
+        mockedApi.patch
+            .mockResolvedValueOnce({ data: { message: 'ok', hiddenCount: 2 } })
+            .mockResolvedValueOnce({ data: { message: 'ok', hiddenCount: 3 } });
+
+        const receivedResult = await hideAllReceivedGeneralDocuments();
+        const sentResult = await hideAllSentGeneralDocuments();
+
+        expect(receivedResult.hiddenCount).toBe(2);
+        expect(sentResult.hiddenCount).toBe(3);
+        expect(mockedApi.patch).toHaveBeenNthCalledWith(1, '/api/v1/documents/received/hide-all');
+        expect(mockedApi.patch).toHaveBeenNthCalledWith(2, '/api/v1/documents/sent/hide-all');
+    });
+
     // --- BLOQUE 4: DESCARGAS SEGURAS DE FLUJO DE BYTES (DOM SIMULATION) ---
     it('debe orquestar la descarga simulando los elementos nativos y revocación de URL en downloadDocumentSecure', async () => {
         const dummyBlobContent = 'bytes_simulados_tfg';

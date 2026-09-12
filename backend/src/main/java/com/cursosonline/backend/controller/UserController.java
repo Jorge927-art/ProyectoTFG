@@ -5,6 +5,7 @@ import com.cursosonline.backend.dto.InterestDTO;
 import com.cursosonline.backend.dto.LoginRequest;
 import com.cursosonline.backend.dto.RefreshTokenRequest;
 import com.cursosonline.backend.dto.RefreshTokenResponse;
+import com.cursosonline.backend.dto.DismissSingleNotificationRequestDTO;
 import com.cursosonline.backend.entities.Users;
 import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.entities.Enrollment;
@@ -19,10 +20,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.web.bind.annotation.*;
-import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.Map;
+import java.time.Duration;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
 import java.time.Instant;
 import java.util.List;
 import java.security.Principal;
@@ -41,16 +47,30 @@ import java.util.LinkedHashMap;
 @RequiredArgsConstructor
 public class UserController {
 
+    private static final String DEFAULT_REFRESH_COOKIE_NAME = "cursosonline_refresh";
+
     private final UserService userService;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final EnrollmentRepository enrollmentRepository;
     private final UserProfileRepository userProfileRepository;
 
+    @Value("${app.auth.refresh-cookie-name:cursosonline_refresh}")
+    private String refreshCookieName = DEFAULT_REFRESH_COOKIE_NAME;
+
+    @Value("${app.auth.refresh-cookie-secure:false}")
+    private boolean refreshCookieSecure = false;
+
+    @Value("${app.auth.refresh-cookie-same-site:Strict}")
+    private String refreshCookieSameSite = "Strict";
+
+    @Value("${app.jwt.refresh-token-expiration-days:7}")
+    private long refreshTokenExpirationDays = 7;
+
     /**
      * Endpoint para registrar un nuevo usuario (alumno) en la plataforma.
      * Asigna automáticamente el rol de STUDENT al usuario registrado.
-     * 
+     *
      * @param user El usuario a registrar.
      * @return Una respuesta con los datos mínimos del usuario registrado.
      */
@@ -69,7 +89,7 @@ public class UserController {
     /**
      * Endpoint para el inicio de sesión de usuarios.
      * Valida las credenciales y genera un token JWT para el usuario autenticado.
-     * 
+     *
      * @param loginRequest La solicitud de inicio de sesión que contiene el nombre
      *                     de usuario y la contraseña.
      * @return Una respuesta con el token JWT y la información del usuario
@@ -95,23 +115,29 @@ public class UserController {
                 ? (expirationInstant.getEpochSecond() - Instant.now().getEpochSecond())
                 : 0;
 
-        return ResponseEntity
-                .ok(AuthTokenResponse.from(user, jwtToken, refreshToken, expiresInSeconds, enrolledCourseIds,
-                        avatarPath, interests));
+        return withRefreshCookie(AuthTokenResponse.from(user, jwtToken, null, expiresInSeconds, enrolledCourseIds,
+                avatarPath, interests), refreshToken);
     }
 
     /**
      * Endpoint para refrescar el token JWT utilizando un refresh token válido.
-     * 
+     *
      * @param request La solicitud que contiene el refresh token.
      * @return Una respuesta con el nuevo token JWT y el refresh token actualizado.
      */
     @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(@RequestBody RefreshTokenRequest request) {
+    public ResponseEntity<?> refresh(@RequestBody(required = false) RefreshTokenRequest request,
+            HttpServletRequest httpRequest) {
         try {
-            String refreshToken = request != null ? request.refreshToken() : null;
+            String refreshToken = readRefreshCookie(httpRequest);
+            if (refreshToken == null && request != null) {
+                refreshToken = request.refreshToken();
+            }
             RefreshTokenResponse response = refreshTokenService.rotate(refreshToken);
-            return ResponseEntity.ok(response);
+            return withRefreshCookie(Map.of(
+                    "accessToken", response.accessToken(),
+                    "tokenType", response.tokenType(),
+                    "expiresIn", response.expiresIn()), response.refreshToken());
         } catch (RuntimeException ex) {
             return ResponseEntity.status(401).body(Map.of("error", ex.getMessage()));
         }
@@ -119,22 +145,64 @@ public class UserController {
 
     /**
      * Endpoint para cerrar la sesión del usuario y revocar el refresh token.
-     * 
+     *
      * @param request La solicitud que contiene el refresh token.
      * @return Una respuesta indicando el éxito de la operación.
      */
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(@RequestBody(required = false) RefreshTokenRequest request) {
-        String refreshToken = request != null ? request.refreshToken() : null;
+    public ResponseEntity<?> logout(@RequestBody(required = false) RefreshTokenRequest request,
+            HttpServletRequest httpRequest) {
+        String refreshToken = readRefreshCookie(httpRequest);
+        if (refreshToken == null && request != null) {
+            refreshToken = request.refreshToken();
+        }
         refreshTokenService.revokeIfPresent(refreshToken);
-        return ResponseEntity.ok(Map.of("success", true));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, buildRefreshCookie(null, Duration.ZERO).toString())
+                .body(Map.of("success", true));
+    }
+
+    private <T> ResponseEntity<T> withRefreshCookie(T body, String refreshToken) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE,
+                        buildRefreshCookie(refreshToken, Duration.ofDays(refreshTokenExpirationDays)).toString())
+                .body(body);
+    }
+
+    private ResponseCookie buildRefreshCookie(String value, Duration maxAge) {
+        String cookieName = refreshCookieName == null || refreshCookieName.isBlank()
+                ? DEFAULT_REFRESH_COOKIE_NAME
+                : refreshCookieName.trim();
+        return ResponseCookie.from(cookieName, value == null ? "" : value)
+                .httpOnly(true)
+                .secure(refreshCookieSecure)
+                .sameSite(refreshCookieSameSite)
+                .path("/api/auth")
+                .maxAge(maxAge)
+                .build();
+    }
+
+    private String readRefreshCookie(HttpServletRequest request) {
+        if (request == null || request.getCookies() == null) {
+            return null;
+        }
+        String cookieName = refreshCookieName == null || refreshCookieName.isBlank()
+                ? DEFAULT_REFRESH_COOKIE_NAME
+                : refreshCookieName.trim();
+        for (Cookie cookie : request.getCookies()) {
+            if (cookieName.equals(cookie.getName()) && cookie.getValue() != null
+                    && !cookie.getValue().isBlank()) {
+                return cookie.getValue();
+            }
+        }
+        return null;
     }
 
     /**
      * Endpoint seguro para recuperar los intereses y criterios de filtrado del
      * alumno en sesión.
      * Extrae la identidad mediante las credenciales del token JWT activo.
-     * 
+     *
      * @param principal El principal que representa al usuario autenticado.
      * @return Una respuesta con los intereses y criterios de filtrado del alumno.
      */
@@ -150,7 +218,7 @@ public class UserController {
     /**
      * Endpoint para guardar o actualizar los intereses y criterios de filtrado del
      * alumno en sesión.
-     * 
+     *
      * @param interestDTO Los intereses y criterios de filtrado del alumno.
      * @param principal   El principal que representa al usuario autenticado.
      * @return Una respuesta indicando el éxito de la operación.
@@ -173,7 +241,7 @@ public class UserController {
     /**
      * Endpoint seguro para recuperar las alertas dinámicas del alumno en sesión.
      * Extrae la identidad mediante las credenciales del token JWT activo.
-     * 
+     *
      * @param principal El principal que representa al usuario autenticado.
      * @return Una respuesta con la lista de alertas dinámicas del alumno.
      */
@@ -191,7 +259,7 @@ public class UserController {
      * Endpoint seguro para descartar todas las alertas dinámicas del alumno en
      * sesión.
      * Extrae la identidad mediante las credenciales del token JWT activo.
-     * 
+     *
      * @param principal El principal que representa al usuario autenticado.
      * @return Una respuesta indicando el éxito de la operación.
      */
@@ -204,10 +272,41 @@ public class UserController {
         return ResponseEntity.ok(Map.of("success", true));
     }
 
+    @PatchMapping("/notifications/dismiss-one")
+    public ResponseEntity<?> dismissSingleNotification(
+            Principal principal,
+            @RequestBody(required = false) DismissSingleNotificationRequestDTO request) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+
+        userService.dismissSingleNotification(
+                principal.getName(),
+                request != null ? request.notificationId() : null,
+                request != null ? request.type() : null);
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    /**
+     * Endpoint seguro para marcar como leídas únicamente las alertas de nueva
+     * calificación del alumno en sesión.
+     *
+     * @param principal El principal que representa al usuario autenticado.
+     * @return Una respuesta indicando el éxito de la operación.
+     */
+    @PatchMapping("/notifications/dismiss-grade-alerts")
+    public ResponseEntity<?> dismissGradeNotifications(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Sesión inválida o expirada."));
+        }
+        userService.dismissGradeNotifications(principal.getName());
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
     /**
      * Endpoint seguro para recuperar la información del usuario autenticado.
      * Extrae la identidad mediante las credenciales del token JWT activo.
-     * 
+     *
      * @param principal El principal que representa al usuario autenticado.
      * @return Una respuesta con la información del usuario autenticado.
      */
@@ -231,7 +330,7 @@ public class UserController {
     /**
      * Endpoint para recuperar la lista de cursos activos del alumno autenticado.
      * Extrae la identidad mediante las credenciales del token JWT activo.
-     * 
+     *
      * @param principal El principal autenticado de la sesión/token.
      * @param username  Fallback legacy opcional por compatibilidad de clientes.
      * @return Una respuesta con la lista de cursos activos del alumno.
@@ -309,7 +408,7 @@ public class UserController {
     /**
      * Endpoint exclusivo para que el Administrador recupere la lista completa de
      * usuarios registrados en la plataforma.
-     * 
+     *
      * @return Una respuesta con la lista de usuarios.
      */
     @GetMapping
@@ -321,7 +420,7 @@ public class UserController {
     /**
      * Endpoint exclusivo para que el Administrador cambie el rol de un usuario.
      * Se asegura de que el Administrador no pueda cambiar su propio rol.
-     * 
+     *
      * @param username    El nombre de usuario del usuario cuyo rol se desea
      *                    cambiar.
      * @param requestBody Un mapa que contiene el nuevo rol bajo la clave "role".
@@ -354,7 +453,7 @@ public class UserController {
      * Endpoint exclusivo para que el Administrador elimine (baja lógica) o reactive
      * un usuario.
      * Se asegura de que el Administrador no pueda eliminar su propia cuenta.
-     * 
+     *
      * @param username  El nombre de usuario del usuario a eliminar o reactivar.
      * @param principal El principal que representa al Administrador autenticado.
      * @return Una respuesta indicando el éxito de la operación.
@@ -383,7 +482,7 @@ public class UserController {
      * Endpoint exclusivo para que el Administrador elimine permanentemente un
      * usuario de la plataforma.
      * Esto incluye la eliminación de documentos, segúncorresponda.
-     * 
+     *
      * @param username  El nombre de usuario del usuario a eliminar permanentemente.
      * @param principal El principal que representa al Administrador autenticado.
      * @return Una respuesta indicando el éxito de la operación.
@@ -404,7 +503,7 @@ public class UserController {
     /**
      * Endpoint para obtener el perfil completo de un usuario específico.
      * Solo accesible para el Administrador o el propio usuario autenticado.
-     * 
+     *
      * @param username El nombre de usuario del perfil a obtener.
      * @return El objeto Users correspondiente al perfil solicitado.
      */
@@ -421,7 +520,7 @@ public class UserController {
      * de usuarios.
      * Este método asegura que solo se expongan los campos necesarios y evita la
      * exposición de información sensible como contraseñas.
-     * 
+     *
      * @param user El objeto Users a convertir.
      * @return Un mapa con los campos relevantes del usuario.
      */
@@ -438,7 +537,7 @@ public class UserController {
     /**
      * Endpoint seguro para iniciar un curso específico para el alumno autenticado.
      * Valida la propiedad del curso mediante el username del token JWT activo.
-     * 
+     *
      * @param id        El ID de la matrícula del curso a iniciar.
      * @param principal El principal que representa al usuario autenticado.
      * @return Una respuesta indicando el éxito de la operación.

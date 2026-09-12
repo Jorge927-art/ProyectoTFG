@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Inbox, Download, Loader2, AlertCircle, FileText, Send, Users, FolderOpen } from 'lucide-react';
+import { Inbox, Download, Loader2, AlertCircle, FileText, Send, Users, FolderOpen, CheckCircle, Search } from 'lucide-react';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import {
     downloadDocumentSecure,
     getAdminDocumentCourses,
     getAdminDocumentRecipients,
+    hideAllReceivedGeneralDocuments,
+    hideAllSentGeneralDocuments,
     getSentDocuments,
     getUserDocuments,
     markDocumentAsRead,
@@ -21,6 +23,29 @@ interface AdminDocumentInboxProps {
     autoFocusUnread?: boolean;
 }
 
+const rolePriority: Record<string, number> = {
+    ADMIN: 0,
+    PROFESSOR: 1,
+    STUDENT: 2,
+};
+
+const spanishUserCollator = new Intl.Collator('es', {
+    usage: 'sort',
+    sensitivity: 'base',
+    ignorePunctuation: true,
+});
+
+const sortRecipientsByRoleAndUsername = (users: AdminDocumentRecipient[]): AdminDocumentRecipient[] => (
+    [...users].sort((left, right) => {
+        const leftRolePriority = rolePriority[left.role] ?? Number.MAX_SAFE_INTEGER;
+        const rightRolePriority = rolePriority[right.role] ?? Number.MAX_SAFE_INTEGER;
+        if (leftRolePriority !== rightRolePriority) {
+            return leftRolePriority - rightRolePriority;
+        }
+        return spanishUserCollator.compare(left.username, right.username);
+    })
+);
+
 export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInboxProps) => {
     const [documents, setDocuments] = useState<DocumentMetadata[]>([]);
     const [sentDocuments, setSentDocuments] = useState<DocumentMetadata[]>([]);
@@ -28,11 +53,15 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
     const [courses, setCourses] = useState<AdminDocumentCourseOption[]>([]);
     const [selectedRecipientId, setSelectedRecipientId] = useState('');
     const [selectedCourseId, setSelectedCourseId] = useState('');
+    const [courseSearchKeyword, setCourseSearchKeyword] = useState('');
+    const [showCourseResults, setShowCourseResults] = useState(false);
     const [sentRecipientFilter, setSentRecipientFilter] = useState('');
     const [sentCourseFilter, setSentCourseFilter] = useState('');
     const [selectedRecipientFile, setSelectedRecipientFile] = useState<File | null>(null);
     const [selectedCourseFile, setSelectedCourseFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
+    const [clearingTray, setClearingTray] = useState<'received' | 'sent' | null>(null);
+    const [trayPendingConfirmation, setTrayPendingConfirmation] = useState<'received' | 'sent' | null>(null);
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
@@ -43,6 +72,28 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
     const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
     const recipientFileInputRef = useRef<HTMLInputElement | null>(null);
     const courseFileInputRef = useRef<HTMLInputElement | null>(null);
+
+    const visibleCourseResults = courseSearchKeyword.trim().length === 0
+        ? []
+        : courses
+            .filter((course) => {
+                const keyword = courseSearchKeyword.trim().toLocaleLowerCase();
+                return course.title.toLocaleLowerCase().includes(keyword)
+                    || course.category.toLocaleLowerCase().includes(keyword);
+            })
+            .sort((left, right) => {
+                const keyword = courseSearchKeyword.trim().toLocaleLowerCase();
+                const rank = (course: AdminDocumentCourseOption) => {
+                    const title = course.title.toLocaleLowerCase();
+                    const category = course.category.toLocaleLowerCase();
+                    if (title === keyword) return 0;
+                    if (title.startsWith(keyword)) return 1;
+                    if (category.startsWith(keyword)) return 2;
+                    return 3;
+                };
+                return rank(left) - rank(right) || left.title.localeCompare(right.title, 'es');
+            })
+            .slice(0, 15);
 
     const loadDocuments = async () => {
         setLoading(true);
@@ -69,9 +120,7 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                 getAdminDocumentCourses(),
             ]);
 
-            setRecipients(
-                recipientData.filter((user) => user.enabled)
-            );
+            setRecipients(sortRecipientsByRoleAndUsername(recipientData.filter((user) => user.enabled)));
             setCourses(courseData);
         } catch {
             setError('No se pudo preparar el formulario de envío de documentos del administrador.');
@@ -150,6 +199,8 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
 
     const resetCourseForm = () => {
         setSelectedCourseId('');
+        setCourseSearchKeyword('');
+        setShowCourseResults(false);
         setSelectedCourseFile(null);
         if (courseFileInputRef.current) {
             courseFileInputRef.current.value = '';
@@ -199,6 +250,47 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
             setSuccessMessage('');
         } finally {
             setSendingTarget(null);
+        }
+    };
+
+    const handleClearReceivedTray = () => {
+        setTrayPendingConfirmation('received');
+    };
+
+    const confirmClearReceivedTray = async () => {
+        setTrayPendingConfirmation(null);
+        try {
+            setClearingTray('received');
+            setError('');
+            setSuccessMessage('');
+            await hideAllReceivedGeneralDocuments();
+            await loadDocuments();
+            emitNotificationsRefresh();
+            setSuccessMessage('Todos tus documentos se han borrado correctamente.');
+        } catch {
+            setError('No se pudo limpiar la bandeja de entrada.');
+        } finally {
+            setClearingTray(null);
+        }
+    };
+
+    const handleClearSentTray = () => {
+        setTrayPendingConfirmation('sent');
+    };
+
+    const confirmClearSentTray = async () => {
+        setTrayPendingConfirmation(null);
+        try {
+            setClearingTray('sent');
+            setError('');
+            setSuccessMessage('');
+            await hideAllSentGeneralDocuments();
+            await loadDocuments();
+            setSuccessMessage('Todos tus documentos se han borrado correctamente.');
+        } catch {
+            setError('No se pudo limpiar la bandeja de salida.');
+        } finally {
+            setClearingTray(null);
         }
     };
 
@@ -265,6 +357,15 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                         onChange={(e) => setSelectedRecipientFile(e.target.files?.[0] ?? null)}
                         className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-100 file:px-3 file:py-2 file:text-xs file:font-bold file:text-blue-700 hover:file:bg-blue-200"
                     />
+                    {selectedRecipientFile && (
+                        <div className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+                            <CheckCircle className="text-emerald-500 shrink-0" size={18} />
+                            <div className="min-w-0">
+                                <p className="text-[11px] font-bold text-slate-700 truncate">{selectedRecipientFile.name}</p>
+                                <p className="text-[10px] font-semibold text-slate-500">Archivo seleccionado para enviar</p>
+                            </div>
+                        </div>
+                    )}
 
                     <GenericButton
                         type="button"
@@ -291,20 +392,52 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                         </span>
                     </div>
 
-                    <select
-                        aria-label="Seleccionar curso destinatario"
-                        value={selectedCourseId}
-                        onChange={(e) => setSelectedCourseId(e.target.value)}
+                    <input
+                        aria-label="Buscar curso destinatario"
+                        type="text"
+                        value={courseSearchKeyword}
+                        onChange={(e) => {
+                            setCourseSearchKeyword(e.target.value);
+                            setSelectedCourseId('');
+                            setShowCourseResults(true);
+                        }}
+                        onFocus={() => setShowCourseResults(true)}
+                        placeholder="Escribe el nombre o categoría del curso..."
                         disabled={sendingTarget !== null}
                         className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                        <option value="">Selecciona curso destinatario</option>
-                        {courses.map((course) => (
-                            <option key={course.courseId} value={course.courseId}>
-                                {course.title} ({course.category})
-                            </option>
-                        ))}
-                    </select>
+                    />
+                    {showCourseResults && courseSearchKeyword.trim() && (
+                        <div className="relative z-10">
+                            <div className="absolute left-0 right-0 mt-1 max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                                {visibleCourseResults.length === 0 ? (
+                                    <p className="px-2.5 py-2 text-[11px] font-medium text-slate-400">
+                                        No se encontraron cursos.
+                                    </p>
+                                ) : (
+                                    visibleCourseResults.map((course) => (
+                                        <button
+                                            key={course.courseId}
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedCourseId(String(course.courseId));
+                                                setCourseSearchKeyword(course.title);
+                                                setShowCourseResults(false);
+                                            }}
+                                            className="w-full rounded-md px-2.5 py-2 text-left hover:bg-indigo-50"
+                                        >
+                                            <span className="block text-xs font-bold text-slate-700">{course.title}</span>
+                                            <span className="block text-[10px] font-medium text-slate-400">{course.category}</span>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {selectedCourseId && (
+                        <p className="flex items-center gap-1.5 text-[10px] font-semibold text-indigo-600">
+                            <Search size={12} /> Curso seleccionado para el envío colectivo.
+                        </p>
+                    )}
 
                     <input
                         ref={courseFileInputRef}
@@ -315,6 +448,15 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                         onChange={(e) => setSelectedCourseFile(e.target.files?.[0] ?? null)}
                         className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-100 file:px-3 file:py-2 file:text-xs file:font-bold file:text-indigo-700 hover:file:bg-indigo-200"
                     />
+                    {selectedCourseFile && (
+                        <div className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+                            <CheckCircle className="text-emerald-500 shrink-0" size={18} />
+                            <div className="min-w-0">
+                                <p className="text-[11px] font-bold text-slate-700 truncate">{selectedCourseFile.name}</p>
+                                <p className="text-[10px] font-semibold text-slate-500">Archivo seleccionado para enviar</p>
+                            </div>
+                        </div>
+                    )}
 
                     <GenericButton
                         type="button"
@@ -359,6 +501,21 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                     </span>
                 </div>
 
+                <div className="mb-3">
+                    <GenericButton
+                        type="button"
+                        variant="text"
+                        onClick={() => void handleClearReceivedTray()}
+                        disabled={loading || documents.length === 0 || clearingTray !== null}
+                        icon={clearingTray === 'received' ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                        label={clearingTray === 'received' ? 'Limpiando...' : 'Limpiar bandeja de entrada'}
+                        className="text-xs! font-bold! text-slate-600!"
+                    />
+                    <span className="ml-2 text-[10px] font-medium text-slate-400">
+                        Se eliminarán TODOS tus documentos.
+                    </span>
+                </div>
+
                 <div className="max-h-80 overflow-y-auto custom-scrollbar space-y-2 pr-1">
                     {loading ? (
                         <div className="py-10 flex flex-col items-center text-slate-400">
@@ -396,9 +553,6 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                                     className="p-2! text-blue-600! hover:bg-blue-50! rounded-lg!"
                                 />
 
-                                {!doc.isRead && (
-                                    <span className="w-2 h-2 rounded-full bg-red-500" title="No leído" />
-                                )}
                             </div>
                         ))
                     )}
@@ -428,6 +582,18 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                     </span>
                 </div>
 
+                <div className="mb-3">
+                    <GenericButton
+                        type="button"
+                        variant="text"
+                        onClick={() => void handleClearSentTray()}
+                        disabled={loading || sentDocuments.length === 0 || clearingTray !== null}
+                        icon={clearingTray === 'sent' ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                        label={clearingTray === 'sent' ? 'Limpiando...' : 'Limpiar bandeja de salida'}
+                        className="text-xs! font-bold! text-slate-600!"
+                    />
+                </div>
+
                 <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white/70 p-3">
                     <select
                         aria-label="Filtrar enviados por destinatario"
@@ -438,7 +604,7 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                         <option value="">Todos los destinatarios</option>
                         {recipients.map((recipient) => (
                             <option key={recipient.userId} value={recipient.userId}>
-                                {recipient.username}
+                                {recipient.username} ({recipient.role})
                             </option>
                         ))}
                     </select>
@@ -497,6 +663,17 @@ export const AdminDocumentInbox = ({ autoFocusUnread = false }: AdminDocumentInb
                     Los documentos enviados permanecen disponibles para consulta y descarga del administrador.
                 </div>
             </div>
+            {trayPendingConfirmation && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4" role="presentation">
+                    <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="admin-clear-documents-title">
+                        <h2 id="admin-clear-documents-title" className="text-base font-bold text-slate-800">Se borrarán todos tus documentos. Este borrado es definitivo.</h2>
+                        <div className="mt-5 flex justify-end gap-2">
+                            <GenericButton type="button" variant="white" label="Cancelar" onClick={() => setTrayPendingConfirmation(null)} />
+                            <GenericButton type="button" variant="primary" label="Aceptar" onClick={() => void (trayPendingConfirmation === 'received' ? confirmClearReceivedTray() : confirmClearSentTray())} />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

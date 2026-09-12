@@ -6,18 +6,22 @@ import type { NotificationDTO } from './useNotifications'; // Importamos el tipo
 import GenericButton from '../genericButton/GenericButton';
 
 export default function NotificationBell() {
-    const { alerts, hasAlerts, hasUnread, dismissNotifications } = useNotifications();
+    const { alerts, hasAlerts, hasUnread, dismissNotifications, dismissSingleAlert } = useNotifications();
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
 
-    const handleAlertClick = (alert: NotificationDTO) => {
+    const handleAlertClick = (alert: NotificationDTO, index: number) => {
         const target = typeof alert.redirectUrl === 'string' && alert.redirectUrl.trim().length > 0
             ? alert.redirectUrl.trim()
             : '/';
 
         setIsOpen(false);
         navigate(target);
+        if (typeof dismissSingleAlert === 'function') {
+            void dismissSingleAlert(alert, index);
+            return;
+        }
         void dismissNotifications();
     };
 
@@ -65,7 +69,7 @@ export default function NotificationBell() {
                         <div className="flex items-center gap-2">
                             {hasAlerts && (
                                 <span className="px-2 py-0.5 text-[10px] font-bold bg-red-100 text-red-700 rounded-full">
-                                    {alerts.length} nuevos
+                                    {alerts.length} por ver
                                 </span>
                             )}
                             {hasUnread && (
@@ -98,7 +102,7 @@ export default function NotificationBell() {
                                         type="button"
                                         key={index}
                                         className="w-full text-left p-3 hover:bg-slate-50/80 transition-colors flex gap-3 items-start"
-                                        onClick={() => handleAlertClick(alert)}
+                                        onClick={() => handleAlertClick(alert, index)}
                                     >
                                         <div className={`p-2 rounded-xl shrink-0 ${iconColor}`}>
                                             <IconComponent size={16} />

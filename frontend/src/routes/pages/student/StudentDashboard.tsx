@@ -34,12 +34,17 @@ const StudentDashboard = () => {
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
     const [successMessage, setSuccessMessage] = useState<string>('');
+    const [recommendationsRefreshKey, setRecommendationsRefreshKey] = useState(0);
     const documentsPanelRef = useRef<HTMLDivElement | null>(null);
     const focusParams = new URLSearchParams(location.search);
     const shouldFocusDocuments = focusParams.get('focus') === 'documents';
     const focusDocumentIdParam = Number(focusParams.get('documentId'));
     const focusDocumentId = Number.isFinite(focusDocumentIdParam) && focusDocumentIdParam > 0
         ? focusDocumentIdParam
+        : null;
+    const focusCourseIdParam = Number(focusParams.get('courseId'));
+    const focusCourseId = Number.isFinite(focusCourseIdParam) && focusCourseIdParam > 0
+        ? focusCourseIdParam
         : null;
 
     /** 
@@ -98,7 +103,8 @@ const StudentDashboard = () => {
      * HOOK DE RECOMENDACIONES ALGORÍTMICAS:
      * Consume dinámicamente el motor de filtrado basado en contenido de Spring Boot [ADR-30].
      */
-    const { recommendations, loadingRecommendations, recommendationsError } = useSmartRecommendations(successMessage);
+    const recommendationsRefreshTrigger = `${recommendationsRefreshKey}:${successMessage}`;
+    const { recommendations, loadingRecommendations, recommendationsError } = useSmartRecommendations(recommendationsRefreshTrigger);
 
     /**
      * MANEJADOR DE ÉXITO EN MATRÍCULA:
@@ -124,12 +130,26 @@ const StudentDashboard = () => {
     }) => {
         console.log("Preferencias del estudiante capturadas para el TFG:", preferences);
         setIsModalOpen(false);
+        setRecommendationsRefreshKey((currentKey) => currentKey + 1);
         setSuccessMessage("¡Intereses guardados y actualizados correctamente!");
         setTimeout(() => setSuccessMessage(''), 5000);
     };
 
     // Evalúa dinámicamente el foco analítico dando prioridad a la selección del alumno [ADR-41]
-    const activeCourseId = enrolledList && enrolledList.length > 0 ? enrolledList[0].course?.course_id : null;
+    const activeCourseId = (() => {
+        if (!enrolledList || enrolledList.length === 0) {
+            return null;
+        }
+
+        if (shouldFocusDocuments && focusCourseId) {
+            const focusedEnrollment = enrolledList.find((enrollment) => enrollment.course?.course_id === focusCourseId);
+            if (focusedEnrollment?.course?.course_id) {
+                return focusedEnrollment.course.course_id;
+            }
+        }
+
+        return enrolledList[0].course?.course_id ?? null;
+    })();
 
     return (
         <DashboardLayout>
@@ -201,7 +221,7 @@ const StudentDashboard = () => {
                     Mantiene el reparto horizontal 1/3 + 2/3 y unifica altura/tipografía.
                 */}
                 <section className="bg-white border border-slate-100 rounded-2xl p-4 xl:p-5 2xl:p-6 shadow-sm">
-                    <div className="grid grid-cols-1 xl:grid-cols-[minmax(340px,0.95fr)_minmax(0,1.9fr)] gap-4 xl:gap-5 2xl:gap-6 items-stretch">
+                    <div className="grid grid-cols-1 xl:grid-cols-[minmax(360px,1fr)_minmax(420px,1.25fr)] gap-4 xl:gap-5 2xl:gap-6 items-stretch">
                         <div className="xl:min-w-85 h-109 xl:h-112 2xl:h-120">
                             <EnrolledCourses
                                 className="h-full"
@@ -232,19 +252,20 @@ const StudentDashboard = () => {
                     Mantiene el reparto horizontal 1/3 + 2/3 y una lectura visual única.
                 */}
                 <section className="bg-white border border-slate-100 rounded-2xl p-4 xl:p-5 2xl:p-6 shadow-sm">
-                    <div className="grid grid-cols-1 xl:grid-cols-[minmax(340px,0.95fr)_minmax(0,1.9fr)] gap-4 xl:gap-5 2xl:gap-6 items-stretch">
+                    <div className="grid grid-cols-1 xl:grid-cols-[minmax(340px,1fr)_minmax(340px,1.1fr)] gap-4 xl:gap-5 2xl:gap-6 items-stretch">
                         <div
                             ref={documentsPanelRef}
                             id="documents-panel"
-                            className="xl:min-w-85 h-109 xl:h-112 2xl:h-120"
+                            className="xl:min-w-85 h-136 xl:h-144 2xl:h-152"
                         >
                             <DocumentManager
                                 autoFocusDocuments={shouldFocusDocuments}
                                 focusDocumentId={focusDocumentId}
+                                enrolledList={enrolledList}
                             />
                         </div>
 
-                        <div className="h-109 xl:h-112 2xl:h-120">
+                        <div className="h-136 xl:h-144 2xl:h-152">
                             <CourseAssignmentPanel
                                 activeCourseId={activeCourseId}
                                 enrolledList={enrolledList}
@@ -259,12 +280,12 @@ const StudentDashboard = () => {
                 */}
                 <section className="bg-white border border-slate-100 rounded-2xl p-4 xl:p-5 2xl:p-6 shadow-sm">
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 xl:gap-5 2xl:gap-6 items-stretch">
-                        <div className="w-full h-109 xl:h-112 2xl:h-120">
+                        <div className="w-full xl:min-h-112 2xl:min-h-120">
                             <StudentStatsPanel activeCourseId={activeCourseId} enrolledList={enrolledList} />
                         </div>
 
-                        <div className="w-full h-109 xl:h-112 2xl:h-120">
-                            <EvaluationPanel />
+                        <div className="w-full xl:min-h-112 2xl:min-h-120">
+                            <EvaluationPanel hasEnrolledCourses={enrolledList.length > 0} />
                         </div>
                     </div>
                 </section>

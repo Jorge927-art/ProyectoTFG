@@ -69,7 +69,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
     it('debe renderizar el estado inicial vacío si no hay ninguna asignatura seleccionada', () => {
         render(<CourseAssignmentPanel activeCourseId={null} enrolledList={[]} />);
 
-        expect(screen.getByText(/ASIGNATURAS/i)).toBeInTheDocument();
+        expect(screen.getByText(/EXAMENES/i)).toBeInTheDocument();
         expect(screen.getByText(/Selecciona una asignatura activa/i)).toBeInTheDocument();
     });
 
@@ -81,13 +81,33 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
         expect(getReceivedDocumentsByCourse).not.toHaveBeenCalled();
     });
 
-    it('debe mostrar los bloques de entrega/calificaciones y permitir cambiar de asignatura', async () => {
+    it('debe mostrar la bandeja de enviados con documentos reales del curso', async () => {
+        vi.mocked(getSentDocumentsByCourse).mockResolvedValueOnce([
+            {
+                documentid: 801,
+                filename: 'entrega-801.pdf',
+                originalname: 'Entrega_Final.pdf',
+                upload_date: '2026-08-11',
+                sender: { username: 'luis_student' },
+                receiver: { username: 'profesor_juan' },
+                course: { courseId: 101, title: 'Desarrollo de Aplicaciones Cloud', category: 'Ingenieria' },
+                folder_type: 'SENT',
+                isRead: false
+            } as never
+        ]);
+
         render(<CourseAssignmentPanel activeCourseId={101} enrolledList={mockEnrolledList} />);
 
-        expect(screen.getByRole('button', { name: /Enviar trabajo \/ examen/i })).toBeInTheDocument();
-        expect(screen.getByText(/CALIFICACIONES/i)).toBeInTheDocument();
-        expect(screen.getByText(/Nota de Trabajos:/i)).toBeInTheDocument();
-        expect(screen.getByText(/Examen Final:/i)).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByText('Entrega_Final.pdf')).toBeInTheDocument());
+        expect(screen.getByText(/Para: profesor_juan/i)).toBeInTheDocument();
+        expect(screen.getByText(/Tus envíos/i)).toBeInTheDocument();
+    });
+
+    it('debe mostrar el flujo de entrega y permitir cambiar de asignatura', async () => {
+        render(<CourseAssignmentPanel activeCourseId={101} enrolledList={mockEnrolledList} />);
+
+        expect(screen.getByRole('button', { name: /Enviar examen/i })).toBeInTheDocument();
+        expect(screen.queryByText(/CALIFICACIONES/i)).not.toBeInTheDocument();
 
         const selectElement = screen.getByDisplayValue('Desarrollo de Aplicaciones Cloud');
         fireEvent.change(selectElement, { target: { value: '102' } });
@@ -172,24 +192,25 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
         });
     });
 
-    it('debe subir un archivo con tipo TRABAJO y courseId activo', async () => {
+    it('debe subir un archivo con tipo fijo TRABAJO y courseId activo', async () => {
         const { container } = render(<CourseAssignmentPanel activeCourseId={101} enrolledList={mockEnrolledList} />);
         const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
         const file = new File(['payload'], 'trabajo.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
         fireEvent.change(input, { target: { files: [file] } });
-        fireEvent.click(screen.getByRole('button', { name: /Enviar trabajo \/ examen/i }));
+        fireEvent.click(screen.getByRole('button', { name: /Enviar examen/i }));
 
         await waitFor(() => expect(apiClient.post).toHaveBeenCalledTimes(1));
 
         const [url, formData] = vi.mocked(apiClient.post).mock.calls[0] as [string, FormData];
         expect(url).toBe('/api/v1/documents/upload/assignment');
         expect(formData.get('courseId')).toBe('101');
-        expect(formData.get('evaluationType')).toBe('TRABAJO');
+        expect(formData.get('evaluationType')).toBe('EXAMEN');
         expect(formData.get('file')).toBe(file);
+        expect(await screen.findByText('Documento enviado correctamente: trabajo.docx.')).toBeInTheDocument();
     });
 
-    it('debe subir con tipo EXAMEN cuando el selector cambia y limpiar error tras timeout', async () => {
+    it('debe limpiar error tras timeout cuando falla la subida', async () => {
         vi.useFakeTimers();
         vi.mocked(apiClient.post).mockRejectedValueOnce({
             response: { data: { error: 'Archivo no permitido por política' } }
@@ -197,12 +218,10 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
 
         const { container } = render(<CourseAssignmentPanel activeCourseId={101} enrolledList={mockEnrolledList} />);
 
-        fireEvent.change(screen.getByDisplayValue('Trabajo Académico Escrito'), { target: { value: 'EXAMEN' } });
-
         const input = container.querySelector('input[type="file"]') as HTMLInputElement;
         const file = new File(['payload'], 'examen.pdf', { type: 'application/pdf' });
         fireEvent.change(input, { target: { files: [file] } });
-        fireEvent.click(screen.getByRole('button', { name: /Enviar trabajo \/ examen/i }));
+        fireEvent.click(screen.getByRole('button', { name: /Enviar examen/i }));
 
         await act(async () => {
             await Promise.resolve();
@@ -222,7 +241,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
         expect(screen.queryByText('Archivo no permitido por política')).not.toBeInTheDocument();
     });
 
-    it('no debe enviar automáticamente al seleccionar archivo; solo al pulsar Enviar trabajo / examen', async () => {
+    it('no debe enviar automáticamente al seleccionar archivo; solo al pulsar Enviar examen', async () => {
         const { container } = render(<CourseAssignmentPanel activeCourseId={101} enrolledList={mockEnrolledList} />);
         const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
@@ -231,7 +250,7 @@ describe('CourseAssignmentPanel - Suite de Pruebas Unitarias [ADR-47]', () => {
 
         expect(apiClient.post).not.toHaveBeenCalled();
 
-        fireEvent.click(screen.getByRole('button', { name: /Enviar trabajo \/ examen/i }));
+        fireEvent.click(screen.getByRole('button', { name: /Enviar examen/i }));
 
         await waitFor(() => {
             expect(apiClient.post).toHaveBeenCalledTimes(1);

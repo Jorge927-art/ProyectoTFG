@@ -29,16 +29,21 @@ export interface CourseGradeDTO {
     gradeId: number;
     title: string; // "Trabajo Académico Escrito" o "Examen Final"
     score: string; // Nota Ej: "8.5"
+    comments?: string;
 }
 
 const normalizeCourseGrades = (grades: Array<{
     gradeId: number;
     title: string;
     score: string | number;
+    comments?: string | null;
 }>): CourseGradeDTO[] => grades.map((grade) => ({
     gradeId: grade.gradeId,
     title: grade.title,
     score: String(grade.score),
+    ...(typeof grade.comments === 'string' && grade.comments.trim().length > 0
+        ? { comments: grade.comments.trim() }
+        : {}),
 }));
 
 /**
@@ -69,10 +74,14 @@ export const getStudentCourseGrades = async (enrollmentId: number): Promise<Cour
 };
 
 export const getTeacherEnrollmentGrades = async (enrollmentId: number): Promise<CourseGradeDTO[]> => {
-    const response = await apiClient.get<Array<{ gradeId: number; title: string; score: string | number }>>(
+    const response = await apiClient.get<Array<{ gradeId: number; title: string; score: string | number; comments?: string | null }>>(
         `/api/v1/teacher/evaluations/enrollments/${enrollmentId}/grades`
     );
     return normalizeCourseGrades(response.data);
+};
+
+export const dismissGradeNotifications = async (): Promise<void> => {
+    await apiClient.patch('/api/auth/notifications/dismiss-grade-alerts');
 };
 
 export interface StudentPerformanceDTO {

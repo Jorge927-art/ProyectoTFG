@@ -15,7 +15,10 @@ const students: StudentMetricBreakdown[] = [
         courseId: 10,
         courseTitle: 'Arquitectura',
         progressPercentage: 90,
-        averageGrade: 8.5
+        averageGrade: 8.5,
+        workAverage: null,
+        finalExamGrade: null,
+        finalGrade: null
     }
 ];
 
@@ -28,7 +31,10 @@ const manyStudents: StudentMetricBreakdown[] = [
         courseId: 10,
         courseTitle: 'Arquitectura',
         progressPercentage: 70,
-        averageGrade: 7.1
+        averageGrade: 7.1,
+        workAverage: null,
+        finalExamGrade: null,
+        finalGrade: null
     },
     {
         userId: 3,
@@ -37,7 +43,10 @@ const manyStudents: StudentMetricBreakdown[] = [
         courseId: 10,
         courseTitle: 'Arquitectura',
         progressPercentage: 55,
-        averageGrade: 6.8
+        averageGrade: 6.8,
+        workAverage: null,
+        finalExamGrade: null,
+        finalGrade: null
     },
     {
         userId: 4,
@@ -46,7 +55,10 @@ const manyStudents: StudentMetricBreakdown[] = [
         courseId: 10,
         courseTitle: 'Arquitectura',
         progressPercentage: 100,
-        averageGrade: 9.2
+        averageGrade: 9.2,
+        workAverage: null,
+        finalExamGrade: null,
+        finalGrade: null
     }
 ];
 

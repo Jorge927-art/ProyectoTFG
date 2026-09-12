@@ -30,6 +30,7 @@ export const useUserSearch = (currentAdminUsername: string) => {
     const [deleting, setDeleting] = useState<boolean>(false);
     const [deletingPermanently, setDeletingPermanently] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
+    const [successMessage, setSuccessMessage] = useState<string>('');
     
     /**
      * Maneja la búsqueda de un usuario por nombre de usuario.
@@ -42,6 +43,7 @@ export const useUserSearch = (currentAdminUsername: string) => {
 
         setLoading(true);
         setError('');
+        setSuccessMessage('');
         setFoundUser(null);
         try {
             const user = await searchUserByUsername(searchName);
@@ -65,10 +67,12 @@ export const useUserSearch = (currentAdminUsername: string) => {
         if (!foundUser) return;
         setUpdatingId(targetId);
         setError('');
+        setSuccessMessage('');
 
         try {
             await updateUserRole(foundUser.username, newRole);
             setFoundUser({ ...foundUser, role: newRole });
+            setSuccessMessage('Rol actualizado correctamente.');
             window.dispatchEvent(new Event(USER_DIRECTORY_REFRESH_EVENT));
         } catch (err) {
             console.error('Error al cambiar el rol en el servidor:', err);
@@ -88,6 +92,7 @@ export const useUserSearch = (currentAdminUsername: string) => {
 
         if (foundUser.username.toLowerCase() === currentAdminUsername.toLowerCase()) {
             setError('Acción denegada: El sistema bloquea el autoborrado por seguridad.');
+            setSuccessMessage('');
             return;
         }
 
@@ -99,11 +104,12 @@ export const useUserSearch = (currentAdminUsername: string) => {
 
         setDeleting(true);
         setError('');
+        setSuccessMessage('');
 
         try {
             const { message, enabled } = await toggleUserStatus(foundUser.username);
-            alert(message);
             setFoundUser({ ...foundUser, enabled });
+            setSuccessMessage(message);
             window.dispatchEvent(new Event(USER_DIRECTORY_REFRESH_EVENT));
         } catch (err) {
             console.error('Error en la petición de baja temporal:', err);
@@ -123,6 +129,7 @@ export const useUserSearch = (currentAdminUsername: string) => {
 
         if (foundUser.username.toLowerCase() === currentAdminUsername.toLowerCase()) {
             setError('Acción denegada: no puedes eliminarte permanentemente a ti mismo.');
+            setSuccessMessage('');
             return;
         }
 
@@ -134,12 +141,13 @@ export const useUserSearch = (currentAdminUsername: string) => {
 
         setDeletingPermanently(true);
         setError('');
+        setSuccessMessage('');
 
         try {
             const { message } = await deleteUserPermanently(foundUser.username);
-            alert(message);
             setFoundUser(null);
             setSearchName('');
+            setSuccessMessage(message);
             window.dispatchEvent(new Event(USER_DIRECTORY_REFRESH_EVENT)); // refresca "Consola de Usuarios" sin recargar la página
         } catch (err) {
             console.error('Error en la baja permanente:', err);
@@ -158,6 +166,7 @@ export const useUserSearch = (currentAdminUsername: string) => {
         deleting,
         deletingPermanently,
         error,
+        successMessage,
         handleSearchUser,
         handleRoleChange,
         handleDeleteUser,

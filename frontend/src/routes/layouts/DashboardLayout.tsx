@@ -14,7 +14,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     const isAdmin = user?.role === 'ADMIN';
     const paddingX = isAdmin ? 'px-4' : 'px-6';
 
-    const containerClasses = `max-w-6xl mx-auto ${paddingX} pt-24 pb-12`;
+    const containerClasses = `max-w-6xl xl:max-w-7xl 2xl:max-w-[1600px] mx-auto ${paddingX} pt-24 pb-12`;
 
     return (
         <div className="min-h-screen bg-slate-50 font-sans">

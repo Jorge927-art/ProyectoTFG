@@ -18,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -26,7 +27,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -295,5 +298,65 @@ class CourseControllerTest {
                                 .andExpect(status().isInternalServerError())
                                 .andExpect(jsonPath("$.error")
                                                 .value("Ocurrió un error inesperado al procesar la vinculación relacional."));
+        }
+
+        @Test
+        @DisplayName("Debe retornar 401 al guardar configuración docente sin sesión")
+        void assignTeacherWithAlertConfig_WithoutPrincipal_ShouldReturnUnauthorized() throws Exception {
+                mockMvc.perform(post("/api/courses/101/assign-teacher-with-alert-config")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"dispatchParts\": 4}"))
+                                .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("Debe asignar docente y guardar la configuración de avisos")
+        void assignTeacherWithAlertConfig_ValidData_ShouldReturnOk() throws Exception {
+                when(mockPrincipal.getName()).thenReturn("mockUser");
+                Users teacherUser = new Users();
+                teacherUser.setUser_id(2L);
+                teacherUser.setUsername("profesor");
+                teacherUser.setRole(Role.PROFESSOR);
+                sampleCourse.setAssignedUser(teacherUser);
+                when(userService.assignUserToCourseWithDispatchConfig("mockUser", 101L, 4))
+                                .thenReturn(sampleCourse);
+
+                mockMvc.perform(post("/api/courses/101/assign-teacher-with-alert-config")
+                                .principal(mockPrincipal)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"dispatchParts\": 4}"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.courseId").value(101))
+                                .andExpect(jsonPath("$.message")
+                                                .value("Curso asignado y configuración de avisos guardada correctamente."));
+        }
+
+        @Test
+        @DisplayName("Debe convertir error de negocio de configuración en 400")
+        void assignTeacherWithAlertConfig_ServicesException_ShouldReturnBadRequest() throws Exception {
+                when(mockPrincipal.getName()).thenReturn("mockUser");
+                when(userService.assignUserToCourseWithDispatchConfig(anyString(), anyLong(), anyInt()))
+                                .thenThrow(new ServicesException("Configuración inválida."));
+
+                mockMvc.perform(post("/api/courses/101/assign-teacher-with-alert-config")
+                                .principal(mockPrincipal)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"dispatchParts\": 4}"))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.error").value("Configuración inválida."));
+        }
+
+        @Test
+        @DisplayName("Debe aceptar cuerpo nulo y propagar la parte nula al servicio")
+        void assignTeacherWithAlertConfig_NullBody_ShouldForwardNullParts() throws Exception {
+                when(mockPrincipal.getName()).thenReturn("mockUser");
+                when(userService.assignUserToCourseWithDispatchConfig("mockUser", 101L, null))
+                                .thenThrow(new ServicesException("Debes seleccionar partes."));
+
+                ResponseEntity<?> response = courseController.assignTeacherToCourseWithAlertConfig(
+                                101L, null, mockPrincipal);
+
+                assertEquals(400, response.getStatusCode().value());
+                Mockito.verify(userService).assignUserToCourseWithDispatchConfig("mockUser", 101L, null);
         }
 }

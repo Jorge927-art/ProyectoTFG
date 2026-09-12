@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Upload, FileText, Download, Loader2, AlertCircle, FileUp, Inbox, Send, UserCheck } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Upload, FileText, Download, Loader2, AlertCircle, FileUp, Inbox, Send, UserCheck, CheckCircle } from 'lucide-react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import type { TaughtCourse } from '../../../../services/userDomains';
@@ -12,13 +12,15 @@ import {
 import {
     downloadDocumentSecure,
     getProfessorRecipientsByCourse,
-    getReceivedDocumentsByCourse,
+    hideAllReceivedGeneralDocuments,
+    getUserDocuments,
     getSentDocumentsByCourse,
     markDocumentAsRead,
     uploadProfessorDocument,
     type DocumentMetadata,
     type UserDirectoryDTO,
 } from '../../../../services/documentService';
+import { emitProfessorAlertsRefresh } from '../../../../services/professorAlertService';
 import { emitNotificationsRefresh } from '../../../../components/ui/globalNotificationBell/useNotifications';
 
 interface ProfessorDocumentManagerProps {
@@ -42,10 +44,13 @@ export const ProfessorDocumentManager = ({
     const [loadingDocuments, setLoadingDocuments] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [documentError, setDocumentError] = useState('');
+    const [documentSuccess, setDocumentSuccess] = useState('');
     const [documentList, setDocumentList] = useState<DocumentMetadata[]>([]);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
     const [highlightedDocumentId, setHighlightedDocumentId] = useState<number | null>(null);
+    const [clearingReceivedTray, setClearingReceivedTray] = useState(false);
+    const [showClearConfirmation, setShowClearConfirmation] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -102,7 +107,7 @@ export const ProfessorDocumentManager = ({
     }, [selectedCourseId]);
 
     useEffect(() => {
-        if (!selectedCourseId) {
+        if (activeTab === 'SENT' && !selectedCourseId) {
             setDocumentList([]);
             return;
         }
@@ -114,8 +119,8 @@ export const ProfessorDocumentManager = ({
             setDocumentError('');
             try {
                 const docs = activeTab === 'RECEIVED'
-                    ? await getReceivedDocumentsByCourse(selectedCourseId)
-                    : await getSentDocumentsByCourse(selectedCourseId);
+                    ? await getUserDocuments()
+                    : await getSentDocumentsByCourse(selectedCourseId as number);
 
                 if (!cancelled) {
                     setDocumentList(docs);
@@ -174,14 +179,6 @@ export const ProfessorDocumentManager = ({
         };
     }, []);
 
-    const selectedCourseTitle = useMemo(() => {
-        if (!selectedCourseId) {
-            return 'Sin asignatura seleccionada';
-        }
-
-        return availableCourses.find((course) => course.id === selectedCourseId)?.title ?? 'Asignatura';
-    }, [availableCourses, selectedCourseId]);
-
     const resetUploadState = () => {
         setSelectedFile(null);
         setSelectedReceiverId('');
@@ -204,6 +201,7 @@ export const ProfessorDocumentManager = ({
 
         setSelectedFile(file);
         setDocumentError('');
+        setDocumentSuccess('');
     };
 
     const handleManualUpload = async () => {
@@ -225,12 +223,13 @@ export const ProfessorDocumentManager = ({
         try {
             setIsUploading(true);
             setDocumentError('');
-            await uploadProfessorDocument(selectedFile, selectedCourseId, Number(selectedReceiverId));
+            setDocumentSuccess('');
+            await uploadProfessorDocument(selectedFile, selectedCourseId, Number(selectedReceiverId), 'DOCUMENTO');
+            emitProfessorAlertsRefresh();
             resetUploadState();
+            setDocumentSuccess(`Documento enviado correctamente: ${selectedFile.name}.`);
 
-            const updated = activeTab === 'RECEIVED'
-                ? await getReceivedDocumentsByCourse(selectedCourseId)
-                : await getSentDocumentsByCourse(selectedCourseId);
+            const updated = await getSentDocumentsByCourse(selectedCourseId);
             setDocumentList(updated);
         } catch (error) {
             console.error('Error al transmitir documento académico desde profesor:', error);
@@ -249,6 +248,7 @@ export const ProfessorDocumentManager = ({
                 || backendError.response?.data?.detalles
                 || 'No se pudo enviar el documento académico. Inténtalo de nuevo.'
             );
+            setDocumentSuccess('');
         } finally {
             setIsUploading(false);
         }
@@ -279,12 +279,34 @@ export const ProfessorDocumentManager = ({
         }
     };
 
+    const handleClearReceivedTray = () => {
+        setShowClearConfirmation(true);
+    };
+
+    const confirmClearReceivedTray = async () => {
+        setShowClearConfirmation(false);
+
+        try {
+            setClearingReceivedTray(true);
+            setDocumentError('');
+            await hideAllReceivedGeneralDocuments();
+            emitNotificationsRefresh();
+            const docs = await getUserDocuments();
+            setDocumentList(docs);
+            setHighlightedDocumentId(null);
+        } catch {
+            setDocumentError('No se pudo limpiar la bandeja de entrada.');
+        } finally {
+            setClearingReceivedTray(false);
+        }
+    };
+
     return (
         <GenericCard className={`flex flex-col h-118 ${className}`.trim()}>
             <div className="flex items-center justify-between mb-3 shrink-0">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                     <FileUp size={18} className="text-blue-600" />
-                    <span>Gestión de Documentos Académicos</span>
+                    <span>Documentación y trabajos académicos</span>
                 </h2>
                 <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">
                     {documentList.length}
@@ -293,7 +315,7 @@ export const ProfessorDocumentManager = ({
 
             <div className="bg-slate-50/60 border border-slate-100 rounded-xl p-2.5 mb-3 shrink-0">
                 <label htmlFor="professor-doc-course-selector" className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
-                    Asignatura activa para documentos
+                    Asignatura activa para documentación y trabajos
                 </label>
                 <select
                     id="professor-doc-course-selector"
@@ -343,10 +365,33 @@ export const ProfessorDocumentManager = ({
                 />
             </div>
 
+            {activeTab === 'RECEIVED' && (
+                <div className="mb-3 shrink-0">
+                    <GenericButton
+                        type="button"
+                        variant="text"
+                        onClick={() => void handleClearReceivedTray()}
+                        disabled={loadingDocuments || documentList.length === 0 || clearingReceivedTray}
+                        icon={clearingReceivedTray ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                        label={clearingReceivedTray ? 'Limpiando...' : 'Limpiar bandeja de entrada'}
+                        className="text-xs! font-bold! text-slate-600!"
+                    />
+                    <span className="ml-2 text-[10px] font-medium text-slate-400">
+                        Se borrarán todos tus documentos. Este borrado es definitivo.
+                    </span>
+                </div>
+            )}
+
             {documentError && (
                 <div className="mb-3 p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg flex items-center gap-2 shrink-0">
                     <AlertCircle size={14} className="shrink-0" />
                     <p className="truncate">{documentError}</p>
+                </div>
+            )}
+            {documentSuccess && (
+                <div className="mb-3 p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-lg flex items-center gap-2 shrink-0">
+                    <CheckCircle size={14} className="shrink-0" />
+                    <p className="truncate">{documentSuccess}</p>
                 </div>
             )}
 
@@ -397,6 +442,8 @@ export const ProfessorDocumentManager = ({
                             >
                                 {isUploading ? (
                                     <Loader2 className="text-blue-500 animate-spin" size={20} />
+                                ) : selectedFile ? (
+                                    <CheckCircle className="text-emerald-500" size={20} />
                                 ) : (
                                     <Upload
                                         className={`transition-colors ${selectedReceiverId
@@ -406,16 +453,21 @@ export const ProfessorDocumentManager = ({
                                         size={20}
                                     />
                                 )}
-                                <span className="text-[11px] font-bold text-slate-600">
-                                    {isUploading
-                                        ? 'Transmitiendo payload seguro...'
-                                        : !selectedReceiverId
+                                {isUploading ? (
+                                    <span className="text-[11px] font-bold text-slate-600">Transmitiendo payload seguro...</span>
+                                ) : selectedFile ? (
+                                    <>
+                                        <span className="text-[11px] font-bold text-slate-700 truncate max-w-full px-1.5">{selectedFile.name}</span>
+                                        <span className="text-[10px] text-slate-500 font-semibold">Archivo seleccionado para enviar</span>
+                                    </>
+                                ) : (
+                                    <span className="text-[11px] font-bold text-slate-600">
+                                        {!selectedReceiverId
                                             ? 'Selecciona destinatario para desbloquear'
-                                            : selectedFile
-                                                ? `Archivo listo: ${selectedFile.name}`
-                                                : `Seleccionar archivo (${ACADEMIC_DOCUMENT_ALLOWED_LABEL})`
-                                    }
-                                </span>
+                                            : `Seleccionar archivo (${ACADEMIC_DOCUMENT_ALLOWED_LABEL})`
+                                        }
+                                    </span>
+                                )}
                             </label>
                         </div>
 
@@ -425,15 +477,9 @@ export const ProfessorDocumentManager = ({
                             disabled={isUploading || !selectedReceiverId || !selectedFile}
                             variant="primary"
                             icon={isUploading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                            label={isUploading ? 'Enviando...' : 'Enviar documento'}
+                            label={isUploading ? 'Enviando...' : 'Enviar documentación o trabajo'}
                             className="w-full justify-center gap-2 py-2! text-xs! font-bold! rounded-lg!"
                         />
-                    </div>
-                )}
-
-                {activeTab === 'RECEIVED' && (
-                    <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-2.5 text-[11px] font-semibold text-blue-700 shrink-0">
-                        Mostrando documentos recibidos en {selectedCourseTitle}.
                     </div>
                 )}
 
@@ -493,6 +539,17 @@ export const ProfessorDocumentManager = ({
                     )}
                 </div>
             </div>
+            {showClearConfirmation && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4" role="presentation">
+                    <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="professor-clear-documents-title">
+                        <h2 id="professor-clear-documents-title" className="text-base font-bold text-slate-800">Se borrarán todos tus documentos. Este borrado es definitivo.</h2>
+                        <div className="mt-5 flex justify-end gap-2">
+                            <GenericButton type="button" variant="white" label="Cancelar" onClick={() => setShowClearConfirmation(false)} />
+                            <GenericButton type="button" variant="primary" label="Aceptar" onClick={() => void confirmClearReceivedTray()} />
+                        </div>
+                    </div>
+                </div>
+            )}
         </GenericCard>
     );
 };

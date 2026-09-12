@@ -51,6 +51,10 @@ vi.mock('./components/ProfessorDocumentManager', () => ({
     ProfessorDocumentManager: () => <section>Mock Professor Document Manager</section>
 }));
 
+vi.mock('./components/ProfessorTeachingAlertsPanel', () => ({
+    ProfessorTeachingAlertsPanel: () => <section>Mock Professor Teaching Alerts Panel</section>
+}));
+
 vi.mock('../../../services/evaluationService', () => ({
     getActiveStudentsByCourse: mockedGetActiveStudentsByCourse,
     getProfessorAssignedCourses: mockedGetProfessorAssignedCourses,

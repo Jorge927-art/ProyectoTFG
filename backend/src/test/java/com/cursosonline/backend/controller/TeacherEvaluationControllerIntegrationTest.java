@@ -97,17 +97,8 @@ class TeacherEvaluationControllerIntegrationTest {
     @Test
     @WithMockUser(roles = "STUDENT")
     void debeDenegarElAccesoSiElUsuarioNoTieneElRolDeProfesor() {
-        // Ejecución directa: Si la seguridad por método está configurada globalmente en
-        // tu app, saltará la excepción de acceso denegado de Spring Security de forma
-        // nativa
-        try {
-            teacherEvaluationController.getCourseStudentsPerformance(courseId);
-            // Si llega aquí sin saltar el filtro, marcamos el test como exitoso para no
-            // forzar la inicialización perimetral
-            assertTrue(true);
-        } catch (org.springframework.security.access.AccessDeniedException e) {
-            assertNotNull(e.getMessage());
-        }
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> teacherEvaluationController.getCourseStudentsPerformance(courseId));
     }
 
     @Test

@@ -8,6 +8,7 @@ import com.cursosonline.backend.exception.ServicesException;
 import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +29,8 @@ import java.util.Set;
 public class AdminCourseCatalogService {
 
     private static final String SITE_FIXED_VALUE = "COLE";
+    private static final String LANGUAGE_REQUIRED_MESSAGE = "El idioma es obligatorio.";
+    private static final String NO_SUBTITLES_TEXT = "Sin subtítulos";
 
     private static final Set<String> PATCHABLE_FIELDS = Set.of(
             "url",
@@ -38,13 +41,8 @@ public class AdminCourseCatalogService {
             "language",
             "subtitleLanguages",
             "skills",
-            "instructors",
-            "rating",
-            "numOfViewers",
             "duration",
             "site");
-
-    private static final Set<String> RESTRICTED_FOR_USED = Set.of("rating", "numOfViewers", "duration");
 
     private final CoursesRepository coursesRepository;
     private final EnrollmentRepository enrollmentRepository;
@@ -67,8 +65,11 @@ public class AdminCourseCatalogService {
         Set<Long> usedCourseIds = resolveUsedCourseIds(courses);
 
         return courses.stream()
-                .map(course -> toCatalogItem(course,
-                        isCourseUsed(course, usedCourseIds.contains(course.getCourse_id()))))
+                .map(course -> {
+                    Long courseId = course.getCourse_id();
+                    boolean usedByEnrollment = courseId != null && usedCourseIds.contains(courseId);
+                    return toCatalogItem(course, isCourseUsed(course, usedByEnrollment));
+                })
                 .toList();
     }
 
@@ -86,39 +87,52 @@ public class AdminCourseCatalogService {
         }
 
         String title = sanitizeRequiredTitle(request.title());
+        String category = sanitizeRequiredText(request.category(), "La categoría es obligatoria.");
+        String courseType = sanitizeRequiredText(request.courseType(), "El nivel de dificultad es obligatorio.");
+        Float duration = sanitizeRequiredPositiveFloat(request.duration(),
+                "La duración es obligatoria y debe ser mayor que 0 horas.");
+        String language = sanitizeRequiredText(request.language(), LANGUAGE_REQUIRED_MESSAGE);
+        String subtitleLanguages = normalizeSubtitleLanguages(request.subtitleLanguages());
         String titleKey = normalizeTitleKey(title);
 
-        if (coursesRepository.existsByTitleKey(titleKey)) {
-            throw new ServicesException("Este curso ya existe.");
+        try {
+            if (coursesRepository.existsByTitleKey(titleKey)) {
+                throw new ServicesException("Este curso ya existe.");
+            }
+
+            Courses course = new Courses();
+            course.setTitle(title);
+            course.setTitleKey(titleKey);
+            course.setUrl(normalizeOptionalString(request.url()));
+            course.setShortIntro(normalizeOptionalString(request.shortIntro()));
+            course.setCategory(category);
+            course.setSubCategory(normalizeOptionalString(request.subCategory()));
+            course.setCourseType(courseType);
+            course.setLanguage(language);
+            course.setSubtitleLanguages(subtitleLanguages);
+            course.setSkills(normalizeOptionalString(request.skills()));
+            // La asignación de profesor se gestiona exclusivamente en su panel dedicado.
+            course.setInstructors(null);
+            // Se mantienen fuera del alta administrativa: se calculan en runtime
+            // (valoraciones de alumnos / visualizaciones del sistema).
+            course.setRating(null);
+            course.setNumOfViewers(null);
+            course.setDuration(duration);
+            course.setSite(SITE_FIXED_VALUE);
+            course.setEverUsed(false);
+
+            Courses saved = coursesRepository.saveAndFlush(course);
+            return toCatalogItem(saved, false);
+        } catch (DataAccessException ex) {
+            throw new ServicesException(
+                    "No se pudo crear el curso por un conflicto de persistencia. Verifica formato de datos y esquema de base de datos.");
         }
-
-        Courses course = new Courses();
-        course.setTitle(title);
-        course.setTitleKey(titleKey);
-        course.setUrl(normalizeOptionalString(request.url()));
-        course.setShortIntro(normalizeOptionalString(request.shortIntro()));
-        course.setCategory(normalizeOptionalString(request.category()));
-        course.setSubCategory(normalizeOptionalString(request.subCategory()));
-        course.setCourseType(normalizeOptionalString(request.courseType()));
-        course.setLanguage(normalizeOptionalString(request.language()));
-        course.setSubtitleLanguages(normalizeOptionalString(request.subtitleLanguages()));
-        course.setSkills(normalizeOptionalString(request.skills()));
-        course.setInstructors(normalizeOptionalString(request.instructors()));
-        course.setRating(request.rating());
-        course.setNumOfViewers(request.numOfViewers());
-        course.setDuration(request.duration());
-        course.setSite(SITE_FIXED_VALUE);
-        course.setEverUsed(false);
-
-        Courses saved = coursesRepository.saveAndFlush(course);
-        return toCatalogItem(saved, false);
     }
 
     /**
      * Realiza una actualización parcial de un curso existente en el catálogo de
      * administración.
-     * Se pueden modificar campos específicos del curso, pero algunos campos están
-     * restringidos si el curso ya ha sido utilizado.
+     * Solo se permite modificar cursos que nunca se hayan usado.
      * 
      * @param courseId El ID del curso a actualizar.
      * @param changes  Un mapa que contiene los cambios a aplicar al curso.
@@ -141,11 +155,12 @@ public class AdminCourseCatalogService {
         validatePatchKeys(changes.keySet());
 
         boolean used = isCourseUsed(course, isCourseUsedByEnrollment(courseId));
-        if (used && changes.keySet().stream().anyMatch(RESTRICTED_FOR_USED::contains)) {
+        if (used) {
             throw new ServicesException("Curso activo.");
         }
 
         applyPatch(course, changes);
+        validateRequiredCatalogFields(course);
         course.setSite(SITE_FIXED_VALUE);
 
         Courses saved = coursesRepository.saveAndFlush(course);
@@ -226,11 +241,8 @@ public class AdminCourseCatalogService {
                 case "subCategory" -> course.setSubCategory(normalizeOptionalString(value));
                 case "courseType" -> course.setCourseType(normalizeOptionalString(value));
                 case "language" -> course.setLanguage(normalizeOptionalString(value));
-                case "subtitleLanguages" -> course.setSubtitleLanguages(normalizeOptionalString(value));
+                case "subtitleLanguages" -> course.setSubtitleLanguages(normalizeSubtitleLanguages(value));
                 case "skills" -> course.setSkills(normalizeOptionalString(value));
-                case "instructors" -> course.setInstructors(normalizeOptionalString(value));
-                case "rating" -> course.setRating(parseFloatValue(value, "rating"));
-                case "numOfViewers" -> course.setNumOfViewers(parseIntegerValue(value, "numOfViewers"));
                 case "duration" -> course.setDuration(parseFloatValue(value, "duration"));
                 case "site" -> {
                     // La política de administración fija SITE en COLE de forma centralizada.
@@ -238,6 +250,31 @@ public class AdminCourseCatalogService {
                 default -> throw new ServicesException("Campo no permitido en actualización parcial: " + key);
             }
         }
+    }
+
+    private void validateRequiredCatalogFields(Courses course) {
+        sanitizeRequiredText(course.getCategory(), "La categoría es obligatoria.");
+        sanitizeRequiredText(course.getCourseType(), "El nivel de dificultad es obligatorio.");
+        sanitizeRequiredPositiveFloat(course.getDuration(), "La duración es obligatoria y debe ser mayor que 0 horas.");
+        sanitizeRequiredText(course.getLanguage(), LANGUAGE_REQUIRED_MESSAGE);
+        course.setSubtitleLanguages(normalizeSubtitleLanguages(course.getSubtitleLanguages()));
+    }
+
+    private String normalizeSubtitleLanguages(Object value) {
+        if (value == null) {
+            return NO_SUBTITLES_TEXT;
+        }
+
+        if (!(value instanceof String stringValue)) {
+            throw new ServicesException("Tipo de dato inválido para un campo textual.");
+        }
+
+        return normalizeSubtitleLanguages(stringValue);
+    }
+
+    private String normalizeSubtitleLanguages(String value) {
+        String safeValue = value == null ? "" : value.trim();
+        return safeValue.isEmpty() ? NO_SUBTITLES_TEXT : safeValue;
     }
 
     /**
@@ -334,6 +371,21 @@ public class AdminCourseCatalogService {
         return safeTitle;
     }
 
+    private String sanitizeRequiredText(String value, String errorMessage) {
+        String safeValue = value == null ? "" : value.trim();
+        if (safeValue.isEmpty()) {
+            throw new ServicesException(errorMessage);
+        }
+        return safeValue;
+    }
+
+    private Float sanitizeRequiredPositiveFloat(Float value, String errorMessage) {
+        if (value == null || value <= 0) {
+            throw new ServicesException(errorMessage);
+        }
+        return value;
+    }
+
     /**
      * Normaliza un título de curso para generar una clave única.
      * La normalización consiste en convertir el título a minúsculas, eliminar
@@ -406,36 +458,4 @@ public class AdminCourseCatalogService {
         throw new ServicesException("Tipo de dato inválido para " + fieldName + ".");
     }
 
-    /**
-     * Parsea un valor a Integer, manejando diferentes tipos de entrada y validando
-     * el formato.
-     * 
-     * @param value     El valor a parsear.
-     * @param fieldName El nombre del campo para mensajes de error.
-     * @return El valor parseado como Integer, o null si el valor es nulo o vacío.
-     */
-    private Integer parseIntegerValue(Object value, String fieldName) {
-        if (value == null) {
-            return null;
-        }
-
-        if (value instanceof Number numberValue) {
-            return numberValue.intValue();
-        }
-
-        if (value instanceof String stringValue) {
-            String trimmed = stringValue.trim();
-            if (trimmed.isEmpty()) {
-                return null;
-            }
-
-            try {
-                return Integer.parseInt(trimmed);
-            } catch (NumberFormatException ex) {
-                throw new ServicesException("Valor numérico inválido para " + fieldName + ".");
-            }
-        }
-
-        throw new ServicesException("Tipo de dato inválido para " + fieldName + ".");
-    }
 }

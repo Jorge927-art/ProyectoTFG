@@ -44,7 +44,7 @@ describe('ProfessorCoursePicker - Suite de Cobertura Funcional y Regresividad Vi
         actionExecutionId: null,
         catalogError: '',
         setCatalogError: vi.fn(),
-        executeCourseAction: vi.fn()
+        executeCourseAction: vi.fn().mockResolvedValue(true)
     };
 
     beforeEach(() => {
@@ -197,30 +197,9 @@ describe('ProfessorCoursePicker - Suite de Cobertura Funcional y Regresividad Vi
        4. PRUEBAS DE FLUJO TRANSACCIONAL SEGURO (MOCK EXTENDIDO)
        ========================================================================= */
     it('4. Debe invocar el endpoint relacional con el ID correcto y disparar el mensaje de éxito en verde', async () => {
-        // Removido todo uso de 'any' para satisfacer al linter
-        let useCourseCatalogMockCallback: unknown = undefined;
+        const mockExecuteAction = vi.fn().mockResolvedValue(true);
 
-        const mockExecuteAction = vi.fn().mockImplementation(() => {
-            // Buscamos el callback de éxito mediante la función capturada de inicialización
-            if (useCourseCatalogMockCallback) {
-                // Sincronizado con el ID 502 (curso vacante y asignable)
-                const mockCourseData = {
-                    course_id: 502,
-                    title: 'Data Analysis and Fundamental Statistics',
-                    category: 'General',
-                    instructors: 'profesor_autenticado'
-                } as unknown;
-
-                // Casting limpio y directo que satisface a TypeScript y ESLint
-                const callbackFn = useCourseCatalogMockCallback as (course: unknown) => void;
-                callbackFn(mockCourseData);
-            }
-            return Promise.resolve();
-        });
-
-        // CORRECCIÓN: Forzamos la implementación para que devuelva tanto el callback como el 'catalogCourses' original
-        useCourseCatalogSpy.mockImplementation((onActionSuccess: Parameters<typeof courseCatalogModule.useCourseCatalog>[0]) => {
-            useCourseCatalogMockCallback = onActionSuccess;
+        useCourseCatalogSpy.mockImplementation(() => {
             return {
                 ...defaultHookReturn, // Trae de vuelta la lista mockCatalogCourses
                 executeCourseAction: mockExecuteAction
@@ -237,14 +216,21 @@ describe('ProfessorCoursePicker - Suite de Cobertura Funcional y Regresividad Vi
 
         const courseActionButton = within(courseCard as HTMLElement).getByRole('button');
 
-        // Ejecutamos el clic en el botón del primer curso de la lista
+        // Ejecutamos el clic para abrir el modal obligatorio de configuración
         fireEvent.click(courseActionButton);
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
 
         // Sincronizado exactamente con el curso vacante (502)
         expect(mockExecuteAction).toHaveBeenCalledWith(
             502,
-            '/api/courses/502/assign-teacher',
-            'post'
+            '/api/courses/502/assign-teacher-with-alert-config',
+            'post',
+            { dispatchParts: 1 }
         );
 
         // Validar el renderizado en caliente del banner verde de éxito en la UI

@@ -70,6 +70,9 @@ describe('Integracion campana + gestor de documentos', () => {
             loadingDirectory: false,
             selectedReceiverId: '',
             setSelectedReceiverId: vi.fn(),
+            fetchDirectoryForCourse: vi.fn(),
+            clearReceivedDocuments: vi.fn(),
+            clearSentDocuments: vi.fn(),
             handleUpload: vi.fn(),
             handleSecureDownload: mockHandleSecureDownload,
         });

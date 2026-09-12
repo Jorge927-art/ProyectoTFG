@@ -27,6 +27,12 @@ export const StudentGradeBreakdown = ({
                 data-testid="student-grade-list"
                 className="max-h-56 overflow-y-scroll pr-1 space-y-1.5 custom-scrollbar"
             >
+                <div className="grid grid-cols-[minmax(10rem,1.5fr)_repeat(3,minmax(5rem,1fr))] items-center gap-3 px-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                    <span>Alumno</span>
+                    <span className="text-center">Trabajos</span>
+                    <span className="text-center">Examen final</span>
+                    <span className="text-center">Nota final</span>
+                </div>
                 {students.length === 0 ? (
                     <p className="text-[11px] text-slate-400 italic text-center py-3">
                         Sin calificaciones registradas en el ámbito seleccionado.
@@ -35,7 +41,7 @@ export const StudentGradeBreakdown = ({
                     students.map((student) => (
                         <div
                             key={`${student.courseId}-${student.userId}`}
-                            className="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-100 text-[11px]"
+                            className="grid grid-cols-[minmax(10rem,1.5fr)_repeat(3,minmax(5rem,1fr))] items-center gap-3 p-2.5 bg-slate-50 rounded border border-slate-100 text-[11px]"
                         >
                             <div className="min-w-0">
                                 <p className="font-semibold text-slate-700 truncate">{student.username}</p>
@@ -43,8 +49,14 @@ export const StudentGradeBreakdown = ({
                                     <p className="text-[10px] text-slate-400 truncate">{student.courseTitle}</p>
                                 )}
                             </div>
-                            <span className="font-bold text-emerald-600 shrink-0">
-                                {student.averageGrade ? `${student.averageGrade.toFixed(1)} / 10` : '---'}
+                            <span className="text-center font-bold text-emerald-600">
+                                {student.workAverage == null ? '--' : student.workAverage.toFixed(1)}
+                            </span>
+                            <span className="text-center font-bold text-emerald-600">
+                                {student.finalExamGrade == null ? '--' : student.finalExamGrade.toFixed(1)}
+                            </span>
+                            <span className="text-center font-bold text-emerald-600">
+                                {student.finalGrade == null ? '--' : student.finalGrade.toFixed(1)}
                             </span>
                         </div>
                     ))

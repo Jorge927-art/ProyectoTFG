@@ -5,12 +5,16 @@ import GenericButton from '../../../../components/ui/genericButton/GenericButton
 import { useActiveEvaluations } from './useActiveEvaluations';
 import type { EvaluationInput } from '../../../../services/evaluationService';
 
+type EvaluationPanelProps = {
+    hasEnrolledCourses?: boolean;
+};
+
 /**
  * Componente de Evaluación Académica [ADR-37].
  * Permite calificar de forma asimétrica la asignatura y al profesorado.
  * Implementa un contenedor de scroll controlado para mantener la simetría visual [ADR-19].
  */
-export const EvaluationPanel = () => {
+export const EvaluationPanel = ({ hasEnrolledCourses = true }: EvaluationPanelProps) => {
     const {
         pendingList,
         loadingPending,
@@ -23,31 +27,53 @@ export const EvaluationPanel = () => {
 
     // Estado local para gestionar el formulario activo de cada tarjeta
     const [formStates, setFormStates] = useState<Record<number, Partial<EvaluationInput>>>({});
+    const [validationErrors, setValidationErrors] = useState<Record<number, string>>({});
 
     const handleRatingChange = (enrollmentId: number, field: keyof EvaluationInput, value: number | string) => {
         setFormStates(prev => ({
             ...prev,
             [enrollmentId]: { ...prev[enrollmentId], [field]: value }
         }));
+        setValidationErrors(prev => {
+            if (!prev[enrollmentId]) return prev;
+            const next = { ...prev };
+            delete next[enrollmentId];
+            return next;
+        });
     };
 
     const handleSend = async (enrollmentId: number, courseId: number) => {
         const state = formStates[enrollmentId];
         // Cortocircuito de seguridad: Evita el envío si el estado no existe o si ambos campos están vacíos
         if (!state || (!state.course_score && !state.instructor_score)) return;
+        if (!state.course_score || !state.instructor_score) {
+            setValidationErrors(prev => ({
+                ...prev,
+                [enrollmentId]: 'Debes evaluar la calidad del curso y el desempeño docente antes de enviar la evaluación.'
+            }));
+            return;
+        }
 
-        await submitEvaluation({
+        const submitted = await submitEvaluation({
             course_id: courseId,
             course_score: state.course_score || 0, // Envía 0 si el alumno decide ignorar el curso
             course_comment: state.course_comment || '',
             instructor_score: state.instructor_score || 0, // Envía 0 si el alumno decide ignorar al profesor
             instructor_comment: state.instructor_comment || ''
         });
+
+        if (submitted) {
+            setFormStates(prev => {
+                const next = { ...prev };
+                delete next[enrollmentId];
+                return next;
+            });
+        }
     };
 
     return (
-        <GenericCard className="h-full flex flex-col shadow-sm border-slate-200">
-            <div className="flex items-center gap-2 mb-6">
+        <GenericCard className="h-full flex flex-col min-h-0 overflow-hidden shadow-sm border-slate-200">
+            <div className="flex items-center gap-2 mb-5 shrink-0">
                 <div className="bg-blue-50 p-2 rounded-lg">
                     <Star className="text-blue-500 fill-blue-500" size={20} />
                 </div>
@@ -62,7 +88,7 @@ export const EvaluationPanel = () => {
             </div>
 
             {/* CONTENEDOR DE SCROLL [ADR-19][ADR-36] */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1 space-y-4">
                 {loadingPending ? (
                     <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                         <Loader2 className="animate-spin mb-2" size={24} />
@@ -70,8 +96,19 @@ export const EvaluationPanel = () => {
                     </div>
                 ) : safePendingList.length === 0 && !evaluationError ? (
                     <div className="bg-slate-50 border-2 border-dashed border-slate-100 rounded-2xl p-8 text-center">
-                        <CheckCircle2 className="mx-auto text-emerald-400 mb-2" size={32} />
-                        <p className="text-slate-500 text-xs font-bold">¡Todo al día! No tienes evaluaciones pendientes.</p>
+                        {hasEnrolledCourses ? (
+                            <>
+                                <CheckCircle2 className="mx-auto text-emerald-400 mb-2" size={32} />
+                                <p className="text-slate-500 text-xs font-bold">¡Todo al día! No tienes evaluaciones pendientes.</p>
+                            </>
+                        ) : (
+                            <>
+                                <AlertCircle className="mx-auto text-amber-500 mb-2" size={32} />
+                                <p className="text-slate-500 text-xs font-bold">
+                                    Aún no puedes evaluar cursos ni profesorado: primero debes matricularte en una asignatura.
+                                </p>
+                            </>
+                        )}
                     </div>
                 ) : (
                     safePendingList.map((item) => {
@@ -153,6 +190,12 @@ export const EvaluationPanel = () => {
                                     label={isSubmitting ? "Enviando..." : "ENVIAR EVALUACIÓN"}
                                     icon={isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                                 />
+
+                                {validationErrors[item.enrollmentid] && (
+                                    <p className="text-[10px] font-bold text-red-600" role="alert">
+                                        {validationErrors[item.enrollmentid]}
+                                    </p>
+                                )}
 
                             </div>
                         );

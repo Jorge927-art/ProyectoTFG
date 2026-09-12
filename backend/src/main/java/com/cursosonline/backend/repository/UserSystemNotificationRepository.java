@@ -21,18 +21,26 @@ public interface UserSystemNotificationRepository extends JpaRepository<UserSyst
      * ordenadas por fecha de creación descendente.
      * Esto es útil para mostrar al usuario las notificaciones más recientes que aún
      * no ha leído.
-     * 
+     *
      * @param username El nombre de usuario del receptor de las notificaciones.
      * @return Una lista de notificaciones no leídas para el usuario especificado.
      */
     @Query("SELECT n FROM UserSystemNotification n WHERE n.receiver.username = :username AND n.read = false ORDER BY n.createdAt DESC")
     List<UserSystemNotification> findUnreadByUsername(@Param("username") String username);
 
+    @Query("SELECT CASE WHEN COUNT(n) > 0 THEN true ELSE false END FROM UserSystemNotification n "
+            + "WHERE n.receiver.user_id = :receiverUserId AND n.type = :type "
+            + "AND n.relatedCourseId = :relatedCourseId")
+    boolean existsRecommendationNotification(
+            @Param("receiverUserId") Long receiverUserId,
+            @Param("type") String type,
+            @Param("relatedCourseId") Long relatedCourseId);
+
     /**
      * Marca todas las notificaciones como leídas para un usuario específico.
      * Esto es útil para permitir que un usuario marque todas sus notificaciones
      * como leídas de una sola vez.
-     * 
+     *
      * @param username El nombre de usuario del receptor de las notificaciones.
      * @return El número de notificaciones marcadas como leídas para el usuario
      *         especificado.
@@ -42,10 +50,26 @@ public interface UserSystemNotificationRepository extends JpaRepository<UserSyst
     int markAllAsReadByUsername(@Param("username") String username);
 
     /**
+     * Marca como leídas las notificaciones no leídas de un tipo concreto para un
+     * usuario específico.
+     *
+     * @param username El nombre de usuario del receptor.
+     * @param type     El tipo de notificación a marcar como leída.
+     * @return Número de notificaciones actualizadas.
+     */
+    @Modifying
+    @Query("UPDATE UserSystemNotification n SET n.read = true WHERE n.receiver.username = :username AND n.type = :type AND n.read = false")
+    int markAllAsReadByUsernameAndType(@Param("username") String username, @Param("type") String type);
+
+    @Modifying
+    @Query("UPDATE UserSystemNotification n SET n.read = true WHERE n.notificationId = :notificationId AND n.receiver.username = :username")
+    int markAsReadByIdAndUsername(@Param("notificationId") Long notificationId, @Param("username") String username);
+
+    /**
      * Elimina todas las notificaciones para un usuario específico.
      * Esto es útil para permitir que un usuario elimine todas sus notificaciones de
      * una sola vez.
-     * 
+     *
      * @param userId El ID del receptor de las notificaciones.
      * @return El número de notificaciones eliminadas para el usuario especificado.
      */

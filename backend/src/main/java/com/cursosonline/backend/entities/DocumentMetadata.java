@@ -44,6 +44,15 @@ public class DocumentMetadata {
     @Column(name = "is_read", nullable = false)
     private boolean read = false;
 
+    // Borrado lógico para ocultar el documento en la bandeja de salida del emisor
+    @Column(name = "hidden_for_sender", nullable = false)
+    private boolean hiddenForSender = false;
+
+    // Borrado lógico para ocultar el documento en la bandeja de entrada del
+    // receptor
+    @Column(name = "hidden_for_receiver", nullable = false)
+    private boolean hiddenForReceiver = false;
+
     // Relación con la entidad Users para asociar el documento con un usuario
     // específico
     @JsonIgnore

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 // SE ACTUALIZAN LOS ICONOS: Añadimos FileText, Download y Loader2 para el listado de documentos recibidos
@@ -20,6 +20,8 @@ interface CourseAssignmentPanelProps {
     enrolledList: EnrollmentInfo[];
 }
 
+const DEFAULT_ASSIGNMENT_EVALUATION_TYPE = 'EXAMEN';
+
 /**
  * Panel de Seguimiento de Asignatura (Tareas y Exámenes) [ADR-47].
  * Replica la lógica de selección de asignatura reactiva del StudentStatsPanel.
@@ -30,10 +32,6 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
 
     // Identificar el ID del curso actualmente bajo análisis en la interfaz
     const currentSelectedId = localSelectedId || activeCourseId;
-
-    // Estados operacionales para controlar el tipo de documento y las notas
-    const [evaluationType, setEvaluationType] = useState<string>('TRABAJO');
-    const [grade] = useState<string>('--');
 
     // =========================================================================
     // --- ESTADO DE PESTAÑAS CLONADO EXACTAMENTE DE DOCUMENTMANAGER ---
@@ -48,38 +46,39 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
     const [isUploading, setIsUploading] = useState<boolean>(false);
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
     const [panelError, setPanelError] = useState<string>('');
+    const [panelSuccess, setPanelSuccess] = useState<string>('');
 
     // REFERENCIA Y ESTADO: Control del archivo físico adjunto y feedback visual
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
     // CICLO REACTIVO: Recupera los archivos reales de la asignatura seleccionada
-    useEffect(() => {
-        const fetchCourseDocuments = async () => {
-            if (!currentSelectedId) return;
-            try {
-                setLoadingDocuments(true);
-                setPanelError('');
+    const fetchCourseDocuments = useCallback(async () => {
+        if (!currentSelectedId) return;
+        try {
+            setLoadingDocuments(true);
+            setPanelError('');
 
-                let docs: DocumentMetadata[] = [];
-                if (activeTab === 'RECEIVED') {
-                    docs = await getReceivedDocumentsByCourse(currentSelectedId);
-                } else {
-                    docs = await getSentDocumentsByCourse(currentSelectedId);
-                }
-                setDocumentList(docs);
-            } catch (error) {
-                console.error("Error al sincronizar documentos del curso:", error);
-                setDocumentList([]);
-                setPanelError("No se pudieron cargar los documentos. Inténtalo de nuevo.");
-                setTimeout(() => setPanelError(''), 5000);
-            } finally {
-                setLoadingDocuments(false);
+            let docs: DocumentMetadata[] = [];
+            if (activeTab === 'RECEIVED') {
+                docs = await getReceivedDocumentsByCourse(currentSelectedId);
+            } else {
+                docs = await getSentDocumentsByCourse(currentSelectedId);
             }
-        };
+            setDocumentList(docs);
+        } catch (error) {
+            console.error("Error al sincronizar documentos del curso:", error);
+            setDocumentList([]);
+            setPanelError("No se pudieron cargar los documentos. Inténtalo de nuevo.");
+            setTimeout(() => setPanelError(''), 5000);
+        } finally {
+            setLoadingDocuments(false);
+        }
+    }, [activeTab, currentSelectedId]);
 
-        fetchCourseDocuments();
-    }, [currentSelectedId, activeTab]);
+    useEffect(() => {
+        void fetchCourseDocuments();
+    }, [fetchCourseDocuments]);
 
 
     // Función para simular el click sobre el input oculto al pulsar la dropzone
@@ -105,20 +104,24 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
         try {
             setIsUploading(true);
             setPanelError('');
+            setPanelSuccess('');
 
             const formData = new FormData();
             formData.append('file', fileToSend);
             formData.append('courseId', currentSelectedId.toString());
-            formData.append('evaluationType', evaluationType); // Envía "TRABAJO" o "EXAMEN"
+            formData.append('evaluationType', DEFAULT_ASSIGNMENT_EVALUATION_TYPE);
 
             // Llamamos al nuevo endpoint especializado y seguro
             await apiClient.post('/api/v1/documents/upload/assignment', formData);
+
+            await fetchCourseDocuments();
 
             setSelectedFile(null);
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
             setPanelError('');
+            setPanelSuccess(`Documento enviado correctamente: ${fileToSend.name}.`);
         } catch (err: unknown) {
             console.error("Fallo en la subida del documento:", err);
 
@@ -132,6 +135,7 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
             const serverMessage = errorData.response?.data?.error || "Error al transmitir el documento al servidor.";
 
             setPanelError(serverMessage);
+            setPanelSuccess('');
 
             // TEMPORIZADOR AUTOMÁTICO: Borra la advertencia de la pantalla tras 7 segundos (7000 ms)
             setTimeout(() => {
@@ -151,6 +155,7 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
             const file = files[0];
             setSelectedFile(file);
             setPanelError('');
+            setPanelSuccess('');
         }
     };
 
@@ -195,7 +200,7 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                 </div>
                 <div className="flex-1 min-w-0">
                     <h2 className="text-base font-bold text-slate-800 leading-tight truncate uppercase">
-                        ASIGNATURAS
+                        EXAMENES
                     </h2>
                 </div>
 
@@ -224,6 +229,12 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                             {panelError}
                         </div>
                     )}
+                    {panelSuccess && (
+                        <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold rounded-lg shrink-0 flex items-center gap-2">
+                            <CheckCircle size={14} className="shrink-0" />
+                            <span>{panelSuccess}</span>
+                        </div>
+                    )}
 
                     {/* BOTONERA DE PESTAÑAS (TABS) INTERACTIVAS */}
                     <div className="flex bg-slate-100 p-1 rounded-xl shrink-0 max-w-xs gap-1">
@@ -250,62 +261,50 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                                 }`}
                         />
                     </div>
-                    {/* REJILLA DE CONTENIDOS DE DOS COLUMNAS */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start flex-1 min-h-0">
+                    {/* CONTENEDOR PRINCIPAL DEL FLUJO DOCUMENTAL */}
+                    <div className="flex-1 min-h-0">
 
-                        {/* SECCIÓN IZQUIERDA CONMUTABLE */}
-                        <div className="space-y-4 border-r pr-0 md:pr-6 border-slate-100 h-full flex flex-col min-h-0">
+                        {/* SECCIÓN CONMUTABLE DE DOCUMENTOS */}
+                        <div className="space-y-4 h-full flex flex-col min-h-0">
                             {activeTab === 'SENT' ? (
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <select
-                                            value={evaluationType}
-                                            disabled={isUploading}
-                                            onChange={(e) => setEvaluationType(e.target.value)}
-                                            className="w-full border border-gray-200 p-3 rounded-xl bg-gray-50 outline-hidden transition-all focus:ring-2 focus:ring-blue-500 text-sm font-semibold text-slate-700 cursor-pointer disabled:opacity-50"
-                                        >
-                                            <option value="TRABAJO">Trabajo Académico Escrito</option>
-                                            <option value="EXAMEN">Examen Final del Curso</option>
-                                        </select>
-                                    </div>
-
+                                <div className="flex h-full min-h-0 flex-col space-y-3">
                                     <input
                                         type="file"
                                         ref={fileInputRef}
                                         onChange={handleFileChange}
-                                        accept=".pdf,.docx"
+                                        accept="application/pdf,.pdf"
                                         className="hidden"
                                         disabled={isUploading}
                                     />
 
                                     <div
                                         onClick={handleBoxClick}
-                                        className={`border-2 border-dashed border-slate-200 rounded-xl p-5 text-center hover:bg-slate-50/50 transition-colors group ${isUploading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                                        className={`border-2 border-dashed border-slate-200 rounded-lg p-2.5 text-center hover:bg-slate-50/50 transition-colors group ${isUploading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
                                             }`}
                                     >
                                         {isUploading ? (
                                             <>
-                                                <Loader2 className="h-7 w-7 text-blue-500 animate-spin mx-auto mb-2" />
-                                                <p className="text-xs text-slate-600 font-bold">Transmitiendo payload seguro...</p>
-                                                <p className="text-[10px] text-slate-400 mt-0.5">Sincronizando con el servidor Spring Boot</p>
+                                                <Loader2 className="h-5 w-5 text-blue-500 animate-spin mx-auto mb-1" />
+                                                <p className="text-[10px] text-slate-600 font-bold">Transmitiendo payload seguro...</p>
+                                                <p className="text-[9px] text-slate-400 mt-0.5">Sincronizando con el servidor Spring Boot</p>
                                             </>
                                         ) : selectedFile ? (
                                             <>
-                                                <CheckCircle className="h-7 w-7 text-emerald-500 mx-auto mb-2" />
-                                                <p className="text-xs text-slate-700 font-bold truncate max-w-full px-2">{selectedFile.name}</p>
-                                                <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">¡Archivo cargado en memoria!</p>
+                                                <CheckCircle className="h-5 w-5 text-emerald-500 mx-auto mb-1" />
+                                                <p className="text-[11px] text-slate-700 font-bold truncate max-w-full px-1.5">{selectedFile.name}</p>
+                                                <p className="text-[9px] text-slate-500 font-semibold mt-0.5">Archivo seleccionado para enviar</p>
                                             </>
                                         ) : (
                                             <>
-                                                <Upload className="h-7 w-7 text-slate-400 mx-auto mb-2 group-hover:text-blue-500 transition-colors" />
+                                                <Upload className="h-5 w-5 text-slate-400 mx-auto mb-1 group-hover:text-blue-500 transition-colors" />
                                                 {/* Mensaje principal integrado y unificado */}
-                                                <p className="text-xs text-slate-800 font-black uppercase tracking-wider mb-1">
-                                                    Enviar Trabajo / Examen
+                                                <p className="text-[10px] text-slate-800 font-black uppercase tracking-wider mb-0.5">
+                                                    Enviar examen
                                                 </p>
-                                                <p className="text-[11px] text-slate-500 font-semibold">
+                                                <p className="text-[9px] text-slate-500 font-semibold">
                                                     Selecciona o suelta tu documento aquí
                                                 </p>
-                                                <p className="text-[9px] text-slate-400 mt-0.5">
+                                                <p className="text-[8px] text-slate-400 mt-0.5">
                                                     Formatos admitidos: PDF, DOCX (Máx. 10MB)
                                                 </p>
                                             </>
@@ -318,9 +317,56 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                                         disabled={isUploading || !selectedFile}
                                         variant="primary"
                                         icon={isUploading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                                        label={isUploading ? 'Enviando...' : 'Enviar trabajo / examen'}
-                                        className="w-full justify-center gap-2 py-2.5! text-xs! font-bold! rounded-xl!"
+                                        label={isUploading ? 'Enviando...' : 'Enviar examen'}
+                                        className="w-full justify-center gap-2 py-2! text-xs! font-bold! rounded-xl!"
                                     />
+
+                                    <div className="pt-2 border-t border-slate-100 space-y-2 flex-1 min-h-0 flex flex-col">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Tus envíos</p>
+                                            <span className="text-[10px] text-slate-400 font-medium">
+                                                {documentList.length} documentos
+                                            </span>
+                                        </div>
+
+                                        {loadingDocuments ? (
+                                            <div className="flex-1 min-h-0 flex flex-col justify-center items-center text-slate-400 p-4 bg-slate-50/50 border border-dashed border-slate-200 rounded-xl">
+                                                <Loader2 size={18} className="animate-spin mb-2 text-blue-600" />
+                                                <p className="text-[11px] font-medium text-slate-500">Recuperando tus envíos...</p>
+                                            </div>
+                                        ) : documentList.length === 0 ? (
+                                            <div className="flex-1 min-h-0 p-5 bg-slate-50/50 border border-dashed border-slate-200 rounded-xl text-center flex flex-col justify-center">
+                                                <Send size={18} className="text-slate-300 mx-auto mb-1.5" />
+                                                <p className="text-xs font-bold text-slate-400 italic">
+                                                    Todavía no has enviado documentos en esta asignatura.
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
+                                                {documentList.map((doc) => (
+                                                    <div
+                                                        key={doc.documentid}
+                                                        className="flex justify-between items-center p-2.5 bg-white border border-slate-100 hover:border-slate-200 rounded-lg shadow-sm transition-all shrink-0"
+                                                    >
+                                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                                            <FileText size={16} className="text-slate-400 shrink-0" />
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className="text-xs font-bold text-slate-700 truncate" title={doc.originalname}>
+                                                                    {doc.originalname}
+                                                                </p>
+                                                                <p className="text-[10px] text-slate-400 font-medium">
+                                                                    Para: {doc.receiver?.username || 'Profesor'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">
+                                                            ENVIADO
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             ) : (
 
@@ -369,25 +415,6 @@ export const CourseAssignmentPanel = ({ activeCourseId, enrolledList }: CourseAs
                                     )}
                                 </div>
                             )}
-                        </div>
-
-                        {/* SECCIÓN DERECHA: Ventana de Calificaciones Separadas */}
-                        <div className="flex flex-col h-full bg-slate-50/40 border border-slate-100 rounded-xl p-5 justify-center space-y-4 shrink-0">
-                            <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase text-center block border-b pb-2">
-                                CALIFICACIONES
-                            </span>
-
-                            {/* Nota de Trabajos */}
-                            <div className="flex items-center justify-between bg-white border border-slate-100 p-3 rounded-lg shadow-xs">
-                                <span className="text-xs font-bold text-slate-600">Nota de Trabajos:</span>
-                                <span className="text-lg font-black text-blue-600">{grade}</span>
-                            </div>
-
-                            {/* Nota de Examen Final */}
-                            <div className="flex items-center justify-between bg-white border border-slate-100 p-3 rounded-lg shadow-xs">
-                                <span className="text-xs font-bold text-slate-600">Examen Final:</span>
-                                <span className="text-lg font-black text-blue-600">--</span>
-                            </div>
                         </div>
 
                     </div>

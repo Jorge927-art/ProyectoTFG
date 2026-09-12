@@ -437,11 +437,10 @@ Deprecar y eliminar del sistema los tres archivos redundantes de diseño por rol
 
 * **Riesgo de Pérdida de Especialización:** Agrupar la lógica de visualización de tres paneles de control en un único archivo puede dificultar la adición de componentes exclusivos de un rol específico (como un menú de administración avanzado).
 * *Mitigación:* Se diseñó `DashboardLayout.tsx` para delegar de forma modular las interfaces específicas en subcomponentes independientes (como `<NavbarUser />`), los cuales gestionan internamente sus insignias y botones mediante composición limpia de React, manteniendo el layout base genérico y protegido.
-.
 
-  ---
+---
 
-  # [ADR-13] Mitigación de Desincronización Temporal mediante Margen de Tolerancia (Clock Skew) en JWT
+# ADR-13: Mitigación de Desincronización Temporal mediante Margen de Tolerancia (Clock Skew) en JWT
 
 ## Estatus
 
@@ -507,32 +506,34 @@ Implementar una suite robusta de pruebas automatizadas utilizando **JUnit 5 y Mo
 
 ---
 
-## [ADR-15] Purificación Arquitectónica de la Capa de Presentación mediante Composición Pura e Inyección del Contenedor de Scroll Controlado
+# ADR-15: Purificación Arquitectónica de la Capa de Presentación mediante Composición Pura e Inyección del Contenedor de Scroll Controlado
 
-### Estado
+## Estatus
 
 Aceptado.
 
-### Contexto
+## Contexto
 
 El componente transversal `GenericCard.tsx` presentaba un sobrediseño inicial que acoplaba rígidamente su estructura a propiedades de texto estáticas (como `title`, `tag`, `footerChildren`), obligando al sistema a realizar mapeos artificiales y limitando su polimorfismo. Además, la necesidad de incorporar un listado masivo de usuarios PostgreSQL en la consola del Administrador exigía un mecanismo de visualización que no degradase el DOM ni alterase de forma descontrolada el layout vertical de la aplicación ante el crecimiento de la base de datos.
 
-### Decisión
+## Decisión
 
 1. **Purificación UI**: Rediseñar por completo `GenericCard.tsx` eliminando todas las propiedades rígidas del contrato de TypeScript y reduciéndola a un contenedor minimalista gobernado única y exclusivamente por la propiedad nativa de composición pura `children`.
 2. **Encapsulamiento del Scroll**: Crear la utilidad atómica `UserScrollList.tsx` dentro de `components/admin/` e inyectarla por composición dentro de la nueva tarjeta genérica.
 3. **Contención Estricta de Altura**: Fijar una altura estricta inamovible de `h-[116px]` en el scroll y compensar simétricamente el Buscador en `AdminDashboard.tsx` mediante un acolchado geométrico equilibrado (`py-15`), garantizando un plano horizontal perfectamente alineado (50% - 50%).
 
-### Justificación para el TFG
+## Justificación para el TFG
 
 Cumplimiento estricto del principio Abierto/Cerrado (OCP) de SOLID. La tarjeta actúa como un lienzo abstracto inmutable capaz de asimilar cualquier contenido futuro sin alterar su código fuente. La contención vertical garantiza la ergonomía visual y un consumo constante de memoria en el navegador sin importar el volumen de datos en PostgreSQL.
 
-### Consecuencias
+## Consecuencias
 
 * Erradicación total de abstracciones falsas y código muerto en el Frontend.
 
 * Logro de simetría geométrica bidireccional perfecta en la interfaz del Administrador.
 * Escalabilidad visual y de rendimiento garantizada frente a cientos de registros concurrentes.
+
+---
 
 # ADR-16: Soporte Multirrol Dinámico y Corrección de Ámbito en Bloques Asíncronos (AuthModal & NavbarUser)
 
@@ -751,7 +752,7 @@ El buscador global de cursos integrado en el panel del estudiante (`StudentDashb
 
 Implementar una reestructuración arquitectónica integral en tres capas para optimizar el flujo de datos y la eficiencia de cómputo:
 
-1. **Capa de Persistencia (PostgreSQL):** Activar la extensión nativa `pg_trgm` y estructurar tres índices invertidos generalizados (**GIN**) basados en operaciones de trigramas (`gin_trgm_ops`) sobre las columnas críticas de búsqueda (`title`, `category`, `skills`) de la tabla `courses` para habilitar búsquedas parciales indexadas de coste O(log N) u O(1).
+1. **Capa de Persistencia (PostgreSQL):** Activar la extensión nativa `pg_trgm` y estructurar tres índices invertidos generalizados (**GIN**) basados en operaciones de trigramas (`gin_trgm_ops`) sobre las columnas críticas de búsqueda (`title`, `category`, `skills`) de la tabla `courses`, sustituyendo el escaneo secuencial completo (*Full Table Scan*, O(N)) del `LIKE` original por una búsqueda indexada por trigramas.
 2. **Capa de Negocio y Repositorio (Spring Boot):** Modificar la firma del método en `CoursesRepository.java` trasladando de forma nativa el formateo de los patrones de coincidencia aproximada (`%keyword%`) a la memoria de Java en `UserService.java`. La consulta se restringe a un lote simétrico estricto de **12 resultados** mediante `PageRequest.of(0, 12)` e incorpora una cláusula algorítmica `ORDER BY CASE` en JPQL que prioriza semánticamente las coincidencias por títulos que comienzan exactamente con el término buscado.
 3. **Capa de Presentación (React & Tailwind):** Consolidar un control de tasa de peticiones (*rate limiting*) en el cliente mediante un temporizador *debounce* de 400ms acoplado al hook de efecto (`useEffect`) para evitar la saturación de peticiones HTTP en vuelo. A nivel de maquetación, se implementa una cuadrícula de tres columnas (`lg:grid-cols-3`) y se acota el contenedor exterior mediante un límite dimensional estricto de altura fija (`max-h-[290px] overflow-y-auto`) para inducir el fenómeno de diseño *Cut-off effect* (efecto de recorte) e incentivar el scroll natural.
 
@@ -795,7 +796,7 @@ Implementar una reestructuración de alcance y una purga de infraestructura en t
 1. **Refactorización del Backend (`CoursesRepository.java`):** Eliminar de forma estricta la cláusula `OR LOWER(c.skills) LIKE LOWER(:formattedKeyword)` tanto del filtro de selección como de la estructura de ponderación algorítmica `ORDER BY CASE`. La búsqueda predictiva instantánea queda restringida exclusivamente a los campos de alta densidad semántica: `title` y `category`.
 2. **Optimización del Almacenamiento (PostgreSQL):** Ejecutar una purga del índice invertido trunco mediante el comando `DROP INDEX IF EXISTS idx_courses_skills_trgm;`, liberando espacio físico en disco y mitigando la sobrecarga computacional de reindexación en las operaciones de inserción (`INSERT`) y actualización (`UPDATE`).
 3. **Sincronización de Interfaz (`StudentDashboard.tsx`):** Modificar los descriptores semánticos de la barra de búsqueda para transparentar el alcance real de la consulta al usuario, limitando el texto informativo a *"por título o categoría temática"*.
-4. **Aislamiento de Responsabilidad Funcional:** Reservar de forma exclusiva el atributo `skills` para el motor del **Algoritmo de Recomendación Inteligente [ADR-20]**, donde su procesamiento se ejecutará de manera asíncrona mediante un cruce de matrices frente a la tabla de intereses del estudiante, evitando penalizar el hilo de la consulta síncrona en tiempo real del catálogo.
+4. **Campo sin uso funcional activo:** El atributo `skills` queda excluido de la búsqueda predictiva síncrona. A fecha de esta enmienda no se ha implementado ningún consumidor de este campo en el motor de recomendaciones (`RecommendationService`) ni en ningún otro módulo; su reutilización queda como línea de trabajo futuro pendiente de valorar.
 
 ## Consecuencias
 
@@ -1115,7 +1116,7 @@ Migrar de forma integral la resolución de identidad en los controladores hacia 
 * *Mitigación:* Al tratarse el `userId` de un tipo numérico largo (`Long`), el peso en bytes añadido al token es técnicamente insignificante, quedando plenamente compensado por el ahorro computacional de omitir un `SELECT` secuencial en la base de datos para recuperar ese mismo dato.
 
   ---
-  
+
 # ADR-30: Hidratación Síncrona de Matrículas en el DTO de Sesión
 
 ## Estatus
@@ -1152,7 +1153,7 @@ Rediseñar el registro (*Record*) de transferencia de datos `AuthTokenResponse.j
 * *Mitigación:* Al estar el núcleo de la plataforma estructurado específicamente en torno al progreso académico y matriculaciones del usuario, consolidar este array atómico de IDs en el login es una licencia de diseño pragmática que reduce el tráfico de red general en un 50% durante el arranque, quedando plenamente justificada su eficiencia frente al tribunal.
 
   ---
-  
+
 # ADR-31: Estrategia de Carga Transaccional (Join Fetch vs OSIV)
 
 ## Estatus
@@ -1189,7 +1190,7 @@ Implementar consultas explícitas utilizando cláusulas **`JOIN FETCH`** en los 
 * *Mitigación:* Se segregaron los métodos del repositorio, manteniendo las consultas simples de JPA para operaciones atómicas de validación de IDs y reservando los métodos optimizados con `JOIN FETCH` exclusivamente para los endpoints del directorio académico y el panel de seguimiento, donde la carga del curso es mandatoria para la interfaz.
 
   ---
-  
+
 # ADR-32: Algoritmo de Filtrado Basado en Contenido para el Motor de Recomendaciones
 
 ## Estatus
@@ -1202,28 +1203,27 @@ Junio 2026
 
 ## Contexto
 
-Se requería un motor de sugerencias personalizado dentro del panel del estudiante que priorizara de manera dinámica la afinidad temática, las competencias académicas y el historial de navegación previo del alumno, en lugar de mostrar un catálogo plano y estático de asignaturas. El reto consistía en procesar y cruzar eficientemente estos vectores de datos sin degradar el tiempo de respuesta del servidor durante la carga inicial del panel.
+Se requería un motor de sugerencias personalizado dentro del panel del estudiante que priorizara de manera dinámica la afinidad temática, las competencias académicas y el historial de matriculación del alumno, en lugar de mostrar un catálogo plano y estático de asignaturas.
 
 ## Decisión
 
-Desarrollar un servicio analítico especializado (`RecommendationService`) que cruce los metadatos estructurales del catálogo de asignaturas (`Courses`) con el perfil normalizado de preferencias guardado del alumno (`Interest` [ADR-20]) y su historial de matrículas previas (`Enrollment` [ADR-31]), aplicando una ponderación matemática estricta de pesos (30% Categoría Temática, 25% Historial de Matriculación, 20% Nivel Técnico, 15% Idioma y 10% Compatibilidad de Subtítulos).
+Desarrollar un servicio analítico especializado (`RecommendationService`) que cruce los metadatos estructurales del catálogo de asignaturas (`Courses`) con el perfil normalizado de preferencias del alumno (`Interest` [ADR-20]) y su historial de matrículas previas (`Enrollment` [ADR-31]), aplicando una matriz de pesos sobre seis criterios: 30 puntos por coincidencia de categoría, hasta 25 puntos en función del progreso del alumno en cursos previos de la misma categoría, 20 puntos por coincidencia de nivel, 15 por idioma, 10 por disponibilidad de subtítulos en un idioma de interés y 5 por duración compatible (máximo teórico: 105 puntos).
 
 ## Justificación para el TFG
 
-* **Capa de Inteligencia de Negocio:** Eleva sustancialmente el valor académico y la complejidad metodológica del proyecto al introducir una capa legítima de lógica algorítmica predictiva y minería de datos básica.
-* **Capitalización del Modelo Relacional:** Justifica técnicamente la inversión en el diseño estructurado de la base de datos y la fragmentación de colecciones multivalor [ADR-20]. Demuestra ante el tribunal cómo un esquema en 1FN habilita operaciones de cruce matricial eficientes en el servidor en lugar de delegar el filtrado a código imperativo pesado en el cliente.
+* **Capa de Inteligencia de Negocio:** Introduce una capa de lógica algorítmica predictiva explicable, priorizando la transparencia del criterio (cada recomendación incluye el motivo textual de por qué se sugiere) sobre la sofisticación del modelo.
+* **Capitalización del Modelo Relacional:** Se apoya en el diseño normalizado de `Interest` [ADR-20] para realizar el cruce de preferencias sin necesidad de procesar cadenas de texto sin normalizar.
 
 ## Consecuencias
 
 ### Impacto Positivo
 
-* **Sugerencias Predictivas Dinámicas:** El frontend pinta en tiempo real sugerencias altamente personalizadas y justificadas con un "porqué" semántico explícito para el estudiante (ej. *"Recomendado por tu interés en Ingeniería del Software"*).
-* **Consumo de Memoria Eficiente:** Al operar directamente sobre colecciones indexadas e hidratadas en el mismo ciclo transaccional, el algoritmo procesa la ordenación y el descarte de elementos duplicados en memoria RAM a través de Streams de Java de forma ultrarrápida.
+* **Sugerencias Predictivas Dinámicas:** El frontend muestra en tiempo real sugerencias personalizadas junto con una justificación textual explícita para el estudiante.
 
 ### Impacto Negativo / Riesgos Mitigados
 
-* **Escalabilidad Computacional Limitada (O(N*M)):** El algoritmo de filtrado basado en contenido evalúa en memoria cada curso disponible frente a la matriz de intereses del alumno. Con un crecimiento masivo del catálogo de cursos (N) y de usuarios concurrentes (M), este cálculo secuencial puede saturar la CPU del backend.
-* *Mitigación:* Se acotó la ventana operativa del servicio mediante un cortocircuito algorítmico defensivo: el repositorio filtra inicialmente y excluye de la consulta JPQL todos los IDs de cursos en los que el alumno ya se encuentra matriculado activamente. Además, el servicio limita el payload final a un lote estricto de los **3 resultados con mayor puntuación de afinidad**, aliviando drásticamente el coste de serialización y renderizado en la SPA.
+* **Escalabilidad Computacional Limitada:** El algoritmo evalúa en memoria cada curso disponible frente al perfil de intereses del alumno; con un crecimiento significativo del catálogo, este cálculo secuencial podría penalizar el tiempo de respuesta.
+* *Mitigación:* El repositorio excluye de antemano los cursos en los que el alumno ya está matriculado, y el servicio limita el resultado final a los **6 cursos** con mayor puntuación de afinidad (`.limit(6)`), acotando el coste de serialización y renderizado.
 
 ---
 
@@ -1243,7 +1243,7 @@ La entidad `Interest` mapea las colecciones de preferencias dinámicas del estud
 
 ## Decisión
 
-Implementar una **Estrategia de Hidratación Explícita Controlada** dentro del método de lectura transaccional `getUserInterests` de `UserService.java`. En lugar de forzar un acoplamiento estructural rígido mediante `@ElementCollection(fetch = FetchType.EAGER)` —el cual sobrecargaría el rendimiento con productos cartesianos inválidos en PostgreSQL—, se mantiene el esquema diferido eficiente (`LAZY`) y se ejecuta programáticamente el método de resolución de proxies invocando el tamaño de cada colección (`.size()`) antes de salir del ámbito del servicio:
+Configurar las cinco colecciones de preferencias de `Interest` mediante `@ElementCollection(fetch = FetchType.EAGER)`. Las preferencias se recuperan siempre de forma conjunta al cargar el perfil de intereses, evitando excepciones de tipo `LazyInitializationException` durante la conversión a `InterestDTO` fuera de la sesión de persistencia.
 
 ```java
 if (interest.getCategory() != null) interest.getCategory().size();
@@ -1253,63 +1253,29 @@ if (interest.getLanguage() != null) interest.getLanguage().size();
 if (interest.getSubtitle_languages() != null) interest.getSubtitle_languages().size();
 ```
 
-Esto obliga al ORM a poblar las colecciones satélite de forma síncrona mientras la transacción `@Transactional(readOnly = true)` permanece abierta.
+El método transaccional `getUserInterests` de `UserService.java` conserva además las llamadas a `.size()` como comprobación defensiva de hidratación antes de devolver el DTO.
 
 ## Justificación para el TFG
 
-* **Evaluación de Compromisos (*Trade-offs*):** Refleja la capacidad del ingeniero para evaluar de forma crítica los compromisos de diseño en la persistencia avanzada de datos.
-* **Control Preciso del Grafo de Datos:** Ante el tribunal, se defiende como una decisión táctica, defensiva y limpia: se evita delegar la carga en intermediarios o inicializaciones globales pesadas del proveedor, controlando a nivel de servicio cuándo y cómo se resuelve el grafo de datos. Esto blinda la API contra fallos de proxy en entornos multihilo o filtros desacoplados, manteniendo la consistencia de tipos primitivos.
+* **Evaluación de Compromisos (*Trade-offs*):** Refleja la decisión de priorizar la disponibilidad inmediata de las preferencias frente al coste de recuperar cinco colecciones pequeñas en cada lectura del perfil.
+* **Robustez del DTO:** La carga ansiosa evita que la transformación a `InterestDTO` dependa de que una sesión de Hibernate siga abierta fuera del servicio.
 
 ## Consecuencias
 
 ### Impacto Positivo
 
-* **Estabilidad Absoluta de la API:** Se eliminan de raíz las excepciones de inicialización diferida al transformar los intereses del alumno a `InterestDTO`, garantizando el retorno seguro de los datos en un estado HTTP 200 OK.
-* **Optimización de Recursos en PostgreSQL:** Al resolver los datos de forma dirigida en el *Read Path* del servicio, se previene el desperdicio de memoria y concurrencia en operaciones de escritura u otras consultas secundarias donde no se requiera el desglose multidimensional de intereses.
+* **Estabilidad de la API:** Se evitan excepciones de inicialización diferida al transformar los intereses del alumno a `InterestDTO`, garantizando el retorno de colecciones disponibles para el cliente.
+* **Implementación simple:** El comportamiento de lectura resulta predecible para los flujos que necesitan todas las dimensiones de preferencias, como autenticación y recomendaciones.
 * **Sincronización Coherente:** Este registro interactúa y se hermana directamente con las directrices de persistencia del [ADR-20], cerrando de forma definitiva la coherencia técnica entre el código fuente transaccional de Spring Boot y la documentación del monorrepo.
 
 ### Impacto Negativo / Riesgos Mitigados
 
-* **Aumento en el Número de Sentencias SQL (Problema de las N Consultas):** Invocar el método `.size()` de cinco colecciones independientes provoca que Hibernate dispare de forma secuencial cinco consultas `SELECT` independientes a PostgreSQL para contar los elementos de cada tabla satélite.
-* *Mitigación:* Al estar el perfil de intereses acotado y guardado de forma atómica en filas de tipos primitivos muy ligeros (máximo 10 filas por tabla de colección satélite por alumno), el tiempo de ejecución sumado de estas cinco consultas síncronas indexadas por clave primaria es inferior a 2 milisegundos, un coste computacionalmente insignificante que neutraliza por completo el riesgo de un desborde por producto cartesiano en el servidor.
+* **Coste de lectura adicional:** La carga ansiosa recupera las cinco colecciones de preferencias aunque un consumidor no necesite todas sus dimensiones.
+* *Mitigación:* El perfil está acotado a colecciones pequeñas de valores primitivos y los flujos principales de uso necesitan el conjunto completo de preferencias.
 
 ---
 
-# ADR-34: Algoritmo de Filtrado Basado en Contenido para el Motor de Recomendaciones
-
-## Estatus
-
-Aceptado
-
-## Fecha
-
-Junio 2026
-
-## Contexto
-
-Se requería un motor de sugerencias personalizado dentro del panel del estudiante que priorizara la afinidad temática, las competencias académicas y la disponibilidad de tiempo del alumno. El backend original carecía de lógica predictiva y el frontend dependía de datos estáticos (*mocks*), lo que reducía el valor tecnológico de la plataforma de cara a la defensa del proyecto y la justificación de la complejidad de la arquitectura.
-
-## Decisión
-
-Diseñar y desarrollar un servicio especializado (`RecommendationService.java`) que implementa un algoritmo de Filtrado Basado en Contenido (*Content-Based Filtering*). El motor opera de forma determinista bajo una matriz de pesos en memoria (30% Categoría, 20% Historial, 20% Nivel, 15% Idioma, 10%  Subtitulos, 5% Duración). El enrutamiento se expone en `/api/courses/recommendations` resolviendo la identidad mediante el *Claim* del token JWT [ADR-29], y el cliente en React se conecta de forma reactiva a través del gancho personalizado `useSmartRecommendations.ts`.
-
-## Justificación para el TFG
-
-* **Estrategia Computacional Stateless:** Resuelve el acoplamiento y la eficiencia del grafo de persistencia. En lugar de delegar el cálculo matemático de ponderación a PostgreSQL mediante costosos procedimientos almacenados o subconsultas cíclicas, los datos se recuperan atómicamente mediante proyecciones nativas e indexadas de clave primaria (`findEnrolledCourseIdsByUserId`) y se procesan a alta velocidad en memoria utilizando *Java Streams*, liberando por completo de carga computacional al servidor de la base de datos.
-* **Inteligencia de Negocio Aplicada:** Eleva el rigor del proyecto demostrando la capacidad de estructurar algoritmos analíticos personalizados en la capa de negocio, sincronizándolos de forma nativa con el tipado estricto de TypeScript en el cliente.
-
-## Consecuencias
-
-### Impacto Positivo
-
-* **Sugerencias Predictivas Dinámicas:** El frontend renderiza en tiempo real recomendaciones justificadas con un porqué explícito (`reason`) de forma transparente para el estudiante en su dashboard principal.
-* **Aislamiento e Inmunidad ante Regresiones:** El algoritmo queda blindado metodológicamente mediante una suite de pruebas de comportamiento automatizadas en JUnit 5 y Mockito (`RecommendationServiceTest`), certificando con un 100% de éxito en consola (`BUILD SUCCESS`) que el sistema descarta cursos irrelevantes y excluye estrictamente las asignaturas en las que el alumno ya está matriculado.
-* **Arquitectura Altamente Reactiva:** La UI del frontend se sincroniza automáticamente e invalida el feed en milisegundos en cuanto el estudiante efectúa una nueva matrícula, disparando una recarga limpia de red sin necesidad de refrescar el navegador.
-
-### Impacto Negativo / Riesgos Mitigados
-
-* **Acoplamiento de Lógica en Memoria de Aplicación:** Al calcular las ponderaciones utilizando Streams de Java, el recolector de basura (*Garbage Collector*) del backend puede experimentar picos de trabajo puntuales para limpiar los objetos temporales generados si miles de alumnos acceden al dashboard simultáneamente.
-* *Mitigación:* Se implementó un límite estricto de corte anticipado en el flujo: el motor aborta la evaluación individual en cuanto detecta que el curso evaluado ya está completado o matriculado, procesando únicamente el remanente activo del catálogo y reduciendo la creación de instancias volátiles a niveles marginales y seguros para la memoria del servidor.
+# ADR-34: (Retirado)
 
 ---
 
@@ -1325,7 +1291,7 @@ Junio 2026
 
 ## Contexto
 
-Durante la integración del Motor de Recomendaciones Algorítmicas [ADR-34], se detectó un fallo de regresión en el guardado del modal de preferencias del estudiante. La tabla principal `interests` y sus cinco tablas satélite multivalor (ej. `interest_categories`) rechazaban las actualizaciones en la base de datos debido a dos fenómenos críticos del ciclo de vida de Hibernate:
+Durante la integración del Motor de Recomendaciones Algorítmicas [ADR-32], se detectó un fallo de regresión en el guardado del modal de preferencias del estudiante. La tabla principal `interests` y sus cinco tablas satélite multivalor (ej. `interest_categories`) rechazaban las actualizaciones en la base de datos debido a dos fenómenos críticos del ciclo de vida de Hibernate:
 
 1. **Identidad Huérfana:** Al utilizar `@MapsId` sin estrategias de generación automática (`@GeneratedValue`), el motor de persistencia requería la asignación explícita y manual del ID del usuario en memoria antes de poder invocar al repositorio.
 2. **Violación de la Colección Persistente (*PersistentBag*):** El uso de métodos *setter* convencionales reemplazaba los envoltorios nativos de las colecciones de Spring Data JPA por instancias estándar de `ArrayList`, inhabilitando el rastreo de cambios (*dirty checking*) y bloqueando la generación automática de sentencias SQL `DELETE` e `INSERT`.
@@ -1352,7 +1318,7 @@ Rediseñar de forma quirúrgica la capa de servicios e infraestructura de persis
 
 ---
 
-# ADR-36: Implementación del Motor de Recomendaciones mediante Algoritmo de Ponderación
+# ADR-36: Corrección de Identidad Inestable en Matrículas y Falsos Positivos de Expiración de Sesión
 
 ## Estatus
 
@@ -1363,7 +1329,7 @@ Aceptado
 Durante la fase de integración del *Activity Tracker*, el cálculo de progreso académico "al vuelo" (*on the fly*) de las asignaturas en curso introdujo una doble anomalía crítica en el flujo de trabajo del alumno:
 
 1. **Desfase de Indexación Visual ("Efecto Dominó"):** Al accionar el evento del DOM "Iniciar curso" en la tarjeta superior de la lista vertical, la interfaz sufría un parpadeo visual y trasladaba erróneamente el estado activo ("✓ Estudiando asignatura") a la tarjeta inferior, dejando el nodo pulsado intacto.
-2. **Falso Positivo de Expiración de Sesión:** Tras pulsaciones consecutivas sobre el componente reactivo, el sistema sufría una expulsión abrupta del usuario hacia la pantalla de login debido a la activación involuntaria del circuito de expiración de sesión definido en el `AuthProvider.tsx` [ADR-34].
+2. **Falso Positivo de Expiración de Sesión:** Tras pulsaciones consecutivas sobre el componente reactivo, el sistema sufría una expulsión abrupta del usuario hacia la pantalla de login debido a la activación involuntaria del circuito de expiración de sesión definido en el `AuthProvider.tsx` [ADR-37].
 
 La auditoría técnica reveló un quiebre de la integridad de identidad bidireccional entre la base de datos y el cliente asíncrono. En el backend, la consulta HQL de `EnrollmentRepository.java` carecía de una cláusula `ORDER BY` explícita, provocando que Hibernate alterara la disposición física de la fila en el cursor de PostgreSQL tras ejecutar el `UPDATE` de la estampa de tiempo `started_at`.
 
@@ -1478,24 +1444,27 @@ Aceptado
 
 ## Contexto
 
-Para consolidar las directrices de privacidad y control de acceso en el módulo de intercambio bidireccional y dirigido de archivos, se requería una solución técnica que garantizara que los documentos académicos almacenados en el servidor solo pudieran ser descargados por sus destinatarios legítimos o sus emisores originales. El diseño arquitectónico inicial presentaba tres vulnerabilidades críticas:
+Para reforzar el control de acceso en el módulo de intercambio bidireccional y dirigido de archivos, se requería un endpoint protegido que comprobara la relación del usuario con los metadatos del documento antes de servir su contenido. La aplicación mantiene también una ruta estática pública `/uploads/**` para servir recursos almacenados, por lo que el control anti-IDOR se aplica específicamente al flujo de descarga gestionado por la API.
 
-1. La ruta estática `/uploads/**` estaba configurada como pública en la seguridad perimetral, permitiendo que cualquier usuario malintencionado que conociera el nombre físico del archivo pudiera saltarse los filtros de autenticación y descargarlo de forma directa.
-2. El uso de `window.open(fileUrl)` en el frontend exponía metadatos e identificadores sensibles en la barra de direcciones del navegador, facilitando vectores de ataque basados en la enumeración predecible de recursos.
-3. El sistema carecía de un mecanismo de validación de identidad en tiempo de ejecución, lo que exponía la plataforma a vulnerabilidades de Referencia Directa Insegura a Objetos (IDOR), donde un alumno autenticado válidamente con su token JWT podía consultar recursos privados pertenecientes a otros alumnos modificando los parámetros de la solicitud.
+1. El cliente necesitaba un mecanismo de descarga que no dependiera de rutas físicas ni de identificadores de archivos conocidos por el usuario.
+2. El sistema requería validación de identidad en tiempo de ejecución para impedir que un usuario autenticado obtuviera documentos ajenos modificando el identificador del endpoint de descarga.
 
 ## Decisión
 
-1. **Aislamiento Perimetral y Blindaje de Archivos:** Eliminar por completo la regla estática `.requestMatchers("/uploads/**").permitAll()` en `SecurityConfig.java`. El directorio de almacenamiento físico queda completamente aislado del tráfico de red externo, obligando a que cualquier solicitud de lectura sea interceptada y evaluada por el contexto de Spring Security.
-2. **Cortocircuito Defensivo Anti-IDOR (Backend):** Implementar el endpoint protegido `GET /api/v1/documents/download/{documentId}` en `DocumentController.java`. El método recupera el token JWT a través del objeto `Principal`, intercepta la entidad en la base de datos de PostgreSQL y evalúa mediante una condición excluyente si el `username` del usuario autenticado coincide obligatoriamente con el emisor (`sender_id`) o el receptor (`receiver_id`) del documento. Si la validación falla, el flujo se interrumpe de forma reactiva respondiendo con un estado HTTP 403 Forbidden.
+1. **Recursos estáticos públicos:** Mantener la regla `GET /uploads/**` y el mapeo estático de `WebConfig` para servir los recursos almacenados mediante URL directa.
+2. **Cortocircuito Defensivo Anti-IDOR (Backend):** Implementar el endpoint protegido `GET /api/v1/documents/download/{documentId}` en `DocumentController.java`. El método recupera el token JWT a través del objeto `Principal`, consulta la entidad en PostgreSQL y verifica que el `username` autenticado coincida con el emisor (`sender_id`) o el receptor (`receiver_id`) del documento. Si la validación falla, responde con HTTP 403 Forbidden.
 3. **Consumo por Flujo de Datos Binarios (Frontend):** Sustituir el uso de `window.open` en el cliente por un consumo asíncrono basado en `Blob`. La función `downloadDocumentSecure` inyecta de forma transparente el token JWT en las cabeceras de autorización mediante el cliente HTTP de Axios (`apiClient`) y procesa el flujo de bytes directamente en la memoria del navegador, forzando la descarga local con el nombre real del archivo (`originalname`).
 4. **Control de Concurrencia y Estado Visual en la UI:** Refactorizar el componente `DocumentManager.tsx` inyectando un estado de bloqueo local denominado `downloadingId`. Al activar el evento `onClick`, el componente inhabilita el botón correspondiente (`disabled`) para evitar solicitudes HTTP simultáneas o dobles clics accidentales del usuario. Simultáneamente, se muta el icono estático por un spinner animado (`Loader2`) preservando las dimensiones geométricas y las clases de Tailwind CSS sin alterar la maquetación.
 
 ## Consecuencias
 
-* **Mitigación Completa de Vulnerabilidades IDOR:** Se erradica la posibilidad de fugas de información por manipulación de identificadores en la URL. El servidor valida la matriz de permisos de forma interna, garantizando la confidencialidad estricta del material académico.
+* **Mitigación de IDOR en la API de descarga:** El endpoint protegido valida la matriz de permisos antes de servir documentos solicitados mediante su identificador lógico.
 * **Flujos de Datos Transparentes:** Las credenciales de autorización y los tokens JWT viajan encapsulados de forma oculta en las cabeceras HTTP, evitando la exposición de firmas digitales en el historial del navegador o en los logs del servidor proxy.
 * **Integridad de la Suite de Pruebas:** Los tests de integración con `MockMvc` en `DocumentControllerTest.java` validan con éxito que los intentos de intrusión devuelvan un error 403. En el cliente, la refactorización mantiene en verde un consolidado absoluto de 46 tests en Vitest, garantizando que el comportamiento asíncrono y los bloqueos de interfaz se ejecutan de manera predecible y libre de regresiones.
+
+### Riesgo aceptado
+
+* La ruta estática pública `/uploads/**` no aplica el control anti-IDOR del endpoint de descarga. Si el proyecto necesitara confidencialidad estricta para todos los documentos almacenados, esta ruta debería restringirse o separarse entre recursos públicos y privados.
 
 ---
 
@@ -1546,8 +1515,8 @@ Específicamente, se debían mitigar dos vectores de riesgo críticos:
 
 ## Decisión
 
-1. **Modelado Físico Normalizado y Bidireccional:** Crear la entidad `CourseGrade.java` vinculada mediante una relación de muchos a uno (`@ManyToOne`) con la matrícula (`Enrollment`). La entidad principal `Enrollment.java` incorpora la contraparte inversa (`@OneToMany`) con estrategias de cascada completa (`CascadeType.ALL`) y remoción de huérfanos para garantizar la integridad referencial en cascada ante limpiezas de historial.
-2. **Aislamiento de Deserialización Perimetral:** Sustituir la anotación restrictiva `@JsonIgnore` por `@JsonProperty(access = JsonProperty.Access.READ_ONLY)` sobre la propiedad `grades`. Esto instruye al serializador Jackson a ignorar de forma proactiva cualquier entrada de datos hacia el servidor a través de esta propiedad, utilizándola exclusivamente como flujo de salida seguro e inmutable hacia el Frontend.
+1. **Modelado Físico Normalizado y Bidireccional:** Crear la entidad `CourseGrade.java` vinculada mediante una relación de muchos a uno (`@ManyToOne`) con la matrícula (`Enrollment`). La entidad principal `Enrollment.java` incorpora la contraparte inversa (`@OneToMany`) con cascada acotada a `PERSIST` y `MERGE` (sin `orphanRemoval`), para evitar que una operación de limpieza sobre la matrícula elimine accidentalmente calificaciones ya emitidas.
+2. **Aislamiento de Deserialización Perimetral:** Mantener `@JsonIgnore` sobre el campo `grades` para bloquear cualquier intento de asignación masiva (*mass assignment*) desde el cliente, y exponer la colección al frontend exclusivamente mediante un getter explícito de solo lectura (`getGradesForFrontend()`, anotado con `@JsonProperty("grades")`), que nunca participa en la deserialización de peticiones entrantes.
 3. **Optimización por Carga Diferida (Lazy Loading) e Hidratación Explícita:** Configurar la relación con `FetchType.LAZY` para salvaguardar el rendimiento del motor de base de datos. En el método transaccional de lectura `getStudentActiveCoursesWithCalculatedProgress` dentro de `UserService.java`, se fuerza la hidratación controlada de la colección invocando un método de acceso estructural (`.size()`) antes del retorno de la lista, poblando el payload únicamente en este flujo de negocio específico.
 4. **Restauración de Firma de Constructores:** Declarar un constructor explícito de 7 argumentos en `Enrollment.java` que actúe como puente de compatibilidad hacia atrás. Esto inmuniza a la suite preexistente de pruebas unitarias (`UserServiceTest.java`, etc.) contra los cambios en las anotaciones automáticas de Lombok.
 
@@ -1563,7 +1532,7 @@ Específicamente, se debían mitigar dos vectores de riesgo críticos:
 
 ## Estatus
 
-Pospuesto
+Superado — implementado posteriormente con un enfoque distinto al aquí planificado (ver nota de actualización)
 
 ## Contexto
 
@@ -1592,11 +1561,15 @@ Se determina **posponer e inactivar temporalmente la integración del componente
 * **Garantía de Documentación Metodológica:** Mantener el ADR bajo el estado de *Pospuesto* justifica de manera académica ante el tribunal que el problema de agregación analítica de datos mixtos (String a Double en PostgreSQL) fue analizado, modelado y resuelto teóricamente, aportando valor al diseño de arquitectura del TFG.
 * **Consistencia del Repositorio Actualizado:** Al retirar los disparadores reactivos del frontend y las consultas complejas del backend, la suite de pruebas y la compilación (`BUILD SUCCESS`) regresan a un terreno de consistencia absoluta, libre de regresiones colaterales en el ecosistema transaccional.
 
+## Nota de actualización
+
+El campo `CourseGrade.score` se implementó finalmente como `BigDecimal` (no `String`), eliminando la necesidad del casteo condicional `CAST(cg.score AS double)` descrito en este ADR como planificación teórica. El componente analítico aquí pospuesto fue implementado en `UserService.getCourseStats`, documentado en el apartado de servicios de la memoria.
+
 ---
 
 # ADR-44: Tipado Defensivo y Gestión de Precisión en el Progreso Académico
 
-### Estado
+## Status
 
 Aceptado
 
@@ -1620,7 +1593,7 @@ Se decide mantener el uso del tipo `Long` para almacenar y procesar el total de 
 
 # ADR-45: Abstracción de Infraestructura y Purificación Semántica de la Interfaz (UX)
 
-### Estado
+## Status
 
 Aceptado
 
@@ -1643,10 +1616,10 @@ Se establece un principio estricto de **Purificación Semántica y Abstracción 
 
 # ADR-46: Arquitectura de Agregación Analítica Disociada y Micro-indicadores
 
-**Fecha:** Julio 2026  
-**Estatus:** Aceptado  
+**Fecha:** Julio 2026
+**Estatus:** Aceptado
 
-### Contexto
+## Status
 
 Se requiere proyectar métricas en tiempo real que combinen el catálogo base de cursos externos (origen, especialidad) con la analítica dinámica de los usuarios en la plataforma local (inscripciones, notas, valoraciones de docentes).
 
@@ -1674,7 +1647,7 @@ Los principales desafíos son:
 
 # ADR-47: Canal de Alarmas Académicas Dinámicas en Barra de Navegación
 
-### Estatus
+## Status
 
 Aceptado (Julio 2026)
 
@@ -1698,7 +1671,7 @@ El estudiante requería avisos visuales inmediatos sobre la llegada de nuevos do
 
 # ADR-48: Purificación del Sistema de Contingencia y Control de Permisos
 
-### Estatus
+## Status
 
 Aceptado (Julio 2026)
 
@@ -1721,7 +1694,7 @@ La vista de error por falta de privilegios (`AccessDenied.tsx`) utilizaba etique
 
 # ADR-49: Purificación Visual de Dashboards y Centralización de Componentes de Enrutamiento
 
-### Estado
+## Status
 
 Aceptado (Julio 2026)
 
@@ -1889,80 +1862,46 @@ Julio 2026
 
 ## Contexto
 
-Con la creciente complejidad funcional y de seguridad de la plataforma (intercambio bidireccional de archivos [ADR-48], motor de recomendaciones algorítmicas [ADR-34] y seguridad stateless JWT [ADR-03]), se hacía imperativo establecer un marco estricto de aseguramiento de la calidad (QA) que garantizara que las refactorizaciones profundas (como la unificación de la campana global [ADR-52] o la limpieza de código muerto) no introdujeran regresiones operacionales. Una arquitectura desacoplada y robusta exige que tanto el contrato de datos del backend como la reactividad de la UI en el frontend estén blindados de manera simétrica ante cualquier alteración del entorno de desarrollo.
+Con la creciente complejidad funcional y de seguridad de la plataforma (intercambio bidireccional de archivos [ADR-48], motor de recomendaciones algorítmicas [ADR-32] y seguridad stateless JWT [ADR-03]), se hacía imperativo establecer un marco estricto de aseguramiento de la calidad (QA) que garantizara que las refactorizaciones profundas (como la unificación de la campana global [ADR-52] o la limpieza de código muerto) no introdujeran regresiones operacionales.
 
 ## Decisión
 
 Adoptar de manera formal una **Estrategia de Testing en Pirámide**, estructurada en tres niveles operativos de validación y ejecutada a través de un ecosistema tecnológico híbrido y complementario [ADR-28]:
 
 1. **Capa Unitaria (Alta Densidad y Aislamiento):**
-   * *Frontend:* Uso de Vitest y React Testing Library para validar el comportamiento de componentes atómicos (`GenericButton`) y aislar la lógica de componentes complejos como `GlobalNotificationBell.test.tsx`.
+   * *Frontend:* Uso de Vitest y React Testing Library para validar componentes atómicos (`GenericButton`), aislar la lógica de componentes complejos como `GlobalNotificationBell.test.tsx` (forzando degradación amigable y simulación asíncrona de dropdowns mediante `await waitFor`).
    * *Backend:* Pruebas unitarias sobre servicios aislados, destacando `RecommendationServiceTest.java`, que valida la matriz de pesos del algoritmo predictivo de forma independiente del motor de persistencia.
 2. **Capa de Integración Técnica e Infraestructura:**
-   * Validación de la capa criptográfica mediante `JwtServiceTest.java` y comprobación perimetral de red a través de `CorsIntegrationTest.java` para asegurar que el modelo stateless sea infranqueable.
-   * Pruebas reales de persistencia y consistencia relacional en repositorios (`EnrollmentRepositoryTest.java`) para garantizar la integridad de las cláusulas JPQL y el cursor de PostgreSQL tras los procesos transaccionales.
+   * Validación de la capa criptográfica mediante `JwtServiceTest.java` y comprobación perimetral de red a través de `CorsIntegrationTest.java`.
+   * Pruebas de persistencia y consistencia relacional en repositorios (`EnrollmentRepositoryTest.java`) para garantizar la integridad de las cláusulas JPQL, junto con auditorías de desmontado de nodos (`unmount`) en elementos de alta carga visual como la consola de administración (`UserScrollList.test.tsx`).
 3. **Capa de Flujo de Negocio (Integración Funcional de Extremo a Extremo):**
-   * Implementación de la suite `NotificationDocumentFlowIntegrationTest.java` en el backend y su equivalente homólogo en el frontend. Estos tests validan el "camino feliz" (*happy path*) completo del sistema: desde que un documento se persiste con metadatos hasta que el sistema de persistencia genera reactivamente la alerta correspondiente indexada por el `receiver_id` del destinatario.
-
-## Consecuencias
-
-### Impacto Positivo
-
-* **Confianza Absoluta en la Refactorización:** Permite realizar cambios estructurales profundos y tareas de purificación de código inerte con la certeza matemática de que los flujos críticos de la plataforma siguen 100% operativos.
-* **Documentación Técnica Viva:** Las suites de pruebas actúan como una especificación funcional ejecutable que describe de forma exacta cómo deben interactuar los componentes, servicios y contratos entre ambas capas del software.
-* **Automatización del Gobierno de Calidad:** La suite completa está integrada en el pipeline de Integración Continua (CI) mediante GitHub Actions (`ci.yml`), garantizando que ninguna rama de código pueda fusionarse con la rama principal si no supera satisfactoriamente todas las validaciones de la pirámide.
-
-### Impacto Negativo / Riesgos Mitigados
-
-* **Sobrecarga de Mantenimiento por Alta Cobertura:** El incremento exponencial de la cobertura exige un esfuerzo de ingeniería adicional para actualizar, sincronizar y adaptar las aserciones de los tests cada vez que se modifique una regla de negocio o la estructura de los DTOs compartidos.
-* *Mitigación:* Se implementó un diseño de pruebas estrictamente acotado y guiado por comportamiento, evitando verificar detalles de implementación volátiles o estilos estéticos mutables. Los tests se centran de forma exclusiva en la invariabilidad de las firmas de los contratos y la lógica perimetral de seguridad, minimizando drásticamente la tasa de mantenimiento y falsos positivos en el pipeline.
-
----
-
-# ADR-055: Estrategia de Testing en Pirámide y Validación de Flujos de Integración
-
-## Estatus
-
-Aceptado
-
-## Fecha
-
-Julio 2026
-
-## Contexto
-
-Con la creciente complejidad funcional y de seguridad de la plataforma (intercambio bidireccional de archivos [ADR-48], motor de recomendaciones algorítmicas [ADR-34] y seguridad stateless JWT [ADR-03]), se hacía imperativo establecer un marco estricto de aseguramiento de la calidad (QA) que garantizara que las refactorizaciones profundas (como la unificación de la campana global [ADR-52] o la limpieza de código muerto) no introdujeran regresiones operacionales. Una arquitectura desacoplada y robusta exige que tanto el contrato de datos del backend como la reactividad de la UI en el frontend estén blindados de manera simétrica ante cualquier alteración del entorno de desarrollo.
-
-## Decisión
-
-Adoptar de manera formal una **Estrategia de Testing en Pirámide**, estructurada en tres niveles operativos de validación y ejecutada a través de un ecosistema tecnológico híbrido y complementario [ADR-28]:
-
-1. **Capa Unitaria (Alta Densidad y Aislamiento):**
-   * *Frontend:* Uso de Vitest y React Testing Library para validar componentes atómicos (`GenericButton`) y aislar la lógica de componentes complejos como `GlobalNotificationBell.test.tsx`, forzando la degradación amigable (*Graceful Degradation*) de la interfaz y la simulación asíncrona de dropdowns mediante bloques `await waitFor`.
-   * *Backend:* Pruebas unitarias sobre servicios aislados, destacando `RecommendationServiceTest.java`, que valida la matriz de pesos del algoritmo predictivo de forma independiente del motor de persistencia.
-2. **Capa de Integración Técnica e Infraestructura:**
-   * Validación de la capa criptográfica mediante `JwtServiceTest.java` y comprobación perimetral de red a través de `CorsIntegrationTest.java` para asegurar que el modelo stateless sea infranqueable.
-   * Pruebas de persistencia y consistencia relacional en repositorios (`EnrollmentRepositoryTest.java`) para garantizar la integridad de las cláusulas JPQL, junto con auditorías programáticas de desmontado de nodos (`unmount`) en elementos de alta carga visual como la consola de administración (`UserScrollList.test.tsx`) para certificar la ausencia de fugas de memoria concurrentes.
-3. **Capa de Flujo de Negocio (Integración Funcional de Extremo a Extremo):**
-   * Implementación de la suite `NotificationDocumentFlow.integration.test.tsx` en el frontend. Este test valida el flujo de negocio completo: desde que un documento se persiste con metadatos hasta que el sistema genera reactivamente la alerta correspondiente indexada por el `receiver_id`, forzando la mutación estética de la campana mediante el consumo de eventos nativos del sistema de ventanas (`window.dispatchEvent`).
+   * Implementación de la suite `NotificationDocumentFlow.integration.test.tsx`, validando el flujo completo desde que un documento se persiste con metadatos hasta que el sistema genera reactivamente la alerta correspondiente indexada por `receiver_id`.
 
 ## Justificación para el TFG
 
-* **Rigor Metodológico Avanzado (QA):** Aporta el máximo nivel de rigor metodológico y madurez de ingeniería de software exigido en la rúbrica de evaluación de un TFG, validando la integración real entre las capas de negocio, seguridad, red y persistencia de datos.
-* **Escudo Inmune a Regresiones:** El uso de contexto web simulado en Spring Boot y mocks controlados en React aísla las responsabilidades de los componentes. Esto garantiza que las pruebas actúen como un escudo perimetral inmune a futuras alteraciones en la base de datos o modificaciones estéticas en la interfaz de usuario, proveyendo documentación viva y ejecutable.
+* **Rigor Metodológico:** Aporta un nivel de validación que cubre la integración real entre las capas de negocio, seguridad, red y persistencia de datos.
+* **Aislamiento de Responsabilidades:** El uso de contexto web simulado en Spring Boot y mocks controlados en React permite que las pruebas actúen como red de seguridad frente a futuras alteraciones sin acoplarse a detalles estéticos de la interfaz.
 
 ## Consecuencias
 
 ### Impacto Positivo
 
-* **Confianza Absoluta en la Refactorización:** Permite realizar cambios estructurales profundos y tareas de purificación de código inerte con la certeza matemática de que los flujos críticos de la plataforma siguen 100% operativos.
-* **Documentación Técnica Viva:** Las suites de pruebas actúan como una especificación funcional ejecutable que describe de forma exacta cómo deben interactuar los componentes, servicios y contratos entre ambas capas del software.
-* **Automatización del Gobierno de Calidad:** La suite completa está integrada en el pipeline de Integración Continua (CI) mediante GitHub Actions (`ci.yml`), garantizando que ninguna rama de código pueda fusionarse con la rama principal si no supera satisfactoriamente todas las validaciones de la pirámiade (83 tests en verde).
+* **Confianza en la Refactorización:** Permite realizar cambios estructurales y tareas de limpieza de código con evidencia automatizada de que los flujos críticos siguen operativos.
+* **Documentación Técnica Viva:** Las suites de pruebas describen de forma ejecutable cómo deben interactuar los componentes, servicios y contratos entre ambas capas.
+* **Automatización del Gobierno de Calidad:** La suite está integrada en el pipeline de CI (`ci.yml`), impidiendo que una rama se fusione sin pasar todas las validaciones.
 
 ### Impacto Negativo / Riesgos Mitigados
 
-* **Sobrecarga de Mantenimiento por Alta Cobertura:** El incremento exponencial de la cobertura exige un esfuerzo de ingeniería adicional para actualizar, sincronizar y adaptar las aserciones de los tests cada vez que se modifique una regla de negocio o la estructura de los DTOs compartidos [ADR-23].
-* *Mitigación:* Se implementó un diseño de pruebas estrictamente acotado y guiado por comportamiento, utilizando expresiones regulares con la bandera `i` para ignorar variaciones de capitalización. Los tests se centran exclusivamente en la invariabilidad de las firmas de los contratos y la lógica perimetral de seguridad, minimizando la tasa de refactorización de los tests ante cambios cosméticos.
+* **Sobrecarga de Mantenimiento:** El incremento de cobertura exige actualizar las aserciones cada vez que cambia una regla de negocio o la estructura de los DTOs compartidos [ADR-23].
+* *Mitigación:* Diseño de pruebas guiado por comportamiento (incluyendo expresiones regulares con la bandera `i` para ignorar variaciones de capitalización), centrado en la invariabilidad de las firmas de los contratos y no en detalles de implementación volátiles.
+
+---
+
+# ADR-055: (Retirado)
+
+## Estatus
+
+Retirado — duplicado de ADR-054, fusionado en dicha entrada.
 
 ---
 
@@ -2155,6 +2094,56 @@ Implementación aplicada:
 * *Mitigación:* ejecución idempotente y consulta acotada al subconjunto de matrículas activas elegibles.
 
 ---
+
+# ADR-064: Bloqueo Automático de Cuenta por Intentos Fallidos de Login
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Agosto 2026
+
+## Contexto
+
+El sistema solo contaba con un mecanismo de baja lógica (`enabled = false`) activado manualmente por el administrador desde `/admin` [ADR-058]. No existía ninguna protección automática frente a ataques de fuerza bruta o adivinación de contraseña sobre `/api/auth/login`: un atacante podía intentar credenciales de forma indefinida sin restricción ni aviso progresivo al usuario legítimo.
+
+Se requería limitar a **3 intentos** de login por usuario, informando de los intentos restantes tras cada fallo, y bloqueando la cuenta automáticamente al tercer fallo consecutivo.
+
+## Decisión
+
+Reutilizar el mecanismo de baja lógica ya existente (`enabled = false`) como bloqueo automático, en lugar de introducir un mecanismo de bloqueo paralelo (p. ej. tabla de intentos, rate-limiting a nivel de infraestructura, o un campo `locked` independiente):
+
+1. **Contador de intentos:** se añade `failedLoginAttempts` (entero, default 0) a la entidad `Users`, incrementado en cada fallo de contraseña dentro de `UserService.login()` y reseteado a 0 tras un login correcto.
+2. **Mensajes progresivos:** 1er fallo → "Quedan 2 intentos"; 2º fallo → "Queda 1 intento"; 3er fallo → baja lógica automática (`enabled = false`) + "Usuario bloqueado. Póngase en contacto con el administrador".
+3. **Canal de error:** se mantiene `ServicesException` → HTTP 400 con mensaje libre, el mismo patrón ya usado por el resto de errores de login ("Usuario no encontrado", "Contraseña incorrecta"). Se descartan explícitamente 401/403/423 porque:
+   * `AuthModal.tsx` sobrescribe el `message` del backend con un texto fijo cuando el status es 401, ocultando los avisos progresivos.
+   * 403 colisiona semánticamente con el `@ExceptionHandler(AccessDeniedException.class)` ya registrado en `GlobalExceptionHandler`, que devuelve un mensaje fijo distinto.
+   * 423 no tiene handler registrado; caería en el `catch-all` genérico y devolvería un 500 engañoso.
+   Esta vía evita tocar el frontend y el manejador global de excepciones.
+4. **Integración con `/admin`:** al no crear un estado nuevo, la cuenta bloqueada aparece automáticamente como "Inactivo" en la Consola de Usuarios [ADR-058], reutilizando la reactivación ya existente. Se resetea `failedLoginAttempts = 0` en el mismo método de toggle (`deleteByUsername`) al reactivar, para evitar un rebloqueo inmediato tras el primer fallo posterior.
+5. **Compatibilidad de constructor:** se preserva manualmente el constructor de 7 argumentos de `Users` (sustituyendo el `@AllArgsConstructor` de Lombok) para no romper las ~143 instanciaciones existentes en el código y en la suite de tests; `failedLoginAttempts` nace a 0 por defecto sin necesidad de tocarlas.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* Protección básica contra fuerza bruta sin introducir infraestructura nueva (sin Redis, sin tabla de intentos separada, sin rate-limiter externo).
+* Cero cambios en frontend y en `GlobalExceptionHandler`: la funcionalidad se apoya íntegramente en un patrón ya consolidado (`ServicesException` + mensaje libre + baja lógica).
+* Visibilidad inmediata para el administrador: una cuenta bloqueada por intentos se ve exactamente igual que una baja manual en la Consola de Usuarios, sin lógica de UI adicional.
+* Cero impacto en los ~143 usos existentes de `new Users(...)` gracias al constructor de compatibilidad.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Ambigüedad de causa:** una cuenta con `enabled = false` no distingue si fue desactivada por el administrador o bloqueada automáticamente por intentos fallidos; ambos casos muestran el mismo estado "Inactivo".
+  * *Mitigación futura:* añadir un campo `lockReason` o `lockedAt` si se necesitara distinguir el origen del bloqueo en auditoría.
+* **Bloqueo por terceros (enumeration/DoS dirigido):** un atacante que conozca un `username` válido puede bloquear la cuenta de otra persona intencionadamente con 3 intentos fallidos.
+  * *Mitigación futura:* complementar con CAPTCHA o rate-limiting por IP en `/api/auth/login` si se detecta abuso en producción.
+* **Semántica HTTP no estricta:** usar 400 para "credenciales inválidas" y "cuenta bloqueada" se aparta de la convención REST más purista (401/403/423).
+  * *Mitigación:* decisión consciente y documentada aquí; el proyecto prioriza consistencia interna y menor superficie de cambio sobre semántica HTTP pura en este endpoint concreto.
+
+  ---
 
 # Notas de Migración: Transición a JWT y Compatibilidad
 
@@ -2498,3 +2487,241 @@ Reglas consolidadas:
 
 * **Dependencia del evento global de refresco:** una omisión del broadcast puede degradar la sincronización visual de la campana.
 * *Mitigación:* conservar patrón único `emitNotificationsRefresh()` tras marcado de lectura y validar con pruebas de integración de flujo.
+
+---
+
+# ADR-065: Panel Operativo de Avisos Docentes y Desacoplamiento de la Campana Global
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Agosto 2026
+
+## Contexto
+
+La evolución funcional del módulo docente requería abandonar un esquema de notificaciones genéricas para adoptar un modelo con trazabilidad real por alumno, curso y estado de gestión. El mecanismo previo mezclaba la señal de aviso con la gestión operativa, lo que dificultaba la priorización, favorecía la duplicidad y no permitía distinguir con claridad entre un aviso simplemente visualizado y un aviso efectivamente resuelto.
+
+Además, la asignación de cursos por parte del profesorado debía quedar condicionada a una configuración previa obligatoria. Al pulsar "Impartir curso", la consolidación de la asignación no debía completarse hasta definir el reparto de envíos de material por partes, ya que de ese parámetro depende la generación posterior de avisos intermedios y del aviso final.
+
+## Decisión
+
+Se adopta una arquitectura de avisos docentes separada en dos canales complementarios:
+
+1. La campana global actúa como canal de señal inmediata y muestra avisos pendientes por ver.
+2. El panel docente actúa como canal operativo y permite gestionar cada aviso con un ciclo de vida propio.
+3. La asignación docente queda supeditada a una configuración obligatoria de partes, sin la cual no se consolida el alta.
+4. Los avisos se generan por matrícula y checkpoint, con deduplicación estricta para evitar repeticiones.
+5. El panel operativo mantiene los avisos en una cola ordenada por antigüedad. El profesor puede pasar un aviso de `PENDIENTE` a `VISTO`, pero la resolución posterior ya no depende de pulsar "Marcar como resuelto".
+6. Un envío correcto de documentación, vídeo o trabajo desde el panel "Documentación y trabajos académicos" consume el aviso `VISTO` más antiguo del mismo profesor, alumno y curso, siempre que sea `INITIAL_CONTACT` o `MATERIAL_DISPATCH`.
+7. El panel "Envío y recepción de exámenes" queda reservado para exámenes y solo puede resolver avisos `FINAL_EXAM` en estado `VISTO`.
+8. No se inspeccionan títulos, nombres de archivo, encabezados, extensiones ni contenido para inferir la intención del profesor. La elección del canal es la declaración operativa del profesor.
+9. La transición a `RESUELTO` se ejecuta únicamente después de persistir correctamente el envío y sus registros de recepción. Cualquier error mantiene el aviso en `VISTO`.
+10. Las reglas de resolución se aplican desde este cambio también a avisos que ya estuvieran en estado `VISTO`; no se generan ni resuelven avisos retroactivamente por lecturas del panel.
+
+## Justificación
+
+Esta decisión mejora la separación de responsabilidades funcionales entre notificación y gestión. La campana informa; el panel opera. El sistema refleja así mejor el dominio académico real, donde el profesorado necesita distinguir entre recibir un aviso, revisarlo y resolverlo.
+
+La configuración por curso también aporta flexibilidad, ya que permite ajustar la frecuencia de avisos sin modificar la lógica principal de negocio ni acoplar el comportamiento al frontend.
+
+## Consecuencias
+
+### Impacto positivo
+
+* Se obtiene trazabilidad completa del trabajo docente por alumno, curso y estado.
+* Se reduce el ruido por duplicidad mediante restricciones de unicidad y control de generación.
+* La experiencia de usuario mejora al separar claramente el canal de señal del canal de gestión.
+* El sistema queda preparado para futuras métricas de carga operativa y tiempos de resolución.
+* La responsabilidad funcional queda explícitamente en el profesor: un envío exitoso por el canal elegido consume el siguiente aviso compatible, sin heurísticas sobre el contenido.
+* La cola evita saltos de estado y garantiza que los avisos intermedios y el examen final se procesen en orden.
+
+### Riesgos y mitigaciones
+
+* La solución añade complejidad de dominio y persistencia.
+* Mitigación: se emplean DTOs explícitos, servicios especializados y pruebas de flujo.
+
+* Puede aparecer desalineación temporal entre campana y panel.
+* Mitigación: refresco centralizado de notificaciones, dismiss individual idempotente y rehidratación tras operaciones exitosas.
+
+## Trazabilidad de Implementación
+
+| Decisión arquitectónica | Materialización en backend | Materialización en frontend |
+| --- | --- | --- |
+| La asignación docente queda supeditada a una configuración previa obligatoria | `controller/CourseController.java` expone el endpoint `/assign-teacher-with-alert-config` y `services/UserService.java` consolida la asignación transaccional con configuración asociada | `routes/pages/professor/components/ProfessorCoursePicker.tsx` incorpora el modal obligatorio de configuración y `services/useCourseCatalog.ts` controla el resultado de la operación |
+| La configuración por curso se persiste como parte del dominio docente | `entities/CourseMaterialDispatchConfig.java`, `repository/CourseMaterialDispatchConfigRepository.java` y `resources/schema-postgresql.sql` formalizan la tabla `course_material_dispatch_config` | `services/professorAlertService.ts` expone las operaciones de alta y consulta de configuración |
+| Los avisos se generan por matrícula y checkpoint, con garantía de no duplicidad | `entities/ProfessorCourseAlert.java`, `entities/ProfessorAlertType.java`, `entities/ProfessorAlertStatus.java`, `repository/ProfessorCourseAlertRepository.java` y la restricción única definida en `resources/schema-postgresql.sql` | `routes/pages/professor/components/ProfessorTeachingAlertsPanel.tsx` presenta y gestiona los avisos por estado |
+| Se separa el canal de notificación inmediata del canal operativo de gestión | `services/ProfessorCourseAlertService.java`, `controller/ProfessorCourseAlertController.java` y `controller/UserController.java` implementan las acciones de dismiss y transición de estado | `components/ui/globalNotificationBell/GlobalNotificationBell.tsx` y `components/ui/globalNotificationBell/useNotifications.ts` gestionan la campana; el panel docente conserva el flujo operativo |
+| La resolución automática consume la cola de avisos vistos después de un envío correcto | `repository/ProfessorCourseAlertRepository.java` localiza el aviso `VIEWED` más antiguo y `services/ProfessorCourseAlertService.java` separa tipos intermedios y examen final; `controller/DocumentController.java` invoca la resolución después de persistir el envío | `ProfessorDocumentManager.tsx` se presenta como "Documentación y trabajos académicos" y `GradingCenter.tsx` como "Envío y recepción de exámenes"; `useGradingCenter.ts` envía `EXAMEN` |
+| Tras cada alta exitosa se evita la persistencia de estados visuales obsoletos | `controller/CourseController.java` devuelve una respuesta coherente y estable | `routes/pages/professor/ProfessorDashboard.tsx` rehidrata las asignaturas desde backend y `routes/pages/professor/components/ProfessorCoursePicker.tsx` mantiene el modal abierto en caso de error |
+
+## Evidencias de Validación
+
+| Escenario de validación | Evidencia registrada | Resultado observado |
+| --- | --- | --- |
+| Alta docente condicionada a la configuración de `dispatchParts` | Modal de configuración en `ProfessorCoursePicker.tsx` y endpoint `POST /api/courses/{courseId}/assign-teacher-with-alert-config` | La asignación no se consolida hasta completar y guardar la configuración |
+| Generación persistente de avisos sin duplicidad | Entidades `CourseMaterialDispatchConfig` y `ProfessorCourseAlert` con restricción única por `enrollment_id, alert_type, checkpoint_index` | Los avisos quedan vinculados a matrícula, curso y checkpoint de forma unívoca |
+| Consumo independiente del aviso en la campana | `dismissSingleNotification` en `useNotifications.ts` y `dismiss-one` en `UserController.java` | La campana se actualiza sin alterar el estado operativo del panel |
+| Gestión secuencial del estado del aviso | `ProfessorTeachingAlertsPanel.tsx`, `ProfessorCourseAlertController.java` y `ProfessorCourseAlertService.java` | Se mantiene `PENDING -> VIEWED`; `VIEWED -> RESOLVED` ocurre automáticamente por envío exitoso y consume la entrada más antigua compatible |
+| Separación del canal intermedio y del examen final | `DocumentController.java` clasifica el envío `EXAMEN` frente a `DOCUMENTO/TRABAJO` antes de resolver avisos | `ProfessorDocumentManager.tsx` gestiona documentación/trabajos y `GradingCenter.tsx` queda limitado al envío de exámenes |
+| Refresco de asignaturas tras guardar la configuración | `ProfessorDashboard.tsx` con rehidratación explícita | La lista "Tus asignaturas asignadas" se actualiza desde backend tras una alta correcta |
+| Resolución automática de avisos intermedios | `DocumentController.java`, `ProfessorCourseAlertService.java` y `ProfessorCourseAlertServiceTest.java` | Un envío correcto de documentación, vídeo o trabajo resuelve solo el aviso `VIEWED` más antiguo compatible |
+| Resolución exclusiva del aviso final por el canal de examen | `DocumentController.java` distingue `EXAMEN` y `ProfessorCourseAlertServiceTest.java` cubre la separación de tipos | Un envío desde el panel de documentación no resuelve `FINAL_EXAM`; solo lo hace el canal de exámenes |
+| Fallo durante el envío | Transacción de `DocumentController.java` y resolución posterior a la persistencia | Si el envío no termina correctamente, el aviso permanece en estado `VIEWED` |
+
+---
+
+# ADR-066: Panel Administrativo `/admin` como Módulo de Supervisión y Gestión Centralizada
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Agosto 2026
+
+## Contexto
+
+La plataforma había ido creciendo en funcionalidades de gestión, pero el rol administrativo seguía disperso entre varias vistas, controladores y flujos de negocio. La lógica de supervisión del sistema no estaba centralizada en un módulo explícito: altas, bajas, reactivaciones, estadísticas, control de usuarios y gestión de incidencias se repartían entre rutas y servicios especializados sin un punto único de orquestación.
+
+Ese diseño provocaba dos riesgos arquitectónicos. En primer lugar, la administración dependía de varios componentes visuales poco cohesivos, lo que hacía más difícil mantener una experiencia consistente para el rol `ADMIN`. En segundo lugar, la seguridad y el acceso estaban más fragmentados de lo que debería, ya que no existía un punto claro de entrada para las operaciones de supervisión global, aumentando el riesgo de fugas de privilegios por semántica o navegación.
+
+## Decisión
+
+Crear un módulo administrativo explícito en la ruta `/admin` con un layout propio, acceso restringido por rol y servicios dedicados a la supervisión de usuarios, cursos, perfiles y alertas globales.
+
+La decisión se materializa en cinco principios:
+
+1. **Ruta centralizada:** toda la gestión operativa del administrador pasa por `/admin` como punto único de entrada.
+2. **Control de acceso por rol:** el módulo solo es accesible para usuarios con rol `ADMIN`, validado desde el contexto de seguridad y los claims del JWT.
+3. **Cohesión funcional:** se agrupan operaciones como activo/inactivo, reactivación, estadísticas globales y administración de usuarios en un único bloque de navegación y servicios.
+4. **Desacoplamiento de vistas:** la capa de presentación y la capa de negocio quedan separadas, evitando que la UI admin contenga lógica de dominio o permisos.
+5. **Compatibilidad con el modelo existente:** la reactivación del usuario y el bloqueo automático por intentos fallidos reutilizan los mecanismos ya presentes de baja lógica (`enabled = false`) para mantener consistencia con la base de datos y con la consola administrativa.
+
+## Justificación
+
+El panel administrativo responde a una necesidad real de arquitectura y mantenimiento. Un rol de supervisión global necesita un espacio con responsabilidad clara, experiencia coherente y límites de acceso definidos. La decisión también mejora la trazabilidad operativa: un administrador puede identificar rápidamente qué está ocurriendo en la plataforma sin depender de rutas diseminadas por la aplicación.
+
+La implementación del módulo en `/admin` refuerza además la separación de responsabilidades ya definida en la arquitectura del proyecto: la capa de presentación gestiona la interactividad visual, mientras que el backend concentra la lógica de seguridad, estadísticas y validación de datos del dominio administrativo.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* Centralización de la gestión operativa del administrador.
+* Mejor cumplimiento de RBAC y menor riesgo de acceso no autorizado a funciones administrativas.
+* Experiencia de usuario más coherente para el rol `ADMIN`.
+* Trazabilidad y mantenimiento mejorados en tareas de supervisión global.
+* Reutilización del flujo de inactivación/reactivación ya existente, reduciendo deuda técnica y complejidad adicional.
+
+### Impacto Negativo / Riesgos Mitigados
+
+* **Mayor complejidad del frontend administrativo:** el módulo exige vistas, rutas y componentes diferenciados.
+  * *Mitigación:* mantener un layout específico y una capa de navegación separada, evitando mezclarlo con dashboards de estudiante o profesor.
+
+* **Riesgo de acoplamiento funcional entre paneles:** si el administrador llega a depender de vistas de otros roles, la lógica se vuelve difícil de auditar.
+  * *Mitigación:* exigir que cada operación administrativa se resuelva en servicios específicos del backend y no desde componentes de otras áreas.
+
+* **Riesgo de sobreexposición de datos sensibles:** las estadísticas y métricas globales pueden revelar información operativa sensible.
+  * *Mitigación:* limitar acceso a usuarios autenticados con rol `ADMIN` y mantener validación perimetral con claims del JWT y reglas de autorización explícitas.
+
+## Trazabilidad de Implementación
+
+| Decisión arquitectónica | Materialización en backend | Materialización en frontend |
+| --- | --- | --- |
+| Ruta centralizada `/admin` | `controller/AdminGlobalStatisticsController.java`, `services/AdminStudentPreferencesService.java`, `services/AdminGlobalStatisticsService.java` | `routes/pages/admin` y componentes del dashboard administrativo |
+| Control de acceso por rol | `SecurityConfig.java`, validación de `Authentication` y claims de JWT | protección de rutas y redirección de acceso no autorizado |
+| Consolidación de gestión de usuarios | `UserService.java` y flujo de baja/reactivación | panel de administración para usuarios activos/inactivos |
+| Supervisión global | servicios analíticos y DTOs de agregación | panel de estadísticas con datos consolidados |
+| Coherencia de diseño para el rol `ADMIN` | endpoints REST con contrato claro y DTOs especializados | layout administrativo y navegación dedicada |
+
+## Evidencias de Validación
+
+| Escenario de validación | Evidencia reconocida | Resultado esperado |
+| --- | --- | --- |
+| Acceso a `/admin` con rol `ADMIN` | validación por seguridad y claims JWT | acceso permitido |
+| Acceso a `/admin` con rol no administrativo | filtro de autorización | acceso denegado |
+| Desactivación y reactivación de usuario | `enabled = false` + proceso de reactivación | coherencia con la consola admin |
+| Estadísticas globales del alumnado | `AdminGlobalStatisticsService`, `AdminStudentPreferencesService` | datos agregados correctos y visibles solo para admin |
+| Integridad del flujo de administración | tests de controller/service y protección de rutas | operación consistente y no propagada a otros roles |
+
+---
+
+# ADR-67: Aplazamiento Deliberado de Sincronización en Tiempo Real para el Canal de Notificaciones
+
+## Estatus
+
+Aceptado (como deuda técnica documentada, no como defecto)
+
+## Fecha
+
+Agosto 2026
+
+## Contexto
+
+`GlobalNotificationBell` obtiene las notificaciones pendientes (documentos no leídos, avisos docentes, alertas de progreso) mediante una consulta bajo demanda (`fetchAlerts`), ejecutada únicamente al montar el componente o en respuesta a un evento disparado por acciones de la propia sesión del usuario. No existe sondeo periódico (`setInterval`), WebSocket ni Server-Sent Events. Como consecuencia, un usuario con la sesión abierta no ve reflejada en la campana una notificación generada por la acción de otro usuario (por ejemplo, un profesor enviando un documento a un alumno) hasta que recarga la página o navega de forma que el componente se remonte.
+
+## Decisión
+
+No introducir ningún mecanismo de sincronización en tiempo real en esta fase del proyecto. Se documenta la limitación como deuda técnica consciente en lugar de corregirla, dado que los datos subyacentes son en todo momento correctos y consultables — el retraso es exclusivamente de propagación hacia el cliente, no de integridad de datos.
+
+## Justificación para el TFG
+
+Introducir sondeo continuo o un canal push (WebSocket/SSE) en la fase final del proyecto constituye un cambio estructural de sincronización, no un ajuste puntual: afecta a la gestión de conexiones, al ciclo de vida de los componentes que consumen notificaciones, y requeriría una batería de pruebas dedicada para descartar regresiones en login/logout y en el flujo de descarte de notificaciones (`dismissUserNotifications`), ambos ya cubiertos por una suite de tests estable. El riesgo de introducir una regresión en un sistema ya validado supera el beneficio de una campana que se actualiza con antelación de minutos en lugar de al recargar la página.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* Cero riesgo de regresión sobre el sistema de autenticación y el flujo de notificaciones ya probado.
+* Alcance del cambio acotado a documentación, sin tocar código de producción.
+
+### Impacto Negativo / Riesgos Aceptados
+
+* El usuario final no recibe avisos inmediatos de eventos generados por terceros mientras su sesión permanece abierta sin recargar.
+* *Mitigación futura propuesta:* evaluar en una segunda fase, con diseño y pruebas dedicadas, un mecanismo de sondeo ligero (`setInterval` de baja frecuencia) como paso intermedio antes de considerar WebSocket/SSE.
+
+---
+
+# ADR-68: Serialización entre Pestañas de la Rotación de Refresh Token
+
+## Estatus
+
+Aceptado
+
+## Fecha
+
+Septiembre 2026
+
+## Contexto
+
+El modelo de sesión JWT (ADR-60) emite el `accessToken` únicamente en memoria de cliente y persiste el `refreshToken` en una cookie `HttpOnly` compartida por todas las pestañas del mismo origen. El backend (`RefreshTokenService.rotate`) trata cada refresh token como de un solo uso: al consumirse, se revoca de inmediato y se emite uno nuevo.
+
+Este diseño es correcto para una única pestaña, pero entra en conflicto con el hecho de que el `accessToken` en memoria no se comparte entre pestañas: cada pestaña, al cargarse o al detectar expiración de su propio token, dispara su propia llamada a `POST /api/auth/refresh`. Si dos pestañas lo hacen de forma concurrente (por ejemplo, al abrir la aplicación en una segunda pestaña, o al recuperar el foco tras dejarla en segundo plano), ambas presentan la misma cookie de refresh token vigente en ese instante. La primera en llegar al servidor rota el token con éxito; la segunda recibe `"Refresh token inválido o revocado"`, lo que dispara `logout()` en esa pestaña. Como `clearStoredAuth()` limpia `localStorage` (compartido entre pestañas) y además invoca `POST /api/auth/logout` (que revoca el refresh token vigente en ese momento), el fallo de una sola pestaña expulsaba también a la pestaña que sí había refrescado correctamente. El síntoma percibido por el usuario era una expulsión de sesión tras un período sin interactuar con la página, pese a que el refresh token de 7 días seguía siendo válido.
+
+## Decisión
+
+Se introduce en el cliente un mutex entre pestañas basado en `localStorage`, sin modificar el contrato de rotación del backend ni el modelo de almacenamiento del `accessToken`.
+
+* Antes de invocar `POST /api/auth/refresh`, la pestaña intenta reservar una clave `auth_refresh_lock` con marca de tiempo en `localStorage`.
+* Si el lock está en uso por otra pestaña (marca de tiempo reciente), la pestaña actual espera en sondeo corto a que se libere, o a que caduque por TTL (6s, margen sobre el timeout de red de 5s) si la pestaña que lo tomó quedó inconsistente.
+* Una vez libre el lock, la pestaña realiza su propia llamada de refresh, que ya usa la cookie actualizada por la rotación previa, evitando presentar un refresh token ya revocado.
+* El lock se libera siempre en un bloque `finally`, tanto en éxito como en fallo de la petición.
+
+## Consecuencias
+
+### Impacto Positivo
+
+* Elimina la expulsión en cascada de sesión por condición de carrera multi-pestaña sin tocar `RefreshTokenService` ni la política de rotación de un solo uso.
+* Cambio acotado a `apiClient.ts`; no varía el modelo de seguridad (el `accessToken` sigue sin persistirse fuera de memoria).
+* Compatible con el mecanismo de single-flight ya existente para 401 concurrentes dentro de una misma pestaña (ADR-60).
+
+### Impacto Negativo / Riesgos Mitigados
+
+* Introduce una dependencia adicional en `localStorage` para coordinación, con TTL como salvaguarda ante pestañas que queden bloqueadas o se cierren abruptamente mientras sostienen el lock.
+* No resuelve el caso de despliegue con frontend y backend en dominios distintos y cookie `SameSite=Strict`, que queda como riesgo pendiente de revisión en la configuración de producción.
+
+---

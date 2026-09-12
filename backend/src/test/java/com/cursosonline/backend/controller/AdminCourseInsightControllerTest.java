@@ -211,6 +211,25 @@ class AdminCourseInsightControllerTest {
         }
 
         @Test
+        @DisplayName("POST /api/admin/courses debe devolver 400 con mensaje claro cuando el payload tiene formato inválido")
+        void createCourse_PayloadConFormatoInvalido_DebeDevolver400() throws Exception {
+                mockMvc.perform(post("/api/admin/courses")
+                                .contentType(APPLICATION_JSON)
+                                .content("""
+                                                {
+                                                        "title": "Arquitectura",
+                                                        "category": "Ingenieria",
+                                                        "courseType": "Básico",
+                                                        "language": "ES",
+                                                        "duration": "abc"
+                                                }
+                                                """))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.message").value(
+                                                "Formato de datos incorrecto en la solicitud. Revisa los tipos y el formato de los campos enviados."));
+        }
+
+        @Test
         @DisplayName("GET /api/admin/courses/search debe delegar el keyword y devolver los resultados")
         void searchCourses_DebeDevolverResultadosDelServicio() throws Exception {
                 when(adminCourseInsightService.searchCourses("Arquitectura"))
@@ -249,7 +268,8 @@ class AdminCourseInsightControllerTest {
                                 4.6,
                                 7.8,
                                 7.4,
-                                8.1);
+                                8.1,
+                                List.of());
                 when(adminCourseInsightService.getCourseCollectiveStats(300L)).thenReturn(dto);
 
                 mockMvc.perform(get("/api/admin/courses/300/collective-stats"))

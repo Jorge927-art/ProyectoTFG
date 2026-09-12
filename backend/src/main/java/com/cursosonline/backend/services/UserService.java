@@ -8,7 +8,9 @@ import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.DocumentMetadata;
 import com.cursosonline.backend.entities.CourseGrade;
+import com.cursosonline.backend.entities.ProfessorAlertType;
 import com.cursosonline.backend.dto.InterestDTO;
+import com.cursosonline.backend.dto.ProfessorBellAlertSummaryDTO;
 import com.cursosonline.backend.repository.UserRepository;
 import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.DocumentMetadataRepository;
@@ -31,10 +33,11 @@ import java.util.Optional;
 import java.util.List;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Locale;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
@@ -53,6 +56,8 @@ import org.slf4j.LoggerFactory;
 public class UserService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(UserService.class);
+    private static final int MAX_FAILED_LOGIN_ATTEMPTS = 3;
+    private static final String GRADE_PUBLISHED_NOTIFICATION_TYPE = "GRADE_PUBLISHED";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -65,6 +70,8 @@ public class UserService {
     private final com.cursosonline.backend.repository.AcademicEvaluationRepository academicEvaluationRepository;
     private final com.cursosonline.backend.repository.UserProfileRepository userProfileRepository;
     private final AdminCourseCatalogService adminCourseCatalogService;
+    private final ProfessorCourseAlertService professorCourseAlertService;
+    private final RecommendationService recommendationService;
     private final JdbcTemplate jdbcTemplate;
     private Clock clock = Clock.systemUTC();
 
@@ -74,7 +81,7 @@ public class UserService {
     /**
      * Permite buscar un usuario por su nombre de usuario de forma transaccional,
      * devolviendo un Optional que puede estar vacío si no se encuentra.
-     * 
+     *
      * @param username El nombre de usuario del usuario a buscar.
      * @return Un Optional que contiene el usuario si se encuentra, o está vacío si
      *         no se encuentra.
@@ -98,7 +105,7 @@ public class UserService {
      * Registra un nuevo usuario en la plataforma, asegurando que el nombre de
      * usuario sea único y que la contraseña se almacene de forma segura mediante
      * codificación.
-     * 
+     *
      * @param user El objeto Users que contiene los datos del nuevo usuario.
      * @return El usuario registrado con su ID generado y la contraseña codificada.
      * @throws UserAlreadyExistsException Si el nombre de usuario ya está en uso.
@@ -112,47 +119,96 @@ public class UserService {
         user.setPassword(encodedPassword);
         user.setRole(Role.STUDENT);
         user.setEnabled(true);
+        user.setFailedLoginAttempts(0);
         return userRepository.save(user);
     }
 
     /**
      * Permite autenticar a un usuario verificando su nombre de usuario y
      * contraseña.
-     * 
+     *
      * @param username    El nombre de usuario del usuario que intenta autenticarse.
      * @param rawPassword La contraseña en texto plano proporcionada por el usuario.
      * @return El usuario autenticado si las credenciales son correctas.
      */
-    @Transactional(readOnly = true)
+    @Transactional(noRollbackFor = ServicesException.class)
     public Users login(String username, String rawPassword) {
         Users user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ServicesException("Usuario no encontrado"));
 
+        int currentFailedAttempts = user.getFailedLoginAttempts() != null ? user.getFailedLoginAttempts() : 0;
+
         if (!user.isEnabled()) {
+            if (currentFailedAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
+                throw new ServicesException("Usuario bloqueado. Póngase en contacto con el administrador");
+            }
             throw new ServicesException("Acceso denegado: La cuenta de este usuario ha sido dada de baja.");
         }
 
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
-            throw new ServicesException("Contraseña incorrecta");
+            int nextFailedAttempts = currentFailedAttempts + 1;
+            user.setFailedLoginAttempts(nextFailedAttempts);
+
+            if (nextFailedAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
+                user.setEnabled(false);
+                userRepository.saveAndFlush(user);
+                throw new ServicesException("Usuario bloqueado. Póngase en contacto con el administrador");
+            }
+
+            userRepository.saveAndFlush(user);
+            int remainingAttempts = MAX_FAILED_LOGIN_ATTEMPTS - nextFailedAttempts;
+            String attemptLabel = remainingAttempts == 1 ? "intento" : "intentos";
+            String remainingLabel = remainingAttempts == 1 ? "Queda" : "Quedan";
+            throw new ServicesException(
+                    "Contraseña incorrecta. " + remainingLabel + " " + remainingAttempts + " " + attemptLabel);
         }
+
+        if (currentFailedAttempts > 0) {
+            user.setFailedLoginAttempts(0);
+            userRepository.saveAndFlush(user);
+        }
+
         return user;
     }
 
     /**
-     * Recupera de forma transaccional todos los usuarios registrados en la
-     * plataforma.
-     * 
-     * @return Lista de todos los usuarios registrados en la plataforma.
+     * Recupera de forma transaccional todos los usuarios de la plataforma,
+     * ordenados alfabéticamente por nombre de usuario y, en caso de empate, por ID
+     * de usuario.
+     *
+     * @return Lista de todos los usuarios de la plataforma, ordenados
+     *         alfabéticamente por nombre de usuario y, en caso de empate, por ID de
+     *         usuario.
      */
     @Transactional(readOnly = true)
     public List<Users> getAllUsers() {
-        return userRepository.findAll();
+        List<Users> users = new ArrayList<>(userRepository.findAll());
+
+        Collator spanishCollator = Collator.getInstance(Locale.forLanguageTag("es-ES"));
+        spanishCollator.setStrength(Collator.PRIMARY);
+        spanishCollator.setDecomposition(Collator.CANONICAL_DECOMPOSITION);
+
+        users.sort((left, right) -> {
+            String leftUsername = left != null && left.getUsername() != null ? left.getUsername().trim() : "";
+            String rightUsername = right != null && right.getUsername() != null ? right.getUsername().trim() : "";
+
+            int usernameOrder = spanishCollator.compare(leftUsername, rightUsername);
+            if (usernameOrder != 0) {
+                return usernameOrder;
+            }
+
+            long leftId = left != null && left.getUser_id() != null ? left.getUser_id() : Long.MAX_VALUE;
+            long rightId = right != null && right.getUser_id() != null ? right.getUser_id() : Long.MAX_VALUE;
+            return Long.compare(leftId, rightId);
+        });
+
+        return users;
     }
 
     /**
      * Permite actualizar el rol de un usuario de forma transaccional, asegurando
      * que los cambios se persistan correctamente.
-     * 
+     *
      * @param username El nombre de usuario del usuario cuyo rol se va a actualizar.
      * @param newRole  El nuevo rol que se asignará al usuario.
      * @return El usuario actualizado con el nuevo rol.
@@ -169,7 +225,7 @@ public class UserService {
     /**
      * Permite habilitar o deshabilitar un usuario de forma transaccional, cambiando
      * su estado de "enabled".
-     * 
+     *
      * @param username El nombre de usuario del usuario a habilitar o deshabilitar.
      * @return El usuario actualizado con el estado de "enabled" modificado.
      */
@@ -182,6 +238,7 @@ public class UserService {
             user.setEnabled(false);
         } else {
             user.setEnabled(true);
+            user.setFailedLoginAttempts(0);
         }
 
         return userRepository.saveAndFlush(user);
@@ -190,7 +247,7 @@ public class UserService {
     /**
      * Permite eliminar permanentemente un usuario de la plataforma, junto con sus
      * documentos, valoraciones y matrículas según corresponda.
-     * 
+     *
      * @param username          El nombre de usuario del usuario a eliminar.
      * @param requesterUsername El nombre de usuario del solicitante de la
      *                          eliminación.
@@ -253,7 +310,7 @@ public class UserService {
 
     /**
      * Recupera de forma transaccional los intereses de un usuario específico.
-     * 
+     *
      * @param username El nombre de usuario del usuario cuyos intereses se van a
      *                 recuperar.
      * @return Un objeto InterestDTO que contiene los intereses del usuario.
@@ -301,7 +358,7 @@ public class UserService {
      * Permite guardar o actualizar de forma transaccional los intereses de un
      * usuario específico, preservando la integridad de las referencias de Hibernate
      * y evitando la creación de nuevas listas.
-     * 
+     *
      * @param username El nombre de usuario del usuario cuyos intereses se van a
      *                 guardar o actualizar.
      * @param dto      El objeto InterestDTO que contiene los nuevos intereses del
@@ -318,7 +375,6 @@ public class UserService {
         Interest interest = interestRepository.findById(user.getUser_id())
                 .orElseGet(() -> {
                     Interest newInterest = new Interest();
-                    newInterest.setId(user.getUser_id()); // Sincronización manual requerida por @MapsId
                     newInterest.setUser(user);
                     return interestRepository.save(newInterest);
                 });
@@ -340,7 +396,7 @@ public class UserService {
      * Permite actualizar de forma transaccional una colección de cadenas de texto
      * preservando la referencia de Hibernate y evitando la creación de nuevas
      * listas.
-     * 
+     *
      * @param current La colección actual gestionada por Hibernate.
      * @param next    La nueva colección de valores a actualizar.
      */
@@ -355,7 +411,7 @@ public class UserService {
      * Recupera de forma transaccional las asignaturas que coinciden con una palabra
      * clave de búsqueda, limitando el resultado a 12 elementos para la UI.
      * Si la palabra clave está vacía, devuelve los primeros 12 cursos del catálogo.
-     * 
+     *
      * @param keyword La palabra clave de búsqueda para filtrar los cursos.
      * @return Lista de cursos que coinciden con la palabra clave de búsqueda,
      *         limitada a 12 elementos.
@@ -377,7 +433,7 @@ public class UserService {
      * Recupera de forma transaccional las asignaturas asignadas a un profesor
      * autenticado, considerando su identidad principal y posibles alias derivados
      * de su cuenta de usuario. La búsqueda es robusta y evita duplicidades.
-     * 
+     *
      * @param principalIdentity La identidad principal del profesor autenticado.
      * @return Lista de asignaturas asignadas al profesor autenticado.
      */
@@ -389,145 +445,18 @@ public class UserService {
                 : userRepository.findByEmailIgnoreCase(principalIdentity);
 
         Users user = userByUsername.orElseGet(() -> userByEmail.orElse(null));
-        Set<String> aliases = buildProfessorAliases(principalIdentity, user);
-
-        Set<Long> seenCourseIds = new LinkedHashSet<>();
-        List<Courses> mergedCourses = new ArrayList<>();
-
-        for (String alias : aliases) {
-            List<Courses> relationalAndDirectMatches = coursesRepository.findAllAssignedToProfessor(alias);
-            for (Courses course : relationalAndDirectMatches) {
-                if (course.getCourse_id() == null || seenCourseIds.add(course.getCourse_id())) {
-                    mergedCourses.add(course);
-                }
-            }
+        if (user == null || user.getUser_id() == null) {
+            return List.of();
         }
 
-        if (!aliases.isEmpty()) {
-            List<Courses> legacyCandidates = coursesRepository.findAllByInstructorsIsNotNullOrderByTitleAsc();
-
-            for (Courses course : legacyCandidates) {
-                Long courseId = course.getCourse_id();
-                if (courseId != null && seenCourseIds.contains(courseId)) {
-                    continue;
-                }
-
-                if (isLegacyInstructorOwnedByProfessor(course.getInstructors(), aliases)) {
-                    mergedCourses.add(course);
-                    if (courseId != null) {
-                        seenCourseIds.add(courseId);
-                    }
-                }
-            }
-        }
-
-        return mergedCourses;
-    }
-
-    /**
-     * Construye un conjunto de alias normalizados para un profesor autenticado,
-     * combinando
-     * su identidad principal y los datos de la entidad Users si está disponible.
-     * 
-     * @param principalIdentity La identidad principal del profesor autenticado.
-     * @param user              La entidad Users asociada al profesor, si está
-     *                          disponible.
-     * @return Un conjunto de alias normalizados para el profesor.
-     */
-    private Set<String> buildProfessorAliases(String principalIdentity, Users user) {
-        Set<String> aliases = new LinkedHashSet<>();
-        addAlias(aliases, principalIdentity);
-        splitAndAddTokens(aliases, principalIdentity);
-
-        if (user != null) {
-            addAlias(aliases, user.getUsername());
-            addAlias(aliases, user.getEmail());
-
-            String email = user.getEmail();
-            if (email != null) {
-                int atIndex = email.indexOf('@');
-                if (atIndex > 0) {
-                    addAlias(aliases, email.substring(0, atIndex));
-                }
-            }
-
-            splitAndAddTokens(aliases, user.getUsername());
-            splitAndAddTokens(aliases, user.getEmail());
-        }
-
-        return aliases;
-    }
-
-    /**
-     * Divide un valor de cadena en tokens basados en delimitadores comunes y agrega
-     * cada token válido al conjunto de alias.
-     * 
-     * @param aliases  El conjunto de alias donde se agregarán los tokens.
-     * @param rawValue El valor de cadena que se dividirá en tokens.
-     */
-    private void splitAndAddTokens(Set<String> aliases, String rawValue) {
-        if (rawValue == null) {
-            return;
-        }
-
-        String[] parts = rawValue.split("[\\s._@-]+");
-        for (String part : parts) {
-            if (part != null && part.length() >= 3) {
-                addAlias(aliases, part);
-            }
-        }
-    }
-
-    /**
-     * Agrega un alias normalizado al conjunto de alias si no está vacío.
-     * 
-     * @param aliases  El conjunto de alias donde se agregará el alias.
-     * @param rawAlias El alias en bruto que se normalizará y agregará.
-     */
-    private void addAlias(Set<String> aliases, String rawAlias) {
-        if (rawAlias == null) {
-            return;
-        }
-
-        String normalized = rawAlias.trim().toLowerCase(Locale.ROOT);
-        if (!normalized.isEmpty()) {
-            aliases.add(normalized);
-        }
-    }
-
-    /**
-     * Verifica si un curso con un campo de instructores heredado (legacy) está
-     * asociado a un profesor específico mediante sus alias.
-     * 
-     * @param instructors El campo de instructores heredado del curso.
-     * @param aliases     El conjunto de alias del profesor.
-     * @return true si el curso está asociado al profesor, false en caso contrario.
-     */
-    private boolean isLegacyInstructorOwnedByProfessor(String instructors, Set<String> aliases) {
-        if (instructors == null || instructors.trim().isEmpty()) {
-            return false;
-        }
-
-        String[] tokens = instructors.split(",");
-        for (String token : tokens) {
-            String normalizedToken = token.trim().toLowerCase(Locale.ROOT);
-            if (normalizedToken.isEmpty()) {
-                continue;
-            }
-
-            if (aliases.contains(normalizedToken)) {
-                return true;
-            }
-        }
-
-        return false;
+        return coursesRepository.findAllByAssignedUser_UserIdOrderByTitleAsc(user.getUser_id());
     }
 
     /**
      * Permite matricular a un estudiante en un curso específico, asegurando que no
      * exista duplicidad y que tanto el usuario como el curso existan en la base de
      * datos. La operación es transaccional y garantiza la integridad de los datos.
-     * 
+     *
      * @param username El nombre de usuario del estudiante.
      * @param courseId El ID del curso.
      * @return La entidad Enrollment creada y persistida.
@@ -550,6 +479,10 @@ public class UserService {
             throw new ServicesException("Acción inválida: Ya te encuentras matriculado en este curso.");
         }
 
+        if (!course.hasEvaluationResponsible()) {
+            throw new ServicesException("El curso no tiene profesor ni modalidad de evaluación disponible.");
+        }
+
         // 4. Instanciar y configurar el objeto de matrícula explícito
         Enrollment enrollment = new Enrollment();
         enrollment.setUser(user);
@@ -565,7 +498,7 @@ public class UserService {
      * Marca la fecha de inicio de un curso para un estudiante específico,
      * asegurando
      * que solo pueda iniciar su propio curso y mitigando ataques de sondeo de IDs.
-     * 
+     *
      * @param enrollmentId          El ID de la matrícula.
      * @param authenticatedUsername El nombre de usuario autenticado del estudiante.
      */
@@ -585,6 +518,9 @@ public class UserService {
             enrollment.setStarted_at(LocalDateTime.now(clock));
             enrollment.setStatus("EN_CURSO");
             enrollmentRepository.save(enrollment);
+            if (professorCourseAlertService != null) {
+                professorCourseAlertService.createInitialEnrollmentAlertIfApplicable(enrollment);
+            }
         }
     }
 
@@ -593,7 +529,7 @@ public class UserService {
      * la
      * fecha de inicio y la duración total del curso. Devuelve un porcentaje entre 0
      * y 100, acotado estrictamente. Si el curso no ha sido iniciado, devuelve 0.
-     * 
+     *
      * @param enrollment La matrícula del estudiante en el curso.
      * @return El progreso actual como un porcentaje entero entre 0 y 100.
      *         Devuelve 0 si el curso no ha sido iniciado o si la duración es
@@ -632,7 +568,7 @@ public class UserService {
      * tiempo.
      * Esto facilita la simulación de escenarios temporales y garantiza la
      * consistencia de los cálculos de progreso.
-     * 
+     *
      * @param clock El reloj personalizado a inyectar.
      */
     public void setClock(Clock clock) {
@@ -644,7 +580,7 @@ public class UserService {
      * calcula
      * su progreso dinámico en cada una de ellas. Evita consultas N+1 y fuerza la
      * inicialización de las notas para su posterior serialización.
-     * 
+     *
      * @param userId El ID del usuario (estudiante).
      * @return Lista de matrículas activas del estudiante con el progreso calculado.
      */
@@ -693,7 +629,7 @@ public class UserService {
     /**
      * Recupera de forma transaccional las estadísticas analíticas de un curso
      * específico.
-     * 
+     *
      * @param courseId El ID del curso.
      * @return Objeto CourseStatsDTO con las estadísticas analíticas del curso.
      */
@@ -718,7 +654,7 @@ public class UserService {
     /**
      * Recupera de forma transaccional las notificaciones activas de un usuario
      * específico.
-     * 
+     *
      * @param username El nombre de usuario del receptor de las notificaciones.
      * @return Lista de notificaciones activas del usuario.
      */
@@ -734,11 +670,12 @@ public class UserService {
         List<com.cursosonline.backend.entities.DocumentMetadata> unreadDocs = documentMetadataRepository
                 .findUnreadReceivedDocumentsByUsername(username);
         if (unreadDocs != null && !unreadDocs.isEmpty()) {
+            com.cursosonline.backend.entities.DocumentMetadata firstUnread = unreadDocs.get(0);
             alerts.add(new com.cursosonline.backend.dto.NotificationDTO(
                     "DOCUMENT_INBOX",
                     "Bandeja de Entrada",
-                    "Tienes " + unreadDocs.size() + " documento(s) pendiente(s) en tu bandeja.",
-                    "/" + user.getRole().name().toLowerCase()));
+                    buildDocumentInboxMessage(user, unreadDocs),
+                    buildDocumentInboxRedirect(user, firstUnread)));
         }
 
         List<com.cursosonline.backend.entities.UserSystemNotification> unreadSystemNotifications = userSystemNotificationRepository
@@ -746,11 +683,23 @@ public class UserService {
         if (unreadSystemNotifications != null) {
             for (com.cursosonline.backend.entities.UserSystemNotification notification : unreadSystemNotifications) {
                 alerts.add(new com.cursosonline.backend.dto.NotificationDTO(
+                        notification.getNotificationId(),
                         notification.getType(),
                         notification.getTitle(),
                         notification.getMessage(),
                         notification.getRedirectUrl()));
             }
+        }
+
+        if (user.getRole() == Role.PROFESSOR && professorCourseAlertService != null) {
+            Optional<ProfessorBellAlertSummaryDTO> bellSummary = professorCourseAlertService
+                    .getOldestBellAlertSummary(username);
+            bellSummary.ifPresent(summary -> alerts.add(0, new com.cursosonline.backend.dto.NotificationDTO(
+                    summary.alertId(),
+                    "PROFESSOR_TASK_ALERT",
+                    summary.title(),
+                    summary.message(),
+                    "/professor")));
         }
 
         if (hasProgressAlertColumns()) {
@@ -765,12 +714,97 @@ public class UserService {
         return alerts;
     }
 
+    private String buildDocumentInboxMessage(Users receiver,
+            List<com.cursosonline.backend.entities.DocumentMetadata> unreadDocuments) {
+        long examCount = unreadDocuments.stream()
+                .filter(document -> isExamTrayDocument(receiver, document))
+                .count();
+        long documentOrWorkCount = unreadDocuments.size() - examCount;
+
+        List<String> trayMessages = new ArrayList<>();
+        if (receiver != null && receiver.getRole() == Role.ADMIN) {
+            return buildTrayMessage("Recepción de Documentos", unreadDocuments, receiver, false,
+                    unreadDocuments.size());
+        }
+        if (examCount > 0) {
+            trayMessages.add(buildTrayMessage("Bandeja de recepción de exámenes",
+                    unreadDocuments, receiver, true, examCount));
+        }
+        if (documentOrWorkCount > 0) {
+            trayMessages.add(buildTrayMessage("Bandeja de recepción de documentos y trabajos",
+                    unreadDocuments, receiver, false, documentOrWorkCount));
+        }
+
+        return "Tienes avisos pendientes. " + String.join(". ", trayMessages) + ".";
+    }
+
+    private String buildTrayMessage(String trayName,
+            List<com.cursosonline.backend.entities.DocumentMetadata> documents,
+            Users receiver,
+            boolean examTray,
+            long count) {
+        List<String> senders = documents.stream()
+                .filter(document -> isExamTrayDocument(receiver, document) == examTray)
+                .map(document -> document.getSender() != null && document.getSender().getUsername() != null
+                        ? document.getSender().getUsername()
+                        : "remitente no disponible")
+                .distinct()
+                .toList();
+        String senderLabel = senders.size() == 1 ? "Remitente: " : "Remitentes: ";
+        return trayName + ": " + count + " documento(s). " + senderLabel + String.join(", ", senders);
+    }
+
+    private boolean isExamTrayDocument(Users receiver,
+            com.cursosonline.backend.entities.DocumentMetadata document) {
+        if (receiver != null && receiver.getRole() == Role.ADMIN) {
+            return false;
+        }
+        if ("EXAMEN".equalsIgnoreCase(document.getEvaluation_type())) {
+            return true;
+        }
+        return receiver != null
+                && receiver.getRole() == Role.PROFESSOR
+                && document.getCourse() != null;
+    }
+
+    private String buildDocumentInboxRedirect(Users user, DocumentMetadata document) {
+        String basePath = "/" + user.getRole().name().toLowerCase();
+        StringBuilder redirect = new StringBuilder(basePath).append("?focus=documents");
+
+        if (document != null && document.getDocumentid() != null && document.getDocumentid() > 0) {
+            redirect.append("&documentId=").append(document.getDocumentid());
+        }
+
+        if (user.getRole() == Role.STUDENT && document != null && document.getCourse() != null
+                && document.getCourse().getCourse_id() != null) {
+            redirect.append("&courseId=").append(document.getCourse().getCourse_id());
+        }
+
+        if (user.getRole() == Role.PROFESSOR && document != null && document.getSender() != null
+                && document.getSender().getUser_id() != null) {
+            redirect.append("&senderId=").append(document.getSender().getUser_id());
+        }
+
+        if (user.getRole() == Role.ADMIN && document != null && document.getReceiver() != null
+                && document.getReceiver().getUser_id() != null) {
+            redirect.append("&receiverId=").append(document.getReceiver().getUser_id());
+        }
+
+        // Encapsulamos un nombre amigable para trazabilidad opcional futura de UI.
+        if (document != null && document.getOriginalname() != null && !document.getOriginalname().isBlank()) {
+            String encodedName = URLEncoder.encode(document.getOriginalname(), StandardCharsets.UTF_8);
+            redirect.append("&doc=").append(encodedName);
+        }
+
+        return redirect.toString();
+    }
+
     /**
      * Marca todas las notificaciones de documentos recibidos como leídas y
      * actualiza
      * los estados de progreso de cursos para estudiantes y profesores según
      * corresponda.
-     * 
+     *
      * @param username El nombre de usuario del receptor de las notificaciones.
      */
     @Transactional
@@ -783,6 +817,10 @@ public class UserService {
             return;
         }
 
+        if (user.getRole() == Role.PROFESSOR && professorCourseAlertService != null) {
+            professorCourseAlertService.dismissAllBellAlerts(username);
+        }
+
         if (hasProgressAlertColumns()) {
             acknowledgeProgressNotificationsSafely(user, username);
         } else {
@@ -792,10 +830,54 @@ public class UserService {
         }
     }
 
+    @Transactional
+    public void dismissSingleNotification(String username, Long notificationId, String type) {
+        if (type != null && "DOCUMENT_INBOX".equalsIgnoreCase(type)) {
+            markAllReceivedAsReadSafely(username);
+            return;
+        }
+
+        if (type != null && "PROFESSOR_TASK_ALERT".equalsIgnoreCase(type)) {
+            if (notificationId != null && notificationId > 0) {
+                if (professorCourseAlertService != null) {
+                    professorCourseAlertService.dismissBellAlert(username, notificationId);
+                }
+            }
+            return;
+        }
+
+        if (notificationId != null && notificationId > 0) {
+            userSystemNotificationRepository.markAsReadByIdAndUsername(notificationId, username);
+            return;
+        }
+
+        if (type != null) {
+            try {
+                ProfessorAlertType parsedType = ProfessorAlertType.valueOf(type.trim().toUpperCase(Locale.ROOT));
+                if (professorCourseAlertService != null) {
+                    professorCourseAlertService.dismissBellAlertByTypeFallback(username, parsedType);
+                }
+            } catch (IllegalArgumentException ignored) {
+                // Fallback de compatibilidad: si no se reconoce el tipo no forzamos error.
+            }
+        }
+    }
+
+    /**
+     * Marca como leídas únicamente las alertas de nueva calificación para el
+     * usuario indicado.
+     *
+     * @param username El nombre de usuario del receptor.
+     */
+    @Transactional
+    public void dismissGradeNotifications(String username) {
+        userSystemNotificationRepository.markAllAsReadByUsernameAndType(username, GRADE_PUBLISHED_NOTIFICATION_TYPE);
+    }
+
     /**
      * Verifica de forma segura si la tabla de matrícula (enrollment) contiene las
      * columnas necesarias para las alertas de progreso de estudiantes y profesores.
-     * 
+     *
      * @return true si las columnas necesarias existen, false en caso contrario.
      */
     private boolean hasProgressAlertColumns() {
@@ -817,7 +899,7 @@ public class UserService {
      * Agrega de forma segura las notificaciones de progreso para estudiantes y
      * profesores, evitando errores de esquema si faltan columnas en la tabla de
      * matrícula (enrollment).
-     * 
+     *
      * @param user     El usuario autenticado.
      * @param username El nombre de usuario del usuario autenticado.
      * @param alerts   La lista de notificaciones a la que se agregarán las alertas
@@ -844,29 +926,8 @@ public class UserService {
                 }
             }
 
-            // Profesor: alumno propio al 90% de tiempo consumido de su asignatura
-            if (user.getRole() == Role.PROFESSOR) {
-                List<Long> courseIds = getAssignedCoursesForProfessor(username).stream()
-                        .map(course -> course != null ? course.getCourse_id() : null)
-                        .filter(java.util.Objects::nonNull)
-                        .toList();
-                if (!courseIds.isEmpty()) {
-                    List<Enrollment> studentEnrollments = enrollmentRepository
-                            .findActiveStudentEnrollmentsByCourseIds(courseIds);
-                    for (Enrollment enrollment : studentEnrollments) {
-                        int progress = calculateCurrentProgress(enrollment);
-                        if (progress >= 90 && progress < 100 && !enrollment.isProgressAlertProfessorAck()) {
-                            alerts.add(new com.cursosonline.backend.dto.NotificationDTO(
-                                    "STUDENT_NEAR_COMPLETION",
-                                    "Alumno a punto de finalizar",
-                                    "'" + enrollment.getUser().getUsername() + "' en '"
-                                            + enrollment.getCourse().getTitle() + "' está al " + progress
-                                            + "%. Prepara el examen final.",
-                                    "/professor"));
-                        }
-                    }
-                }
-            }
+            // Profesor: los avisos operativos de progreso (material y examen) se
+            // gestionan ahora mediante ProfessorCourseAlertService + panel dedicado.
         } catch (RuntimeException ex) {
             LOGGER.warn(
                     "No se pudieron calcular alertas de progreso para usuario {}. Se devuelven solo alertas de documentos.",
@@ -878,7 +939,7 @@ public class UserService {
      * Marca de forma segura las notificaciones de progreso como reconocidas (ACK)
      * para estudiantes y profesores, evitando errores de esquema si faltan columnas
      * en la tabla de matrícula (enrollment).
-     * 
+     *
      * @param user     El usuario autenticado.
      * @param username El nombre de usuario del usuario autenticado.
      */
@@ -920,7 +981,7 @@ public class UserService {
      * usuario específico. Si la operación de actualización masiva falla, se aplica
      * un
      * fallback por entidad.
-     * 
+     *
      * @param username El nombre de usuario del receptor de los documentos.
      */
     private void markAllReceivedAsReadSafely(String username) {
@@ -972,6 +1033,11 @@ public class UserService {
                     "Este curso está gestionado por Administración. La asignación solo puede modificarse por un administrador.");
         }
 
+        if (isLegacyInstructorLockedForSelfAssignment(course)) {
+            throw new ServicesException(
+                    "Este curso conserva un instructor heredado. Solo Administración puede regularizar su titularidad docente.");
+        }
+
         // Establecer la vinculación relacional fuerte (JPA mapeará la clave
         // assigned_user_id)
         course.setAssignedUser(user);
@@ -985,7 +1051,34 @@ public class UserService {
         // Volcar los cambios de forma transaccional directa a PostgreSQL
         Courses savedCourse = coursesRepository.saveAndFlush(course);
         adminCourseCatalogService.markCourseAsEverUsed(savedCourse.getCourse_id());
+        if (recommendationService != null) {
+            recommendationService.notifyStudentsAboutNewCourse(savedCourse);
+        }
         return savedCourse;
+    }
+
+    @Transactional
+    public Courses assignUserToCourseWithDispatchConfig(String username, Long courseId, Integer dispatchParts) {
+        if (dispatchParts == null) {
+            throw new ServicesException("Debes seleccionar el número de partes antes de guardar.");
+        }
+
+        Courses savedCourse = assignUserToCourse(username, courseId);
+        Users professor = savedCourse.getAssignedUser();
+        if (professorCourseAlertService == null) {
+            throw new ServicesException("No se pudo preparar la configuración de avisos para el curso.");
+        }
+        professorCourseAlertService.createConfigForCourse(savedCourse, professor, dispatchParts);
+        return savedCourse;
+    }
+
+    private boolean isLegacyInstructorLockedForSelfAssignment(Courses course) {
+        if (course == null || course.getInstructors() == null) {
+            return false;
+        }
+
+        String normalizedInstructor = course.getInstructors().trim().toLowerCase(Locale.ROOT);
+        return !normalizedInstructor.isEmpty() && !normalizedInstructor.equals("por asignar");
     }
 
 }

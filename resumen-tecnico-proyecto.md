@@ -12,7 +12,6 @@
 
 ## 2. Backend — arquitectura en capas
 
-```
 config/            → SecurityConfig, WebConfig, CustomUserDetailsService, config/jwt/JwtProperties
 controller/        → @RestController, un controlador por dominio funcional
 dto/               → Objetos de transferencia (requests/responses), nunca se exponen entidades JPA "en crudo" hacia fuera si contienen datos sensibles
@@ -21,7 +20,7 @@ exception/         → Excepciones de dominio + GlobalExceptionHandler (@RestCon
 repository/        → Spring Data JPA repositories
 security/jwt/      → JwtAuthenticationFilter, JwtService
 services/          → Lógica de negocio (FileStorageService, RecommendationService, UserService)
-```
+---
 
 ### Convenciones observadas
 
@@ -57,7 +56,8 @@ services/          → Lógica de negocio (FileStorageService, RecommendationSer
 
 ## 3. Frontend — arquitectura
 
-```
+---
+
 auth/                 → AuthContext, AuthProvider, useAuth, authStorage (persistencia del token), authTypes, avatarUrl
 components/
   navbar/              → Navbar, MainNavbar, NavbarUser
@@ -77,9 +77,9 @@ routes/
   AppRoutes / index.tsx → enrutado centralizado
 services/              → apiClient (Axios + interceptores), documentService, evaluationService,
                           profileService, courseTypes, userDomains
-```
+---
 
-### Convenciones observadas
+## Convenciones observadas
 
 - **Autenticación**: `AuthContext` + `AuthProvider` en la raíz (`main.tsx`), hook `useAuth()` como única puerta de entrada al estado de sesión. Token persistido vía `authStorage` (localStorage) y leído en cada petición por el interceptor de Axios.
 - **Cliente HTTP centralizado** (`services/apiClient.ts`):

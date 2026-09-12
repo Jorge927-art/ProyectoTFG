@@ -5,6 +5,8 @@ import com.cursosonline.backend.entities.Courses;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.entities.Interest;
 import com.cursosonline.backend.entities.Users;
+import com.cursosonline.backend.entities.UserSystemNotification;
+import com.cursosonline.backend.entities.Role;
 import com.cursosonline.backend.repository.CoursesRepository;
 import com.cursosonline.backend.repository.EnrollmentRepository;
 import com.cursosonline.backend.repository.InterestRepository;
@@ -40,6 +42,9 @@ class RecommendationServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private com.cursosonline.backend.repository.UserSystemNotificationRepository userSystemNotificationRepository;
 
     @InjectMocks
     private RecommendationService recommendationService;
@@ -106,6 +111,97 @@ class RecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("Debe priorizar un curso de idiomas en inglés cuando el alumno elige sus etiquetas en español")
+    void getRecommendations_ShouldMatchLocalizedCategoryAndLanguageAliases() {
+        Courses languageLearningCourse = new Courses();
+        languageLearningCourse.setCourse_id(105L);
+        languageLearningCourse.setTitle("English Communication Skills");
+        languageLearningCourse.setCategory("Language Learning");
+        languageLearningCourse.setLanguage("English");
+        languageLearningCourse.setCourseType("Principiante");
+
+        Courses businessCourse = new Courses();
+        businessCourse.setCourse_id(106L);
+        businessCourse.setTitle("Administración de empresas");
+        businessCourse.setCategory("Business");
+        businessCourse.setLanguage("Spanish");
+        businessCourse.setCourseType("Principiante");
+
+        userInterests.setCategory(new ArrayList<>(List.of("Aprendizaje de Idiomas")));
+        userInterests.setLanguage(new ArrayList<>(List.of("Inglés")));
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(businessCourse, languageLearningCourse));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertEquals(105L, results.get(0).id());
+        assertEquals(45, results.get(0).score());
+    }
+
+    @Test
+    @DisplayName("Debe valorar el certificado portugués como avanzado y priorizarlo frente a un curso sin datos")
+    void getRecommendations_ShouldPrioritizePortugueseProfessionalCertificate() {
+        Courses portugueseCertificate = new Courses();
+        portugueseCertificate.setCourse_id(108L);
+        portugueseCertificate.setTitle("Google Data Analytics (PT) Professional Certificate");
+        portugueseCertificate.setCourseType("Professional Certificate");
+        portugueseCertificate.setLanguage("Portuguese (Brazilian)");
+
+        Courses incompleteCourse = new Courses();
+        incompleteCourse.setCourse_id(109L);
+        incompleteCourse.setTitle("Data Analysis Using NumPy & Pandas");
+
+        userInterests.setCategory(new ArrayList<>());
+        userInterests.setCourse_type(new ArrayList<>(List.of("Avanzado / Experto")));
+        userInterests.setLanguage(new ArrayList<>(List.of("Portugués")));
+        userInterests.setSubtitle_languages(new ArrayList<>());
+        userInterests.setDuration(new ArrayList<>());
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(incompleteCourse, portugueseCertificate));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertEquals(1, results.size());
+        assertEquals(108L, results.get(0).id());
+        assertEquals(35, results.get(0).score());
+    }
+
+    @Test
+    @DisplayName("Debe aplicar las cinco preferencias emitidas por el modal sobre datos legacy del catálogo")
+    void getRecommendations_ShouldApplyAllModalPreferenceDimensions() {
+        Courses matchingCourse = new Courses();
+        matchingCourse.setCourse_id(107L);
+        matchingCourse.setTitle("English Intermediate Course");
+        matchingCourse.setCategory("Language Learning");
+        matchingCourse.setCourseType("Intermediate");
+        matchingCourse.setLanguage("English");
+        matchingCourse.setSubtitleLanguages("Subtitles: English");
+        matchingCourse.setDuration(25.0f);
+
+        userInterests.setCategory(new ArrayList<>(List.of("Aprendizaje de Idiomas")));
+        userInterests.setCourse_type(new ArrayList<>(List.of("Medio / Intermedio")));
+        userInterests.setDuration(new ArrayList<>(List.of("Medio (1 - 6 semanas)")));
+        userInterests.setLanguage(new ArrayList<>(List.of("Inglés")));
+        userInterests.setSubtitle_languages(new ArrayList<>(List.of("Subtítulos en Inglés")));
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(List.of(matchingCourse));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertEquals(107L, results.get(0).id());
+        assertEquals(80, results.get(0).score());
+    }
+
+    @Test
     @DisplayName("Debe excluir estrictamente cursos donde el alumno ya está matriculado [ADR-32]")
     void getRecommendations_ExcludesEnrolled() {
         // Arrange
@@ -123,6 +219,15 @@ class RecommendationServiceTest {
         // Assert
         boolean containsEnrolled = results.stream().anyMatch(r -> r.id().equals(101L));
         assertFalse(containsEnrolled, "No debe recomendar cursos ya matriculados");
+    }
+
+    @Test
+    @DisplayName("Debe manejar repositorios nulos de forma segura y devolver una lista vacía")
+    void getRecommendationsForUser_WithNullRepositoryData_ShouldReturnEmptyList() {
+        List<RecommendationDTO> results = recommendationService.getRecommendationsForUser(1L);
+
+        assertNotNull(results);
+        assertTrue(results.isEmpty());
     }
 
     @Test
@@ -185,12 +290,221 @@ class RecommendationServiceTest {
                 "FALLO ALGORÍTMICO: El motor no priorizó el curso con el peso de coincidencia más alto.");
         assertEquals("Master en Machine Learning e IA", results.get(0).title());
 
-        // El curso de Marketing (0 pts) queda relegado al final de la cola
-        int ultimoIndice = results.size() - 1;
-        assertEquals(102L, results.get(ultimoIndice).id(),
-                "El curso sin ninguna coincidencia temática debe quedar al final.");
+        // El curso de Marketing (0 pts) no se publica como recomendación
+        assertTrue(results.stream().noneMatch(result -> result.id().equals(102L)));
 
         verify(coursesRepository, times(1)).findAll();
+    }
+
+    @Test
+    @DisplayName("Debe devolver lista vacía si el nombre de usuario es nulo o en blanco")
+    void getRecommendations_WithBlankUsername_ShouldReturnEmptyList() {
+        assertTrue(recommendationService.getRecommendations(null).isEmpty());
+        assertTrue(recommendationService.getRecommendations("   ").isEmpty());
+    }
+
+    @Test
+    @DisplayName("Debe devolver lista vacía cuando se pide por userId nulo")
+    void getRecommendationsForUser_WithNullUserId_ShouldReturnEmptyList() {
+        assertTrue(recommendationService.getRecommendationsForUser(null).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Debe tolerar intereses y colecciones nulas sin romper el algoritmo")
+    void getRecommendations_WithNullInterestsAndCollections_ShouldReturnCourses() {
+        userInterests.setCategory(null);
+        userInterests.setCourse_type(null);
+        userInterests.setLanguage(null);
+        userInterests.setSubtitle_languages(null);
+        userInterests.setDuration(null);
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1, course2));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertTrue(results.isEmpty());
+    }
+
+    @Test
+    @DisplayName("PESOS [Ajuste]: historial académico al 50% debe aportar 8 puntos")
+    void getRecommendations_HistoryScoreAt50_WhenProgressIsAtLeast50() {
+        Courses historyCourse = new Courses();
+        historyCourse.setCourse_id(999L);
+        historyCourse.setCategory("Ciencia de Datos");
+        Enrollment progress50 = new Enrollment();
+        progress50.setCourse(historyCourse);
+        progress50.setProgress_percentage(50);
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(Arrays.asList(progress50));
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertEquals(38, results.get(0).score());
+    }
+
+    @Test
+    @DisplayName("PESOS [Ajuste]: historial académico al 75% debe aportar 15 puntos")
+    void getRecommendations_HistoryScoreAt75_WhenProgressIsAtLeast75() {
+        Courses historyCourse = new Courses();
+        historyCourse.setCourse_id(998L);
+        historyCourse.setCategory("Ciencia de Datos");
+        Enrollment progress75 = new Enrollment();
+        progress75.setCourse(historyCourse);
+        progress75.setProgress_percentage(75);
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(Arrays.asList(progress75));
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertEquals(45, results.get(0).score());
+    }
+
+    @Test
+    @DisplayName("Debe reconocer coincidencia de subtítulos y duración cuando el usuario tiene esas preferencias")
+    void getRecommendations_ShouldApplySubtitleAndDurationBranches() {
+        userInterests.setSubtitle_languages(new ArrayList<>(Arrays.asList("English")));
+        userInterests.setDuration(new ArrayList<>(Arrays.asList("Corto", "Medio")));
+
+        Courses courseWithSubtitleAndDuration = new Courses();
+        courseWithSubtitleAndDuration.setCourse_id(104L);
+        courseWithSubtitleAndDuration.setTitle("Curso con subtítulos y duración media");
+        courseWithSubtitleAndDuration.setCategory("Negocios");
+        courseWithSubtitleAndDuration.setLanguage("Español");
+        courseWithSubtitleAndDuration.setCourseType("Principiante");
+        courseWithSubtitleAndDuration.setSubtitleLanguages("English, Spanish");
+        courseWithSubtitleAndDuration.setDuration(25.0f);
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(courseWithSubtitleAndDuration));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertFalse(results.isEmpty());
+        RecommendationDTO dto = results.get(0);
+        assertEquals(104L, dto.id());
+        assertTrue(dto.reason().contains("subtítulos") || dto.reason().contains("disponibilidad"));
+        assertEquals(15, dto.score());
+    }
+
+    @Test
+    @DisplayName("Debe ignorar coincidencias de duración cuando el curso no tiene duración")
+    void getRecommendations_ShouldSkipDurationMatchWhenCourseHoursAreMissing() {
+        userInterests.setDuration(new ArrayList<>(Arrays.asList("Corto")));
+        course1.setDuration(null);
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertFalse(results.isEmpty());
+        assertEquals(30, results.get(0).score());
+    }
+
+    @Test
+    @DisplayName("Debe normalizar intereses con entradas nulas, vacías y acentuadas")
+    void getRecommendations_ShouldNormalizeMessyInterestCollections() {
+        userInterests.setCategory(new ArrayList<>(Arrays.asList(" Ciencia de Datos", null, "  ", "Música y Arte")));
+        userInterests.setCourse_type(new ArrayList<>(Arrays.asList("Avanzado")));
+        userInterests.setLanguage(new ArrayList<>(Arrays.asList("Español")));
+        userInterests.setSubtitle_languages(new ArrayList<>(Arrays.asList("English")));
+        userInterests.setDuration(new ArrayList<>(Arrays.asList("Medio")));
+
+        course1.setCategory("Ciencia de Datos");
+        course1.setCourseType("Avanzado");
+        course1.setLanguage("Español");
+        course1.setSubtitleLanguages("English");
+        course1.setDuration(25.0f);
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertFalse(results.isEmpty());
+        assertTrue(results.get(0).score() >= 30 + 20 + 15 + 10 + 5);
+        assertTrue(
+                results.get(0).reason().contains("categorías") || results.get(0).reason().contains("disponibilidad"));
+    }
+
+    @Test
+    @DisplayName("Debe tratar 'Todos los niveles' como comodín real para cualquier dificultad del curso")
+    void getRecommendations_ShouldMatchAnyCourseWhenUserPrefersAllLevels() {
+        userInterests.setCategory(new ArrayList<>());
+        userInterests.setCourse_type(new ArrayList<>(Arrays.asList("Todos los niveles")));
+
+        course1.setCourseType("Intermedio");
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertFalse(results.isEmpty());
+        assertEquals(20, results.get(0).score());
+        assertTrue(results.get(0).reason().contains("nivel de experiencia"));
+    }
+
+    @Test
+    @DisplayName("Debe hacer compatible el nivel legacy del alumno con el nivel breve del curso en administración")
+    void getRecommendations_ShouldMatchLegacyStudentLevelWithAdminCourseLevel() {
+        userInterests.setCategory(new ArrayList<>());
+        userInterests.setCourse_type(new ArrayList<>(Arrays.asList("Principiante / Básico")));
+
+        course1.setCourseType("Básico");
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertFalse(results.isEmpty());
+        assertEquals(20, results.get(0).score());
+        assertTrue(results.get(0).reason().contains("nivel de experiencia"));
+    }
+
+    @Test
+    @DisplayName("Debe excluir cursos sin coincidencias semánticas relevantes")
+    void getRecommendations_ShouldReturnBaseScoreWhenNoPreferencesMatch() {
+        userInterests.setCategory(new ArrayList<>(Arrays.asList("Arte")));
+        userInterests.setCourse_type(new ArrayList<>(Arrays.asList("Avanzado")));
+        userInterests.setLanguage(new ArrayList<>(Arrays.asList("Frances")));
+        userInterests.setSubtitle_languages(new ArrayList<>(Arrays.asList("Japanese")));
+        userInterests.setDuration(new ArrayList<>(Arrays.asList("Largo")));
+
+        course1.setCategory("Tecnología");
+        course1.setCourseType("Principiante");
+        course1.setLanguage("Ingles");
+        course1.setSubtitleLanguages("German");
+        course1.setDuration(3.0f);
+
+        when(userRepository.findByUsername("luis")).thenReturn(Optional.of(mockUser));
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(new ArrayList<>());
+        when(coursesRepository.findAll()).thenReturn(Arrays.asList(course1));
+
+        List<RecommendationDTO> results = recommendationService.getRecommendations("luis");
+
+        assertTrue(results.isEmpty());
     }
 
     @Test
@@ -220,5 +534,92 @@ class RecommendationServiceTest {
         assertEquals(101L, topRecommendation.id());
         assertEquals(50, topRecommendation.score(),
                 "El peso total esperado debe ser 50 (30 por categoría + 20 por historial >= 100). ");
+    }
+
+    @Test
+    @DisplayName("Crea una alarma una sola vez cuando el curso asignado coincide con los intereses del alumno")
+    void notifyStudentsAboutNewCourse_CreatesOneNotificationForMatchingStudent() {
+        mockUser.setRole(Role.STUDENT);
+        mockUser.setEnabled(true);
+        Users professor = new Users();
+        professor.setUser_id(2L);
+        professor.setRole(Role.PROFESSOR);
+        course1.setAssignedUser(professor);
+
+        when(userRepository.findByRole(Role.STUDENT)).thenReturn(List.of(mockUser));
+        when(coursesRepository.findAll()).thenReturn(List.of(course1));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(List.of());
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(userSystemNotificationRepository.existsRecommendationNotification(
+                1L, "COURSE_RECOMMENDATION", 101L)).thenReturn(false);
+
+        recommendationService.notifyStudentsAboutNewCourse(course1);
+
+        verify(userSystemNotificationRepository).save(argThat(notification -> notification.getReceiver() == mockUser
+                && notification.getRelatedCourseId().equals(101L)
+                && notification.getType().equals("COURSE_RECOMMENDATION")));
+    }
+
+    @Test
+    @DisplayName("No crea alarma si el curso asignado no tiene coincidencia ponderada")
+    void notifyStudentsAboutNewCourse_DoesNotNotifyWhenScoreIsZero() {
+        mockUser.setRole(Role.STUDENT);
+        mockUser.setEnabled(true);
+        Users professor = new Users();
+        professor.setUser_id(2L);
+        professor.setRole(Role.PROFESSOR);
+        course1.setAssignedUser(professor);
+        userInterests.setCategory(new ArrayList<>(List.of("Arte")));
+        userInterests.setCourse_type(new ArrayList<>(List.of("Avanzado")));
+        userInterests.setLanguage(new ArrayList<>(List.of("Frances")));
+
+        when(userRepository.findByRole(Role.STUDENT)).thenReturn(List.of(mockUser));
+        when(coursesRepository.findAll()).thenReturn(List.of(course1));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(List.of());
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+
+        recommendationService.notifyStudentsAboutNewCourse(course1);
+
+        verify(userSystemNotificationRepository, never()).save(any(UserSystemNotification.class));
+    }
+
+    @Test
+    @DisplayName("No duplica la alarma cuando ya existe para el mismo alumno y curso")
+    void notifyStudentsAboutNewCourse_DoesNotDuplicateExistingNotification() {
+        mockUser.setRole(Role.STUDENT);
+        mockUser.setEnabled(true);
+        Users professor = new Users();
+        professor.setUser_id(2L);
+        professor.setRole(Role.PROFESSOR);
+        course1.setAssignedUser(professor);
+
+        when(userRepository.findByRole(Role.STUDENT)).thenReturn(List.of(mockUser));
+        when(coursesRepository.findAll()).thenReturn(List.of(course1));
+        when(enrollmentRepository.findAllByUserIdWithCourses(1L)).thenReturn(List.of());
+        when(interestRepository.findByUser_Username("luis")).thenReturn(Optional.of(userInterests));
+        when(userSystemNotificationRepository.existsRecommendationNotification(
+                1L, "COURSE_RECOMMENDATION", 101L)).thenReturn(true);
+
+        recommendationService.notifyStudentsAboutNewCourse(course1);
+
+        verify(userSystemNotificationRepository, never()).save(any(UserSystemNotification.class));
+    }
+
+    @Test
+    void notifyStudentsAboutNewCourseSkipsInvalidCourseAndDisabledStudents() {
+        recommendationService.notifyStudentsAboutNewCourse(null);
+        course1.setAssignedUser(null);
+        recommendationService.notifyStudentsAboutNewCourse(course1);
+
+        course1.setAssignedUser(new Users());
+        mockUser.setRole(Role.STUDENT);
+        mockUser.setEnabled(false);
+        when(userRepository.findByRole(Role.STUDENT)).thenReturn(List.of(mockUser));
+        when(coursesRepository.findAll()).thenReturn(List.of(course1));
+
+        recommendationService.notifyStudentsAboutNewCourse(course1);
+
+        verify(userSystemNotificationRepository, never()).save(any(UserSystemNotification.class));
+        verifyNoInteractions(interestRepository, enrollmentRepository);
     }
 }

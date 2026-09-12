@@ -3,6 +3,7 @@ import { Search, Loader2, BookOpen, User, GraduationCap, Users, CheckCircle2, St
 import GenericCard from '../../../../components/ui/genericCard/GenericCard';
 import GenericButton from '../../../../components/ui/genericButton/GenericButton';
 import { useCourseInsight } from './useCourseInsight';
+import type { CourseCollectiveStats } from '../../../../services/adminCourseInsightService';
 
 export const CourseInsightPanel = () => {
     const {
@@ -55,10 +56,6 @@ export const CourseInsightPanel = () => {
                 />
             </form>
 
-            <p className="text-[11px] text-slate-500">
-                Búsqueda predictiva: se actualiza automáticamente mientras escribes (mínimo 2 letras).
-            </p>
-
             {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
 
             {/* RESULTADOS DE BÚSQUEDA */}
@@ -82,7 +79,7 @@ export const CourseInsightPanel = () => {
                 </div>
             )}
 
-            {!loadingSearch && keyword.trim().length >= 2 && results.length === 0 && !selectedCourse && !error && (
+            {!loadingSearch && keyword.trim().length >= 1 && results.length === 0 && !selectedCourse && !error && (
                 <p className="text-[11px] text-slate-400 italic">
                     No hay cursos cuyo nombre comience por "{keyword.trim()}".
                 </p>
@@ -163,39 +160,33 @@ export const CourseInsightPanel = () => {
                         colorClass="bg-blue-600"
                     />
 
-                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                        <p className="text-xs font-semibold text-slate-700">
-                            Tasa de finalización (nota &gt; 5):{' '}
-                            <span className="font-black text-emerald-700">{collectiveStats.completionRatePercentage}%</span>
-                        </p>
+                    <HistoricalMetric label="Valoración media del curso" icon={<Star size={14} className="text-amber-500 fill-amber-400" />} current={collectiveStats.averageCourseRating} rows={collectiveStats.yearlyComparisons} selector={(row) => row.averageCourseRating} formatRating />
+                    <CourseComments comments={collectiveStats.courseComments} />
+                    <HistoricalMetric label="Valoración media del profesor" icon={<Star size={14} className="text-amber-500 fill-amber-400" />} current={collectiveStats.averageInstructorRating} rows={collectiveStats.yearlyComparisons} selector={(row) => row.averageInstructorRating} formatRating />
+                    <HistoricalMetric label="Índice de aprobados" icon={<CheckCircle2 size={14} className="text-emerald-600" />} current={collectiveStats.completionRatePercentage} rows={collectiveStats.yearlyComparisons} selector={(row) => row.approvalIndexPercentage} suffix="%" />
+                    <HistoricalMetric label="Nota media trabajos" current={collectiveStats.averageWorkGrade} rows={collectiveStats.yearlyComparisons} selector={(row) => row.averageWorkGrade} />
+                    <HistoricalMetric label="Nota media examen final" current={collectiveStats.averageFinalExamGrade} rows={collectiveStats.yearlyComparisons} selector={(row) => row.averageFinalExamGrade} />
+                    <HistoricalMetric label="Nota media global" current={collectiveStats.averageGrade} rows={collectiveStats.yearlyComparisons} selector={(row) => row.averageGrade} />
+
+                    <div className="rounded-lg border border-slate-100 bg-white p-2.5">
+                        <p className="text-xs font-black text-slate-700 mb-2">Estadísticas del alumnado activo</p>
+                        {collectiveStats.studentStatistics.length === 0 ? (
+                            <p className="text-[11px] text-slate-400 italic">No hay alumnos activos con estadísticas disponibles.</p>
+                        ) : (
+                            <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+                                {collectiveStats.studentStatistics.map((student) => (
+                                    <div key={student.userId} className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-center rounded border border-slate-100 bg-slate-50 p-2 text-[10px]">
+                                        <span className="font-bold text-slate-700 truncate">{student.username}</span>
+                                        <span>Progreso: <strong>{student.progressPercentage}%</strong></span>
+                                        <span>Trabajos: <strong>{formatStudentGrade(student.averageWorkGrade)}</strong></span>
+                                        <span>Examen: <strong>{formatStudentGrade(student.averageFinalExamGrade)}</strong></span>
+                                        <span>Global: <strong className={student.passed ? 'text-emerald-700' : 'text-slate-700'}>{formatStudentGrade(student.averageGrade)}</strong></span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
-                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                        <Star size={16} className="text-amber-500 shrink-0" />
-                        <p className="text-xs font-semibold text-slate-700">
-                            Valoración media del curso:{' '}
-                            <span className="font-black text-amber-600">
-                                {formatRating(collectiveStats.averageCourseRating)}
-                            </span>
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                        <Star size={16} className="text-purple-500 shrink-0" />
-                        <p className="text-xs font-semibold text-slate-700">
-                            Valoración media del profesor:{' '}
-                            <span className="font-black text-purple-600">
-                                {formatRating(collectiveStats.averageInstructorRating)}
-                            </span>
-                        </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <CollectiveGradeCard label="Nota media global" score={collectiveStats.averageGrade} accentClass="text-indigo-700 bg-indigo-50" />
-                        <CollectiveGradeCard label="Nota media trabajos" score={collectiveStats.averageWorkGrade} accentClass="text-emerald-700 bg-emerald-50" />
-                        <CollectiveGradeCard label="Nota media examen final" score={collectiveStats.averageFinalExamGrade} accentClass="text-rose-700 bg-rose-50" />
-                    </div>
                 </div>
             )}
 
@@ -281,23 +272,81 @@ const GradeRow = ({ label, score }: { label: string; score: number | null }) => 
     </div>
 );
 
-const CollectiveGradeCard = ({
-    label,
-    score,
-    accentClass
-}: {
+const HistoricalMetric = ({ label, icon, current, rows, selector, suffix = '', formatRating: rating = false }: {
     label: string;
-    score: number | null;
-    accentClass: string;
-}) => (
-    <div className="rounded-lg border border-slate-100 bg-white p-2">
-        <p className="text-[10px] font-black uppercase tracking-wide text-slate-500 mb-1">{label}</p>
-        <span className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-black ${accentClass}`}>
-            {score !== null ? score.toFixed(1) : 'Sin notas aún'}
-        </span>
-    </div>
-);
+    icon?: React.ReactNode;
+    current: number | null;
+    rows: CourseCollectiveStats['yearlyComparisons'];
+    selector: (row: CourseCollectiveStats['yearlyComparisons'][number]) => number | null;
+    suffix?: string;
+    formatRating?: boolean;
+}) => {
+    const format = (value: number | null) => value === null ? 'Sin datos' : rating ? `${value.toFixed(1)} / 5` : `${value.toFixed(1)}${suffix}`;
+    const max = rating ? 5 : suffix === '%' ? 100 : 10;
+    const renderStars = (value: number | null, colorClass = 'text-amber-500 fill-amber-400') => value === null
+        ? <span className="text-slate-400">Sin datos</span>
+        : <span className="inline-flex items-center gap-0.5" aria-label={`${value.toFixed(1)} de 5 estrellas`}>
+            {Array.from({ length: 5 }, (_, index) => (
+                <Star key={index} size={11} className={index < Math.round(value) ? colorClass : 'text-slate-300'} />
+            ))}
+            <strong className="ml-1 text-slate-700">{value.toFixed(1)} / 5</strong>
+        </span>;
+    const renderBar = (value: number | null, colorClass: string) => (
+        <div className="flex items-center gap-2">
+            <div className="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                <div className={`${colorClass} h-full`} style={{ width: `${value === null ? 0 : Math.max(0, Math.min(100, (value / max) * 100))}%` }} />
+            </div>
+            <strong className="min-w-14 text-right text-slate-700">{format(value)}</strong>
+        </div>
+    );
+    return (
+        <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5">
+            <p className="text-xs font-semibold text-slate-700 flex items-center gap-2">{icon}{label}</p>
+            <div className="mt-1.5 space-y-1.5 text-[10px] text-slate-500">
+                <div>
+                    <div className="flex justify-between mb-0.5"><span>Actual</span>{rating ? renderStars(current) : null}</div>
+                    {!rating && renderBar(current, 'bg-blue-600')}
+                </div>
+                {rows.map((row, index) => {
+                    const historicalColor = 'text-amber-500 fill-amber-400';
+                    const historicalBarColor = index === 0 ? 'bg-amber-500' : 'bg-emerald-600';
+                    return (
+                        <div key={`${label}-${row.year}`}>
+                            <div className="flex justify-between mb-0.5"><span>{row.year}{row.realData ? '' : ' (ficticio)'}</span>{rating ? renderStars(selector(row), historicalColor) : null}</div>
+                            {!rating && renderBar(selector(row), historicalBarColor)}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
 
-const formatRating = (rating: number | null) => (
-    rating !== null ? `${rating.toFixed(1)} / 5` : 'Sin valoraciones aún'
+const formatStudentGrade = (grade: number | null) => grade === null ? 'Sin datos' : `${grade.toFixed(1)} / 10`;
+
+const CourseComments = ({ comments }: { comments: CourseCollectiveStats['courseComments'] }) => (
+    <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5">
+        <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-slate-700">Comentarios de los alumnos</p>
+            <span className="text-[10px] font-bold text-slate-400">{comments.length}</span>
+        </div>
+        {comments.length === 0 ? (
+            <p className="mt-1.5 text-[10px] text-slate-400 italic">Todavía no hay comentarios.</p>
+        ) : (
+            <div className="mt-1.5 max-h-24 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+                {comments.map((comment) => (
+                    <article key={comment.evaluationId} className="rounded border border-slate-100 bg-white p-2 text-[10px]">
+                        <div className="flex items-center justify-between gap-2 text-slate-400">
+                            <span className="font-bold text-slate-600 truncate">{comment.studentUsername}</span>
+                            <span className="shrink-0">{new Date(comment.evaluationDate).toLocaleDateString('es-ES')}</span>
+                        </div>
+                        <p className="mt-1 text-slate-600 whitespace-pre-wrap wrap-break-word">{comment.comment}</p>
+                        <p className="mt-1 font-semibold text-amber-600">
+                            Valoración curso: {comment.courseScore} / 5 · Valoración docente: {comment.instructorScore} / 5
+                        </p>
+                    </article>
+                ))}
+            </div>
+        )}
+    </div>
 );

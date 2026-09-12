@@ -3,6 +3,7 @@ package com.cursosonline.backend.services;
 import com.cursosonline.backend.dto.StudentMetricBreakdownDTO;
 import com.cursosonline.backend.dto.TeachingMetricsSummaryDTO;
 import com.cursosonline.backend.entities.Courses;
+import com.cursosonline.backend.entities.CourseGrade;
 import com.cursosonline.backend.entities.Enrollment;
 import com.cursosonline.backend.repository.CourseGradeRepository;
 import com.cursosonline.backend.repository.CoursesRepository;
@@ -28,6 +29,8 @@ public class TeachingMetricsService {
     private final EnrollmentRepository enrollmentRepository;
     private final CourseGradeRepository courseGradeRepository;
     private final UserService userService;
+
+    private static final String FINAL_GRADE_TITLE = "nota final asignatura";
 
     /**
      * Resuelve la lista de IDs de asignaturas que el profesor autenticado puede
@@ -131,6 +134,21 @@ public class TeachingMetricsService {
 
             Double individualGrade = courseGradeRepository
                     .getIndividualStudentAverageScore(enrollmentCourseId, studentId);
+            List<CourseGrade> grades = courseGradeRepository
+                    .findAllByEnrollmentIdOrderByGradeIdAsc(enrollment.getEnrollmentid());
+            List<CourseGrade> workGrades = grades.stream()
+                    .filter(grade -> !isExamGrade(grade.getTitle()) && !isFinalGrade(grade.getTitle()))
+                    .toList();
+            Double workAverage = workGrades.isEmpty()
+                    ? null
+                    : workGrades.stream()
+                            .map(grade -> grade.getScore())
+                            .filter(Objects::nonNull)
+                            .mapToDouble(score -> score.doubleValue())
+                            .average()
+                            .orElse(0.0);
+            Double finalExamGrade = latestGradeScore(grades, this::isExamGrade);
+            Double finalGrade = latestGradeScore(grades, this::isFinalGrade);
 
             return new StudentMetricBreakdownDTO(
                     studentId,
@@ -139,7 +157,45 @@ public class TeachingMetricsService {
                     enrollmentCourseId,
                     enrollment.getCourse().getTitle(),
                     userService.calculateCurrentProgress(enrollment),
-                    individualGrade != null ? individualGrade : 0.0);
+                    individualGrade != null ? individualGrade : 0.0,
+                    workAverage,
+                    finalExamGrade,
+                    finalGrade);
         }).toList();
+    }
+
+    private Double latestGradeScore(List<CourseGrade> grades,
+            java.util.function.Predicate<String> gradeType) {
+        return grades.stream()
+                .filter(grade -> gradeType.test(grade.getTitle()))
+                .reduce((first, latest) -> latest)
+                .map(grade -> grade.getScore())
+                .filter(Objects::nonNull)
+                .map(score -> score.doubleValue())
+                .orElse(null);
+    }
+
+    private boolean isFinalGrade(String title) {
+        return title != null && title.trim().equalsIgnoreCase(FINAL_GRADE_TITLE);
+    }
+
+    private boolean isExamGrade(String title) {
+        if (title == null) {
+            return false;
+        }
+
+        String normalized = title.trim().toLowerCase(java.util.Locale.ROOT);
+        if (normalized.contains("trabajo")
+                || normalized.contains("proyecto")
+                || normalized.contains("actividad")
+                || normalized.contains("práctica")
+                || normalized.contains("practica")) {
+            return false;
+        }
+
+        return normalized.contains("examen")
+                || normalized.contains("evaluación final")
+                || normalized.contains("evaluacion final")
+                || normalized.equals("final");
     }
 }

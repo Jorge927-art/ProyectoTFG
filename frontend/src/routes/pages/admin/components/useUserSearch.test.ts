@@ -214,7 +214,7 @@ describe('useUserSearch', () => {
 
         expect(window.confirm).toHaveBeenCalled();
         expect(toggleUserStatus).toHaveBeenCalledWith('laura_student');
-        expect(window.alert).toHaveBeenCalledWith('Usuario suspendido temporalmente');
+        expect(result.current.successMessage).toBe('Usuario suspendido temporalmente');
         expect(result.current.foundUser?.enabled).toBe(false);
         expect(result.current.deleting).toBe(false);
     });
@@ -316,7 +316,7 @@ describe('useUserSearch', () => {
 
         expect(window.confirm).toHaveBeenCalled();
         expect(deleteUserPermanently).toHaveBeenCalledWith('laura_student');
-        expect(window.alert).toHaveBeenCalledWith("El usuario 'laura_student' ha sido eliminado permanentemente de PostgreSQL.");
+        expect(result.current.successMessage).toBe("El usuario 'laura_student' ha sido eliminado permanentemente de PostgreSQL.");
         expect(result.current.foundUser).toBeNull();
         expect(result.current.searchName).toBe('');
         expect(result.current.deletingPermanently).toBe(false);

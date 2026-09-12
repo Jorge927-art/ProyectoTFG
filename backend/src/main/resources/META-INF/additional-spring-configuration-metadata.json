@@ -6,6 +6,23 @@
       "description": "Lista de orígenes permitidos para CORS separados por coma."
     },
     {
+      "name": "app.auth.refresh-cookie-name",
+      "type": "java.lang.String",
+      "description": "Nombre de la cookie HttpOnly utilizada para renovar la sesión."
+    },
+    {
+      "name": "app.auth.refresh-cookie-secure",
+      "type": "java.lang.Boolean",
+      "description": "Indica si la cookie de renovación solo debe viajar por HTTPS.",
+      "defaultValue": false
+    },
+    {
+      "name": "app.auth.refresh-cookie-same-site",
+      "type": "java.lang.String",
+      "description": "Política SameSite de la cookie de renovación.",
+      "defaultValue": "Strict"
+    },
+    {
       "name": "app.jwt.secret",
       "type": "java.lang.String",
       "description": "Clave secreta usada para firmar y verificar tokens JWT.",

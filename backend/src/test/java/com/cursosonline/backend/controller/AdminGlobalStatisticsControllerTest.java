@@ -4,6 +4,8 @@ import com.cursosonline.backend.dto.AdminGlobalStatisticsDTO;
 import com.cursosonline.backend.dto.AdminGlobalTopCourseDTO;
 import com.cursosonline.backend.dto.AdminGlobalYearComparisonDTO;
 import com.cursosonline.backend.services.AdminGlobalStatisticsService;
+import com.cursosonline.backend.services.AdminStudentPreferencesService;
+import com.cursosonline.backend.dto.AdminStudentPreferencesDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,7 +24,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -45,6 +46,9 @@ class AdminGlobalStatisticsControllerTest {
 
         @MockitoBean
         private AdminGlobalStatisticsService adminGlobalStatisticsService;
+
+        @MockitoBean
+        private AdminStudentPreferencesService adminStudentPreferencesService;
 
         @Test
         @WithMockUser(authorities = "ADMIN")
@@ -72,14 +76,24 @@ class AdminGlobalStatisticsControllerTest {
 
         @Test
         @WithMockUser(authorities = "ADMIN")
-        @DisplayName("POST /api/admin/statistics/global/finalize-previous-year debe consolidar el año cerrado")
-        void finalizePreviousYearSnapshot_DebeDevolverOk() throws Exception {
-                when(adminGlobalStatisticsService.finalizePreviousYearSnapshotNow()).thenReturn(2025);
+        @DisplayName("GET /api/admin/statistics/student-preferences debe devolver el análisis agregado")
+        void getStudentPreferences_DebeDevolverDatos() throws Exception {
+                AdminStudentPreferencesDTO dto = new AdminStudentPreferencesDTO(
+                                4,
+                                12,
+                                List.of(new AdminStudentPreferencesDTO.PreferenceSummary(
+                                                "Categorías", List.of("Programación"), 4, 4)),
+                                List.of(new AdminStudentPreferencesDTO.CourseDemand(
+                                                10L, "Java avanzado", 85, 30, 20, 20, 15, 0, 0, 8,
+                                                true, "laura")));
 
-                mockMvc.perform(post("/api/admin/statistics/global/finalize-previous-year"))
+                when(adminStudentPreferencesService.getAggregatedPreferences()).thenReturn(dto);
+
+                mockMvc.perform(get("/api/admin/statistics/student-preferences"))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.message").value("Histórico anual consolidado correctamente."))
-                                .andExpect(jsonPath("$.finalizedYear").value(2025));
+                                .andExpect(jsonPath("$.studentsWithPreferences").value(4))
+                                .andExpect(jsonPath("$.courses[0].totalScore").value(85))
+                                .andExpect(jsonPath("$.courses[0].professorAssigned").value(true));
         }
 
         @Test
@@ -90,19 +104,6 @@ class AdminGlobalStatisticsControllerTest {
                                 .thenThrow(new RuntimeException("fallo inesperado"));
 
                 mockMvc.perform(get("/api/admin/statistics/global"))
-                                .andExpect(status().isInternalServerError())
-                                .andExpect(jsonPath("$.status").value(500))
-                                .andExpect(jsonPath("$.message").value("Error interno en el servidor."));
-        }
-
-        @Test
-        @WithMockUser(authorities = "ADMIN")
-        @DisplayName("POST /api/admin/statistics/global/finalize-previous-year debe devolver 500 si el servicio falla")
-        void finalizePreviousYearSnapshot_ServicioFalla_DebeDevolver500() throws Exception {
-                when(adminGlobalStatisticsService.finalizePreviousYearSnapshotNow())
-                                .thenThrow(new RuntimeException("fallo inesperado"));
-
-                mockMvc.perform(post("/api/admin/statistics/global/finalize-previous-year"))
                                 .andExpect(status().isInternalServerError())
                                 .andExpect(jsonPath("$.status").value(500))
                                 .andExpect(jsonPath("$.message").value("Error interno en el servidor."));

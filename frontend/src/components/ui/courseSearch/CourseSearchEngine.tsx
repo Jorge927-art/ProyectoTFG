@@ -1,7 +1,24 @@
-import { Search, Loader2, Star } from 'lucide-react';
+import { Search, Loader2, Star, Clock } from 'lucide-react';
 import type { DBModelCourse } from '../../../services/courseTypes';
 import GenericCard from '../genericCard/GenericCard';
 import Input from '../Input';
+import { getSubtitleLanguagesDisplay } from '../../../shared/subtitleLanguages';
+
+const formatCourseDuration = (durationHours?: number): string => {
+    if (typeof durationHours !== 'number' || !Number.isFinite(durationHours) || durationHours <= 0) {
+        return 'Duración no disponible';
+    }
+
+    const roundedHours = Math.ceil(durationHours);
+    if (roundedHours <= 24) {
+        return roundedHours === 1 ? 'Duración: 1 hora' : `Duración: ${roundedHours} horas`;
+    }
+
+    const durationInDays = Math.ceil(roundedHours / 24);
+    const dayLabel = durationInDays === 1 ? 'día' : 'días';
+    const hourLabel = roundedHours === 1 ? 'hora' : 'horas';
+    return `Duración: ${durationInDays} ${dayLabel} (${roundedHours} ${hourLabel})`;
+};
 
 interface CourseSearchEngineProps {
     title: string;
@@ -65,6 +82,13 @@ export const CourseSearchEngine = ({
                                     </h4>
                                     <p className="text-[11px] text-slate-400 mt-1 truncate">
                                         Instructores: {course.instructors || "Por asignar"}
+                                    </p>
+                                    <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                                        Subtítulos: {getSubtitleLanguagesDisplay(course.subtitleLanguages)}
+                                    </p>
+                                    <p className="text-[11px] text-slate-500 mt-0.5 font-semibold flex items-center gap-1">
+                                        <Clock size={11} className="shrink-0 text-slate-400" />
+                                        <span>{formatCourseDuration(course.duration)}</span>
                                     </p>
                                 </div>
                                 <div className="mt-2 pt-3 border-t border-slate-50 flex flex-col gap-3">

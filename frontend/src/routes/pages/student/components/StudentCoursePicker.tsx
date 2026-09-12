@@ -106,6 +106,7 @@ export const StudentCoursePicker = ({
             renderAction={(course: DBModelCourse) => {
                 const enrolled = isUserEnrolled(course);
                 const isProcessing = actionExecutionId === course.course_id;
+                const canEnroll = course.hasEvaluationResponsible !== false;
 
                 if (enrolled) {
                     return (
@@ -123,10 +124,10 @@ export const StudentCoursePicker = ({
                 return (
                     <GenericButton
                         type="button"
-                        disabled={isProcessing}
+                        disabled={isProcessing || !canEnroll}
                         onClick={() => handleEnrollStudent(course.course_id)}
                         variant="primary"
-                        label="Matricularme"
+                        label={canEnroll ? "Matricularme" : "Sin profesor"}
                         icon={isProcessing ? <Loader2 size={12} className="animate-spin" /> : <PlusCircle size={12} />}
                         className="bg-blue-600! hover:bg-blue-700! text-white! text-[10px]! font-bold! py-1.5! px-3! rounded-lg! transition-colors! cursor-pointer! disabled:bg-slate-300!"
                     />

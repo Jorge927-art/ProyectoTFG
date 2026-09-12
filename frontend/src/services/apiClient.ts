@@ -1,11 +1,7 @@
 import axios from 'axios';
 import {
     clearStoredAuth,
-    readStoredAuthUser,
-    readStoredRefreshToken,
     readStoredToken,
-    writeStoredAuthUser,
-    writeStoredRefreshToken,
     writeStoredToken
 } from '../auth/authStorage';
 
@@ -17,6 +13,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 export const apiClient = axios.create({
     baseURL: API_URL,
     timeout: 5000,
+    withCredentials: true,
 });
 
 type RefreshResponse = {
@@ -25,11 +22,13 @@ type RefreshResponse = {
     expiresIn?: number;
 };
 
+export type AccessTokenRefreshResult = RefreshResponse;
+
 type RetriableRequestConfig = import('axios').InternalAxiosRequestConfig & {
     _retry?: boolean;
 };
 
-let refreshRequestInFlight: Promise<string | null> | null = null;
+let refreshRequestInFlight: Promise<AccessTokenRefreshResult | null> | null = null;
 
 const AUTH_PATHS_WITHOUT_RETRY = [
     '/api/auth/login',
@@ -46,17 +45,59 @@ function shouldBypassRefresh(url?: string): boolean {
     return AUTH_PATHS_WITHOUT_RETRY.some((path) => url.includes(path));
 }
 
-async function requestNewAccessToken(): Promise<string | null> {
-    const refreshToken = readStoredRefreshToken();
-    if (!refreshToken) {
-        return null;
+// Mutex entre pestañas: el refresh token es de un solo uso en backend, así que dos
+// pestañas no pueden llamar a /api/auth/refresh en paralelo con la misma cookie.
+const CROSS_TAB_REFRESH_LOCK_KEY = 'auth_refresh_lock';
+const REFRESH_LOCK_TTL_MS = 6000; // Margen sobre el timeout de red (5000ms) por si la pestaña que tiene el lock muere.
+const REFRESH_LOCK_POLL_MS = 150;
+const REFRESH_LOCK_MAX_WAIT_MS = 6000;
+
+function hasBrowserStorage(): boolean {
+    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+}
+
+function isRefreshLockFree(): boolean {
+    const lockedAt = Number(window.localStorage.getItem(CROSS_TAB_REFRESH_LOCK_KEY));
+    return !lockedAt || Number.isNaN(lockedAt) || (Date.now() - lockedAt) > REFRESH_LOCK_TTL_MS;
+}
+
+function acquireCrossTabRefreshLock(): boolean {
+    if (!hasBrowserStorage()) {
+        return true;
+    }
+    if (!isRefreshLockFree()) {
+        return false;
+    }
+    window.localStorage.setItem(CROSS_TAB_REFRESH_LOCK_KEY, String(Date.now()));
+    return true;
+}
+
+function releaseCrossTabRefreshLock() {
+    if (hasBrowserStorage()) {
+        window.localStorage.removeItem(CROSS_TAB_REFRESH_LOCK_KEY);
+    }
+}
+
+// Espera a que la pestaña que ya está refrescando termine (o su lock caduque) antes de
+// intentar nuestro propio refresh, evitando que dos pestañas roten el mismo token a la vez.
+async function waitForCrossTabRefreshLock(): Promise<void> {
+    const start = Date.now();
+    while (!isRefreshLockFree() && (Date.now() - start) < REFRESH_LOCK_MAX_WAIT_MS) {
+        await new Promise((resolve) => setTimeout(resolve, REFRESH_LOCK_POLL_MS));
+    }
+}
+
+async function performRefreshAccessToken(): Promise<AccessTokenRefreshResult | null> {
+    if (!acquireCrossTabRefreshLock()) {
+        await waitForCrossTabRefreshLock();
+        acquireCrossTabRefreshLock();
     }
 
     try {
         const response = await axios.post<RefreshResponse>(
             `${API_URL}/api/auth/refresh`,
-            { refreshToken },
-            { timeout: 5000 }
+            undefined,
+            { timeout: 5000, withCredentials: true }
         );
 
         const newAccessToken = typeof response.data?.accessToken === 'string'
@@ -68,30 +109,24 @@ async function requestNewAccessToken(): Promise<string | null> {
         }
 
         writeStoredToken(newAccessToken);
-
-        const newRefreshToken = typeof response.data?.refreshToken === 'string'
-            ? response.data.refreshToken.trim()
-            : '';
-        if (newRefreshToken) {
-            writeStoredRefreshToken(newRefreshToken);
-        }
-
-        const currentUser = readStoredAuthUser();
-        if (currentUser) {
-            const expiresIn = typeof response.data?.expiresIn === 'number' ? response.data.expiresIn : 0;
-            const sessionLifespanMs = expiresIn > 0 ? expiresIn * 1000 : 15 * 60 * 1000;
-            writeStoredAuthUser({
-                ...currentUser,
-                token: newAccessToken,
-                refreshToken: newRefreshToken || currentUser.refreshToken,
-                expiresAt: Date.now() + sessionLifespanMs
-            });
-        }
-
-        return newAccessToken;
+        window.dispatchEvent(new CustomEvent('auth-session-refreshed', {
+            detail: { expiresIn: response.data?.expiresIn ?? 0 }
+        }));
+        return response.data;
     } catch {
         return null;
+    } finally {
+        releaseCrossTabRefreshLock();
     }
+}
+
+export function refreshAccessToken(): Promise<AccessTokenRefreshResult | null> {
+    if (!refreshRequestInFlight) {
+        refreshRequestInFlight = performRefreshAccessToken().finally(() => {
+            refreshRequestInFlight = null;
+        });
+    }
+    return refreshRequestInFlight;
 }
 
 /**
@@ -130,13 +165,7 @@ apiClient.interceptors.response.use(
 
         originalRequest._retry = true;
 
-        if (!refreshRequestInFlight) {
-            refreshRequestInFlight = requestNewAccessToken().finally(() => {
-                refreshRequestInFlight = null;
-            });
-        }
-
-        const renewedAccessToken = await refreshRequestInFlight;
+        const renewedAccessToken = (await refreshAccessToken())?.accessToken ?? null;
         if (!renewedAccessToken) {
             clearStoredAuth();
             window.dispatchEvent(new Event('auth-session-expired'));

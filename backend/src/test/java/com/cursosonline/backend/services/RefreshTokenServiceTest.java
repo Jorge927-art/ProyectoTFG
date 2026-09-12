@@ -75,6 +75,30 @@ class RefreshTokenServiceTest {
     }
 
     @Test
+    @DisplayName("issueRefreshToken debe rechazar un usuario sin identificador válido")
+    void issueRefreshToken_WithInvalidUser_ShouldThrow() {
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> refreshTokenService.issueRefreshToken(new Users()));
+
+        assertEquals("No se puede emitir refresh token sin usuario válido.", ex.getMessage());
+        verify(authRefreshTokenRepository, never()).save(any(AuthRefreshToken.class));
+    }
+
+    @Test
+    @DisplayName("rotate debe rechazar un token con tipo incorrecto antes de consultar la base")
+    void rotate_WithWrongTokenType_ShouldThrowBeforeLookup() {
+        String token = "refresh-wrong-type";
+
+        when(jwtService.isTokenValid(token)).thenReturn(true);
+        when(jwtService.extractTokenTypeOrNull(token)).thenReturn("access");
+
+        ServicesException ex = assertThrows(ServicesException.class, () -> refreshTokenService.rotate(token));
+
+        assertEquals("El token recibido no es de tipo refresh.", ex.getMessage());
+        verify(authRefreshTokenRepository, never()).findByTokenHash(any());
+    }
+
+    @Test
     @DisplayName("rotate debe revocar token antiguo y devolver nueva pareja access/refresh")
     void rotate_ShouldRevokeCurrentAndReturnNewTokens() {
         Users user = enabledUser();
@@ -230,6 +254,67 @@ class RefreshTokenServiceTest {
     }
 
     @Test
+    @DisplayName("rotate debe rechazar refresh token en blanco antes de validar la estructura")
+    void rotate_WithBlankToken_ShouldThrowBeforeValidation() {
+        ServicesException ex = assertThrows(ServicesException.class, () -> refreshTokenService.rotate("   "));
+
+        assertEquals("Refresh token requerido.", ex.getMessage());
+        verify(authRefreshTokenRepository, never()).findByTokenHash(any());
+    }
+
+    @Test
+    @DisplayName("rotate debe rechazar un token inválido cuando la estructura falla")
+    void rotate_WithInvalidStructure_ShouldThrow() {
+        when(jwtService.isTokenValid("bad-token")).thenReturn(false);
+
+        ServicesException ex = assertThrows(ServicesException.class, () -> refreshTokenService.rotate("bad-token"));
+
+        assertEquals("Refresh token inválido o expirado.", ex.getMessage());
+        verify(authRefreshTokenRepository, never()).findByTokenHash(any());
+    }
+
+    @Test
+    @DisplayName("rotate debe traducir errores inesperados de parseo a mensaje controlado")
+    void rotate_WithUnexpectedValidationException_ShouldThrowControlledError() {
+        when(jwtService.isTokenValid("token-runtime")).thenThrow(new RuntimeException("jwt-parser-failed"));
+
+        ServicesException ex = assertThrows(ServicesException.class,
+                () -> refreshTokenService.rotate("token-runtime"));
+
+        assertEquals("Refresh token inválido o expirado.", ex.getMessage());
+        verify(authRefreshTokenRepository, never()).findByTokenHash(any());
+    }
+
+    @Test
+    @DisplayName("rotate debe rechazar cuando el token válido no existe en persistencia")
+    void rotate_WithMissingPersistedToken_ShouldThrow() {
+        String refreshToken = "refresh-not-stored";
+
+        when(jwtService.isTokenValid(refreshToken)).thenReturn(true);
+        when(jwtService.extractTokenTypeOrNull(refreshToken)).thenReturn("refresh");
+        when(authRefreshTokenRepository.findByTokenHash(eq(sha256(refreshToken)))).thenReturn(Optional.empty());
+
+        ServicesException ex = assertThrows(ServicesException.class, () -> refreshTokenService.rotate(refreshToken));
+
+        assertEquals("Refresh token inválido o revocado.", ex.getMessage());
+        verify(authRefreshTokenRepository, never()).save(any(AuthRefreshToken.class));
+    }
+
+    @Test
+    @DisplayName("persistToken debe fallar de forma controlada si falta el JTI o la expiración")
+    void issueRefreshToken_WithMissingJtiOrExpiration_ShouldThrow() {
+        Users user = enabledUser();
+        when(jwtService.generateRefreshToken(user, 99L, "a@cursosonline.es")).thenReturn("refresh-no-jti");
+        when(jwtService.extractJti("refresh-no-jti")).thenReturn(null);
+        when(jwtService.extractExpiration("refresh-no-jti")).thenReturn(null);
+
+        ServicesException ex = assertThrows(ServicesException.class, () -> refreshTokenService.issueRefreshToken(user));
+
+        assertEquals("No se pudo persistir el refresh token emitido.", ex.getMessage());
+        verify(authRefreshTokenRepository, never()).save(any(AuthRefreshToken.class));
+    }
+
+    @Test
     @DisplayName("revokeIfPresent debe marcar como revocado cuando existe token")
     void revokeIfPresent_ShouldRevokeStoredToken() {
         String activeRefresh = "refresh-active";
@@ -247,6 +332,30 @@ class RefreshTokenServiceTest {
         assertNotNull(stored.getRevokedAt());
         assertNotNull(stored.getLastUsedAt());
         verify(authRefreshTokenRepository).save(stored);
+    }
+
+    @Test
+    @DisplayName("revokeIfPresent no debe hacer nada si el token llega en blanco")
+    void revokeIfPresent_WithBlankToken_ShouldDoNothing() {
+        refreshTokenService.revokeIfPresent("   ");
+
+        verify(authRefreshTokenRepository, never()).findByTokenHash(any());
+        verify(authRefreshTokenRepository, never()).save(any(AuthRefreshToken.class));
+    }
+
+    @Test
+    @DisplayName("revokeIfPresent no debe persistir cuando el token ya estaba revocado")
+    void revokeIfPresent_WithAlreadyRevokedToken_ShouldNotSave() {
+        String refreshToken = "refresh-already-revoked";
+        AuthRefreshToken revoked = new AuthRefreshToken();
+        revoked.setTokenId(89L);
+        revoked.setRevoked(true);
+
+        when(authRefreshTokenRepository.findByTokenHash(eq(sha256(refreshToken)))).thenReturn(Optional.of(revoked));
+
+        refreshTokenService.revokeIfPresent(refreshToken);
+
+        verify(authRefreshTokenRepository, never()).save(any(AuthRefreshToken.class));
     }
 
     private String sha256(String value) {

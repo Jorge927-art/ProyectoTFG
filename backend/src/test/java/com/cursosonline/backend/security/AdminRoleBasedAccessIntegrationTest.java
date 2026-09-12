@@ -92,17 +92,6 @@ class AdminRoleBasedAccessIntegrationTest {
         }
 
         @Test
-        @DisplayName("ALUMNO -> 403 en cierre de histórico anual")
-        void shouldReturn403WhenStudentFinalizesPreviousYearSnapshot() throws Exception {
-                mockMvc.perform(post("/api/admin/statistics/global/finalize-previous-year")
-                                .with(user(studentUserDetails))
-                                .contentType(MediaType.APPLICATION_JSON))
-                                .andExpect(status().isForbidden());
-
-                verifyNoInteractions(adminGlobalStatisticsService);
-        }
-
-        @Test
         @DisplayName("ALUMNO -> 403 en catálogo administrativo de cursos")
         void shouldReturn403WhenStudentAccessesAdminCourseCatalog() throws Exception {
                 mockMvc.perform(get("/api/admin/courses/catalog")

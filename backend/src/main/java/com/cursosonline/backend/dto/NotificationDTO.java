@@ -5,7 +5,7 @@ package com.cursosonline.backend.dto;
  * Alineado con el estándar de agregación analítica de solo lectura.
  *
  * NotificationDTO
- * 
+ *
  * @param type        Tipo de notificación ('DOCUMENT_INBOX', 'COURSE_PROGRESS'
  *                    (alumno) o 'STUDENT_NEAR_COMPLETION' (profesor))
  * @param title       Título descriptivo de la notificación.
@@ -13,10 +13,14 @@ package com.cursosonline.backend.dto;
  * @param redirectUrl Ruta interna del frontend para redirigir al hacer clic.
  */
 public record NotificationDTO(
-                String type, // 'DOCUMENT_INBOX', 'COURSE_PROGRESS' (alumno) o 'STUDENT_NEAR_COMPLETION'
-                             // (profesor)
-                String title, // Título descriptivo (ej: "Nuevo documento recibido")
-                String message, // Mensaje detallado para el alumno
-                String redirectUrl // Ruta interna del frontend para redirigir al hacer clic
+        Long notificationId,
+        String type, // 'DOCUMENT_INBOX', 'COURSE_PROGRESS' (alumno) o 'STUDENT_NEAR_COMPLETION'
+                     // (profesor)
+        String title, // Título descriptivo (ej: "Nuevo documento recibido")
+        String message, // Mensaje detallado para el alumno
+        String redirectUrl // Ruta interna del frontend para redirigir al hacer clic
 ) {
+    public NotificationDTO(String type, String title, String message, String redirectUrl) {
+        this(null, type, title, message, redirectUrl);
+    }
 }

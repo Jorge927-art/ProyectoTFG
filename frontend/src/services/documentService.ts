@@ -24,6 +24,7 @@ export interface DocumentMetadata {
     filename: string;
     originalname: string;
     upload_date: string;
+    evaluation_type?: string | null;
     sender: UserDocumentMinDTO;
     receiver: UserDocumentMinDTO;
     course?: CourseDocumentMinDTO | null;
@@ -77,6 +78,7 @@ const normalizeDocumentMetadata = (value: RawDocumentMetadata): DocumentMetadata
     filename: typeof value.filename === 'string' ? value.filename : '',
     originalname: typeof value.originalname === 'string' ? value.originalname : 'Documento sin nombre',
     upload_date: typeof value.upload_date === 'string' ? value.upload_date : '',
+    evaluation_type: typeof value.evaluation_type === 'string' ? value.evaluation_type : null,
     sender: normalizeUserDocument(value.sender),
     receiver: normalizeUserDocument(value.receiver),
     course: normalizeCourseDocument(value.course),
@@ -105,6 +107,11 @@ export interface UploadDocumentResponse {
     message: string;
     filename: string;
     originalname: string;
+}
+
+export interface HideDocumentsResponse {
+    message: string;
+    hiddenCount: number;
 }
 
 export interface AdminDocumentRecipient {
@@ -152,14 +159,26 @@ export const getProfessorRecipientsByCourse = async (courseId: number): Promise<
     const response = await apiClient.get<UserDirectoryDTO[]>(`/api/v1/documents/professor/courses/${courseId}/recipients`);
     return Array.isArray(response.data) ? response.data : [];
 };
+
+export const getStudentDirectoryByCourse = async (courseId: number): Promise<UserDirectoryDTO[]> => {
+    const response = await apiClient.get<UserDirectoryDTO[]>(`/api/v1/documents/directory/course/${courseId}`);
+    return Array.isArray(response.data) ? response.data : [];
+};
 /**
  * [SERVICIO DE CARGA DIRIGIDO]: Envía el archivo físico y asocia el ID del destinatario
  * seleccionado de forma obligatoria para persistir el contrato emisor-receptor.
  */
-export const uploadStudentDocument = async (file: File, receiverId: number): Promise<UploadDocumentResponse> => {
+export const uploadStudentDocument = async (
+    file: File,
+    receiverId: number,
+    courseId?: number
+): Promise<UploadDocumentResponse> => {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('receiverId', receiverId.toString()); // Payload dirigido obligatorio
+    formData.append('receiverId', receiverId.toString());
+    if (courseId) {
+        formData.append('courseId', courseId.toString());
+    }
 
     const response = await apiClient.post<UploadDocumentResponse>(
         '/api/v1/documents/upload',
@@ -270,19 +289,31 @@ export const markDocumentAsRead = async (documentId: number): Promise<{ message:
     return response.data;
 };
 
+export const hideAllReceivedGeneralDocuments = async (): Promise<HideDocumentsResponse> => {
+    const response = await apiClient.patch<HideDocumentsResponse>('/api/v1/documents/received/hide-all');
+    return response.data;
+};
+
+export const hideAllSentGeneralDocuments = async (): Promise<HideDocumentsResponse> => {
+    const response = await apiClient.patch<HideDocumentsResponse>('/api/v1/documents/sent/hide-all');
+    return response.data;
+};
+
 /**
  * [EXCLUSIVO PROFESOR]: Transmite guías, temarios o exámenes asociando el ID de la asignatura
- * y, de manera opcional, el ID del alumno concreto o toda la clase (receiverId = 0).
+ * y el ID positivo del alumno concreto.
  */
 export const uploadProfessorDocument = async (
     file: File, 
     courseId: number, 
-    receiverId: number
+    receiverId: number,
+    deliveryType: 'DOCUMENTO' | 'TRABAJO' | 'EXAMEN' = 'DOCUMENTO'
 ): Promise<UploadDocumentResponse> => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('courseId', courseId.toString());
     formData.append('receiverId', receiverId.toString());
+    formData.append('deliveryType', deliveryType);
 
     const response = await apiClient.post<UploadDocumentResponse>(
         '/api/v1/documents/professor-upload',
@@ -312,5 +343,16 @@ export const uploadAdminDocumentToCourse = async (
  */
 export const getDocumentsByEnrollment = async (enrollmentId: number): Promise<DocumentMetadata[]> => {
     const response = await apiClient.get<RawDocumentMetadata[]>(`/api/v1/documents/course/enrollment/${enrollmentId}`);
+    return normalizeDocumentList(response.data);
+};
+
+/**
+ * [EXCLUSIVO PROFESOR - CENTRO DE EXÁMENES]: Recupera los documentos enviados
+ * por el profesor al alumno de una matrícula concreta.
+ */
+export const getSentDocumentsByEnrollment = async (enrollmentId: number): Promise<DocumentMetadata[]> => {
+    const response = await apiClient.get<RawDocumentMetadata[]>(
+        `/api/v1/documents/course/enrollment/${enrollmentId}/sent`
+    );
     return normalizeDocumentList(response.data);
 };

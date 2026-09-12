@@ -1,5 +1,5 @@
 // frontend/src/routes/pages/admin/AdminDashboard.test.tsx
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import AdminDashboard from './AdminDashboard';
 
@@ -46,6 +46,10 @@ vi.mock('./components/AdminCourseCatalogPanel', () => ({
     AdminCourseCatalogPanel: () => <div data-testid="mock-admin-course-catalog-panel" />
 }));
 
+vi.mock('./components/AdminStudentPreferencesPanel', () => ({
+    AdminStudentPreferencesPanel: () => <div data-testid="mock-admin-student-preferences-panel" />
+}));
+
 vi.mock('./components/CourseInsightPanel', () => ({
     CourseInsightPanel: () => <div data-testid="mock-course-insight-panel" />
 }));
@@ -55,6 +59,10 @@ vi.mock('./components/GlobalStatisticsPanel', () => ({
 }));
 
 describe('AdminDashboard - Orquestación de paneles', () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
     it('renderiza la cabecera institucional y ambos paneles', () => {
         render(<AdminDashboard />);
 
@@ -64,6 +72,7 @@ describe('AdminDashboard - Orquestación de paneles', () => {
         expect(screen.getByTestId('mock-user-search-panel')).toBeInTheDocument();
         expect(screen.getByTestId('mock-user-scroll-list')).toBeInTheDocument();
         expect(screen.getByTestId('mock-admin-course-catalog-panel')).toBeInTheDocument();
+        expect(screen.getByTestId('mock-admin-student-preferences-panel')).toBeInTheDocument();
         expect(screen.getByTestId('mock-admin-course-reassignment-panel')).toBeInTheDocument();
         expect(screen.getByTestId('mock-admin-document-inbox')).toBeInTheDocument();
         expect(screen.getByTestId('mock-global-statistics-panel')).toBeInTheDocument();
@@ -83,6 +92,15 @@ describe('AdminDashboard - Orquestación de paneles', () => {
 
         const position = courseCatalog.compareDocumentPosition(inbox);
         expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('renderiza preferencias de alumnos entre usuarios y catálogo de cursos', () => {
+        render(<AdminDashboard />);
+
+        const preferences = screen.getByTestId('mock-admin-student-preferences-panel');
+        const catalog = screen.getByTestId('mock-admin-course-catalog-panel');
+
+        expect(preferences.compareDocumentPosition(catalog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it('renderiza el panel de reasignación antes que la bandeja de documentos', () => {
@@ -113,5 +131,24 @@ describe('AdminDashboard - Orquestación de paneles', () => {
 
         const position = courseInsight.compareDocumentPosition(globalStats);
         expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it.each([
+        [390, 'móvil'],
+        [768, 'tablet'],
+        [1366, 'portátil'],
+        [1920, 'monitor grande'],
+        [2560, 'monitor amplio'],
+    ])('mantiene el contrato responsive en %s px (%s)', (viewportWidth) => {
+        vi.stubGlobal('innerWidth', viewportWidth);
+        render(<AdminDashboard />);
+
+        const analyticsGrid = screen.getByTestId('admin-analytics-grid');
+        const userGrid = screen.getByTestId('mock-user-search-panel').parentElement?.parentElement;
+
+        expect(analyticsGrid).toHaveClass('grid-cols-1', '2xl:grid-cols-2');
+        expect(userGrid).toHaveClass('grid-cols-1', 'md:grid-cols-2');
+        expect(analyticsGrid).not.toHaveClass('w-screen', 'min-w-max');
+        expect(userGrid).not.toHaveClass('w-screen', 'min-w-max');
     });
 });

@@ -14,7 +14,7 @@ import type {
     CourseCollectiveStats
 } from '../../../../services/adminCourseInsightService';
 
-const MIN_PREDICTIVE_CHARS = 2;
+const MIN_PREDICTIVE_CHARS = 1;
 
 export const useCourseInsight = () => {
     const [keyword, setKeyword] = useState<string>('');

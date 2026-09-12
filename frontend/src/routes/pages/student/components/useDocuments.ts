@@ -6,6 +6,7 @@ import {
     getTeachersDirectory, 
     getClassmatesDirectory, 
     getAdminsDirectory, 
+    getStudentDirectoryByCourse,
     downloadDocumentSecure,
     type DocumentMetadata, 
     type UserDirectoryDTO 
@@ -91,10 +92,26 @@ export const useDocuments = (successTrigger?: string) => {
             setLoadingDirectory(false);
         }
     }, []);
+
+    const fetchDirectoryForCourse = useCallback(async (courseId: number) => {
+        setLoadingDirectory(true);
+        setSelectedReceiverId('');
+        try {
+            const data = await getStudentDirectoryByCourse(courseId);
+            setDirectory(data);
+            setDocumentError('');
+        } catch (err: unknown) {
+            console.error("Error al recuperar usuarios de la asignatura:", err);
+            setDirectory([]);
+            setDocumentError("No se pudo cargar el listado de usuarios de la asignatura.");
+        } finally {
+            setLoadingDirectory(false);
+        }
+    }, []);
     /**
      * Sube un archivo físico vinculándolo al destinatario seleccionado.
      */
-    const handleUpload = async (file: File): Promise<boolean> => {
+    const handleUpload = async (file: File, courseId?: number): Promise<boolean> => {
         if (!file) return false;
         
         // Validación perimetral en cliente: Obligatorio haber seleccionado un destino
@@ -106,7 +123,11 @@ export const useDocuments = (successTrigger?: string) => {
         setIsUploading(true);
         setDocumentError('');
         try {
-            await uploadStudentDocument(file, Number(selectedReceiverId));
+            if (courseId) {
+                await uploadStudentDocument(file, Number(selectedReceiverId), courseId);
+            } else {
+                await uploadStudentDocument(file, Number(selectedReceiverId));
+            }
             
             // Limpiamos el selector de destinatario tras el éxito
             setSelectedReceiverId('');
@@ -136,6 +157,14 @@ export const useDocuments = (successTrigger?: string) => {
         }
     };
 
+    const clearReceivedDocuments = useCallback(() => {
+        setReceivedList([]);
+    }, []);
+
+    const clearSentDocuments = useCallback(() => {
+        setSentList([]);
+    }, []);
+
     // Efecto 1: Reacciona al cambio de pestaña o trigger externo para sincronizar documentos
     useEffect(() => {
         fetchTabDocuments();
@@ -159,7 +188,10 @@ export const useDocuments = (successTrigger?: string) => {
         loadingDirectory,
         selectedReceiverId,
         setSelectedReceiverId,
+        fetchDirectoryForCourse,
         handleUpload,
+        clearReceivedDocuments,
+        clearSentDocuments,
         handleSecureDownload: downloadDocumentSecure
     };
 

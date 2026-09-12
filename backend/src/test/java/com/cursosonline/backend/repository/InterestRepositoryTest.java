@@ -1,76 +1,81 @@
 package com.cursosonline.backend.repository;
 
 import com.cursosonline.backend.entities.Interest;
-import org.junit.jupiter.api.BeforeEach;
+import com.cursosonline.backend.entities.Role;
+import com.cursosonline.backend.entities.Users;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
+import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@DisplayName("Suite de Pruebas Unitarias para InterestRepository")
+@SpringBootTest
+@ActiveProfiles("test-ci")
+@Transactional
+@DisplayName("Suite de persistencia para preferencias de estudiantes")
 class InterestRepositoryTest {
 
+    @Autowired
     private InterestRepository interestRepository;
-    private Interest sampleInterest;
-    private final String sampleUsername = "alumno_tfg";
 
-    @BeforeEach
-    void setUp() {
-        // 1. Crear el simulador directo para el repositorio de intereses
-        interestRepository = Mockito.mock(InterestRepository.class);
+    @Autowired
+    private UserRepository userRepository;
 
-        // 2. Instanciar la entidad de persistencia real de Java
-        sampleInterest = new Interest();
-        try {
-            // Inicialización de IDs mediante reflexión por seguridad de tipos
-            java.lang.reflect.Method setInterestId = Interest.class.getMethod("setInterestId", Long.class);
-            setInterestId.invoke(sampleInterest, 8001L);
-        } catch (Exception e) {
-            try {
-                java.lang.reflect.Method setInterestId = Interest.class.getMethod("setId", long.class);
-                setInterestId.invoke(sampleInterest, 8001L);
-            } catch (Exception ignored) {
-            }
-        }
+    @Test
+    @DisplayName("findByUser_Username debe recuperar las preferencias mediante el join con usuario")
+    void findByUserUsername_ShouldReturnPreferencesForExactUser() {
+        Users student = saveUser("alumno_intereses");
+        Interest interest = saveInterest(student, List.of("Programación"));
+
+        Interest result = interestRepository.findByUser_Username(student.getUsername()).orElseThrow();
+
+        assertEquals(interest.getId(), result.getId());
+        assertEquals(student.getUser_id(), result.getUser().getUser_id());
+        assertEquals(List.of("Programación"), result.getCategory());
     }
 
-    /*
-     * =========================================================================
-     * 1. FLUJO EXITOSO: PREFERENCIAS ENCONTRADAS
-     * =========================================================================
-     */
     @Test
-    @DisplayName("Debe recuperar exitosamente los intereses del estudiante mediante su nombre de usuario")
-    void findByUser_Username_ShouldReturnPopulatedOptional() {
-        // Simulamos que el repositorio encuentra las preferencias relacionales
-        when(interestRepository.findByUser_Username(sampleUsername))
-                .thenReturn(Optional.of(sampleInterest));
+    @DisplayName("findByUser_Username debe devolver vacío para un usuario sin preferencias")
+    void findByUserUsername_ShouldReturnEmptyForUserWithoutPreferences() {
+        saveUser("alumno_sin_intereses");
 
-        Optional<Interest> result = interestRepository.findByUser_Username(sampleUsername);
-
-        assertTrue(result.isPresent(), "El contenedor Optional debe contener un registro");
-        assertEquals(sampleInterest, result.get(), "La entidad recuperada debe coincidir con la simulada");
+        assertTrue(interestRepository.findByUser_Username("alumno_sin_intereses").isEmpty());
     }
 
-    /*
-     * =========================================================================
-     * 2. FLUJO DE CONTROL: REGISTRO NO CONFIGURADO
-     * =========================================================================
-     */
     @Test
-    @DisplayName("Debe retornar un Optional vacío si el estudiante no posee intereses guardados")
-    void findByUser_Username_UserHasNoInterests_ShouldReturnEmptyOptional() {
-        // Simulamos el escenario en el que el alumno aún no ha pasado por el panel de
-        // configuración
-        when(interestRepository.findByUser_Username("usuario_nuevo"))
-                .thenReturn(Optional.empty());
+    @DisplayName("findByUser_Username no debe devolver preferencias de otro usuario")
+    void findByUserUsername_ShouldNotCrossUsers() {
+        Users firstStudent = saveUser("alumno_primero");
+        Users secondStudent = saveUser("alumno_segundo");
+        saveInterest(firstStudent, List.of("Diseño"));
+        saveInterest(secondStudent, List.of("Marketing"));
 
-        Optional<Interest> result = interestRepository.findByUser_Username("usuario_nuevo");
+        Interest result = interestRepository.findByUser_Username("alumno_segundo").orElseThrow();
 
-        assertFalse(result.isPresent(), "El contenedor Optional debe estar estrictamente vacío");
+        assertEquals(List.of("Marketing"), result.getCategory());
+        assertEquals(secondStudent.getUser_id(), result.getUser().getUser_id());
+    }
+
+    private Users saveUser(String username) {
+        Users user = new Users();
+        user.setUsername(username);
+        user.setPassword("secret-pass");
+        user.setRole(Role.STUDENT);
+        user.setEmail(username + "@uni.es");
+        user.setEnabled(true);
+        return userRepository.saveAndFlush(user);
+    }
+
+    private Interest saveInterest(Users user, List<String> categories) {
+        Interest interest = new Interest();
+        interest.setUser(user);
+        interest.setCategory(categories);
+        return interestRepository.saveAndFlush(interest);
     }
 }
